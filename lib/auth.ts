@@ -23,17 +23,21 @@ export const authOptions: NextAuthOptions = {
           throw new Error('No user found with this email');
         }
 
+        // Check if user is active
+        if (user.status === 'INACTIVE') {
+          throw new Error('Your account has been deactivated. Please contact administrator.');
+        }
+
         const isValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isValid) {
           throw new Error('Invalid password');
         }
 
-        // Only return the fields you want to store in the JWT
         return {
           id: user._id.toString(),
           email: user.email,
-          role: user.role, // Assuming you store a role like 'PICKER' or 'ADMIN'
+          role: user.role,
         };
       },
     }),

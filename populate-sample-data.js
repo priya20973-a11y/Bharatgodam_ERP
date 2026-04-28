@@ -64,12 +64,6 @@ async function populateSampleData() {
     const clients = [
       {
         _id: 'client-001',
-        name: 'ABC Traders',
-        contact: '9876543210',
-        createdAt: new Date()
-      },
-      {
-        _id: 'client-002',
         name: 'XYZ Enterprises',
         contact: '9876543211',
         createdAt: new Date()

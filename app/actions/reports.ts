@@ -1,8 +1,7 @@
 'use server';
 
 import { getDb } from '@/lib/mongodb';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getTenantFilterForMongo, appendOwnership, requireSession } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import type { IDetailedBooking, IClient, IInvoiceMaster, IInvoiceLineItem, IWarehouse } from '@/types/schemas';
 
@@ -56,12 +55,9 @@ type ReportRow = ReportRecord & {
 
 export async function getFilteredBookings(filters: ReportFilter = {}) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      throw new Error('Unauthorized');
-    }
-
+    const session = await requireSession();
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
     const dateFilter: Record<string, Date> = {};
     if (filters.startDate) dateFilter.$gte = new Date(filters.startDate);
     if (filters.endDate) {
@@ -248,7 +244,7 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
 
     const inwards = shouldFetchInwards
       ? await db.collection('inwards').aggregate<Record<string, unknown>>([
-          { $match: matchBase },
+          { $match: { ...matchBase, ...tenantFilter } },
           ...lookupStages,
           {
             $addFields: {
@@ -329,7 +325,7 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
 
     const outwards = shouldFetchOutwards
       ? await db.collection('outwards').aggregate<Record<string, unknown>>([
-          { $match: matchBase },
+          { $match: { ...matchBase, ...tenantFilter } },
           ...lookupStages,
           {
             $addFields: {
@@ -542,12 +538,18 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
 
 export async function getClientOptions() {
   try {
+    const session = await requireSession();
     const db = await getDb();
-    const clients = await db.collection('clients').find().sort({ name: 1 }).toArray() as IClient[];
+    const clients = await db.collection('clients').find({ ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray() as IClient[];
+
+    const filteredClients = clients.filter((client) => {
+      const name = client.name?.trim().toLowerCase() || '';
+      return name !== 'abc traders' && name !== 'xyz enterprise' && name !== 'xyz enterprises';
+    });
 
     return [
       { label: 'All Clients', value: 'ALL' },
-      ...clients.map(c => ({ label: c.name, value: c._id?.toString() || '' }))
+      ...filteredClients.map(c => ({ label: c.name, value: c._id?.toString() || '' }))
     ];
   } catch (error) {
     console.error('[getClientOptions] Error:', error);
@@ -558,8 +560,10 @@ export async function getClientOptions() {
 export async function getClientInvoicesByClientId(clientId: string, month?: string, warehouseId?: string) {
   try {
     const db = await getDb();
+    const session = await requireSession();
+    const tenantFilter = getTenantFilterForMongo(session);
     const clientObjectId = new ObjectId(clientId);
-    const client = await db.collection('clients').findOne({ _id: clientObjectId }) as IClient | null;
+    const client = await db.collection('clients').findOne({ _id: clientObjectId, ...tenantFilter }) as IClient | null;
     if (!client) {
       return { success: false, message: 'Client not found' };
     }
@@ -581,8 +585,12 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
       }
     }
 
+    const invoiceMasterQuery: any = Object.keys(tenantFilter).length
+      ? { $and: [query, tenantFilter] }
+      : query;
+
     const invoiceMasters = await db.collection('invoice_master')
-      .find(query)
+      .find(invoiceMasterQuery)
       .sort({ invoiceMonth: -1 })
       .toArray() as IInvoiceMaster[];
 
@@ -622,8 +630,12 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
         }
       }
 
+      const newInvoiceQuery: any = Object.keys(tenantFilter).length
+        ? { $and: [invoiceQuery, tenantFilter] }
+        : invoiceQuery;
+
       const newInvoices = await db.collection('invoices')
-        .find(invoiceQuery)
+        .find(newInvoiceQuery)
         .sort({ year: -1, month: -1, createdAt: -1 })
         .toArray();
 
@@ -709,8 +721,12 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
       })
     };
 
+    const warehouseQueryWithTenant: any = Object.keys(tenantFilter).length
+      ? { $and: [warehouseQuery, tenantFilter] }
+      : warehouseQuery;
+
     const warehouses = await db.collection('warehouses')
-      .find(warehouseQuery)
+      .find(warehouseQueryWithTenant)
       .toArray() as IWarehouse[];
 
     const warehouseMap = new Map(warehouses.map(warehouse => [warehouse._id?.toString(), warehouse.name]));
@@ -786,8 +802,9 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
 
 export async function getWarehouseOptions() {
   try {
+    const session = await requireSession();
     const db = await getDb();
-    const warehouses = await db.collection('warehouses').find({ status: 'ACTIVE' }).sort({ name: 1 }).toArray();
+    const warehouses = await db.collection('warehouses').find({ status: 'ACTIVE', ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
     return warehouses.map(w => ({
       label: w.name,
@@ -801,8 +818,9 @@ export async function getWarehouseOptions() {
 
 export async function getCommodityOptions() {
   try {
+    const session = await requireSession();
     const db = await getDb();
-    const items = await db.collection('commodities').find().sort({ name: 1 }).toArray();
+    const items = await db.collection('commodities').find({ ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
     return [
       { label: "All Commodities", value: "ALL" },
@@ -819,10 +837,11 @@ export async function getCommodityOptions() {
 
 export async function recordPayment(clientId: string, amount: number, paymentDate: string, invoiceId?: string, notes?: string) {
   try {
+    const session = await requireSession();
     const db = await getDb();
     const clientObjectId = new ObjectId(clientId);
 
-    const payment = {
+    const payment = appendOwnership({
       clientId: clientObjectId,
       amount: amount,
       paymentDate: new Date(paymentDate),
@@ -830,7 +849,7 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
       notes: notes || '',
       createdAt: new Date(),
       status: 'COMPLETED'
-    };
+    }, session);
 
     const result = await db.collection('payments').insertOne(payment);
     return { success: true, paymentId: result.insertedId };
@@ -842,10 +861,12 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
 
 export async function getClientPayments(clientId: string, startDate?: string, endDate?: string) {
   try {
+    const session = await requireSession();
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
     const clientObjectId = new ObjectId(clientId);
 
-    const query: any = { clientId: clientObjectId };
+    const query: any = { clientId: clientObjectId, ...tenantFilter };
     if (startDate) query.paymentDate = { ...query.paymentDate, $gte: new Date(startDate) };
     if (endDate) query.paymentDate = { ...query.paymentDate, $lte: new Date(endDate) };
 
@@ -863,12 +884,14 @@ export async function getClientPayments(clientId: string, startDate?: string, en
 
 export async function getClientBalance(clientId: string) {
   try {
+    const session = await requireSession();
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
     const clientObjectId = new ObjectId(clientId);
 
     // Get total payments
     const paymentsResult = await db.collection('payments').aggregate([
-      { $match: { clientId: clientObjectId, status: 'COMPLETED' } },
+      { $match: { clientId: clientObjectId, status: 'COMPLETED', ...tenantFilter } },
       { $group: { _id: null, totalPayments: { $sum: '$amount' } } }
     ]).toArray();
 
@@ -876,7 +899,7 @@ export async function getClientBalance(clientId: string) {
 
     // Get total outstanding invoices
     const invoicesResult = await db.collection('invoice_master').aggregate([
-      { $match: { clientId: clientObjectId } },
+      { $match: { clientId: clientObjectId, ...tenantFilter } },
       { $group: { _id: null, totalOutstanding: { $sum: '$totalAmount' } } }
     ]).toArray();
 

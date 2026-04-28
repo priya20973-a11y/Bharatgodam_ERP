@@ -42,7 +42,9 @@ async function generateRiceLedgerEntries() {
       }
 
       // Calculate rate per MT per day
-      const ratePerMTPerDay = commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10;
+      const ratePerMTPerDay =
+        commodity.ratePerMtPerDay ??
+        (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
 
       // Create ledger entry
       const transactionDate = new Date(txn.date);

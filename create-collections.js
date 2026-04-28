@@ -6,7 +6,7 @@ async function createCollections() {
   const db = client.db('wms_production');
 
   // Create collections if they don't exist
-  const collections = ['stock_entries', 'ledger_entries', 'invoice_master', 'invoice_line_items', 'clients', 'commodities', 'warehouses'];
+  const collections = ['stock_entries', 'ledger_entries', 'invoice_master', 'invoice_line_items', 'clients', 'commodities', 'warehouses', 'users', 'signup_requests'];
 
   for (const coll of collections) {
     try {

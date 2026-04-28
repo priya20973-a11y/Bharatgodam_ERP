@@ -1,24 +1,55 @@
 import React from 'react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import TransactionsReport from './transactions-report';
 import { getDb } from '@/lib/mongodb';
+import { getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export default async function TransactionsReportWrapper() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      throw new Error('Unauthorized');
+    }
+
+    const tenantFilter = getTenantFilterForMongo(session);
     const db = await getDb();
 
-    // Get valid warehouse IDs (exclude problematic warehouses)
-    const validWarehouses = await db.collection('warehouses')
-      .find({ name: { $nin: ['Warehouse ABC', 'Warehouse XYZ'] } })
+    const ownedWarehouses = await db.collection('warehouses')
+      .find({ ...tenantFilter })
       .project({ _id: 1 })
       .toArray();
-    const validWarehouseIds = validWarehouses.map(w => w._id.toString()); // Convert to strings
+
+    const ownedWarehouseIds = ownedWarehouses.map((warehouse: any) => warehouse._id);
+    const ownedWarehouseIdStrings = ownedWarehouseIds.map((id: any) => id.toString());
+    const ownedWarehouseObjectIds = ownedWarehouseIds
+      .map((id: any) => {
+        if (typeof id === 'string' && ObjectId.isValid(id)) {
+          return new ObjectId(id);
+        }
+        return id instanceof ObjectId ? id : null;
+      })
+      .filter((id): id is ObjectId => id !== null);
+
+    const tenantWarehouseMatch = {
+      $and: [
+        tenantFilter,
+        {
+          $or: [
+            { warehouseId: { $in: ownedWarehouseIds } },
+            { warehouseId: { $in: ownedWarehouseIdStrings } },
+            { warehouseId: { $in: ownedWarehouseObjectIds } },
+          ],
+        },
+      ],
+    };
 
     const [transactions, inwards, outwards, stockEntries] = await Promise.all([
       // Fetch transactions with warehouse lookup to get CURRENT warehouse name
       db.collection('transactions').aggregate([
         { $sort: { date: -1, createdAt: -1 } },
-        { $match: { warehouseId: { $in: validWarehouseIds } } }, // Only include valid warehouses
+        { $match: tenantWarehouseMatch },
         {
           $lookup: {
             from: 'warehouses',
@@ -35,47 +66,7 @@ export default async function TransactionsReportWrapper() {
       ]).toArray(),
       db.collection('inwards').aggregate([
         { $sort: { date: -1, createdAt: -1 } },
-        { $match: { warehouseId: { $in: validWarehouseIds } } }, // Only include valid warehouses
-        {
-          $lookup: {
-            from: 'warehouses',
-            localField: 'warehouseId',
-            foreignField: '_id',
-            as: 'warehouse',
-          },
-        },
-        {
-          $addFields: {
-            warehouse: { $arrayElemAt: ['$warehouse', 0] },
-          },
-        },
-      ]).toArray(),
-      db.collection('outwards').aggregate([
-        { $sort: { date: -1, createdAt: -1 } },
-        { $match: { warehouseId: { $in: validWarehouseIds } } }, // Only include valid warehouses
-        {
-          $lookup: {
-            from: 'warehouses',
-            localField: 'warehouseId',
-            foreignField: '_id',
-            as: 'warehouse',
-          },
-        },
-        {
-          $addFields: {
-            warehouse: { $arrayElemAt: ['$warehouse', 0] },
-          },
-        },
-      ]).toArray(),
-      db.collection('stock_entries').aggregate([
-        { $sort: { inwardDate: -1, createdAt: -1 } },
-        {
-          $addFields: {
-            warehouseId: { $toObjectId: '$warehouseId' },
-            clientId: { $toObjectId: '$clientId' },
-            commodityId: { $toObjectId: '$commodityId' }
-          }
-        },
+        { $match: tenantWarehouseMatch },
         {
           $lookup: {
             from: 'clients',
@@ -100,7 +91,101 @@ export default async function TransactionsReportWrapper() {
             as: 'warehouse',
           },
         },
-        { $match: { warehouseId: { $in: validWarehouseIds.map(id => new ObjectId(id)) } } }, // Only include valid warehouses (convert to ObjectId for comparison)
+        {
+          $addFields: {
+            client: { $arrayElemAt: ['$client', 0] },
+            commodity: { $arrayElemAt: ['$commodity', 0] },
+            warehouse: { $arrayElemAt: ['$warehouse', 0] },
+          },
+        },
+      ]).toArray(),
+      db.collection('outwards').aggregate([
+        { $sort: { date: -1, createdAt: -1 } },
+        { $match: tenantWarehouseMatch },
+        {
+          $lookup: {
+            from: 'clients',
+            localField: 'clientId',
+            foreignField: '_id',
+            as: 'client',
+          },
+        },
+        {
+          $lookup: {
+            from: 'commodities',
+            localField: 'commodityId',
+            foreignField: '_id',
+            as: 'commodity',
+          },
+        },
+        {
+          $lookup: {
+            from: 'warehouses',
+            localField: 'warehouseId',
+            foreignField: '_id',
+            as: 'warehouse',
+          },
+        },
+        {
+          $addFields: {
+            client: { $arrayElemAt: ['$client', 0] },
+            commodity: { $arrayElemAt: ['$commodity', 0] },
+            warehouse: { $arrayElemAt: ['$warehouse', 0] },
+          },
+        },
+      ]).toArray(),
+      db.collection('stock_entries').aggregate([
+        { $sort: { inwardDate: -1, createdAt: -1 } },
+        {
+          $addFields: {
+            warehouseId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$warehouseId', null] }, { $regexMatch: { input: { $toString: '$warehouseId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$warehouseId' },
+                else: '$warehouseId'
+              }
+            },
+            clientId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$clientId', null] }, { $regexMatch: { input: { $toString: '$clientId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$clientId' },
+                else: '$clientId'
+              }
+            },
+            commodityId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$commodityId', null] }, { $regexMatch: { input: { $toString: '$commodityId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$commodityId' },
+                else: '$commodityId'
+              }
+            }
+          }
+        },
+        { $match: { warehouseId: { $in: ownedWarehouseObjectIds }, ...tenantFilter } }, // Only include owned warehouses and tenant-owned records
+        {
+          $lookup: {
+            from: 'clients',
+            localField: 'clientId',
+            foreignField: '_id',
+            as: 'client',
+          },
+        },
+        {
+          $lookup: {
+            from: 'commodities',
+            localField: 'commodityId',
+            foreignField: '_id',
+            as: 'commodity',
+          },
+        },
+        {
+          $lookup: {
+            from: 'warehouses',
+            localField: 'warehouseId',
+            foreignField: '_id',
+            as: 'warehouse',
+          },
+        },
         {
           $addFields: {
             client: { $arrayElemAt: ['$client', 0] },
@@ -163,12 +248,7 @@ export default async function TransactionsReportWrapper() {
       lotNo: t.lotNo,
       status: t.status || 'COMPLETED',
       createdAt: t.createdAt || t.updatedAt || t.date,
-    })).filter((record) => {
-      // Exclude records with missing or unknown client/commodity names
-      return record.clientName && record.clientName !== 'Unknown' &&
-             record.commodityName && record.commodityName !== 'Unknown' &&
-             record.warehouseName && record.warehouseName !== 'Unknown';
-    });
+    }));
 
     return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} />;
   } catch (error) {

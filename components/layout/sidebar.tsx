@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt } from 'lucide-react';
+import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
+import type { Session } from 'next-auth';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -19,9 +20,21 @@ const navItems = [
   { name: 'Revenue Split', href: '/dashboard/revenue', icon: DollarSign },
 ];
 
-export default function Sidebar() {
+const adminNavItems = [
+  { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
+  { name: 'Warehouse Settings', href: '/dashboard/settings/warehouse', icon: Settings },
+];
+
+interface SidebarProps {
+  session: Session | null;
+}
+
+export default function Sidebar({ session }: SidebarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+
+  const isAdmin = session?.user && (session.user as any).role === 'ADMIN';
+  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
   return (
     <>
@@ -34,20 +47,19 @@ export default function Sidebar() {
 
       {/* Sidebar Container */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform bg-slate-900 text-slate-100 transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform sidebar-background text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo Setup */}
-          <div className="flex h-20 shrink-0 items-center px-6 border-b border-slate-800">
-            <Box className="h-8 w-8 text-blue-500 mr-3" />
-            <span className="text-xl font-bold tracking-tight">WMS Pro</span>
+          <div className="flex h-28 shrink-0 items-center px-6 border-b sidebar-border">
+            <img src="/bharatgodam-logo.png" alt="BharatGodam Logo" className="h-20 w-auto" />
           </div>
 
           {/* Navigation Links */}
           <nav className="flex-1 space-y-1 px-4 py-8">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               

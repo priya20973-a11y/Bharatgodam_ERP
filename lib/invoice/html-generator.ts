@@ -12,7 +12,6 @@ import { formatCurrency, amountInWords, formatNumber } from './formatters';
 export function generateInvoiceHTML(data: InvoiceData): string {
 
   // Summary section logic
-  const commodityNames = Array.from(new Set(data.lineItems.map(item => item.itemName))).join(', ');
   const totalAmount = data.lineItems.reduce((sum, item) => sum + (item.amount || 0), 0);
   const lastInventory = data.lineItems.length > 0 ? data.lineItems[data.lineItems.length - 1].quantity : 0;
   // Get month name from invoice date (assume YYYY-MM-DD or similar)
@@ -255,9 +254,6 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 
     <!-- Summary Section: Only one line -->
     <div style="padding: 30px 0 20px 0;">
-      <div style="font-size: 1.2em; margin-bottom: 10px;">
-        Storage charge for <strong>${monthName} ${commodityNames}</strong>: <span style="font-weight:bold; color:#28a745;">${formatCurrency(totalAmount, false)}</span>
-      </div>
       <div style="font-size: 1.1em; color: #555; margin-bottom: 10px;">
         Last inventory available at end of month: <strong>${lastInventory.toFixed(2)} MT</strong>
       </div>

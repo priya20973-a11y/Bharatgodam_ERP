@@ -104,7 +104,14 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
 
     // Get valid warehouse IDs from warehouse master (single source of truth)
     const validWarehouseIds = await getValidWarehouseIds();
-    const validWarehouseObjectIds = validWarehouseIds.map(id => new ObjectId(id));
+    const validWarehouseObjectIds = validWarehouseIds
+      .map(id => {
+        if (typeof id === 'string' && ObjectId.isValid(id)) {
+          return new ObjectId(id);
+        }
+        return (id && typeof id === 'object' && (id as any) instanceof ObjectId) ? id : null;
+      })
+      .filter((id): id is ObjectId => id !== null);
 
     const dateFilter: Record<string, Date> = {};
     if (filters.startDate) dateFilter.$gte = new Date(filters.startDate);
@@ -535,9 +542,18 @@ export async function getClientOptions() {
     const db = await getDb();
     const clients = await db.collection('clients').find().sort({ name: 1 }).toArray() as IClient[];
 
+    const filteredClients = clients.filter((client) => {
+      const name = client.name?.trim().toLowerCase() || '';
+      return (
+        name !== 'abc traders' &&
+        name !== 'xyz enterprise' &&
+        name !== 'xyz enterprises'
+      );
+    });
+
     return [
       { label: 'All Clients', value: 'ALL' },
-      ...clients.map(c => ({ label: c.name, value: c._id?.toString() || '' }))
+      ...filteredClients.map(c => ({ label: c.name, value: c._id?.toString() || '' }))
     ];
   } catch (error) {
     console.error('[getClientOptions] Error:', error);
@@ -702,11 +718,20 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
     const db = await getDb();
     const clientObjectId = new ObjectId(clientId);
 
+    let invoiceIdValue: string | ObjectId | null = null;
+    if (invoiceId) {
+      try {
+        invoiceIdValue = new ObjectId(invoiceId);
+      } catch {
+        invoiceIdValue = invoiceId;
+      }
+    }
+
     const payment = {
       clientId: clientObjectId,
       amount: amount,
       paymentDate: new Date(paymentDate),
-      invoiceId: invoiceId ? new ObjectId(invoiceId) : null,
+      invoiceId: invoiceIdValue,
       notes: notes || '',
       createdAt: new Date(),
       status: 'COMPLETED'

@@ -205,7 +205,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>No clients available</SelectItem>
+                    <SelectItem value="none" disabled>No clients available</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -232,7 +232,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>No commodities available</SelectItem>
+                    <SelectItem value="none" disabled>No commodities available</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -261,7 +261,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>No warehouses available</SelectItem>
+                    <SelectItem value="none" disabled>No warehouses available</SelectItem>
                   )}
                 </SelectContent>
               </Select>

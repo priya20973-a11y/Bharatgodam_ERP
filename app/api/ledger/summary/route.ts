@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 
 export async function GET() {
+  const session = await requireSession();
   const db = await getDb();
+  const tenantFilter = getTenantFilterForMongo(session);
 
   const outstandingResult = await db.collection('invoice_master').aggregate([
+    { $match: tenantFilter },
     {
       $project: {
         totalAmount: 1,
@@ -23,7 +27,7 @@ export async function GET() {
   ]).toArray();
 
   const receivedResult = await db.collection('payments').aggregate([
-    { $match: { status: 'COMPLETED' } },
+    { $match: { status: 'COMPLETED', ...tenantFilter } },
     { $group: { _id: null, totalReceived: { $sum: '$amount' } } }
   ]).toArray();
 

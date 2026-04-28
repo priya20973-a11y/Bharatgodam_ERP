@@ -6,6 +6,8 @@ export interface IWarehouse extends Document {
   totalCapacity: number; // in MT
   occupiedCapacity: number; // in MT
   status: 'ACTIVE' | 'INACTIVE' | 'FULL';
+  userId?: mongoose.Types.ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,8 @@ const WarehouseSchema: Schema = new Schema(
       enum: ['ACTIVE', 'INACTIVE', 'FULL'],
       default: 'ACTIVE',
     },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );

@@ -8,14 +8,16 @@ import { MongoCommodity } from '@/lib/validations/commodity';
 import { redirect } from 'next/navigation';
 
 interface BookingsPageProps {
-  searchParams: { [key: string]: string | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function BookingsPage({ searchParams }: BookingsPageProps) {
   // Await searchParams as it's now a Promise in Next.js 15+
   const params = await searchParams;
-  const page = params.page ? parseInt(params.page) : 1;
-  const commodity = params.commodity || 'ALL';
+  const pageParam = params.page ? (Array.isArray(params.page) ? params.page[0] : params.page) : undefined;
+  const page = pageParam ? parseInt(pageParam) : 1;
+  const commodityParam = params.commodity ? (Array.isArray(params.commodity) ? params.commodity[0] : params.commodity) : undefined;
+  const commodity = commodityParam || 'ALL';
 
   // Validate page number
   if (page < 1) {

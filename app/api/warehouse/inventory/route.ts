@@ -1,21 +1,36 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const tenantFilter = getTenantFilterForMongo(session);
     const { searchParams } = new URL(request.url);
     const requestedWarehouseId = searchParams.get('warehouseId');
 
     const db = await getDb();
     const warehouseCollection = db.collection('warehouses');
 
-    const activeWarehouses = await warehouseCollection.find({ status: 'ACTIVE' }).toArray();
+    const activeWarehouses = await warehouseCollection.find({
+      ...tenantFilter,
+      status: 'ACTIVE'
+    }).toArray();
     let warehouse = null;
 
     if (requestedWarehouseId) {
       try {
-        warehouse = await warehouseCollection.findOne({ _id: new ObjectId(requestedWarehouseId) });
+        warehouse = await warehouseCollection.findOne({
+          _id: new ObjectId(requestedWarehouseId),
+          ...tenantFilter
+        });
       } catch {
         warehouse = null;
       }
@@ -32,7 +47,8 @@ export async function GET(request: Request) {
     const commodityBreakdown = await db.collection('transactions').aggregate([
       {
         $match: {
-          warehouseId: warehouse._id.toString()
+          warehouseId: warehouse._id.toString(),
+          ...tenantFilter
         }
       },
       {

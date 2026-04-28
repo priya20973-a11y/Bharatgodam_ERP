@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 
 export async function GET() {
   try {
+    const session = await requireSession();
+    const tenantFilter = getTenantFilterForMongo(session);
     const db = await getDb();
 
     // Aggregation: Group bookings by Month and calculate Total vs Advance
@@ -29,7 +32,7 @@ export async function GET() {
       { $sort: { _id: 1 } } // Sort by month ascending
     ];
 
-    const stats = await db.collection('bookings').aggregate(pipeline).toArray();
+    const stats = await db.collection('bookings').aggregate([{ $match: tenantFilter }, ...pipeline]).toArray();
     return NextResponse.json({ success: true, data: stats, message: 'Analytics fetched' });
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });

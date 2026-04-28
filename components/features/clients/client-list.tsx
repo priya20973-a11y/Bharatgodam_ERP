@@ -27,13 +27,16 @@ export default function ClientList({ clients, onEdit }: ClientListProps) {
             <TableHead>Type</TableHead>
             <TableHead>Address</TableHead>
             <TableHead>Mobile</TableHead>
+            <TableHead className="hidden md:table-cell">PAN</TableHead>
+            <TableHead className="hidden md:table-cell">GSTIN</TableHead>
+            <TableHead className="hidden lg:table-cell">Added By</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {clients.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center">
+              <TableCell colSpan={8} className="h-24 text-center">
                 No clients registered.
               </TableCell>
             </TableRow>
@@ -51,6 +54,9 @@ export default function ClientList({ clients, onEdit }: ClientListProps) {
                 </TableCell>
                 <TableCell>{c.address}</TableCell>
                 <TableCell>{c.mobile}</TableCell>
+                <TableCell className="hidden md:table-cell">{c.panNumber || '—'}</TableCell>
+                <TableCell className="hidden md:table-cell">{c.gstNumber || '—'}</TableCell>
+                <TableCell className="hidden lg:table-cell text-sm text-slate-600">{c.addedBy || 'Unknown'}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => onEdit(c)}>
                     <Edit className="h-4 w-4" />

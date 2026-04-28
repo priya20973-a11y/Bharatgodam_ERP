@@ -81,7 +81,15 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
           getClientOptions(),
           getWarehouseOptions(),
         ]);
-        setClientOptions(clients);
+        const filteredClients = clients.filter((client) => {
+          const name = client.label.trim().toLowerCase();
+          return (
+            name !== 'abc traders' &&
+            name !== 'xyz enterprise' &&
+            name !== 'xyz enterprises'
+          );
+        });
+        setClientOptions(filteredClients);
         setWarehouseOptions(warehouses);
       } catch (error) {
         console.error('Failed to load master dropdown options:', error);

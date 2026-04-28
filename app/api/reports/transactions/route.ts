@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongodb';
+import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,15 +27,40 @@ export async function GET(request: NextRequest) {
       if (endDate) filter.date.$lte = new Date(endDate);
     }
 
+    const session = await requireSession();
+    const tenantFilter = getTenantFilterForMongo(session);
+
+    const warehouseDocs = await db.collection('warehouses')
+      .find({ ...tenantFilter })
+      .project({ _id: 1 })
+      .toArray();
+    const ownedWarehouseIdStrings = warehouseDocs.map((warehouse: any) => warehouse._id.toString());
+    const ownedWarehouseObjectIds = warehouseDocs
+      .map((warehouse: any) => warehouse._id)
+      .filter((id: any) => id instanceof ObjectId);
+    const warehouseQueryIds = [...ownedWarehouseIdStrings, ...ownedWarehouseObjectIds];
+
+    if (warehouseId) {
+      const requestedWarehouseIds: Array<string | ObjectId> = [warehouseId];
+      const warehouseIdString = String(warehouseId);
+      if (ObjectId.isValid(warehouseIdString)) requestedWarehouseIds.push(new ObjectId(warehouseIdString));
+
+      const ownsWarehouse = warehouseQueryIds.some((id: any) => id.toString() === warehouseIdString);
+      filter.warehouseId = ownsWarehouse ? { $in: requestedWarehouseIds } : { $in: [] };
+    } else if (warehouseQueryIds.length > 0) {
+      filter.warehouseId = { $in: warehouseQueryIds };
+    }
+
     const inwardsCollection = db.collection('inwards');
     const outwardsCollection = db.collection('outwards');
 
+    const tenantAwareFilter = { ...filter, ...tenantFilter };
     const [inwardTransactions, outwardTransactions] = await Promise.all([
       inwardsCollection
-        .find(direction !== 'OUTWARD' ? filter : { $expr: { $literal: false } })
+        .find(direction !== 'OUTWARD' ? tenantAwareFilter : { $expr: { $literal: false } })
         .toArray(),
       outwardsCollection
-        .find(direction !== 'INWARD' ? filter : { $expr: { $literal: false } })
+        .find(direction !== 'INWARD' ? tenantAwareFilter : { $expr: { $literal: false } })
         .toArray(),
     ]);
 

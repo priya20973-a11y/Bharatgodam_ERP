@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getTenantFilterForMongo } from '@/lib/ownership';
 import { calculateLedger } from '@/lib/ledger-engine';
 import { ObjectId } from 'mongodb';
 import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
@@ -11,11 +12,11 @@ export async function GET(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    // Temporarily disable auth for testing
-    // const session = await getServerSession(authOptions);
-    // if (!session) {
-    //   return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    // }
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+    const tenantFilter = getTenantFilterForMongo(session);
 
     const url = new URL(req.url);
     const clientId = url.pathname.split('/').pop() || '';
@@ -33,25 +34,25 @@ export async function GET(
 
     const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
-        .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] } })
+        .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
-        .find({ accountId })
+        .find({ accountId, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
-        .find({ accountId })
+        .find({ accountId, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('invoice_master')
         .aggregate([
-          { $match: { clientId: new ObjectId(trimmedClientId), status: { $ne: 'PAID' } } },
+          { $match: { clientId: new ObjectId(trimmedClientId), status: { $ne: 'PAID' }, ...tenantFilter } },
           { $group: { _id: null, totalOutstanding: { $sum: '$totalAmount' } } }
         ])
         .toArray(),
       db.collection('commodities')
-        .find({})
+        .find({ ...tenantFilter })
         .toArray(),
     ]);
 

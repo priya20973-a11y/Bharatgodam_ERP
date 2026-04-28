@@ -83,7 +83,6 @@ export default function BookingForm({ commodities }: BookingFormProps) {
   const watchedMT = watch('mt') || 0;
   const watchedDays = watch('storageDays') || 1;
   const watchedDate = watch('date');
-  const watchedDateOutward = watch('dateOutward' as any);
   const watchedCommodity = watch('commodityName');
   const watchedDirection = watch('direction');
   const watchedWarehouse = watch('warehouseName');
@@ -96,30 +95,6 @@ export default function BookingForm({ commodities }: BookingFormProps) {
       setDirection('OUTWARD');
     }
   }, [watchedDirection]);
-
-  useEffect(() => {
-    if (direction === 'OUTWARD') {
-      setValue('dateOutward', '');
-    }
-  }, [direction, setValue]);
-
-  // Auto-calculate storageDays from the date range whenever either date changes
-  useEffect(() => {
-    if (direction !== 'INWARD') {
-      setValue('storageDays', 1);
-      return;
-    }
-
-    if (watchedDate && watchedDateOutward) {
-      const start = new Date(watchedDate);
-      const end = new Date(watchedDateOutward as string);
-      const days = differenceInDays(end, start);
-      setValue('storageDays', Math.max(1, days));
-    } else {
-      // No outward date yet — reset to minimum 1 so validation always pass in Inward mode
-      setValue('storageDays', 1);
-    }
-  }, [direction, watchedDate, watchedDateOutward, setValue]);
 
   // Fetch warehouses and create dynamic mapping
   useEffect(() => {
@@ -201,11 +176,9 @@ export default function BookingForm({ commodities }: BookingFormProps) {
   let rentPreview: ReturnType<typeof calculateRent> | null = null;
   if (watchedDate && watchedMT > 0 && selectedRate > 0) {
     try {
-      // Use actual outward date if set, else project from storageDays
-      const outwardForPreview = watchedDateOutward
-        ? watchedDateOutward as string
-        : new Date(new Date(watchedDate).getTime() + watchedDays * 86400000)
-            .toISOString().slice(0, 10);
+      const outwardForPreview = new Date(new Date(watchedDate).getTime() + watchedDays * 86400000)
+        .toISOString()
+        .slice(0, 10);
       rentPreview = calculateRent(watchedMT, selectedRate, watchedDate, outwardForPreview);
     } catch { } // Fails silently while dates are mid-entry
   }
@@ -219,8 +192,11 @@ export default function BookingForm({ commodities }: BookingFormProps) {
     }
 
     // 🔍 DEBUG: Verify the total amount matches UI preview before submission
-    const debugRent = calculateRent(watchedMT, selectedRate, watchedDate, 
-      watchedDateOutward || new Date(new Date(watchedDate).getTime() + watchedDays * 86400000).toISOString().slice(0, 10)
+    const debugRent = calculateRent(
+      watchedMT,
+      selectedRate,
+      watchedDate,
+      new Date(new Date(watchedDate).getTime() + watchedDays * 86400000).toISOString().slice(0, 10)
     );
     console.log('[Form] Pre-Submission Verification:');
     console.log('  Expected Total (UI): ' + formatCurrency(rentPreview?.totalAmount || 0));
@@ -483,29 +459,16 @@ export default function BookingForm({ commodities }: BookingFormProps) {
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 justify-between">
                 <div className="flex flex-col sm:flex-row gap-5">
                   <div>
-                    <label htmlFor="dateOutward" className="block text-xs font-bold text-slate-600 mb-1">
-                      Expected Outward Date
-                    </label>
-                    <input
-                      id="dateOutward"
-                      type="date"
-                      {...register('dateOutward' as any)}
-                      min={watchedDate || undefined}
-                      className="rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-
-                  <div>
                     <label htmlFor="storageDays" className="block text-xs font-bold text-slate-600 mb-1">
-                      Storage Duration (Auto)
+                      Storage Duration (days)
                     </label>
                     <div className="flex items-center gap-2">
                       <input
                         id="storageDays"
                         type="number"
                         {...register('storageDays')}
-                        readOnly
-                        className="w-24 rounded-md border border-slate-200 px-3 py-2 text-sm text-center font-bold bg-slate-100 text-slate-700 cursor-default"
+                        min={1}
+                        className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm text-center font-bold bg-white text-slate-900"
                       />
                       <span className="text-sm font-semibold text-slate-500">Days</span>
                     </div>

@@ -6,6 +6,7 @@ import { getClientPayments } from '@/app/actions/reports';
 import { differenceInCalendarDays, isLastDayOfMonth } from 'date-fns';
 import type { IInvoiceMaster, IInvoiceLineItem } from '@/types/schemas';
 import { generateStoragePeriods, type Transaction } from '@/lib/storage-engine';
+import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 
 export interface ClientMonthlyLedgerRow {
   commodity: string;
@@ -17,6 +18,8 @@ export interface ClientMonthlyLedgerRow {
   rent: number;
   status: string;
   calculation: string;
+  warehouseId?: string;
+  warehouseName?: string;
 }
 
 export interface ClientMonthlyLedgerSummary {
@@ -30,6 +33,9 @@ export interface ClientMonthLedger {
   month: string;
   rows: ClientMonthlyLedgerRow[];
   summary: ClientMonthlyLedgerSummary;
+  warehouseId?: string;
+  warehouseName?: string;
+  invoiceId?: string;
 }
 
 export interface ClientMonthlyLedgerResult {
@@ -289,8 +295,19 @@ export async function generateClientMonthlyLedger(
   return monthlyLedgers;
 }
 
-export async function getClientMonthlyLedger(clientId: string, month?: string, warehouseId?: string) {
+export async function getClientMonthlyLedger(clientId: string, month?: string, warehouseId?: string, tenantFilter?: any) {
   console.log(`=== GETTING LEDGER FOR CLIENT: ${clientId}, MONTH: ${month || 'ALL'}, WAREHOUSE: ${warehouseId || 'ANY'} ===`);
+
+  // Get tenant filter if not provided
+  if (!tenantFilter) {
+    try {
+      const session = await requireSession();
+      tenantFilter = getTenantFilterForMongo(session);
+    } catch (error) {
+      // If no session, use empty filter (for backward compatibility)
+      tenantFilter = {};
+    }
+  }
 
   const db = await getDb();
   if (!db) throw new Error('Database connection not established');
@@ -301,13 +318,13 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   }
 
   const clientObjectId = new ObjectId(clientId);
-  const client = await db.collection('clients').findOne({ _id: clientObjectId });
+  const client = await db.collection('clients').findOne({ _id: clientObjectId, ...(tenantFilter || {}) });
   const clientName = client?.name || client?.clientName || 'Unknown Client';
 
   console.log(`CLIENT FOUND: ${clientName} (${clientId})`);
 
   // Build transaction query for the client
-  const transactionQuery: any = { clientId: clientId };
+  const transactionQuery: any = { clientId: clientId, ...(tenantFilter || {}) };
   if (warehouseId && warehouseId !== 'ALL') {
     transactionQuery.warehouseId = warehouseId;
   }
@@ -326,7 +343,7 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   // Get commodity rates
   const commodityIds = [...new Set(transactions.map(t => t.commodityId))];
   const commodities = await db.collection('commodities').find(
-    { _id: { $in: commodityIds.map(id => new ObjectId(id)) } }
+    { _id: { $in: commodityIds.map(id => new ObjectId(id)) }, ...(tenantFilter || {}) }
   ).toArray();
   const commodityMap = new Map(commodities.map(c => [c._id.toString(), c]));
 
@@ -334,16 +351,17 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   console.log('COMMODITIES:', commodities.map(c => ({ id: c._id, name: c.name, rate: c.ratePerMtPerDay })));
 
   // Convert to Transaction format and group by commodity/warehouse
-  const txnGroups = new Map<string, Transaction[]>();
+  const txnGroups = new Map<string, { txns: Transaction[]; warehouseId: string }>();
+  const warehouseIds = new Set<string>();
 
   transactions.forEach(txn => {
     const key = `${txn.commodityId}-${txn.warehouseId}`;
-    if (!txnGroups.has(key)) txnGroups.set(key, []);
+    if (!txnGroups.has(key)) txnGroups.set(key, { txns: [], warehouseId: txn.warehouseId });
 
     const commodity = commodityMap.get(txn.commodityId);
     const rate = commodity?.ratePerMtPerDay || 10;
 
-    txnGroups.get(key)?.push({
+    txnGroups.get(key)?.txns.push({
       date: txn.date instanceof Date ? txn.date.toISOString().split('T')[0] : 
             typeof txn.date === 'string' && txn.date.includes('T') ? txn.date.split('T')[0] : 
             txn.date,
@@ -353,24 +371,36 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
       commodityId: txn.commodityId,
       warehouseId: txn.warehouseId
     });
+
+    warehouseIds.add(txn.warehouseId);
   });
 
   console.log(`CLIENT ${clientId}: Created ${txnGroups.size} transaction groups`);
-  txnGroups.forEach((txns, key) => {
-    console.log(`GROUP ${key}: ${txns.length} transactions`, txns);
+  txnGroups.forEach((group, key) => {
+    console.log(`GROUP ${key}: ${group.txns.length} transactions`, group.txns);
   });
+
+  // Resolve warehouse names for each transaction group
+  const warehouseDocs = warehouseIds.size
+    ? await db.collection('warehouses').find({
+        _id: { $in: Array.from(warehouseIds).map((id) => new ObjectId(id)) },
+        ...(tenantFilter || {}),
+      }).toArray()
+    : [];
+  const warehouseMap = new Map(warehouseDocs.map((warehouse) => [warehouse._id?.toString() || '', warehouse]));
 
   // Generate periods for each group
   const allPeriods: ClientMonthlyLedgerRow[] = [];
-  txnGroups.forEach((txns, key) => {
+  txnGroups.forEach((group, key) => {
     const [commodityId, warehouseId] = key.split('-');
     const commodity = commodityMap.get(commodityId);
+    const warehouse = warehouseMap.get(warehouseId);
     const rate = commodity?.ratePerMtPerDay || 10;
     const monthlyRate = roundCurrency(rate * 30);
 
-    console.log(`CLIENT ${clientId}: Generating periods for group ${key} with ${txns.length} transactions, rate: ${rate}`);
+    console.log(`CLIENT ${clientId}: Generating periods for group ${key} with ${group.txns.length} transactions, rate: ${rate}`);
 
-    const periods = generateStoragePeriods(txns, month, rate);
+    const periods = generateStoragePeriods(group.txns, month, rate);
 
     console.log(`CLIENT ${clientId}: Generated ${periods.length} periods for group ${key}:`, periods);
 
@@ -387,7 +417,9 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
         days: period.days,
         rent: roundCurrency(period.rent),
         status: period.status,
-        calculation
+        calculation,
+        warehouseId,
+        warehouseName: warehouse?.name || '',
       });
     });
   });
@@ -396,16 +428,27 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
   console.log("ALL PERIODS GENERATED:", allPeriods);
 
-  // Group by month
-  const grouped = new Map<string, ClientMonthlyLedgerRow[]>();
+  // Group by month + warehouse to keep one invoice per warehouse per client per month
+  const grouped = new Map<string, { month: string; warehouseId?: string; warehouseName?: string; rows: ClientMonthlyLedgerRow[] }>();
   allPeriods.forEach(row => {
     const monthKey = formatMonthKey(normalizeDate(row.fromDate));
-    console.log(`Grouping period ${row.fromDate} -> month ${monthKey}`);
-    if (!grouped.has(monthKey)) grouped.set(monthKey, []);
-    grouped.get(monthKey)?.push(row);
+    const warehouseKey = row.warehouseId || 'ALL';
+    const groupKey = `${monthKey}::${warehouseKey}`;
+    console.log(`Grouping period ${row.fromDate} -> ${groupKey}`);
+
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
+        month: monthKey,
+        warehouseId: row.warehouseId,
+        warehouseName: row.warehouseName,
+        rows: [],
+      });
+    }
+
+    grouped.get(groupKey)?.rows.push(row);
   });
 
-  console.log(`CLIENT ${clientId}: Grouped into ${grouped.size} months:`, Array.from(grouped.keys()));
+  console.log(`CLIENT ${clientId}: Grouped into ${grouped.size} month-warehouse invoices:`, Array.from(grouped.keys()));
 
   const paymentsResult = await getClientPayments(clientId);
   const payments = paymentsResult.success ? paymentsResult.data : [];
@@ -418,8 +461,19 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
     return acc;
   }, {});
 
+  const paymentsByInvoice = (payments || []).reduce((acc: Record<string, number>, payment: any) => {
+    if (!payment?.invoiceId) return acc;
+    const invoiceKey = typeof payment.invoiceId === 'string'
+      ? payment.invoiceId
+      : typeof payment.invoiceId?.toString === 'function'
+        ? payment.invoiceId.toString()
+        : String(payment.invoiceId);
+    acc[invoiceKey] = (acc[invoiceKey] || 0) + Number(payment.amount || 0);
+    return acc;
+  }, {});
+
   const allMonthKeys = new Set<string>([
-    ...Array.from(grouped.keys()),
+    ...Array.from(grouped.keys()).map((groupKey) => grouped.get(groupKey)?.month || ''),
     ...Object.keys(paymentsByMonth),
   ]);
 
@@ -427,28 +481,38 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   const monthlyLedgers: ClientMonthLedger[] = [];
   let runningBalance = 0;
 
-  sortedMonthKeys.forEach(monthKey => {
-    const monthRows = grouped.get(monthKey) || [];
-    const totalRent = roundCurrency(monthRows.reduce((sum, row) => sum + row.rent, 0));
-    const paymentsForMonth = roundCurrency(paymentsByMonth[monthKey] || 0);
-    const previousBalance = roundCurrency(runningBalance);
-    const outstanding = roundCurrency(previousBalance + totalRent - paymentsForMonth);
+  // preserve each warehouse-specific invoice separately, but keep month ordering for balances
+  Array.from(grouped.entries())
+    .sort(([aKey, a], [bKey, b]) => {
+      if (a.month !== b.month) return a.month.localeCompare(b.month);
+      return (a.warehouseName || '').localeCompare(b.warehouseName || '');
+    })
+    .forEach(([groupKey, group]) => {
+      const invoiceId = group.warehouseId ? `${clientId}-${group.month}-${group.warehouseId}` : `${clientId}-${group.month}`;
+      const totalRent = roundCurrency(group.rows.reduce((sum, row) => sum + row.rent, 0));
+      const invoiceSpecificPayments = roundCurrency(paymentsByInvoice[invoiceId] || 0);
+      const paymentsForMonth = invoiceSpecificPayments || roundCurrency(paymentsByMonth[group.month] || 0);
+      const previousBalance = roundCurrency(runningBalance);
+      const outstanding = roundCurrency(previousBalance + totalRent - paymentsForMonth);
 
-    monthlyLedgers.push({
-      month: monthKey,
-      rows: monthRows,
-      summary: {
-        totalRent,
-        previousBalance,
-        payments: paymentsForMonth,
-        outstanding,
-      },
+      monthlyLedgers.push({
+        month: group.month,
+        warehouseId: group.warehouseId,
+        warehouseName: group.warehouseName,
+        invoiceId,
+        rows: group.rows,
+        summary: {
+          totalRent,
+          previousBalance,
+          payments: paymentsForMonth,
+          outstanding,
+        },
+      });
+
+      runningBalance = outstanding;
     });
 
-    runningBalance = outstanding;
-  });
-
-  const availableMonths = monthlyLedgers.map(m => m.month);
+  const availableMonths = Array.from(new Set(monthlyLedgers.map(m => m.month)));
   const filteredMonths = month ? monthlyLedgers.filter(m => m.month === month) : monthlyLedgers;
   const outstanding = filteredMonths.length > 0 ? filteredMonths[filteredMonths.length - 1].summary.outstanding : 0;
 

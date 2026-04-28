@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient, updateClient } from '@/app/actions/client-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,22 @@ export default function ClientForm({ client, onSuccess }: ClientFormProps) {
     address: client?.address || '',
     clientType: client?.clientType || 'FARMER',
     mobile: client?.mobile || '',
+    panNumber: client?.panNumber || '',
+    aadharNumber: client?.aadharNumber || '',
+    gstNumber: client?.gstNumber || '',
   });
+
+  useEffect(() => {
+    setFormData({
+      name: client?.name || '',
+      address: client?.address || '',
+      clientType: client?.clientType || 'FARMER',
+      mobile: client?.mobile || '',
+      panNumber: client?.panNumber || '',
+      aadharNumber: client?.aadharNumber || '',
+      gstNumber: client?.gstNumber || '',
+    });
+  }, [client]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +95,33 @@ export default function ClientForm({ client, onSuccess }: ClientFormProps) {
           value={formData.address} 
           onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
           placeholder="Location/Village/City"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">PAN Card Number</label>
+        <Input 
+          required 
+          value={formData.panNumber} 
+          onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })} 
+          placeholder="ABCDE1234F"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Aadhaar Number</label>
+        <Input 
+          required 
+          value={formData.aadharNumber} 
+          onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value })} 
+          placeholder="1234 5678 9012"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">GSTIN</label>
+        <Input 
+          required 
+          value={formData.gstNumber} 
+          onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })} 
+          placeholder="22AAAAA0000A1Z5"
         />
       </div>
       <div className="space-y-2">

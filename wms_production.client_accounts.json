@@ -1,0 +1,65 @@
+[{
+  "_id": {
+    "$oid": "69e12dfa4d137dd896f9a1d0"
+  },
+  "clientId": {
+    "$oid": "69e0c97dcaec663cd7815773"
+  },
+  "clientName": "ABC Grains Inc",
+  "bookingId": "69e0c97dcaec663cd7815773",
+  "createdAt": {
+    "$date": "2026-04-16T18:44:10.425Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-16T18:44:10.425Z"
+  },
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e12dfa4d137dd896f9a1d1"
+  },
+  "clientId": "client-001",
+  "clientName": "ABC Traders",
+  "bookingId": "client-001",
+  "createdAt": {
+    "$date": "2026-04-16T18:44:10.426Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-16T18:44:10.426Z"
+  },
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e12dfa4d137dd896f9a1d2"
+  },
+  "clientId": "client-002",
+  "clientName": "XYZ Enterprises",
+  "bookingId": "client-002",
+  "createdAt": {
+    "$date": "2026-04-16T18:44:10.427Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-16T18:44:10.427Z"
+  },
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+}]

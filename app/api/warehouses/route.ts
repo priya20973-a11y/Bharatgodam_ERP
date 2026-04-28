@@ -2,15 +2,23 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownership';
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
 
     const warehouses = await db
       .collection('warehouses')
       .find({
-        name: { $nin: ['Warehouse ABC', 'Warehouse XYZ'] } // Exclude problematic warehouses
+        ...tenantFilter,
+        name: { $nin: ['Warehouse ABC', 'Warehouse XYZ'] }
       })
       .sort({ name: 1 })
       .toArray();
@@ -53,25 +61,23 @@ export async function POST(request: Request) {
 
     const db = await getDb();
 
-    const warehouse = {
+    const warehousePayload = appendOwnershipForMongo({
       name,
       address,
       totalCapacity: Number(totalCapacity),
       availableCapacity: Number(totalCapacity), // Initially fully available
       isActive: isActive !== undefined ? isActive : true,
-      userId: (session.user as any).id,
-      userEmail: session.user.email,
       createdAt: new Date(),
-    };
+    }, session);
 
-    const result = await db.collection('warehouses').insertOne(warehouse);
+    const result = await db.collection('warehouses').insertOne(warehousePayload);
 
     return NextResponse.json({
       success: true,
       message: 'Warehouse created successfully',
       warehouse: {
         id: result.insertedId.toString(),
-        ...warehouse
+        ...warehousePayload
       }
     });
 

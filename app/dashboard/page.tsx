@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Box, Layers, DollarSign, Clock3 } from 'lucide-react';
 import { getDb } from '@/lib/mongodb';
+import { getTenantFilterForMongo } from '@/lib/ownership';
+import { getClientRevenueAnalytics } from '@/app/actions/transaction-actions';
 import TransactionsReportWrapper from '@/components/features/reports/transactions-report-wrapper';
 import WarehouseInventory from '@/components/features/warehouse/warehouse-inventory';
 
@@ -37,22 +39,27 @@ export default async function DashboardPage() {
   }
 
   const db = await getDb();
+  const tenantFilter = getTenantFilterForMongo(session);
+
   const now = new Date();
   const currentYearStart = new Date(now.getFullYear(), 0, 1);
   const currentYearEnd = new Date(now.getFullYear() + 1, 0, 1);
   const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
   const previousYearEnd = new Date(now.getFullYear(), 0, 1);
 
-  const transactionMatch: Record<string, unknown> = {};
+  const transactionMatch: Record<string, unknown> = { ...tenantFilter };
   const currentYearStartStr = currentYearStart.toISOString().slice(0, 10);
   const currentYearEndStr = currentYearEnd.toISOString().slice(0, 10);
   const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
   const previousYearEndStr = previousYearEnd.toISOString().slice(0, 10);
 
-  const [transactionAnalytics] = await db.collection('transactions').aggregate([
+  const [transactionAnalytics] = await db.collection('inwards').aggregate([
+    {
+      $match: Object.keys(transactionMatch).length ? transactionMatch : {}
+    },
     {
       $project: {
-        direction: 1,
+        direction: { $literal: 'INWARD' },
         quantityMT: 1,
         commodityName: 1,
         date: 1,
@@ -66,7 +73,29 @@ export default async function DashboardPage() {
       }
     },
     {
-      $match: Object.keys(transactionMatch).length ? transactionMatch : {}
+      $unionWith: {
+        coll: 'outwards',
+        pipeline: [
+          {
+            $match: Object.keys(transactionMatch).length ? transactionMatch : {}
+          },
+          {
+            $project: {
+              direction: { $literal: 'OUTWARD' },
+              quantityMT: 1,
+              commodityName: 1,
+              date: 1,
+              dateString: {
+                $cond: [
+                  { $eq: [{ $type: '$date' }, 'date'] },
+                  { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+                  { $substrCP: ['$date', 0, 10] }
+                ]
+              }
+            }
+          }
+        ]
+      }
     },
     {
       $facet: {
@@ -221,7 +250,7 @@ export default async function DashboardPage() {
     }
   ]).toArray();
 
-  const [invoiceReceivablesResult, paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceCount, ledgerEntryCount] = await Promise.all([
+  const [invoiceReceivablesResult, paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, transactionInvoiceCountResult, ledgerEntryCount] = await Promise.all([
     db.collection('invoice_master').aggregate([
       {
         $project: {
@@ -236,18 +265,58 @@ export default async function DashboardPage() {
           status: 1
         }
       },
-      { $match: { status: { $ne: 'PAID' }, pendingAmount: { $gt: 0 } } },
+      { $match: { ...tenantFilter, status: { $ne: 'PAID' }, pendingAmount: { $gt: 0 } } },
       { $group: { _id: null, totalPendingReceivables: { $sum: '$pendingAmount' } } }
     ]).toArray(),
     db.collection('payments').aggregate([
-      { $match: { status: 'COMPLETED' } },
+      { $match: { ...tenantFilter, status: 'COMPLETED' } },
       { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
     ]).toArray(),
-    db.collection('warehouses').countDocuments({ status: 'ACTIVE' }),
-    db.collection('clients').countDocuments({ status: 'ACTIVE' }),
-    db.collection('invoice_master').countDocuments(),
-    db.collection('ledger_entries').countDocuments()
+    db.collection('warehouses').countDocuments({ ...tenantFilter, status: 'ACTIVE' }),
+    db.collection('clients').countDocuments({ ...tenantFilter, status: 'ACTIVE' }),
+    db.collection('invoice_master').countDocuments({ ...tenantFilter }),
+    db.collection('invoices').countDocuments({ ...tenantFilter }),
+    db.collection('transactions').aggregate([
+      {
+        $match: tenantFilter
+      },
+      {
+        $project: {
+          clientId: 1,
+          warehouseId: 1,
+          monthKey: {
+            $cond: [
+              { $eq: [{ $type: '$date' }, 'date'] },
+              { $dateToString: { format: '%Y-%m', date: '$date' } },
+              { $substrCP: ['$date', 0, 7] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          clientId: { $exists: true, $ne: null },
+          monthKey: { $exists: true, $ne: '' }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            clientId: '$clientId',
+            warehouseId: '$warehouseId',
+            monthKey: '$monthKey'
+          }
+        }
+      },
+      { $count: 'invoicePeriods' }
+    ]).toArray(),
+    db.collection('ledger_entries').countDocuments({ ...tenantFilter })
   ]);
+
+  const invoiceMasterCountValue = invoiceMasterCount ?? 0;
+  const formalInvoiceCountValue = formalInvoiceCount ?? 0;
+  const ledgerInvoiceCount = transactionInvoiceCountResult?.[0]?.invoicePeriods ?? 0;
+  const invoiceCount = ledgerInvoiceCount; // Use transaction periods as invoice count
 
   const totalTransactions = transactionAnalytics?.totals?.[0]?.totalTransactions ?? 0;
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
@@ -255,7 +324,8 @@ export default async function DashboardPage() {
   const outwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'OUTWARD')?.count ?? 0;
   const commodityBreakdown = transactionAnalytics?.commodityBreakdown ?? [];
 
-  const totalRevenue = paymentsReceivedResult[0]?.totalRevenue ?? 0;
+  const revenueAnalytics = await getClientRevenueAnalytics();
+  const totalRevenue = revenueAnalytics?.summary?.totalRevenue ?? paymentsReceivedResult[0]?.totalRevenue ?? 0;
   const pendingReceivables = invoiceReceivablesResult[0]?.totalPendingReceivables ?? 0;
 
   const masterLinks = [

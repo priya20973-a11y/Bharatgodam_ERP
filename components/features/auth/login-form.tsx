@@ -7,7 +7,6 @@ import { signIn } from 'next-auth/react'; // <-- Import NextAuth signIn
 
 export default function LoginForm() {
   const router = useRouter(); // <-- Initialize Router
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,27 +17,7 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        // Handle Sign Up
-        const response = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert(`Error: ${data.message}`);
-          setIsLoading(false);
-          return;
-        }
-        
-        // Optionally show success message
-        // alert(`Success: ${data.message}`);
-      }
-
-      // Handle Sign In (either after signup or direct signin)
+      // Handle Sign In
       const result = await signIn('credentials', {
         redirect: false,
         email,
@@ -61,7 +40,6 @@ export default function LoginForm() {
   };
 
   const toggleMode = () => {
-    setIsSignUp((prev) => !prev);
     // Optional: Clear form when switching modes
     setEmail('');
     setPassword('');
@@ -75,7 +53,7 @@ export default function LoginForm() {
         {/* Header Section */}
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
-            {isSignUp ? 'Create new account' : 'Sign in to your account'}
+            Sign in to your account
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Warehouse Management System v2.0
@@ -123,13 +101,12 @@ export default function LoginForm() {
                   id="password"
                   name="password"
                   type="password"
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
+                  autoComplete="current-password"
                   required
-                  minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm transition-colors"
-                  placeholder={isSignUp ? "Create Password (Min 6 chars)" : "Password"}
+                  placeholder="Password"
                   aria-required="true"
                 />
               </div>
@@ -144,13 +121,9 @@ export default function LoginForm() {
               className="group relative flex w-full justify-center rounded-lg border border-transparent bg-blue-600 py-3 px-4 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
             >
               <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                {isSignUp ? (
-                  <UserPlus className="h-5 w-5 text-blue-500 group-hover:text-blue-400 transition-colors" aria-hidden="true" />
-                ) : (
-                  <ArrowRight className="h-5 w-5 text-blue-500 group-hover:text-blue-400 transition-colors" aria-hidden="true" />
-                )}
+                <ArrowRight className="h-5 w-5 text-blue-500 group-hover:text-blue-400 transition-colors" aria-hidden="true" />
               </span>
-              {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Login')}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </div>
         </form>
@@ -162,19 +135,17 @@ export default function LoginForm() {
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">Need to switch?</span>
+              <span className="bg-white px-2 text-gray-500">Need an account?</span>
             </div>
           </div>
 
           <div className="mt-6 text-center">
             <button
-              onClick={toggleMode}
+              onClick={() => router.push('/auth/signup')}
               type="button"
               className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:underline"
             >
-              {isSignUp
-                ? 'Already have an account? Sign In'
-                : "Don't have an account? Sign Up"}
+              Sign up for a WSP account
             </button>
           </div>
         </div>

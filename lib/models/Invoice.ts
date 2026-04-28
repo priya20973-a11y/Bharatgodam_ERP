@@ -21,6 +21,8 @@ export interface IInvoice extends Document {
   paidAmount: number;
   status: 'ACTIVE' | 'PAID' | 'OVERDUE';
   generatedAt: Date;
+  userId?: mongoose.Types.ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +49,8 @@ const InvoiceSchema: Schema = new Schema(
     paidAmount: { type: Number, default: 0 },
     status: { type: String, enum: ['ACTIVE', 'PAID', 'OVERDUE'], default: 'ACTIVE' },
     generatedAt: { type: Date, default: Date.now },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );

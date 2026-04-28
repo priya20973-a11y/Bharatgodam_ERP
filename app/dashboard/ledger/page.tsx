@@ -21,6 +21,7 @@ type ClientBreakdown = {
 type LedgerSummary = {
   totalOutstanding: number;
   totalReceived: number;
+  totalRent: number;
   clientBreakdown: ClientBreakdown[];
 };
 
@@ -60,7 +61,7 @@ export default function LedgerDashboard() {
       setSummary(data);
     } catch (error) {
       console.error('Failed to load ledger summary:', error);
-      setSummary({ totalOutstanding: 0, totalReceived: 0, clientBreakdown: [] });
+      setSummary({ totalOutstanding: 0, totalReceived: 0, totalRent: 0, clientBreakdown: [] });
     } finally {
       setSummaryLoading(false);
     }
@@ -167,9 +168,9 @@ export default function LedgerDashboard() {
         {loading ? (
           [1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-xl" />)
         ) : (
-          filteredClients.map((client) => (
+          filteredClients.map((client, index) => (
             <Card 
-              key={client._id} 
+              key={`${client._id || client.id || index}-${client.name}-${index}`} 
               className="group hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-sm"
               onClick={() => handleDrillDown(client)}
             >

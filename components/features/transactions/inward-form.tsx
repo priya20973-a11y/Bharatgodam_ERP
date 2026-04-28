@@ -62,7 +62,6 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
   const lotNoId = useId();
   const gatePassId = useId();
   const inwardDateId = useId();
-  const outwardDateId = useId();
 
   const {
     register,
@@ -212,7 +211,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     {clients && clients.length > 0 ? (
                       clients.filter(c => c && c._id && c.name).map(c => <SelectItem key={c._id.toString()} value={c._id.toString()}>{c.name}</SelectItem>)
                     ) : (
-                      <SelectItem value="" disabled>No clients available</SelectItem>
+                      <SelectItem value="none" disabled>No clients available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -235,7 +234,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     {commodities && commodities.length > 0 ? (
                       commodities.filter(c => c && c._id && c.name).map(c => <SelectItem key={c._id.toString()} value={c._id.toString()}>{c.name}</SelectItem>)
                     ) : (
-                      <SelectItem value="" disabled>No commodities available</SelectItem>
+                      <SelectItem value="none" disabled>No commodities available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -273,7 +272,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                           );
                         })
                     ) : (
-                      <SelectItem value="" disabled>No warehouses available</SelectItem>
+                      <SelectItem value="none" disabled>No warehouses available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -366,16 +365,6 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     {...register('inwardDate')}
                     type="date" 
                 />
-            </div>
-            <div className="space-y-2">
-                <label htmlFor={outwardDateId} className="text-sm font-semibold text-slate-700">Expected Outward Date</label>
-                <Input 
-                    id={outwardDateId}
-                    {...register('outwardDate')}
-                    type="date" 
-                    className={errors.outwardDate ? 'border-red-500' : ''}
-                />
-                {errors.outwardDate && <p className="text-xs text-red-500">{errors.outwardDate.message}</p>}
             </div>
         </div>
 

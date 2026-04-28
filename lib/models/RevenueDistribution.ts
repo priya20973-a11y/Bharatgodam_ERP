@@ -8,6 +8,8 @@ export interface IRevenueDistribution extends Document {
   ownerShare: number;   // 60%
   platformShare: number; // 40%
   timestamp: Date;
+  userId?: mongoose.Types.ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,8 @@ const RevenueDistributionSchema: Schema = new Schema(
     ownerShare: { type: Number, required: true },
     platformShare: { type: Number, required: true },
     timestamp: { type: Date, default: Date.now },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );

@@ -10,6 +10,8 @@ export interface IOutward extends Document {
   lotNo?: string;
   gatePass?: string;
   date: Date;
+  userId?: mongoose.Types.ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +27,8 @@ const OutwardSchema: Schema = new Schema(
     lotNo: { type: String, trim: true },
     gatePass: { type: String, trim: true },
     date: { type: Date, default: Date.now },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );

@@ -37,11 +37,26 @@ export default function InwardPage() {
     commodityId: '',
     quantityMT: 0,
     inwardDate: '',
-    expectedOutwardDate: '',
-    ratePerMTPerDay: 10, // Default rate
+    ratePerMTPerDay: 0,
     gatePass: '',
     remarks: '',
   });
+
+  useEffect(() => {
+    if (!formData.commodityId || masterData.commodities.length === 0) return;
+
+    const commodity = masterData.commodities.find(
+      item => item._id?.toString() === formData.commodityId
+    );
+
+    if (!commodity) return;
+
+    const ratePerMTPerDay =
+      commodity.ratePerMtPerDay ??
+      (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 0);
+
+    setFormData(prev => ({ ...prev, ratePerMTPerDay }));
+  }, [formData.commodityId, masterData.commodities]);
 
   // Fetch master data on component mount
   useEffect(() => {
@@ -94,15 +109,10 @@ export default function InwardPage() {
             commodityId: '',
             quantityMT: 0,
             inwardDate: '',
-            expectedOutwardDate: '',
             ratePerMTPerDay: 10,
             gatePass: '',
             remarks: '',
           });
-
-          toast.success('Inward transaction recorded successfully!');
-        } else {
-          toast.error(result.message || 'Failed to record inward transaction');
         }
       } catch (error) {
         console.error('Error submitting inward transaction:', error);
@@ -210,18 +220,6 @@ export default function InwardPage() {
                 value={formData.inwardDate}
                 onChange={handleChange}
                 required
-                className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="expectedOutwardDate" className="block text-sm font-medium text-slate-700 mb-1">Expected Outward Date</label>
-              <input
-                type="date"
-                id="expectedOutwardDate"
-                name="expectedOutwardDate"
-                value={formData.expectedOutwardDate}
-                onChange={handleChange}
                 className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-indigo-500"
               />
             </div>

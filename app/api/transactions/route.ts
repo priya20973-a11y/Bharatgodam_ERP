@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
 import { createStockEntry } from '@/app/actions/stock-ledger-actions';
+import { getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export async function POST(request: Request) {
@@ -171,7 +172,7 @@ export async function POST(request: Request) {
     }
 
     // Create transaction record ONLY with valid master references
-    const transaction = {
+    const transaction = appendOwnershipForMongo({
       accountId: accountId,
       direction: direction,
       date: date,
@@ -182,13 +183,11 @@ export async function POST(request: Request) {
       clientId: clientId,
       clientName: clientFromMaster.name,
       warehouseId: warehouseId || null,
-      userId: (session.user as any).id,
-      userEmail: session.user.email,
       createdAt: new Date(),
       updatedAt: new Date(),
       status: 'COMPLETED',
       type: direction,
-    };
+    }, session);
 
     // Insert transaction
     const result = await db.collection('transactions').insertOne(transaction);
@@ -196,7 +195,9 @@ export async function POST(request: Request) {
     // Mirror transaction into stock/ledger entries for full traceability
     if (warehouseId && commodityFromMaster) {
       try {
-        const ratePerMTPerDay = commodityFromMaster.ratePerMtMonth ? commodityFromMaster.ratePerMtMonth / 30 : 10;
+        const ratePerMTPerDay =
+          commodityFromMaster.ratePerMtPerDay ??
+          (commodityFromMaster.ratePerMtMonth ? commodityFromMaster.ratePerMtMonth / 30 : 10);
 
         await createStockEntry({
           clientId,
@@ -307,14 +308,35 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
+
+    const warehouseDocs = await db.collection('warehouses')
+      .find({ ...tenantFilter })
+      .project({ _id: 1 })
+      .toArray();
+    const ownedWarehouseIdStrings = warehouseDocs.map((warehouse: any) => warehouse._id.toString());
+    const ownedWarehouseObjectIds = warehouseDocs
+      .map((warehouse: any) => warehouse._id)
+      .filter((id: any) => id instanceof ObjectId);
+    const warehouseQueryIds = [...ownedWarehouseIdStrings, ...ownedWarehouseObjectIds];
 
     // Build query
-    const query: any = { userEmail: session.user.email };
+    const query: any = { ...tenantFilter };
     if (clientId) query.clientId = clientId;
     if (accountId) query.accountId = accountId;
-    if (warehouseId) query.warehouseId = warehouseId;
     if (direction) query.direction = direction.toUpperCase();
-    
+
+    if (warehouseId) {
+      const requestedWarehouseIds: Array<string | ObjectId> = [warehouseId];
+      const warehouseIdString = String(warehouseId);
+      if (ObjectId.isValid(warehouseIdString)) requestedWarehouseIds.push(new ObjectId(warehouseIdString));
+
+      const ownsWarehouse = warehouseQueryIds.some((id: any) => id.toString() === warehouseIdString);
+      query.warehouseId = ownsWarehouse ? { $in: requestedWarehouseIds } : { $in: [] };
+    } else if (warehouseQueryIds.length > 0) {
+      query.warehouseId = { $in: warehouseQueryIds };
+    }
+
     // Date range filtering
     if (startDate || endDate) {
       query.date = {};

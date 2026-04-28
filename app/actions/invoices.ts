@@ -7,6 +7,7 @@ import { ObjectId } from 'mongodb';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { calculateLedger, Transaction, Payment, LedgerSummary, LedgerEntry } from '@/lib/ledger-engine';
+import { getTenantFilterForMongo, isAdmin, requireSession } from '@/lib/ownership';
 import type { ILogisticsBooking } from '@/types/schemas';
 
 /**
@@ -59,14 +60,17 @@ async function notifyRevenueSystem(
 }
 
 export async function fetchUserInvoices() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) throw new Error('Unauthorized');
-
+  const session = await requireSession();
+  if (!session.user) throw new Error('User not authenticated');
   const db = await getDb();
-  
+  const tenantFilter = getTenantFilterForMongo(session);
+  const query: any = isAdmin(session)
+    ? {}
+    : { $or: [tenantFilter, { clientEmail: session.user.email }] };
+
   // Fetch actual formal invoices from the database
   const invoices = await db.collection('invoices')
-    .find({ clientEmail: session.user.email })
+    .find(query)
     .sort({ generatedAt: -1 })
     .toArray();
 
@@ -92,15 +96,16 @@ export async function fetchUserInvoices() {
  * Fetch invoice master records for the current user
  */
 export async function fetchInvoiceMasters() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) throw new Error('Unauthorized');
-
+  const session = await requireSession();
+  if (!session.user) throw new Error('User not authenticated');
   const db = await getDb();
+  const tenantFilter = getTenantFilterForMongo(session);
+  const query: any = isAdmin(session)
+    ? {}
+    : { $or: [tenantFilter, { clientEmail: session.user.email }] };
 
-  // For demo purposes, return all invoices if user is authenticated
-  // In production, you would filter by clientId or user permissions
   const invoices = await db.collection('invoices')
-    .find({})
+    .find(query)
     .sort({ generatedAt: -1 })
     .toArray();
 
@@ -161,29 +166,35 @@ export async function getUnifiedFinancials(
   clientId: string
 ): Promise<{ success: boolean; data?: UnifiedInvoiceData; message?: string }> {
   try {
+    const session = await requireSession();
+    if (!session.user) throw new Error('User not authenticated');
     const trimmedId = clientId?.trim();
     if (!trimmedId) {
       return { success: false, message: 'Client ID is required' };
     }
 
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
+    const sharedFilter: any = isAdmin(session)
+      ? {}
+      : { $or: [tenantFilter, { userEmail: session.user.email }] };
 
     const [bookings, transactionDocs, paymentDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
-        .find({ accountId: trimmedId })
+        .find({ accountId: trimmedId, ...sharedFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
-        .find({ accountId: trimmedId })
+        .find({ accountId: trimmedId, ...sharedFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
-        .find({ accountId: trimmedId })
+        .find({ accountId: trimmedId, ...sharedFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('invoices')
         .aggregate([
-          { $match: { clientId: new ObjectId(trimmedId), status: { $ne: 'PAID' } } },
+          { $match: { clientId: new ObjectId(trimmedId), status: { $ne: 'PAID' }, ...sharedFilter } },
           { $group: { _id: null, totalOutstanding: { $sum: '$totalAmount' } } }
         ])
         .toArray(),

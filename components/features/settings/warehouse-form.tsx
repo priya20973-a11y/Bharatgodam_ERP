@@ -5,7 +5,8 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Trash2, PlusCircle, Settings, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { WarehouseConfigSchema, WarehouseConfigValues, updateWarehouseConfig } from '@/app/actions/warehouse-config';
+import { WarehouseConfigSchema, WarehouseConfigValues } from '@/lib/schemas/warehouse-client';
+import { updateWarehouseConfig } from '@/app/actions/warehouse-config';
 
 export default function WarehouseConfigForm({ initialData }: { initialData?: Partial<WarehouseConfigValues> }) {
   const [isSaving, setIsSaving] = useState(false);

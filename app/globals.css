@@ -3,6 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --brand-bg: #0f2f5d;
+  --brand-bg-dark: #0b264b;
+  --brand-accent: #ff8a00;
+  --brand-accent-dark: #d37100;
+  --brand-accent-soft: #fff1de;
+  --brand-text: #ffffff;
 }
 
 @theme inline {
@@ -23,4 +29,52 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar-background {
+  background-color: var(--brand-bg) !important;
+}
+
+.sidebar-border {
+  border-color: var(--brand-bg-dark) !important;
+}
+
+.bg-blue-500 {
+  background-color: #ff9a33 !important;
+}
+
+.bg-blue-600 {
+  background-color: var(--brand-accent) !important;
+}
+
+.hover\:bg-blue-700:hover {
+  background-color: var(--brand-accent-dark) !important;
+}
+
+.text-blue-500 {
+  color: #ff8a00 !important;
+}
+
+.text-blue-600 {
+  color: var(--brand-accent) !important;
+}
+
+.text-blue-700 {
+  color: var(--brand-accent-dark) !important;
+}
+
+.text-blue-800 {
+  color: #0b264b !important;
+}
+
+.bg-blue-50 {
+  background-color: var(--brand-accent-soft) !important;
+}
+
+.bg-blue-100 {
+  background-color: #ffe6c2 !important;
+}
+
+.border-blue-200 {
+  border-color: #ffd09f !important;
 }

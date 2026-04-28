@@ -86,6 +86,7 @@ export default function CommoditiesDashboard({ initialData }: { initialData: any
             <TableRow className="bg-slate-50">
               <TableHead className="font-bold">Commodity</TableHead>
               <TableHead className="font-bold">Daily Rate (₹/MT)</TableHead>
+              <TableHead className="font-bold">Added By</TableHead>
               <TableHead className="text-right font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -99,6 +100,7 @@ export default function CommoditiesDashboard({ initialData }: { initialData: any
                       ₹{item.ratePerMtPerDay ? item.ratePerMtPerDay.toFixed(2) : '0.00'}
                     </span>
                   </TableCell>
+                  <TableCell className="text-sm text-slate-600">{item.addedBy || 'Unknown'}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="ghost" size="icon" onClick={() => { setEditingId(item._id); setFormData({ name: item.name, ratePerMtPerDay: item.ratePerMtPerDay }); }}>
                       <Edit className="h-4 w-4" />
@@ -111,7 +113,7 @@ export default function CommoditiesDashboard({ initialData }: { initialData: any
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={4} className="text-center py-8 text-slate-500">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   No commodities found
                 </TableCell>

@@ -5,6 +5,11 @@ export interface IClient extends Document {
   address: string;
   clientType: 'FARMER' | 'FPO' | 'COMPANY';
   mobile: string;
+  panNumber: string;
+  aadharNumber: string;
+  gstNumber: string;
+  userId?: mongoose.Types.ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +24,11 @@ const ClientSchema: Schema = new Schema(
       required: true,
     },
     mobile: { type: String, required: true },
+    panNumber: { type: String, required: true },
+    aadharNumber: { type: String, required: true },
+    gstNumber: { type: String, required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );

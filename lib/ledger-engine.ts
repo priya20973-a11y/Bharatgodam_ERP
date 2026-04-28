@@ -273,8 +273,8 @@ export function calculateLedger(
   const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const totalPaid = roundCurrency(sortedPayments.reduce((sum, p) => sum + p.amount, 0));
 
-  // Balance = Rent Owed - Payments Received + Outstanding Invoices
-  const balance = roundCurrency(totalRent + outstandingInvoices - totalPaid);
+  // Balance = Total Rent - Total Paid
+  const balance = roundCurrency(totalRent - totalPaid);
 
   const calculationDate = new Date();
   calculationDate.setHours(0, 0, 0, 0);

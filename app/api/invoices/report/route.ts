@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getDb } from '@/lib/mongodb';
+import { getTenantFilter, getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,11 +25,13 @@ export async function GET(request: Request) {
     }
 
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
 
     const master = await db.collection('invoice_master').findOne({
       clientId: new ObjectId(clientId),
       warehouseId: new ObjectId(warehouseId),
       invoiceMonth,
+      ...tenantFilter,
     });
 
     const lineItems = master

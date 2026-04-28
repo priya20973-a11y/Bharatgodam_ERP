@@ -59,7 +59,7 @@ node populate-sample-data.js
 **Adds:**
 - 2 warehouses (Main Warehouse, Secondary Warehouse)
 - 2 commodities (Rice, Wheat)
-- 2 clients (ABC Traders, XYZ Enterprises)
+- 1 client (XYZ Enterprises)
 
 ### Check Database Status
 ```bash

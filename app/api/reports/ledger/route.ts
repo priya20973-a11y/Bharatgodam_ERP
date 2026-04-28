@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { appendOwnership, requireSession } from '@/lib/ownership';
 
 /**
  * POST /api/reports/ledger
@@ -9,10 +8,7 @@ import { authOptions } from '@/lib/auth';
  */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const session = await requireSession();
 
     const body = await req.json();
     const { accountId, clientName, amount, date } = body;
@@ -33,14 +29,16 @@ export async function POST(req: Request) {
 
     const db = await getDb();
 
-    const result = await db.collection('payments').insertOne({
+    const paymentDocument = appendOwnership({
       accountId: accountId?.trim() || null,
       clientName: clientName?.trim() || '',
       amount: Number(amount),
       date: new Date(date).toISOString().split('T')[0],
       recordedBy: session.user?.email,
       createdAt: new Date(),
-    });
+    }, session);
+
+    const result = await db.collection('payments').insertOne(paymentDocument);
 
     return NextResponse.json(
       {

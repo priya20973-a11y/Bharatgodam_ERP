@@ -1,0 +1,74 @@
+app/actions/stock-ledger-actions.ts(3,23): error TS2307: Cannot find module '@/lib/mongodb' or its corresponding type declarations.
+app/actions/stock-ledger-actions.ts(4,115): error TS2307: Cannot find module '@/types/schemas' or its corresponding type declarations.
+app/api/invoice/download/[id]/route.ts(3,29): error TS2307: Cannot find module '@/lib/auth' or its corresponding type declarations.
+app/api/invoice/download/[id]/route.ts(4,23): error TS2307: Cannot find module '@/lib/mongodb' or its corresponding type declarations.
+app/api/invoice/download/[id]/route.ts(6,43): error TS2307: Cannot find module '@/app/actions/monthly-invoice-pdf' or its corresponding type declarations.
+app/api/invoice/download/[id]/route.ts(7,40): error TS2307: Cannot find module '@/app/actions/ledger' or its corresponding type declarations.
+node_modules/next-auth/adapters.d.ts(2,47): error TS2307: Cannot find module '@auth/core/adapters' or its corresponding type declarations.
+node_modules/next-auth/core/lib/cookie.d.ts(31,5): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/next-auth/providers/email.d.ts(1,45): error TS2307: Cannot find module 'nodemailer' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(2,32): error TS2307: Cannot find module 'nodemailer/lib/json-transport/index.js' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(3,36): error TS2307: Cannot find module 'nodemailer/lib/sendmail-transport/index.js' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(4,31): error TS2307: Cannot find module 'nodemailer/lib/ses-transport/index.js' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(5,27): error TS2307: Cannot find module 'nodemailer/lib/smtp-pool/index.js' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(6,32): error TS2307: Cannot find module 'nodemailer/lib/smtp-transport/index.js' or its corresponding type declarations.
+node_modules/next-auth/providers/email.d.ts(7,34): error TS2307: Cannot find module 'nodemailer/lib/stream-transport/index.js' or its corresponding type declarations.
+node_modules/next/dist/build/webpack/loaders/next-app-loader/index.d.ts(1,13): error TS2613: Module '"next/dist/compiled/webpack/webpack"' has no default export. Did you mean to use 'import { webpack } from "next/dist/compiled/webpack/webpack"' instead?
+node_modules/next/dist/client/components/catch-error.d.ts(2,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/components/error-boundary.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/components/http-access-fallback/error-boundary.d.ts(11,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/components/layout-router.d.ts(3,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/components/segment-cache/cache.d.ts(104,21): error TS2304: Cannot find name 'PromiseWithResolvers'.
+node_modules/next/dist/client/image-component.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/link.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/script.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/client/with-router.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/lib/metadata/metadata.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/next-devtools/userspace/pages/pages-dev-overlay-setup.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/pages/_app.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/pages/_document.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/pages/_error.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/server/app-render/types.d.ts(10,8): error TS1192: Module '"next/dist/compiled/superstruct"' has no default export.
+node_modules/next/dist/server/web/spec-extension/adapters/headers.d.ts(39,16): error TS2304: Cannot find name 'HeadersIterator'.
+node_modules/next/dist/server/web/spec-extension/adapters/headers.d.ts(40,13): error TS2304: Cannot find name 'HeadersIterator'.
+node_modules/next/dist/server/web/spec-extension/adapters/headers.d.ts(41,15): error TS2304: Cannot find name 'HeadersIterator'.
+node_modules/next/dist/server/web/spec-extension/adapters/headers.d.ts(42,26): error TS2304: Cannot find name 'HeadersIterator'.
+node_modules/next/dist/shared/lib/app-router-context.shared-runtime.d.ts(4,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/app-router-types.d.ts(7,13): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/dynamic.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/head-manager-context.shared-runtime.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/head.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/image-config-context.shared-runtime.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/loadable-context.shared-runtime.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/loadable.shared-runtime.d.ts(21,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/router-context.shared-runtime.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/server-inserted-html.shared-runtime.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/next/dist/shared/lib/utils.d.ts(10,13): error TS1192: Module '"fs"' has no default export.
+node_modules/next/dist/styled-jsx/types/global.d.ts(1,8): error TS1259: Module '"/Users/shrutimehata/Desktop/BG/warehouse-management-main/warehouse-management-main/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+node_modules/puppeteer-core/lib/types.d.ts(39,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(621,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(881,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1190,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1353,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1681,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1777,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1821,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(1980,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2091,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2659,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2776,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2831,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2863,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(2999,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(4110,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(5015,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(5621,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(7989,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(8377,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(8502,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(8801,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(8887,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(9244,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(9487,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(9527,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.
+node_modules/puppeteer-core/lib/types.d.ts(9659,3): error TS18028: Private identifiers are only available when targeting ECMAScript 2015 and higher.

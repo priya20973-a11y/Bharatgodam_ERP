@@ -27,31 +27,9 @@ export const DetailedLogisticsSchema = z.object({
   bags: z.coerce.number().min(0, 'Quantity cannot be negative'),
   mt: z.coerce.number().min(0.1, 'Minimum 0.1 MT required'),
   palaBags: z.coerce.number().min(0, 'Invalid pala bags').default(0),
-  dateOutward: z.string().optional(),
 
   // 5. Billing Configuration
   storageDays: z.coerce.number().min(1, 'Minimum 1 day of storage').default(1),
-}).superRefine((data, ctx) => {
-  if (data.direction === 'INWARD' && data.dateOutward) {
-    const entryDate = new Date(data.date);
-    const outwardDate = new Date(data.dateOutward);
-    if (Number.isNaN(entryDate.getTime()) || Number.isNaN(outwardDate.getTime())) {
-      ctx.addIssue({
-        path: ['dateOutward'],
-        code: z.ZodIssueCode.custom,
-        message: 'Expected a valid outward date',
-      });
-      return;
-    }
-
-    if (outwardDate < entryDate) {
-      ctx.addIssue({
-        path: ['dateOutward'],
-        code: z.ZodIssueCode.custom,
-        message: 'Outward date must be on or after the inward date',
-      });
-    }
-  }
 });
 
 export type DetailedLogisticsValues = z.infer<typeof DetailedLogisticsSchema>;

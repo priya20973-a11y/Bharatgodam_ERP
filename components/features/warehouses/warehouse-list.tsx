@@ -29,13 +29,14 @@ export default function WarehouseList({ warehouses, onEdit }: WarehouseListProps
             <TableHead className="text-right">Occupied (MT)</TableHead>
             <TableHead className="text-right">Available (MT)</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="hidden lg:table-cell">Added By</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {warehouses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center">
+              <TableCell colSpan={8} className="h-24 text-center">
                 No warehouses found. Start by adding one.
               </TableCell>
             </TableRow>
@@ -54,6 +55,7 @@ export default function WarehouseList({ warehouses, onEdit }: WarehouseListProps
                       {w.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-slate-600">{w.addedBy || 'Unknown'}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => onEdit(w)}>
                       <Edit className="h-4 w-4" />

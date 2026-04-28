@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { LedgerCalculator } from '@/components/features/ledger';
 
@@ -22,13 +20,14 @@ import { LedgerCalculator } from '@/components/features/ledger';
  */
 
 interface LedgerPageProps {
-  params: {
+  params: Promise<{
     clientId: string;
-  };
+  }>;
 }
 
-export default function LedgerPage({ params }: LedgerPageProps) {
-  const decodedClientId = decodeURIComponent(params.clientId);
+export default async function LedgerPage({ params }: LedgerPageProps) {
+  const { clientId } = await params;
+  const decodedClientId = decodeURIComponent(clientId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8">

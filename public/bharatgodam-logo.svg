@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" role="img" aria-labelledby="title">
+  <title id="title">BharatGodam Logo</title>
+  <defs>
+    <linearGradient id="roofGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0057b7" />
+      <stop offset="100%" stop-color="#00a8ff" />
+    </linearGradient>
+    <linearGradient id="wallGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f4c81" />
+      <stop offset="100%" stop-color="#1d6fa5" />
+    </linearGradient>
+  </defs>
+  <rect x="16" y="28" width="56" height="36" rx="6" fill="url(#wallGradient)" />
+  <rect x="32" y="18" width="22" height="16" rx="3" fill="#f28928" />
+  <rect x="46" y="12" width="26" height="8" rx="3" fill="#f28928" />
+  <path d="M14 28 L44 4 L76 28 Z" fill="#f28928" />
+  <path d="M20 28 L58 28 L58 14 L20 14 Z" fill="#ffffff" opacity="0.15" />
+  <rect x="28" y="42" width="8" height="12" rx="2" fill="#ffffff" opacity="0.85" />
+  <rect x="44" y="42" width="8" height="12" rx="2" fill="#ffffff" opacity="0.85" />
+  <rect x="60" y="42" width="8" height="12" rx="2" fill="#ffffff" opacity="0.85" />
+  <text x="86" y="48" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" fill="#0f4c81">Bharat</text>
+  <text x="86" y="66" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" fill="#f28928">Godam</text>
+</svg>

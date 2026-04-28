@@ -74,12 +74,10 @@ export async function createDetailedBooking(formData: DetailedLogisticsValues) {
     }
 
     // ── 3. PRO-RATA BILLING CALCULATION ──────────────────────────────────────
-    // outwardDate comes from the dateOutward field if set, else defaults to inward + storageDays
-    const inwardDate  = data.date;
-    const outwardDate = (data as any).dateOutward
-      ? (data as any).dateOutward as string
-      : new Date(new Date(data.date).getTime() + data.storageDays * 86400000)
-          .toISOString().slice(0, 10);
+    const inwardDate = data.date;
+    const outwardDate = new Date(new Date(data.date).getTime() + data.storageDays * 86400000)
+      .toISOString()
+      .slice(0, 10);
 
     const rent = calculateRent(data.mt, ratePerTon, inwardDate, outwardDate);
 

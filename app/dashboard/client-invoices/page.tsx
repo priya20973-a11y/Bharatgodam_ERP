@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
 import { getClientOptions, getClientInvoicesByClientId, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/ledger';
-import { generateMonthlyInvoiceHTML } from '@/app/actions/monthly-invoice-pdf';
 import { toast } from 'react-hot-toast';
 
 interface MonthlyInvoice {
@@ -176,29 +175,33 @@ export default function ClientInvoicesPage() {
         const client = clientResult.find((c: any) => c.value === clientId);
         const warehouse = warehouseResult.find((w: any) => w.value === warehouseId);
 
-        const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => ({
-          bookingId: clientId,
-          clientName: client?.label || result.data.clientName || '',
-          month: invoice.month.split('-')[1].padStart(2, '0'),
-          year: parseInt(invoice.month.split('-')[0]),
-          periods: invoice.rows.map((period: any) => ({
-            startDate: period.fromDate,
-            endDate: period.toDate,
-            quantityMT: Number(period.qty ?? 0),
-            daysTotal: Number(period.days ?? 0),
-            rentTotal: Number(period.rent ?? 0),
-            status: period.status || 'COMPLETED',
-            commodityName: period.commodity || '',
-          })),
-          warehouseId: warehouseId || undefined,
-          warehouseName: warehouse?.label || '',
-          totalRent: Number(invoice.summary.totalRent ?? 0),
-          previousBalance: Number(invoice.summary.previousBalance ?? 0),
-          paymentsReceived: Number(invoice.summary.payments ?? 0),
-          outstandingBalance: Number(invoice.summary.outstanding ?? 0),
-          invoiceDate: new Date().toISOString().split('T')[0],
-          invoiceId: `${clientId}-${invoice.month}`,
-        }));
+        const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
+          const invoiceWarehouseId = invoice.warehouseId || warehouseId || undefined;
+          const invoiceWarehouseName = invoice.warehouseName || warehouse?.label || '';
+          return {
+            bookingId: clientId,
+            clientName: client?.label || result.data.clientName || '',
+            month: invoice.month.split('-')[1].padStart(2, '0'),
+            year: parseInt(invoice.month.split('-')[0]),
+            periods: invoice.rows.map((period: any) => ({
+              startDate: period.fromDate,
+              endDate: period.toDate,
+              quantityMT: Number(period.qty ?? 0),
+              daysTotal: Number(period.days ?? 0),
+              rentTotal: Number(period.rent ?? 0),
+              status: period.status || 'COMPLETED',
+              commodityName: period.commodity || '',
+            })),
+            warehouseId: invoiceWarehouseId,
+            warehouseName: invoiceWarehouseName,
+            totalRent: Number(invoice.summary.totalRent ?? 0),
+            previousBalance: Number(invoice.summary.previousBalance ?? 0),
+            paymentsReceived: Number(invoice.summary.payments ?? 0),
+            outstandingBalance: Number(invoice.summary.outstanding ?? 0),
+            invoiceDate: new Date().toISOString().split('T')[0],
+            invoiceId: invoiceWarehouseId ? `${clientId}-${invoice.month}-${invoiceWarehouseId}` : `${clientId}-${invoice.month}`,
+          };
+        });
 
         setInvoices(transformedInvoices);
       } else {
@@ -214,27 +217,32 @@ export default function ClientInvoicesPage() {
     }
   };
 
-  // Download invoice as HTML/PDF
+  // Download invoice as PDF (from backend API)
   const handleDownloadInvoice = async (invoice: MonthlyInvoice) => {
-    setDownloading(invoice.bookingId);
+    const invoiceId = invoice.invoiceId || invoice.bookingId;
+    const warehouseQuery = invoice.warehouseId ? `?warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
+    setDownloading(invoiceId);
     try {
-      const html = await generateMonthlyInvoiceHTML(invoice);
-
-      // Create blob and download
-      const blob = new Blob([html], { type: 'text/html' });
+      // Fetch PDF from backend API
+      const res = await fetch(`/api/invoice/download/${invoiceId}${warehouseQuery}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to fetch PDF: ${res.status} ${errorText}`);
+      }
+      const pdfBuffer = await res.arrayBuffer();
+      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Invoice_${invoice.clientName.replace(/\s+/g, '_')}_${invoice.month}_${invoice.year}.html`;
+      link.download = `Invoice_${invoice.clientName.replace(/\s+/g, '_')}_${invoice.month}_${invoice.year}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-
-      toast.success('Invoice downloaded successfully');
+      toast.success('Invoice PDF downloaded successfully');
     } catch (error) {
-      console.error('Failed to download invoice:', error);
-      toast.error('Failed to download invoice');
+      console.error('Failed to download invoice PDF:', error);
+      toast.error('Failed to download invoice PDF');
     } finally {
       setDownloading(null);
     }

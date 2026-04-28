@@ -158,7 +158,6 @@ export async function POST(req: Request) {
       const commodityName = body.commodityName?.toString().toUpperCase();
       const mt = Number(body.mt);
       const storageDays = Number(body.storageDays || 1);
-      const dateOutward = body.dateOutward ? body.dateOutward.toString() : undefined;
 
       if (!date || !warehouseName || !commodityName || !body.clientName || !body.gatePass || !mt || mt <= 0) {
         return NextResponse.json({ success: false, message: 'Missing required booking fields.' }, { status: 400 });
@@ -198,8 +197,6 @@ export async function POST(req: Request) {
         status: 'PENDING_APPROVAL',
         createdAt: new Date(),
       };
-
-      if (dateOutward) bookingDoc.dateOutward = dateOutward;
 
       const insertResult = await db.collection('bookings').insertOne(bookingDoc);
       const stockDelta = direction === 'INWARD' ? mt : -mt;

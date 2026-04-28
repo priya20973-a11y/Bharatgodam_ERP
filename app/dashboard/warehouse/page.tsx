@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import WarehouseInventory from '@/components/features/warehouse/warehouse-inventory';
 
 export const metadata: Metadata = {
-  title: 'Warehouse Management | WMS Pro',
+  title: 'Warehouse Management | BharatGodam',
   description: 'Comprehensive warehouse inventory and capacity management dashboard.',
 };
 

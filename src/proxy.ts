@@ -6,7 +6,7 @@ export default withAuth(
     // Example: Redirect non-admins away from an admin panel
     if (
       req.nextUrl.pathname.startsWith('/admin') &&
-      req.nextauth.token?.role !== 'ADMIN'
+      req.nextauth.token?.role !== 'admin'
     ) {
       return NextResponse.rewrite(new URL('/unauthorized', req.url));
     }

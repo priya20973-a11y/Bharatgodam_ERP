@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 
 /**
  * GET /api/reports/ledger/line-items?clientId=[clientId]
@@ -28,14 +29,16 @@ export async function GET(req: Request) {
     const trimmedClientId = clientId.trim();
 
     // Fetch invoices and bookings for the client
+    const tenantFilter = getTenantFilterForMongo(session);
+
     const [bookings, invoices] = await Promise.all([
       db.collection('bookings')
-        .find({ accountId: trimmedClientId, direction: { $in: ['INWARD', 'OUTWARD'] } })
+        .find({ accountId: trimmedClientId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
         .sort({ date: -1 })
         .limit(50)
         .toArray(),
       db.collection('invoices')
-        .find({ accountId: trimmedClientId })
+        .find({ accountId: trimmedClientId, ...tenantFilter })
         .sort({ date: -1 })
         .limit(50)
         .toArray(),

@@ -54,7 +54,10 @@ export default function ClientListWrapper({ initialClients }: { initialClients: 
             name: client.name,
             address: client.address,
             clientType: client.clientType,
-            mobile: client.mobile
+            mobile: client.mobile,
+            panNumber: client.panNumber || '',
+            aadharNumber: client.aadharNumber || '',
+            gstNumber: client.gstNumber || ''
           });
         }} 
       />

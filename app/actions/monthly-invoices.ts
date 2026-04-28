@@ -8,6 +8,8 @@ import { formatTimeStateForDisplay } from '@/lib/ledger-time-state-engine';
 export interface MonthlyInvoiceData {
   bookingId: string;
   clientName: string;
+  panNumber?: string;
+  gstNumber?: string;
   month: string;
   year: number;
   periods: Array<{
@@ -17,13 +19,16 @@ export interface MonthlyInvoiceData {
     daysTotal: number;
     rentTotal: number;
     status: string;
+    commodityName?: string;
   }>;
+  warehouseId?: string;
   warehouseName?: string;
   totalRent: number;
   previousBalance?: number;
   currentPayments?: number;
   newBalance?: number;
   invoiceDate: string;
+  invoiceNumber?: string;
 }
 
 /**

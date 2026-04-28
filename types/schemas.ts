@@ -4,7 +4,7 @@ export interface IUser {
   _id?: ObjectId;
   email: string;
   passwordHash: string;
-  role: 'ADMIN' | 'MANAGER' | 'STAFF';
+  role: 'ADMIN' | 'WSP' | 'MANAGER' | 'PICKER' | 'STAFF';
   createdAt: Date;
 }
 
@@ -25,6 +25,7 @@ export interface IWarehouse {
   capacity: number;
   occupiedCapacity: number; // Current occupied capacity in MT
   type: 'DRY_STORAGE' | 'COLD_STORAGE' | 'HAZARDOUS';
+  userId?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +64,7 @@ export interface ITransaction {
   gatePass: string;
   warehouseName?: string;
   location?: string;
+  userId?: ObjectId;
   createdAt: Date;
 }
 
@@ -191,6 +193,7 @@ export interface IInvoice {
   invoiceType?: 'STANDARD_STORAGE' | 'FINAL_WITHDRAWAL';
   generatedAt: Date;
   createdBy?: string;
+  userId?: ObjectId;
 }
 
 // NEW SCHEMAS FOR REDESIGNED LEDGER + INVOICE SYSTEM
@@ -208,11 +211,11 @@ export interface IStockEntry {
   quantityMT: number;
   bagsCount?: number;
   inwardDate: string; // ISO date string (YYYY-MM-DD)
-  expectedOutwardDate?: string; // Optional expected date
   actualOutwardDate?: string; // Final actual date (for out wards)
   ratePerMTPerDay: number; // Storage rate
   gatePass?: string;
   remarks?: string;
+  userId?: ObjectId;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   createdAt: Date;
   updatedAt: Date;
@@ -237,6 +240,7 @@ export interface ILedgerEntry {
   version: number; // For audit trail, increments on changes
   changeReason?: string; // Why this entry was created/split
   previousEntryId?: ObjectId; // Link to previous version
+  userId?: ObjectId;
   createdAt: Date;
   // Populated by aggregation lookups
   commodity?: ICommodity;
@@ -250,12 +254,14 @@ export interface IInvoiceMaster {
   _id?: ObjectId;
   clientId: ObjectId;
   warehouseId: ObjectId;
+  invoiceId?: string;
   invoiceMonth: string; // YYYY-MM format
   totalAmount: number;
   status: 'DRAFT' | 'FINAL' | 'PAID' | 'OVERDUE';
   generatedAt: Date;
   dueDate: string; // ISO date string
   paidAmount?: number;
+  userId?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -275,6 +281,7 @@ export interface IInvoiceLineItem {
   totalAmount: number;
   periodStart: string; // ISO date
   periodEnd: string; // ISO date
+  userId?: ObjectId;
   createdAt: Date;
 }
 
