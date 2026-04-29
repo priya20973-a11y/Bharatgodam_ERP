@@ -71,7 +71,7 @@ async function getInvoiceMasterClientBreakdown(db: any, clients: any[], tenantFi
       const clientOutstanding = outstandingResult[0]?.totalOutstanding ?? 0;
 
       const receivedResult = await db.collection('payments').aggregate([
-        { $match: { clientId, status: 'COMPLETED' } },
+        { $match: { clientId, status: 'COMPLETED', ...tenantFilter } },
         { $group: { _id: null, totalReceived: { $sum: '$amount' } } }
       ]).toArray();
 
@@ -154,9 +154,31 @@ export async function GET() {
 
   try {
     const clients = await db.collection('clients').find({ status: 'ACTIVE', ...tenantFilter }).toArray();
-    const invoiceMasterExists = await db.collection('invoice_master').findOne({ ...tenantFilter });
+    const latestInvoice = await db.collection('invoice_master')
+      .find({ ...tenantFilter })
+      .sort({ invoiceMonth: -1 })
+      .limit(1)
+      .toArray();
 
-    const breakdownResult = invoiceMasterExists
+    const latestInvoiceMonth = latestInvoice[0]?.invoiceMonth;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    let useInvoiceMaster = Boolean(latestInvoiceMonth);
+    if (useInvoiceMaster && latestInvoiceMonth < currentMonth) {
+      const activeLedgerEntries = await db.collection('ledger_entries').countDocuments({
+        ...tenantFilter,
+        status: 'ACTIVE',
+        $or: [
+          { periodEndDate: null },
+          { periodEndDate: { $gte: `${currentMonth}-01` } }
+        ]
+      });
+      if (activeLedgerEntries > 0) {
+        useInvoiceMaster = false;
+      }
+    }
+
+    const breakdownResult = useInvoiceMaster
       ? await getInvoiceMasterClientBreakdown(db, clients, tenantFilter)
       : await getLedgerEntryClientBreakdown(db, clients, tenantFilter);
 

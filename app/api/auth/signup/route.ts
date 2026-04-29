@@ -73,6 +73,7 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Create signup request
+    const normalizedRole = (role || 'WSP').toString().toUpperCase();
     const signupRequest = {
       fullName,
       email,
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
       phoneNumber,
       warehouseLocation,
       gstNumber: gstNumber || null,
-      role: role || 'wsp',
+      role: normalizedRole,
       status: 'pending', // pending, approved, rejected
       createdAt: new Date(),
       updatedAt: new Date(),

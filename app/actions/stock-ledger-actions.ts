@@ -324,6 +324,7 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
       { periodEndDate: { $gte: monthStart } },
       { periodEndDate: null },
     ],
+    ...(tenantFilter || {}),
     ...(userId ? { userId: new ObjectId(userId) } : {}),
   };
 
@@ -421,6 +422,7 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
   }
 
   if (lineItems.length === 0) return;
+  if (totalAmount <= 0) return;
 
   const invoiceMonthParts = invoiceMonth.split('-');
   const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];

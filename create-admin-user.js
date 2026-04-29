@@ -9,7 +9,7 @@ async function createAdminUser() {
   const adminUser = {
     email: 'admin@wms.com',
     password: await bcrypt.hash('admin123', 10),
-    role: 'admin',
+    role: 'ADMIN',
     fullName: 'System Administrator',
     companyName: 'WMS Admin',
     phoneNumber: '+1234567890',

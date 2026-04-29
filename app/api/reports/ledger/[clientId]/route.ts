@@ -31,14 +31,21 @@ export async function GET(
     const db = await getDb();
 
     const accountId = trimmedClientId;
+    const clientIdFilter = ObjectId.isValid(trimmedClientId)
+      ? { $in: [new ObjectId(trimmedClientId), trimmedClientId] }
+      : trimmedClientId;
 
-    const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
+    const [bookings, transactionDocs, outwards, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
         .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
         .find({ accountId, ...tenantFilter })
+        .sort({ date: 1 })
+        .toArray(),
+      db.collection('outwards')
+        .find({ clientId: clientIdFilter, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
@@ -61,6 +68,8 @@ export async function GET(
       typeof value === 'string' ? value.trim().toUpperCase() : '';
 
     const commodityRates = new Map<string, number>();
+    const commodityNameById = new Map<string, string>();
+
     commoditiesResult.forEach((commodity: any) => {
       const nameKey = normalizeCommodityName(commodity.name);
       const rate =
@@ -69,6 +78,10 @@ export async function GET(
       if (nameKey && rate > 0) {
         commodityRates.set(nameKey, rate);
         console.log(`[LEDGER] Loaded commodity rate: '${nameKey}' -> ₹${rate}/MT/day`);
+      }
+
+      if (commodity?._id) {
+        commodityNameById.set(commodity._id.toString(), commodity.name || '');
       }
     });
 
@@ -91,6 +104,15 @@ export async function GET(
             mt: txn.quantityMT,
             clientName: txn.clientName || bookings[0]?.clientName || clientId,
             commodityName: txn.commodityName,
+            gatePass: txn.gatePass || '',
+          })),
+          ...outwards.map((txn) => ({
+            _id: txn._id?.toString() || '',
+            date: txn.date,
+            direction: 'OUTWARD' as const,
+            mt: txn.quantityMT,
+            clientName: txn.clientName || bookings[0]?.clientName || clientId,
+            commodityName: txn.commodityName || commodityNameById.get(txn.commodityId?.toString() || '') || '',
             gatePass: txn.gatePass || '',
           })),
         ].map((item) => [item._id, item])

@@ -374,8 +374,8 @@ export async function updateInvoicePayment(invoiceId: string, additionalPayment:
       }
     );
 
-    // If payment is now fully paid, notify revenue distribution system
-    if (status === 'PAID') {
+    // If payment is now fully paid, notify revenue distribution system (only for non-zero invoices)
+    if (status === 'PAID' && totalAmount > 0) {
       try {
         // Get booking details to extract warehouse info
         const booking = await db.collection('bookings').findOne({ _id: invoice.bookingId });

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { requireSession } from '@/lib/ownership';
+import { requireSession, isAdmin } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export async function GET() {
   try {
     const session = await requireSession();
-    if (session.user.role !== 'admin') {
+    if (!isAdmin(session)) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
     }
 
@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await requireSession();
-    if (session.user.role !== 'admin') {
+    if (!isAdmin(session)) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
     }
 
@@ -68,6 +68,7 @@ export async function POST(req: Request) {
       }
 
       // Create the user
+      const normalizedRole = (request.role || 'WSP').toString().toUpperCase();
       const userData = {
         fullName: request.fullName,
         email: request.email,
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
         phoneNumber: request.phoneNumber,
         warehouseLocation: request.warehouseLocation,
         gstNumber: request.gstNumber,
-        role: request.role,
+        role: normalizedRole,
         status: 'ACTIVE',
         createdAt: new Date(),
         updatedAt: new Date(),

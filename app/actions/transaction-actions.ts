@@ -570,6 +570,14 @@ export async function getClientRevenueAnalytics(warehouseId?: string) {
         continue;
       }
 
+      const today = parseIsoDate(new Date());
+      if (endDate > today) {
+        endDate = today;
+      }
+      if (startDate > endDate) {
+        continue;
+      }
+
       const dailyRate = getDailyRateForEntry(entry, commodityRateMap);
       const quantity = entry.quantityMT || 0;
       if (quantity <= 0) continue;

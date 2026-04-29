@@ -96,6 +96,12 @@ export async function getAllUsers(): Promise<User[]> {
     }
   };
 
+  const formatDate = (value: unknown): string | undefined => {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && value) return value;
+    return undefined;
+  };
+
   clients.forEach(client => {
     addAssociation(client.userId, client.userEmail, client.name, 'clientAssociations');
   });
@@ -121,8 +127,8 @@ export async function getAllUsers(): Promise<User[]> {
       gstNumber: user.gstNumber,
       status: user.status,
       password: user.password,
-      createdAt: user.createdAt ? user.createdAt.toISOString() : undefined,
-      updatedAt: user.updatedAt ? user.updatedAt.toISOString() : undefined,
+      createdAt: formatDate(user.createdAt),
+      updatedAt: formatDate(user.updatedAt),
       clientAssociations: associations ? Array.from(associations.clientAssociations).slice(0, 10) : [],
       commodityAssociations: associations ? Array.from(associations.commodityAssociations).slice(0, 10) : [],
       warehouseAssociations: associations ? Array.from(associations.warehouseAssociations).slice(0, 10) : [],

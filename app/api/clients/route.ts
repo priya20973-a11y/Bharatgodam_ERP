@@ -26,10 +26,19 @@ export async function GET() {
     const warehouseQueryIds = [...ownedWarehouseIdStrings, ...ownedWarehouseObjectIds];
 
     const clientIds = warehouseQueryIds.length > 0
-      ? await db.collection('transactions').distinct('clientId', {
-          warehouseId: { $in: warehouseQueryIds },
-          ...tenantFilter,
-        })
+      ? (await db.collection('transactions').aggregate([
+          {
+            $match: {
+              warehouseId: { $in: warehouseQueryIds },
+              ...tenantFilter,
+            }
+          },
+          {
+            $group: {
+              _id: '$clientId'
+            }
+          }
+        ]).toArray()).map((doc: any) => doc._id)
       : [];
 
     const clientDocs = await db.collection('clients')
