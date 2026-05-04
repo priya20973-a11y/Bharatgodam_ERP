@@ -92,17 +92,21 @@ export default function RevenueDashboard() {
 
   const exportToCSV = () => {
     try {
-      const rows = warehouseRevenue.flatMap((item: any) =>
-        Object.entries(item.monthlyCharges)
-          .filter(([monthKey]: [string, any]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
-          .map(([monthKey, rent]: [string, number]) => ({
-            'Warehouse Name': item.warehouseName,
-            Month: formatMonthLabel(monthKey),
-            'Rent (₹)': Math.round(rent),
-            'Owner Share (₹)': Math.round(rent * 0.6 * 100) / 100,
-            'Platform Share (₹)': Math.round(rent * 0.4 * 100) / 100,
-          }))
-      );
+      type MonthlyCharges = Record<string, number>;
+
+const rows = warehouseRevenue.flatMap((item: any) => {
+  const charges = item.monthlyCharges as MonthlyCharges;
+
+  return (Object.entries(charges) as [string, number][])
+    .filter(([monthKey]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
+    .map(([monthKey, rent]) => ({
+      'Warehouse Name': item.warehouseName,
+      Month: formatMonthLabel(monthKey),
+      'Rent (₹)': Math.round(rent),
+      'Owner Share (₹)': Math.round(rent * 0.6 * 100) / 100,
+      'Platform Share (₹)': Math.round(rent * 0.4 * 100) / 100,
+    }));
+});
 
       if (rows.length === 0) {
         toast.error('No revenue data available to export');
