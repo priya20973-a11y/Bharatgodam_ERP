@@ -142,21 +142,23 @@ const rows = warehouseRevenue.flatMap((item: any) => {
   };
 
   const revenueRows = warehouseRevenue.flatMap((item: any) =>
-    Object.entries(item.monthlyCharges)
-      .filter(([monthKey]: [string, any]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
-      .map(([monthKey, rent]: [string, number]) => ({
-        warehouseId: item.warehouseId,
-        warehouseName: item.warehouseName,
-        monthKey,
-        monthLabel: formatMonthLabel(monthKey),
-        rent,
-        ownerShare: Math.round(rent * 0.6 * 100) / 100,
-        platformShare: Math.round(rent * 0.4 * 100) / 100,
-      }))
-  ).sort((a, b) => {
-    if (a.warehouseName !== b.warehouseName) return a.warehouseName.localeCompare(b.warehouseName);
-    return a.monthKey.localeCompare(b.monthKey);
-  });
+  Object.entries(item.monthlyCharges as Record<string, number>)
+    .filter(([monthKey]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
+    .map(([monthKey, rent]) => ({
+      warehouseId: item.warehouseId,
+      warehouseName: item.warehouseName,
+      monthKey,
+      monthLabel: formatMonthLabel(monthKey),
+      rent,
+      ownerShare: Math.round(rent * 0.6 * 100) / 100,
+      platformShare: Math.round(rent * 0.4 * 100) / 100,
+    }))
+).sort((a, b) => {
+  if (a.warehouseName !== b.warehouseName) {
+    return a.warehouseName.localeCompare(b.warehouseName);
+  }
+  return a.monthKey.localeCompare(b.monthKey);
+});
 
   return (
     <div className="space-y-8">
