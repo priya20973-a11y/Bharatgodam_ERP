@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 async function cleanup() {
   try {
-    const { getDb } = await import('./lib/mongodb.ts');
+    const { getDb } = await import('./lib/mongodb');
     const db = await getDb();
 
     console.log('🧹 Starting cleanup of duplicate transactions for Akshay CASTERSEED...\n');
