@@ -1,0 +1,680 @@
+[{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b65"
+  },
+  "invoiceNumber": "INV-BHA-202604-000",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-04",
+  "invoiceDate": {
+    "$date": "2026-04-27T09:24:24.109Z"
+  },
+  "dueDate": {
+    "$date": "2026-05-27T09:24:24.109Z"
+  },
+  "totalAmount": 60000,
+  "gstAmount": 10800,
+  "finalAmount": 70800,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.109Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b67"
+  },
+  "invoiceNumber": "INV-BHA-202603-001",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-03",
+  "invoiceDate": {
+    "$date": "2026-03-27T09:24:24.110Z"
+  },
+  "dueDate": {
+    "$date": "2026-04-26T09:24:24.110Z"
+  },
+  "totalAmount": 70000,
+  "gstAmount": 12600,
+  "finalAmount": 82600,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.110Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b69"
+  },
+  "invoiceNumber": "INV-BHA-202602-002",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-02",
+  "invoiceDate": {
+    "$date": "2026-02-27T09:24:24.111Z"
+  },
+  "dueDate": {
+    "$date": "2026-03-29T09:24:24.111Z"
+  },
+  "totalAmount": 80000,
+  "gstAmount": 14400,
+  "finalAmount": 94400,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6b"
+  },
+  "invoiceNumber": "INV-RIT-202604-000",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-04",
+  "invoiceDate": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  },
+  "dueDate": {
+    "$date": "2026-05-27T09:24:24.111Z"
+  },
+  "totalAmount": 60000,
+  "gstAmount": 10800,
+  "finalAmount": 70800,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6d"
+  },
+  "invoiceNumber": "INV-RIT-202603-001",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-03",
+  "invoiceDate": {
+    "$date": "2026-03-27T09:24:24.111Z"
+  },
+  "dueDate": {
+    "$date": "2026-04-26T09:24:24.111Z"
+  },
+  "totalAmount": 70000,
+  "gstAmount": 12600,
+  "finalAmount": 82600,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6f"
+  },
+  "invoiceNumber": "INV-RIT-202602-002",
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "month": "2026-02",
+  "invoiceDate": {
+    "$date": "2026-02-27T09:24:24.112Z"
+  },
+  "dueDate": {
+    "$date": "2026-03-29T09:24:24.112Z"
+  },
+  "totalAmount": 80000,
+  "gstAmount": 14400,
+  "finalAmount": 94400,
+  "status": "PAID",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.112Z"
+  },
+  "createdBy": "bharatgodam.techsolutions@gmail.com"
+},
+{
+  "_id": {
+    "$oid": "69efcd7f4a0e4582cc166cfb"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00001",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 678.39,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T20:56:31.798Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T20:56:31.798Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:56:31.798Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd55f4a0e4582cc166cff"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00002",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 887.77,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:07.673Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:07.673Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:07.673Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd56b4a0e4582cc166d02"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00003",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 2204.01,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:19.815Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:19.815Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:19.815Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5764a0e4582cc166d07"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00001",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 3404.34,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:30.344Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:30.344Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:30.344Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5834a0e4582cc166d0a"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00004",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 1810.07,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:43.630Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:43.630Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:43.630Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd58a4a0e4582cc166d0d"
+  },
+  "clientId": {
+    "$oid": "69e220990699e1d323a4a8fe"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00002",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 555.17,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:50.831Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:50.831Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:50.831Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5914a0e4582cc166d0f"
+  },
+  "clientId": {
+    "$oid": "69e221fc0699e1d323a4a906"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00005",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 198.16,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:30:57.550Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:30:57.550Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:30:57.550Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5984a0e4582cc166d11"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00003",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 2306.69,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:04.078Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:04.078Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:04.078Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd59d4a0e4582cc166d15"
+  },
+  "clientId": {
+    "$oid": "69e137aa4c5cd55a18e497e9"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00004",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 900,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:09.432Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:09.432Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:09.432Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a24a0e4582cc166d17"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00005",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 2257.49,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00006",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 5318.97,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b04a0e4582cc166d23"
+  },
+  "clientId": {
+    "$oid": "69e221e80699e1d323a4a905"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "invoiceId": "BD-/MAR/2026/00006",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 110.46,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:28.559Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:28.559Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:28.559Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "invoiceId": "RAV/MAR/2026/00007",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 4583.53,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-27T21:31:35.803Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.803Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T21:31:35.803Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a3c64e98e498828cc72"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "invoiceId": "CSA/FEB/2026/00001",
+  "invoiceMonth": "2026-02",
+  "totalAmount": 3636,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-28T10:21:48.211Z"
+  },
+  "dueDate": "2026-02-28",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "createdAt": {
+    "$date": "2026-04-28T10:21:48.211Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-28T10:21:48.211Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a4764e98e498828cc75"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "invoiceId": "CSA/MAR/2026/00001",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 10780,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-28T10:21:59.008Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "createdAt": {
+    "$date": "2026-04-28T10:21:59.008Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-28T10:21:59.008Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f19d475f3a326f66d6dc73"
+  },
+  "clientId": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "invoiceId": "CSA/MAR/2026/00002",
+  "invoiceMonth": "2026-03",
+  "totalAmount": 155000,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-29T05:55:19.459Z"
+  },
+  "dueDate": "2026-03-31",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "createdAt": {
+    "$date": "2026-04-29T05:55:19.459Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T05:55:19.459Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f19d4c5f3a326f66d6dc75"
+  },
+  "clientId": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "invoiceId": "CSA/FEB/2026/00002",
+  "invoiceMonth": "2026-02",
+  "totalAmount": 75000,
+  "status": "DRAFT",
+  "generatedAt": {
+    "$date": "2026-04-29T05:55:24.766Z"
+  },
+  "dueDate": "2026-02-28",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "createdAt": {
+    "$date": "2026-04-29T05:55:24.766Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T05:55:24.766Z"
+  }
+}]

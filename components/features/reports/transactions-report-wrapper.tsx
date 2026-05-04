@@ -196,6 +196,48 @@ export default async function TransactionsReportWrapper() {
       ]).toArray(),
     ]);
 
+    const normalizeId = (id: any) => {
+      if (id === undefined || id === null) return '';
+      return typeof id === 'string' ? id : id.toString?.() || '';
+    };
+
+    const normalizeDateValue = (dateValue: any) => {
+      if (dateValue === undefined || dateValue === null) return '';
+      const asString = dateValue.toString();
+      const parsed = new Date(asString);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
+      return asString.trim();
+    };
+
+    const getRecordDate = (record: any) => {
+      const direction = (record.direction || record.type || record.sourceType || 'INWARD').toString().toUpperCase();
+      if (direction === 'OUTWARD') {
+        return normalizeDateValue(record.actualOutwardDate || record.inwardDate || record.date || record.createdAt || '');
+      }
+      return normalizeDateValue(record.inwardDate || record.date || record.createdAt || '');
+    };
+
+    const getRecordDirection = (record: any) => {
+      if (record.direction) return record.direction.toString().toUpperCase();
+      if (record.type) return record.type.toString().toUpperCase();
+      if (record.sourceType === 'outward') return 'OUTWARD';
+      if (record.sourceType === 'inward') return 'INWARD';
+      return 'INWARD';
+    };
+
+    const getRecordKey = (record: any) => {
+      const direction = getRecordDirection(record);
+      const date = getRecordDate(record);
+      const clientId = normalizeId(record.clientId) || normalizeId(record.client?._id) || (record.clientName || '').toString().trim().toLowerCase();
+      const commodityId = normalizeId(record.commodityId) || normalizeId(record.commodity?._id) || (record.commodityName || '').toString().trim().toLowerCase();
+      const warehouseId = normalizeId(record.warehouseId) || normalizeId(record.warehouse?._id) || (record.warehouseName || '').toString().trim().toLowerCase();
+      const quantityMT = Number(record.quantityMT || record.quantity || 0).toString();
+      const gatePass = (record.gatePass || '').toString().trim().toLowerCase();
+      return `${direction}|${date}|${clientId}|${commodityId}|${warehouseId}|${quantityMT}|${gatePass}`;
+    };
+
     const existingSourceKeys = new Set(
       transactions.map((t: any) => {
         const sourceType = t.sourceType || 'transactions';
@@ -204,11 +246,15 @@ export default async function TransactionsReportWrapper() {
       })
     );
 
-    const stockEntryRecords = (stockEntries as any[]).map((t: any) => ({
-      ...t,
-      sourceType: 'stock_entries',
-      sourceId: t._id?.toString(),
-    }));
+    const existingRecordKeys = new Set(transactions.map(getRecordKey));
+
+    const stockEntryRecords = (stockEntries as any[])
+      .map((t: any) => ({
+        ...t,
+        sourceType: 'stock_entries',
+        sourceId: t._id?.toString(),
+      }))
+      .filter((t: any) => !existingRecordKeys.has(getRecordKey(t)));
 
     const legacyRecords = [
       ...inwards.map((t: any) => ({
@@ -223,7 +269,7 @@ export default async function TransactionsReportWrapper() {
       })),
     ].filter((t: any) => {
       const key = `${t.sourceType}/${t.sourceId}`;
-      return !existingSourceKeys.has(key);
+      return !existingSourceKeys.has(key) && !existingRecordKeys.has(getRecordKey(t));
     });
 
     const combinedTransactions = [

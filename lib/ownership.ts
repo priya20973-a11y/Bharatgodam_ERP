@@ -6,6 +6,14 @@ import type { Session } from 'next-auth';
 export const ADMIN_ROLE = 'ADMIN';
 export const WSP_ROLE = 'WSP';
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+}
+
+function normalizeEmail(email?: string | null) {
+  return email?.trim().toLowerCase() || null;
+}
+
 export function isAdmin(session: Session | null) {
   return session?.user?.role?.toString().toUpperCase() === ADMIN_ROLE;
 }
@@ -22,8 +30,9 @@ export function getTenantFilter(session: Session | null) {
     $or: [{ userId: session.user.id }]
   };
 
-  if (session.user.email) {
-    filter.$or.push({ userEmail: session.user.email });
+  const email = normalizeEmail(session.user.email);
+  if (email) {
+    filter.$or.push({ userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, 'i') } });
   }
 
   return filter;
@@ -33,12 +42,17 @@ export function getTenantFilterForMongo(session: Session | null) {
   if (!session?.user?.id) return { $expr: { $eq: [1, 0] } };
   if (isAdmin(session)) return {};
 
-  const filter: any = {
-    $or: [{ userId: new ObjectId(String(session.user.id)) }]
-  };
+  const filter: any = { $or: [] };
+  const email = normalizeEmail(session.user.email);
 
-  if (session.user.email) {
-    filter.$or.push({ userEmail: session.user.email });
+  try {
+    filter.$or.push({ userId: new ObjectId(String(session.user.id)) });
+  } catch {
+    filter.$or.push({ userId: session.user.id });
+  }
+
+  if (email) {
+    filter.$or.push({ userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, 'i') } });
   }
 
   return filter;
@@ -49,7 +63,7 @@ export function appendOwnership(doc: any, session: Session | null) {
   return {
     ...doc,
     userId: session.user.id,
-    userEmail: session.user.email || null,
+    userEmail: normalizeEmail(session.user.email),
   };
 }
 
@@ -58,7 +72,7 @@ export function appendOwnershipForMongo(doc: any, session: Session | null) {
   return {
     ...doc,
     userId: new ObjectId(String(session.user.id)),
-    userEmail: session.user.email || null,
+    userEmail: normalizeEmail(session.user.email),
   };
 }
 

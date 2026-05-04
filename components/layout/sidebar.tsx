@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck } from 'lucide-react';
+import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import type { Session } from 'next-auth';
 
@@ -14,6 +14,7 @@ const navItems = [
   { name: 'Client Master', href: '/dashboard/clients', icon: Users },
   { name: 'Inward Transaction', href: '/dashboard/inward', icon: ArrowDownToLine },
   { name: 'Outward Transaction', href: '/dashboard/outward', icon: ArrowUpFromLine },
+  { name: 'Bulk Upload', href: '/dashboard/bulk-transactions', icon: Upload },
   { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
   { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
   { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
@@ -22,7 +23,7 @@ const navItems = [
 
 const adminNavItems = [
   { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
-  { name: 'Warehouse Settings', href: '/dashboard/settings/warehouse', icon: Settings },
+  { name: 'Signup Requests', href: '/admin/signup-requests', icon: Mail },
 ];
 
 interface SidebarProps {

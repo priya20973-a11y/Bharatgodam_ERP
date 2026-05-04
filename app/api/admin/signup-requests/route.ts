@@ -14,7 +14,7 @@ export async function GET() {
     const signupRequestsCollection = db.collection('signup_requests');
 
     const requests = await signupRequestsCollection
-      .find({ status: 'pending' })
+      .find({ status: { $in: ['pending', 'PENDING_APPROVAL'] } })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -88,14 +88,14 @@ export async function POST(req: Request) {
       // Update request status
       await signupRequestsCollection.updateOne(
         { _id: new ObjectId(requestId) },
-        { $set: { status: 'approved', updatedAt: new Date() } }
+        { $set: { status: 'APPROVED', updatedAt: new Date() } }
       );
 
       return NextResponse.json({ message: 'Request approved and user created' });
     } else if (action === 'reject') {
       await signupRequestsCollection.updateOne(
         { _id: new ObjectId(requestId) },
-        { $set: { status: 'rejected', updatedAt: new Date() } }
+        { $set: { status: 'REJECTED', updatedAt: new Date() } }
       );
 
       return NextResponse.json({ message: 'Request rejected' });

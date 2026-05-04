@@ -424,7 +424,7 @@ export async function processOutward(data: {
  * Get warehouse-level revenue analytics with month-wise charges from ledger
  * Groups by warehouse and returns month-wise revenue totals.
  */
-export async function getClientRevenueAnalytics(warehouseId?: string) {
+export async function getClientRevenueAnalytics(warehouseId?: string, month?: string) {
   try {
     console.log('[getClientRevenueAnalytics] Starting client revenue calculation...');
     await connectToDatabase();
@@ -560,17 +560,23 @@ export async function getClientRevenueAnalytics(warehouseId?: string) {
 
       const startDate = parseIsoDate(entry.periodStartDate);
       let endDate = parseIsoDate(entry.periodEndDate);
-      if (!endDate) {
-        const daysStored = typeof entry.daysStored === 'number' ? entry.daysStored : 0;
-        if (daysStored > 0 && startDate) {
-          endDate = addDays(startDate, daysStored - 1);
+      const today = parseIsoDate(new Date());
+
+      if (!endDate && startDate) {
+        if (entry.status === 'ACTIVE') {
+          endDate = today;
+        } else {
+          const daysStored = typeof entry.daysStored === 'number' ? entry.daysStored : 0;
+          if (daysStored > 0) {
+            endDate = addDays(startDate, daysStored - 1);
+          }
         }
       }
+
       if (!startDate || !endDate) {
         continue;
       }
 
-      const today = parseIsoDate(new Date());
       if (endDate > today) {
         endDate = today;
       }
@@ -667,22 +673,28 @@ export async function getClientRevenueAnalytics(warehouseId?: string) {
     const warehouseRevenue = Array.from(warehouseRevenueData.values())
       .map(item => {
         const monthlyCharges: { [key: string]: number } = {};
-        item.monthlyCharges.forEach((charge: number, month: string) => {
-          monthlyCharges[month] = Math.round(charge * 100) / 100;
+        item.monthlyCharges.forEach((charge: number, monthKey: string) => {
+          // Filter by month if provided
+          if (!month || month === 'ALL' || monthKey === month) {
+            monthlyCharges[monthKey] = Math.round(charge * 100) / 100;
+          }
         });
+
+        // Calculate total revenue for filtered months only
+        const filteredTotalRevenue = Object.values(monthlyCharges).reduce((sum, charge) => sum + charge, 0);
 
         return {
           warehouseId: item.warehouseId.toString(),
           warehouseName: item.warehouseName,
           monthlyCharges,
-          totalRevenue: Math.round(item.totalRevenue * 100) / 100,
-          ownerShare: Math.round(item.totalRevenue * 0.6 * 100) / 100,
-          platformShare: Math.round(item.totalRevenue * 0.4 * 100) / 100
+          totalRevenue: Math.round(filteredTotalRevenue * 100) / 100,
+          ownerShare: Math.round(filteredTotalRevenue * 0.6 * 100) / 100,
+          platformShare: Math.round(filteredTotalRevenue * 0.4 * 100) / 100
         };
       })
       .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
 
-    // Calculate overall summary
+    // Calculate overall summary from filtered data
     const totalRevenue = warehouseRevenue.reduce((sum, row) => sum + row.totalRevenue, 0);
     const ownerEarnings = Math.round(totalRevenue * 0.6 * 100) / 100;
     const platformCommissions = Math.round(totalRevenue * 0.4 * 100) / 100;

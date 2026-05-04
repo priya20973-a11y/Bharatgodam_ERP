@@ -1,0 +1,1404 @@
+[{
+  "_id": {
+    "$oid": "69e223d40699e1d323a4a90c"
+  },
+  "inwardId": {
+    "$oid": "69e223d40699e1d323a4a909"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3022.03,
+  "ownerShare": 1813.22,
+  "platformShare": 1208.81,
+  "timestamp": {
+    "$date": "2026-04-17T12:13:08.747Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:13:08.748Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:13:08.748Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e227260699e1d323a4a912"
+  },
+  "inwardId": {
+    "$oid": "69e227260699e1d323a4a90f"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3039.32,
+  "ownerShare": 1823.59,
+  "platformShare": 1215.73,
+  "timestamp": {
+    "$date": "2026-04-17T12:27:18.412Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:27:18.413Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:27:18.413Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e228700699e1d323a4a919"
+  },
+  "inwardId": {
+    "$oid": "69e228700699e1d323a4a916"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2706.51,
+  "ownerShare": 1623.91,
+  "platformShare": 1082.6,
+  "timestamp": {
+    "$date": "2026-04-17T12:32:48.846Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:32:48.846Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:32:48.846Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e228e50699e1d323a4a921"
+  },
+  "inwardId": {
+    "$oid": "69e228e50699e1d323a4a91e"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2203.19,
+  "ownerShare": 1321.91,
+  "platformShare": 881.28,
+  "timestamp": {
+    "$date": "2026-04-17T12:34:45.496Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:34:45.496Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:34:45.496Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e2293e0699e1d323a4a92a"
+  },
+  "inwardId": {
+    "$oid": "69e2293e0699e1d323a4a927"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 1585.78,
+  "ownerShare": 951.47,
+  "platformShare": 634.31,
+  "timestamp": {
+    "$date": "2026-04-17T12:36:14.048Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:36:14.048Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:36:14.048Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e229d20699e1d323a4a934"
+  },
+  "inwardId": {
+    "$oid": "69e229d20699e1d323a4a931"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3742.86,
+  "ownerShare": 2245.72,
+  "platformShare": 1497.14,
+  "timestamp": {
+    "$date": "2026-04-17T12:38:42.364Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:38:42.364Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:38:42.364Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e22a820699e1d323a4a93f"
+  },
+  "inwardId": {
+    "$oid": "69e22a820699e1d323a4a93c"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3397.18,
+  "ownerShare": 2038.31,
+  "platformShare": 1358.87,
+  "timestamp": {
+    "$date": "2026-04-17T12:41:38.579Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:41:38.579Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:41:38.579Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e22af80699e1d323a4a94b"
+  },
+  "inwardId": {
+    "$oid": "69e22af80699e1d323a4a948"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2565.51,
+  "ownerShare": 1539.31,
+  "platformShare": 1026.2,
+  "timestamp": {
+    "$date": "2026-04-17T12:43:36.756Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:43:36.756Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:43:36.756Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e230320699e1d323a4a95e"
+  },
+  "inwardId": {
+    "$oid": "69e230320699e1d323a4a95b"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2375.16,
+  "ownerShare": 1425.1,
+  "platformShare": 950.06,
+  "timestamp": {
+    "$date": "2026-04-17T13:05:54.281Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T13:05:54.281Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T13:05:54.281Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e6071dec8d2a885f1c14d5"
+  },
+  "inwardId": {
+    "$oid": "69e6071dec8d2a885f1c14d2"
+  },
+  "clientId": {
+    "$oid": "69e137aa4c5cd55a18e497e9"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4275,
+  "ownerShare": 2565,
+  "platformShare": 1710,
+  "timestamp": {
+    "$date": "2026-04-20T10:59:41.158Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-20T10:59:41.158Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-20T10:59:41.158Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e79cb58580b71b10d05a08"
+  },
+  "inwardId": {
+    "$oid": "69e79cb58580b71b10d05a05"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 4111.3,
+  "ownerShare": 2466.78,
+  "platformShare": 1644.52,
+  "timestamp": {
+    "$date": "2026-04-21T15:50:13.666Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:50:13.667Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:50:13.667Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e79d0f8580b71b10d05a0c"
+  },
+  "inwardId": {
+    "$oid": "69e79d0f8580b71b10d05a09"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2275.9,
+  "ownerShare": 1365.54,
+  "platformShare": 910.36,
+  "timestamp": {
+    "$date": "2026-04-21T15:51:43.249Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:51:43.249Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:51:43.249Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e79d6a8580b71b10d05a10"
+  },
+  "inwardId": {
+    "$oid": "69e79d6a8580b71b10d05a0d"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 4201.68,
+  "ownerShare": 2521.01,
+  "platformShare": 1680.67,
+  "timestamp": {
+    "$date": "2026-04-21T15:53:14.296Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:53:14.296Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:53:14.296Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e79e9a8580b71b10d05a14"
+  },
+  "inwardId": {
+    "$oid": "69e79e9a8580b71b10d05a11"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 4168.47,
+  "ownerShare": 2501.08,
+  "platformShare": 1667.39,
+  "timestamp": {
+    "$date": "2026-04-21T15:58:18.558Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:58:18.558Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:58:18.558Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e79f0b8580b71b10d05a18"
+  },
+  "inwardId": {
+    "$oid": "69e79f0b8580b71b10d05a15"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 4974.82,
+  "ownerShare": 2984.89,
+  "platformShare": 1989.93,
+  "timestamp": {
+    "$date": "2026-04-21T16:00:11.408Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:00:11.408Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:00:11.408Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a1c88580b71b10d05a1c"
+  },
+  "inwardId": {
+    "$oid": "69e7a1c88580b71b10d05a19"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 6478.89,
+  "ownerShare": 3887.33,
+  "platformShare": 2591.56,
+  "timestamp": {
+    "$date": "2026-04-21T16:11:52.779Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:11:52.779Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:11:52.779Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a2778580b71b10d05a20"
+  },
+  "inwardId": {
+    "$oid": "69e7a2778580b71b10d05a1d"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 6095.12,
+  "ownerShare": 3657.07,
+  "platformShare": 2438.05,
+  "timestamp": {
+    "$date": "2026-04-21T16:14:47.010Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:14:47.010Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:14:47.010Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a2eb8580b71b10d05a24"
+  },
+  "inwardId": {
+    "$oid": "69e7a2eb8580b71b10d05a21"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 1833.22,
+  "ownerShare": 1099.93,
+  "platformShare": 733.29,
+  "timestamp": {
+    "$date": "2026-04-21T16:16:43.219Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:16:43.219Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:16:43.219Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a36c8580b71b10d05a28"
+  },
+  "inwardId": {
+    "$oid": "69e7a36c8580b71b10d05a25"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2170.11,
+  "ownerShare": 1302.07,
+  "platformShare": 868.04,
+  "timestamp": {
+    "$date": "2026-04-21T16:18:52.462Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:18:52.462Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:18:52.462Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a4318580b71b10d05a2c"
+  },
+  "inwardId": {
+    "$oid": "69e7a4318580b71b10d05a29"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2301.94,
+  "ownerShare": 1381.16,
+  "platformShare": 920.78,
+  "timestamp": {
+    "$date": "2026-04-21T16:22:09.538Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:22:09.538Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:22:09.538Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a4ad8580b71b10d05a30"
+  },
+  "inwardId": {
+    "$oid": "69e7a4ad8580b71b10d05a2d"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2296.73,
+  "ownerShare": 1378.04,
+  "platformShare": 918.69,
+  "timestamp": {
+    "$date": "2026-04-21T16:24:13.681Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:24:13.682Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:24:13.682Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7a5168580b71b10d05a34"
+  },
+  "inwardId": {
+    "$oid": "69e7a5168580b71b10d05a31"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 5117.73,
+  "ownerShare": 3070.64,
+  "platformShare": 2047.09,
+  "timestamp": {
+    "$date": "2026-04-21T16:25:58.264Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:25:58.264Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:25:58.264Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7ae5e8580b71b10d05a38"
+  },
+  "inwardId": {
+    "$oid": "69e7ae5e8580b71b10d05a35"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3586.44,
+  "ownerShare": 2151.86,
+  "platformShare": 1434.58,
+  "timestamp": {
+    "$date": "2026-04-21T17:05:34.588Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:05:34.589Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:05:34.589Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7af138580b71b10d05a3c"
+  },
+  "inwardId": {
+    "$oid": "69e7af138580b71b10d05a39"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3689.04,
+  "ownerShare": 2213.42,
+  "platformShare": 1475.62,
+  "timestamp": {
+    "$date": "2026-04-21T17:08:35.424Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:08:35.425Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:08:35.425Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7af5d8580b71b10d05a40"
+  },
+  "inwardId": {
+    "$oid": "69e7af5d8580b71b10d05a3d"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4430.04,
+  "ownerShare": 2658.02,
+  "platformShare": 1772.02,
+  "timestamp": {
+    "$date": "2026-04-21T17:09:49.550Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:09:49.550Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:09:49.550Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7afcf8580b71b10d05a44"
+  },
+  "inwardId": {
+    "$oid": "69e7afcf8580b71b10d05a41"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2332.44,
+  "ownerShare": 1399.46,
+  "platformShare": 932.98,
+  "timestamp": {
+    "$date": "2026-04-21T17:11:43.500Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:11:43.500Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:11:43.500Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b00d8580b71b10d05a48"
+  },
+  "inwardId": {
+    "$oid": "69e7b00d8580b71b10d05a45"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 2373.18,
+  "ownerShare": 1423.91,
+  "platformShare": 949.27,
+  "timestamp": {
+    "$date": "2026-04-21T17:12:45.807Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:12:45.807Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:12:45.807Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b15e8580b71b10d05a4c"
+  },
+  "inwardId": {
+    "$oid": "69e7b15e8580b71b10d05a49"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2789.81,
+  "ownerShare": 1673.89,
+  "platformShare": 1115.92,
+  "timestamp": {
+    "$date": "2026-04-21T17:18:22.767Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:18:22.767Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:18:22.767Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b18c8580b71b10d05a50"
+  },
+  "inwardId": {
+    "$oid": "69e7b18c8580b71b10d05a4d"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 6143.76,
+  "ownerShare": 3686.26,
+  "platformShare": 2457.5,
+  "timestamp": {
+    "$date": "2026-04-21T17:19:08.614Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:19:08.614Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:19:08.614Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b1e78580b71b10d05a54"
+  },
+  "inwardId": {
+    "$oid": "69e7b1e78580b71b10d05a51"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 4093.91,
+  "ownerShare": 2456.35,
+  "platformShare": 1637.56,
+  "timestamp": {
+    "$date": "2026-04-21T17:20:39.846Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:20:39.846Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:20:39.846Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b2298580b71b10d05a58"
+  },
+  "inwardId": {
+    "$oid": "69e7b2298580b71b10d05a55"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 3673.91,
+  "ownerShare": 2204.35,
+  "platformShare": 1469.56,
+  "timestamp": {
+    "$date": "2026-04-21T17:21:45.953Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:21:45.954Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:21:45.954Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b26d8580b71b10d05a5c"
+  },
+  "inwardId": {
+    "$oid": "69e7b26d8580b71b10d05a59"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 3096.6,
+  "ownerShare": 1857.96,
+  "platformShare": 1238.64,
+  "timestamp": {
+    "$date": "2026-04-21T17:22:53.240Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:22:53.240Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:22:53.240Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b3e88580b71b10d05a60"
+  },
+  "inwardId": {
+    "$oid": "69e7b3e88580b71b10d05a5d"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 5777.52,
+  "ownerShare": 3466.51,
+  "platformShare": 2311.01,
+  "timestamp": {
+    "$date": "2026-04-21T17:29:12.253Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:29:12.254Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:29:12.254Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b42a8580b71b10d05a64"
+  },
+  "inwardId": {
+    "$oid": "69e7b42a8580b71b10d05a61"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4560.75,
+  "ownerShare": 2736.45,
+  "platformShare": 1824.3,
+  "timestamp": {
+    "$date": "2026-04-21T17:30:18.613Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:30:18.613Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:30:18.613Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b46d8580b71b10d05a68"
+  },
+  "inwardId": {
+    "$oid": "69e7b46d8580b71b10d05a65"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3354.42,
+  "ownerShare": 2012.65,
+  "platformShare": 1341.77,
+  "timestamp": {
+    "$date": "2026-04-21T17:31:25.652Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:31:25.652Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:31:25.652Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b4a78580b71b10d05a6c"
+  },
+  "inwardId": {
+    "$oid": "69e7b4a78580b71b10d05a69"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 6710.16,
+  "ownerShare": 4026.1,
+  "platformShare": 2684.06,
+  "timestamp": {
+    "$date": "2026-04-21T17:32:23.802Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:32:23.802Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:32:23.802Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b4e58580b71b10d05a70"
+  },
+  "inwardId": {
+    "$oid": "69e7b4e58580b71b10d05a6d"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3179.52,
+  "ownerShare": 1907.71,
+  "platformShare": 1271.81,
+  "timestamp": {
+    "$date": "2026-04-21T17:33:25.601Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:33:25.601Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:33:25.601Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b5208580b71b10d05a74"
+  },
+  "inwardId": {
+    "$oid": "69e7b5208580b71b10d05a71"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4975.68,
+  "ownerShare": 2985.41,
+  "platformShare": 1990.27,
+  "timestamp": {
+    "$date": "2026-04-21T17:34:24.442Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:34:24.442Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:34:24.442Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b5578580b71b10d05a78"
+  },
+  "inwardId": {
+    "$oid": "69e7b5578580b71b10d05a75"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3718.56,
+  "ownerShare": 2231.14,
+  "platformShare": 1487.42,
+  "timestamp": {
+    "$date": "2026-04-21T17:35:19.562Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:35:19.562Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:35:19.562Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b6368580b71b10d05a7c"
+  },
+  "inwardId": {
+    "$oid": "69e7b6368580b71b10d05a79"
+  },
+  "clientId": {
+    "$oid": "69e220990699e1d323a4a8fe"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3118.56,
+  "ownerShare": 1871.14,
+  "platformShare": 1247.42,
+  "timestamp": {
+    "$date": "2026-04-21T17:39:02.344Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:39:02.344Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:39:02.344Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b72d8580b71b10d05a80"
+  },
+  "inwardId": {
+    "$oid": "69e7b72d8580b71b10d05a7d"
+  },
+  "clientId": {
+    "$oid": "69e221fc0699e1d323a4a906"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 2576.15,
+  "ownerShare": 1545.69,
+  "platformShare": 1030.46,
+  "timestamp": {
+    "$date": "2026-04-21T17:43:09.206Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:43:09.206Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:43:09.206Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b7ac8580b71b10d05a84"
+  },
+  "inwardId": {
+    "$oid": "69e7b7ac8580b71b10d05a81"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 5067.08,
+  "ownerShare": 3040.25,
+  "platformShare": 2026.83,
+  "timestamp": {
+    "$date": "2026-04-21T17:45:16.891Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:45:16.891Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:45:16.891Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b7f48580b71b10d05a88"
+  },
+  "inwardId": {
+    "$oid": "69e7b7f48580b71b10d05a85"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4807.6,
+  "ownerShare": 2884.56,
+  "platformShare": 1923.04,
+  "timestamp": {
+    "$date": "2026-04-21T17:46:28.497Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:46:28.498Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:46:28.498Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b8328580b71b10d05a8c"
+  },
+  "inwardId": {
+    "$oid": "69e7b8328580b71b10d05a89"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4878.05,
+  "ownerShare": 2926.83,
+  "platformShare": 1951.22,
+  "timestamp": {
+    "$date": "2026-04-21T17:47:30.137Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:47:30.137Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:47:30.137Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b8608580b71b10d05a90"
+  },
+  "inwardId": {
+    "$oid": "69e7b8608580b71b10d05a8d"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 3454.98,
+  "ownerShare": 2072.99,
+  "platformShare": 1381.99,
+  "timestamp": {
+    "$date": "2026-04-21T17:48:16.134Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:48:16.134Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:48:16.134Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b93c8580b71b10d05a94"
+  },
+  "inwardId": {
+    "$oid": "69e7b93c8580b71b10d05a91"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 5236.29,
+  "ownerShare": 3141.77,
+  "platformShare": 2094.52,
+  "timestamp": {
+    "$date": "2026-04-21T17:51:56.765Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:51:56.765Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:51:56.765Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b9af8580b71b10d05a98"
+  },
+  "inwardId": {
+    "$oid": "69e7b9af8580b71b10d05a95"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 4055.52,
+  "ownerShare": 2433.31,
+  "platformShare": 1622.21,
+  "timestamp": {
+    "$date": "2026-04-21T17:53:51.561Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:53:51.561Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:53:51.561Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7b9de8580b71b10d05a9c"
+  },
+  "inwardId": {
+    "$oid": "69e7b9de8580b71b10d05a99"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "totalAmount": 5719.41,
+  "ownerShare": 3431.65,
+  "platformShare": 2287.76,
+  "timestamp": {
+    "$date": "2026-04-21T17:54:38.768Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:54:38.768Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:54:38.768Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69e7ba4e8580b71b10d05aa0"
+  },
+  "inwardId": {
+    "$oid": "69e7ba4e8580b71b10d05a9d"
+  },
+  "clientId": {
+    "$oid": "69e221e80699e1d323a4a905"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "totalAmount": 3425.13,
+  "ownerShare": 2055.08,
+  "platformShare": 1370.05,
+  "timestamp": {
+    "$date": "2026-04-21T17:56:30.431Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:56:30.431Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:56:30.431Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb2a80045624e2211f3676"
+  },
+  "inwardId": {
+    "$oid": "69eb2a80045624e2211f3673"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "totalAmount": 12355.2,
+  "ownerShare": 7413.12,
+  "platformShare": 4942.08,
+  "timestamp": {
+    "$date": "2026-04-24T08:32:00.988Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-24T08:32:00.988Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:32:00.988Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb2af1045624e2211f367e"
+  },
+  "inwardId": {
+    "$oid": "69eb2af1045624e2211f367b"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "totalAmount": 14750,
+  "ownerShare": 8850,
+  "platformShare": 5900,
+  "timestamp": {
+    "$date": "2026-04-24T08:33:53.188Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-24T08:33:53.188Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:33:53.188Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb2bc4045624e2211f3684"
+  },
+  "inwardId": {
+    "$oid": "69eb2bc4045624e2211f3681"
+  },
+  "clientId": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "totalAmount": 380000,
+  "ownerShare": 228000,
+  "platformShare": 152000,
+  "timestamp": {
+    "$date": "2026-04-24T08:37:24.305Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-24T08:37:24.305Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:37:24.305Z"
+  },
+  "__v": 0
+}]

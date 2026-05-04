@@ -1,0 +1,408 @@
+[{
+  "_id": {
+    "$oid": "69e137aa4c5cd55a18e497e9"
+  },
+  "name": "Radhe Trading ",
+  "status": "ACTIVE",
+  "createdAt": {
+    "$date": "2026-04-16T19:25:30.097Z"
+  },
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "updatedAt": {
+    "$date": "2026-04-17T11:58:10.064Z"
+  },
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "name": "Sureshwar Corporation",
+  "contact": "+91-98765-43210",
+  "email": "vatsal@example.com",
+  "createdAt": {
+    "$date": "2026-04-17T04:20:51.548Z"
+  },
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "updatedAt": {
+    "$date": "2026-04-17T12:04:26.660Z"
+  },
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "name": "Dharam Enterprise",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T11:58:58.791Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:04:11.970Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e220990699e1d323a4a8fe"
+  },
+  "name": "Krupal Tradersh",
+  "address": "JASDAN",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T11:59:21.613Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:40:07.081Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "name": "Madhav Puls Industries",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T11:59:44.346Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T11:59:44.346Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "name": "Shankar Tredarsh",
+  "address": "MOTI MARAD",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:00:08.163Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-23T04:57:14.304Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "name": "Chotai Enterprise",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:01:30.329Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:01:30.329Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "name": "Ankitkumar Makadiya",
+  "address": "GONDAL",
+  "clientType": "FARMER",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:01:57.285Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-23T05:09:05.617Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350L",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "name": "Hareshkumar Kantilal",
+  "address": "GONDAL",
+  "clientType": "FARMER",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:02:45.569Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:02:45.569Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "name": "Nilesh Enterprise",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:03:59.806Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:03:59.806Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e221e80699e1d323a4a905"
+  },
+  "name": "Shantilal Gordhanbhai Makadiya",
+  "address": "GONDAL",
+  "clientType": "FARMER",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:04:56.773Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:04:56.773Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e221fc0699e1d323a4a906"
+  },
+  "name": "Kuber Trading ",
+  "address": "MORBI",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:05:16.336Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:05:16.336Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e222a60699e1d323a4a907"
+  },
+  "name": "Bansi Traders",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:08:06.590Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:08:06.590Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "name": "Chotai Brother",
+  "address": "GONDAL",
+  "clientType": "COMPANY",
+  "mobile": "9082994158",
+  "createdAt": {
+    "$date": "2026-04-17T12:08:43.408Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:08:43.408Z"
+  },
+  "__v": 0,
+  "status": "ACTIVE",
+  "aadharNumber": "999999990019",
+  "gstNumber": "07AAAAA0000A0Z1",
+  "panNumber": "BAJPC4350M",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "name": "Shekhar Mehata",
+  "address": "Ahmedabad",
+  "clientType": "FPO",
+  "mobile": "9082994158",
+  "panNumber": "asdty2681d",
+  "aadharNumber": "123412341242",
+  "gstNumber": "22aaaaa0000a1z5",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T07:52:28.634Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T07:52:28.634Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "name": "Vatsal Trivedi",
+  "address": "Ahmedabad",
+  "clientType": "FARMER",
+  "mobile": "9082994158",
+  "panNumber": "sggpm2369d",
+  "aadharNumber": "123412345678",
+  "gstNumber": "22aaaaa0000",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T07:53:46.997Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T07:53:54.897Z"
+  },
+  "__v": 0
+},
+{
+  "_id": "client-001",
+  "name": "ABC Traders",
+  "contact": "9876543210",
+  "createdAt": {
+    "$date": "2026-04-24T16:19:24.381Z"
+  }
+},
+{
+  "_id": "client-002",
+  "name": "XYZ Enterprises",
+  "contact": "9876543211",
+  "createdAt": {
+    "$date": "2026-04-24T16:19:24.381Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ee013aeeeb1280b6fa513f"
+  },
+  "name": "Shruti Mehata",
+  "status": "ACTIVE",
+  "createdAt": {
+    "$date": "2026-04-26T12:12:42.811Z"
+  }
+}]

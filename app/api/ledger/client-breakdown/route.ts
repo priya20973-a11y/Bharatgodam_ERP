@@ -7,6 +7,30 @@ import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 function calculateLedgerEntryRent(entry: any) {
+  const quantityMT = Number(entry?.quantityMT || 0);
+  const ratePerMTPerDay = Number(entry?.ratePerMTPerDay || 0);
+  const startDate = entry?.periodStartDate ? new Date(entry.periodStartDate) : null;
+  const endDate = entry?.periodEndDate ? new Date(entry.periodEndDate) : null;
+
+  if (startDate && !Number.isNaN(startDate.getTime())) {
+    const effectiveEndDate = endDate && !Number.isNaN(endDate.getTime())
+      ? endDate
+      : entry?.status === 'ACTIVE'
+        ? new Date()
+        : null;
+
+    if (effectiveEndDate) {
+      const dayDiff = Math.floor((effectiveEndDate.getTime() - startDate.getTime()) / MS_PER_DAY);
+      const sameDay = dayDiff === 0;
+      const days = sameDay
+        ? 1
+        : entry?.status === 'CLOSED'
+          ? Math.max(dayDiff, 1)
+          : Math.max(dayDiff + 1, 1);
+      return quantityMT * ratePerMTPerDay * days;
+    }
+  }
+
   if (entry?.rentCalculated != null) {
     return Number(entry.rentCalculated) || 0;
   }
@@ -15,17 +39,7 @@ function calculateLedgerEntryRent(entry: any) {
     return Number(entry.rent) || 0;
   }
 
-  const quantityMT = Number(entry?.quantityMT || 0);
-  const ratePerMTPerDay = Number(entry?.ratePerMTPerDay || 0);
-  const startDate = entry?.periodStartDate ? new Date(entry.periodStartDate) : null;
-  const endDate = entry?.periodEndDate ? new Date(entry.periodEndDate) : startDate;
-
-  if (!startDate || Number.isNaN(startDate.getTime()) || !endDate || Number.isNaN(endDate.getTime())) {
-    return 0;
-  }
-
-  const days = Math.floor((endDate.getTime() - startDate.getTime()) / MS_PER_DAY) + 1;
-  return quantityMT * ratePerMTPerDay * Math.max(days, 1);
+  return 0;
 }
 
 async function getInvoiceMasterClientBreakdown(db: any, clients: any[], tenantFilter: any) {

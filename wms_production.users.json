@@ -1,0 +1,40 @@
+[{
+  "_id": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "email": "TESTIFY@GMAIL.COM",
+  "password": "$2b$12$0sMqoCyjNhTCrMgNJGPZKuKEPA8ZAm6JE02SpORVTJL98miW0DhNa",
+  "role": "WSP",
+  "createdAt": {
+    "$date": "2026-04-17T14:23:30.589Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T05:38:33.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "email": "bharatgodam.techsolutions@gmail.com",
+  "password": "$2b$12$DSc9Q76j19zi.deyBxCTiOOpH5riOoUq/WpfCZ7MUEK4iCt1cAnZm",
+  "role": "WSP",
+  "createdAt": {
+    "$date": "2026-04-24T04:32:19.561Z"
+  },
+  "status": "ACTIVE"
+},
+{
+  "_id": {
+    "$oid": "69eb2f75588b6672c9047500"
+  },
+  "email": "shrutimehata.01@gmail.com",
+  "password": "$2b$12$uJcDktQUUeT8TKy1fpIcYuzsbzK9XVKaoyUHxWld3.qzKBEjb3ube",
+  "role": "ADMIN",
+  "createdAt": {
+    "$date": "2026-04-24T08:53:09.193Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:53:09.193Z"
+  }
+}]

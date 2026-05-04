@@ -1,0 +1,966 @@
+[{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b66"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b65"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-04",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 60000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.110Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b68"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b67"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-03",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 70000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.110Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6a"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b69"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-02",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 80000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6c"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b6b"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-04",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 60000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.111Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b6e"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b6d"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-03",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 70000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.112Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ef2b48b5c7c40311fd4b70"
+  },
+  "invoiceMasterId": {
+    "$oid": "69ef2b48b5c7c40311fd4b6f"
+  },
+  "clientId": {
+    "$oid": "69eefe1a11e1d8076f808683"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69eefe1a11e1d8076f808684"
+  },
+  "description": "Storage Rent - 2026-02",
+  "quantity": 100,
+  "rate": 600,
+  "amount": 80000,
+  "status": "ACTIVE",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  },
+  "createdAt": {
+    "$date": "2026-04-27T09:24:24.112Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efcd7f4a0e4582cc166cfc"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efcd7f4a0e4582cc166cfb"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 7,
+  "averageQuantityMT": 21.275,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 416.99,
+  "periodStart": "2026-03-23",
+  "periodEnd": "2026-03-30",
+  "createdAt": {
+    "$date": "2026-04-27T20:56:31.800Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efcd7f4a0e4582cc166cfd"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efcd7f4a0e4582cc166cfb"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 34.379999999999995,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 96.26,
+  "periodStart": "2026-03-30",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T20:56:31.800Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efcd7f4a0e4582cc166cfe"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efcd7f4a0e4582cc166cfb"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 58.98,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 165.14,
+  "periodStart": "2026-03-31",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T20:56:31.800Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd55f4a0e4582cc166d00"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd55f4a0e4582cc166cff"
+  },
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 22.22,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 62.22,
+  "periodStart": "2026-03-25",
+  "periodEnd": "2026-03-26",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:07.682Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd55f4a0e4582cc166d01"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd55f4a0e4582cc166cff"
+  },
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "daysOccupied": 6,
+  "averageQuantityMT": 49.14,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 825.55,
+  "periodStart": "2026-03-26",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:07.682Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd56b4a0e4582cc166d03"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd56b4a0e4582cc166d02"
+  },
+  "commodityName": "CHANA (85 PER MT)",
+  "daysOccupied": 4,
+  "averageQuantityMT": 32.59,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 365.01,
+  "periodStart": "2026-03-21",
+  "periodEnd": "2026-03-25",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:19.817Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd56b4a0e4582cc166d04"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd56b4a0e4582cc166d02"
+  },
+  "commodityName": "CHANA (85 PER MT)",
+  "daysOccupied": 3,
+  "averageQuantityMT": 65.075,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 546.63,
+  "periodStart": "2026-03-25",
+  "periodEnd": "2026-03-28",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:19.817Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd56b4a0e4582cc166d05"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd56b4a0e4582cc166d02"
+  },
+  "commodityName": "CHANA (85 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 87.41,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 489.5,
+  "periodStart": "2026-03-28",
+  "periodEnd": "2026-03-30",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:19.817Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd56b4a0e4582cc166d06"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd56b4a0e4582cc166d02"
+  },
+  "commodityName": "CHANA (85 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 143.37,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 802.87,
+  "periodStart": "2026-03-30",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:19.817Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5764a0e4582cc166d08"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5764a0e4582cc166d07"
+  },
+  "commodityName": "CHANA (90 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 61.56999999999999,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 369.42,
+  "periodStart": "2026-03-16",
+  "periodEnd": "2026-03-18",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:30.344Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5764a0e4582cc166d09"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5764a0e4582cc166d07"
+  },
+  "commodityName": "CHANA (90 PER MT)",
+  "daysOccupied": 14,
+  "averageQuantityMT": 72.25999999999999,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 3034.92,
+  "periodStart": "2026-03-18",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:30.344Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5834a0e4582cc166d0b"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5834a0e4582cc166d0a"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 8,
+  "averageQuantityMT": 67.425,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 1510.32,
+  "periodStart": "2026-03-23",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:43.637Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5834a0e4582cc166d0c"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5834a0e4582cc166d0a"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 107.05499999999999,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 299.75,
+  "periodStart": "2026-03-31",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:43.637Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd58a4a0e4582cc166d0e"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd58a4a0e4582cc166d0d"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 13,
+  "averageQuantityMT": 14.235,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 555.17,
+  "periodStart": "2026-03-19",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:50.831Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5914a0e4582cc166d10"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5914a0e4582cc166d0f"
+  },
+  "commodityName": "CHANA (100 PER MT)",
+  "daysOccupied": 5,
+  "averageQuantityMT": 12.01,
+  "ratePerMTPerDay": 99,
+  "totalAmount": 198.16,
+  "periodStart": "2026-03-27",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:30:57.551Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5984a0e4582cc166d12"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5984a0e4582cc166d11"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 23.91,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 143.46,
+  "periodStart": "2026-03-19",
+  "periodEnd": "2026-03-21",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:04.079Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5984a0e4582cc166d13"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5984a0e4582cc166d11"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 42.95,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 257.7,
+  "periodStart": "2026-03-21",
+  "periodEnd": "2026-03-23",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:04.079Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5984a0e4582cc166d14"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5984a0e4582cc166d11"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 9,
+  "averageQuantityMT": 70.575,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 1905.53,
+  "periodStart": "2026-03-23",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:04.079Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd59d4a0e4582cc166d16"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd59d4a0e4582cc166d15"
+  },
+  "commodityName": "SEESAM SEED (WHITE) (90 PER MT)",
+  "daysOccupied": 16,
+  "averageQuantityMT": 18.75,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 900,
+  "periodStart": "2026-03-16",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:09.433Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a24a0e4582cc166d18"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a24a0e4582cc166d17"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 5,
+  "averageQuantityMT": 24.785,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 346.99,
+  "periodStart": "2026-03-19",
+  "periodEnd": "2026-03-24",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a24a0e4582cc166d19"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a24a0e4582cc166d17"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 4,
+  "averageQuantityMT": 75.65,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 847.28,
+  "periodStart": "2026-03-24",
+  "periodEnd": "2026-03-28",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a24a0e4582cc166d1a"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a24a0e4582cc166d17"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 4,
+  "averageQuantityMT": 94.93,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 1063.22,
+  "periodStart": "2026-03-28",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:14.894Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d1c"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 25.335,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 76.01,
+  "periodStart": "2026-03-16",
+  "periodEnd": "2026-03-17",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d1d"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 45.6,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 136.8,
+  "periodStart": "2026-03-17",
+  "periodEnd": "2026-03-18",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d1e"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 60.71,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 182.13,
+  "periodStart": "2026-03-18",
+  "periodEnd": "2026-03-19",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d1f"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 91.345,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 274.03,
+  "periodStart": "2026-03-19",
+  "periodEnd": "2026-03-20",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d20"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 106.065,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 318.2,
+  "periodStart": "2026-03-20",
+  "periodEnd": "2026-03-21",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d21"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 10,
+  "averageQuantityMT": 129.42,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 3882.6,
+  "periodStart": "2026-03-21",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5a94a0e4582cc166d22"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5a94a0e4582cc166d1b"
+  },
+  "commodityName": "WHEAT (90 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 149.73499999999999,
+  "ratePerMTPerDay": 90,
+  "totalAmount": 449.2,
+  "periodStart": "2026-03-31",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:21.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b04a0e4582cc166d24"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b04a0e4582cc166d23"
+  },
+  "commodityName": "WHEAT (85 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 19.725,
+  "ratePerMTPerDay": 84,
+  "totalAmount": 110.46,
+  "periodStart": "2026-03-30",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:28.560Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d26"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 13.355,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 77.46,
+  "periodStart": "2026-03-14",
+  "periodEnd": "2026-03-16",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d27"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 58.900000000000006,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 170.81,
+  "periodStart": "2026-03-16",
+  "periodEnd": "2026-03-17",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d28"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 73.29,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 425.08,
+  "periodStart": "2026-03-17",
+  "periodEnd": "2026-03-19",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d29"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 90.965,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 263.8,
+  "periodStart": "2026-03-19",
+  "periodEnd": "2026-03-20",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d2a"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 1,
+  "averageQuantityMT": 107.235,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 310.98,
+  "periodStart": "2026-03-20",
+  "periodEnd": "2026-03-21",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d2b"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 7,
+  "averageQuantityMT": 119.69,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 2429.71,
+  "periodStart": "2026-03-21",
+  "periodEnd": "2026-03-28",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d2c"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 71.475,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 414.55,
+  "periodStart": "2026-03-28",
+  "periodEnd": "2026-03-30",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efd5b74a0e4582cc166d2d"
+  },
+  "invoiceMasterId": {
+    "$oid": "69efd5b74a0e4582cc166d25"
+  },
+  "commodityName": "WHEAT (87 PER MT)",
+  "daysOccupied": 2,
+  "averageQuantityMT": 84.67999999999999,
+  "ratePerMTPerDay": 87,
+  "totalAmount": 491.14,
+  "periodStart": "2026-03-30",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-27T21:31:35.813Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a3c64e98e498828cc73"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f08a3c64e98e498828cc72"
+  },
+  "commodityName": "CASTERSEED",
+  "daysOccupied": 25,
+  "averageQuantityMT": 23.4,
+  "ratePerMTPerDay": 180,
+  "totalAmount": 3510,
+  "periodStart": "2026-02-02",
+  "periodEnd": "2026-02-27",
+  "createdAt": {
+    "$date": "2026-04-28T10:21:48.213Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a3c64e98e498828cc74"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f08a3c64e98e498828cc72"
+  },
+  "commodityName": "CASTERSEED",
+  "daysOccupied": 1,
+  "averageQuantityMT": 21,
+  "ratePerMTPerDay": 180,
+  "totalAmount": 126,
+  "periodStart": "2026-02-27",
+  "periodEnd": "2026-02-28",
+  "createdAt": {
+    "$date": "2026-04-28T10:21:48.213Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a4764e98e498828cc76"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f08a4764e98e498828cc75"
+  },
+  "commodityName": "CASTERSEED",
+  "daysOccupied": 30,
+  "averageQuantityMT": 21,
+  "ratePerMTPerDay": 180,
+  "totalAmount": 3780,
+  "periodStart": "2026-03-01",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-28T10:21:59.008Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f08a4764e98e498828cc77"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f08a4764e98e498828cc75"
+  },
+  "commodityName": "MAIZE",
+  "daysOccupied": 28,
+  "averageQuantityMT": 100,
+  "ratePerMTPerDay": 75,
+  "totalAmount": 7000,
+  "periodStart": "2026-03-03",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-28T10:21:59.008Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f19d475f3a326f66d6dc74"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f19d475f3a326f66d6dc73"
+  },
+  "commodityName": "MAIZE",
+  "daysOccupied": 31,
+  "averageQuantityMT": 2000,
+  "ratePerMTPerDay": 75,
+  "totalAmount": 155000,
+  "periodStart": "2026-03-01",
+  "periodEnd": "2026-03-31",
+  "createdAt": {
+    "$date": "2026-04-29T05:55:19.463Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f19d4c5f3a326f66d6dc76"
+  },
+  "invoiceMasterId": {
+    "$oid": "69f19d4c5f3a326f66d6dc75"
+  },
+  "commodityName": "MAIZE",
+  "daysOccupied": 15,
+  "averageQuantityMT": 2000,
+  "ratePerMTPerDay": 75,
+  "totalAmount": 75000,
+  "periodStart": "2026-02-14",
+  "periodEnd": "2026-02-28",
+  "createdAt": {
+    "$date": "2026-04-29T05:55:24.767Z"
+  }
+}]

@@ -1,0 +1,59 @@
+[{
+  "_id": {
+    "$oid": "69dfd334df855759dac9b76f"
+  },
+  "totalCapacity": 5000,
+  "name": "Main Warehouse Complex",
+  "location": "Ahmedabad, Gujarat",
+  "type": "Multi-Commodity Warehouse",
+  "createdAt": {
+    "$date": "2026-04-15T18:04:36.397Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-15T18:04:36.397Z"
+  },
+  "commodities": [
+    {
+      "name": "WHEAT",
+      "baseRate": 85,
+      "unit": "MT",
+      "category": "Grains"
+    },
+    {
+      "name": "RICE",
+      "baseRate": 90,
+      "unit": "MT",
+      "category": "Grains"
+    },
+    {
+      "name": "CHANA",
+      "baseRate": 95,
+      "unit": "MT",
+      "category": "Pulses"
+    },
+    {
+      "name": "SOYABEAN",
+      "baseRate": 80,
+      "unit": "MT",
+      "category": "Oilseeds"
+    },
+    {
+      "name": "MUSTARD",
+      "baseRate": 88,
+      "unit": "MT",
+      "category": "Oilseeds"
+    },
+    {
+      "name": "CORN",
+      "baseRate": 75,
+      "unit": "MT",
+      "category": "Grains"
+    },
+    {
+      "name": "COTTON",
+      "baseRate": 120,
+      "unit": "MT",
+      "category": "Fibres"
+    }
+  ]
+}]

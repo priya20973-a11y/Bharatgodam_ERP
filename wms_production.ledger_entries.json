@@ -1,0 +1,3518 @@
+[{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd41"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-14",
+  "periodEndDate": null,
+  "quantityMT": 13.355,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1742.83,
+  "daysStored": 45,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.933Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd42"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 13.79,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1719.61,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.935Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd43"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 12.28,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1531.32,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.936Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd44"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 19.475,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 2428.53,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.938Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd45"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-17",
+  "periodEndDate": null,
+  "quantityMT": 14.39,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1752.7,
+  "daysStored": 42,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.939Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd46"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-19",
+  "periodEndDate": null,
+  "quantityMT": 17.675,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 2050.3,
+  "daysStored": 40,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.940Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd47"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-20",
+  "periodEndDate": null,
+  "quantityMT": 16.27,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1840.14,
+  "daysStored": 39,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.941Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd48"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-21",
+  "periodEndDate": null,
+  "quantityMT": 12.455,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1372.54,
+  "daysStored": 38,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.942Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd49"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "clientName": "Sureshwar Corporation",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (87 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 13.205,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 1110.54,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.943Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4a"
+  },
+  "clientId": {
+    "$oid": "69e137aa4c5cd55a18e497e9"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21faa0699e1d323a4a8f9"
+  },
+  "clientName": "Radhe Trading ",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "SEESAM SEED (WHITE) (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 18.75,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2418.75,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.944Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4b"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Ankitkumar Makadiya",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-23",
+  "periodEndDate": null,
+  "quantityMT": 21.275,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2144.52,
+  "daysStored": 36,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.945Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4c"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Ankitkumar Makadiya",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 13.105,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1064.13,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.945Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4d"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Ankitkumar Makadiya",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-31",
+  "periodEndDate": null,
+  "quantityMT": 24.6,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1928.64,
+  "daysStored": 28,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.946Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4e"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "clientName": "Chotai Brother",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-25",
+  "periodEndDate": null,
+  "quantityMT": 22.22,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2115.34,
+  "daysStored": 34,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.947Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd4f"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "clientName": "Chotai Brother",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-26",
+  "periodEndDate": null,
+  "quantityMT": 26.92,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2487.41,
+  "daysStored": 33,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.948Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd50"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-21",
+  "periodEndDate": null,
+  "quantityMT": 32.59,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 3467.58,
+  "daysStored": 38,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.949Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd51"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-25",
+  "periodEndDate": null,
+  "quantityMT": 32.485,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 3092.57,
+  "daysStored": 34,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.950Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd52"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-28",
+  "periodEndDate": null,
+  "quantityMT": 10.23,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 887.96,
+  "daysStored": 31,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.951Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd53"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-28",
+  "periodEndDate": null,
+  "quantityMT": 12.105,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1050.71,
+  "daysStored": 31,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.952Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd54"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 13.255,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1076.31,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.953Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd55"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 13.23,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1074.28,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.954Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd56"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "clientName": "Chotai Enterprise",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 29.475,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2393.37,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.955Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd57"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "clientName": "Dharam Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "CHANA (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 15.725,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2028.53,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.956Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd58"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "clientName": "Dharam Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "CHANA (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 16.185,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2087.86,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.957Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd59"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "clientName": "Dharam Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "CHANA (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 19.43,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2506.47,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.958Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5a"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "clientName": "Dharam Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "CHANA (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 10.23,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1319.67,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.959Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5b"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "clientName": "Dharam Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "CHANA (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-18",
+  "periodEndDate": null,
+  "quantityMT": 10.69,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1314.87,
+  "daysStored": 41,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.960Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5c"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Hareshkumar Kantilal",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-23",
+  "periodEndDate": null,
+  "quantityMT": 14.435,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1455.05,
+  "daysStored": 36,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.961Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.011Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5d"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Hareshkumar Kantilal",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-23",
+  "periodEndDate": null,
+  "quantityMT": 31.8,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 3205.44,
+  "daysStored": 36,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.962Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5e"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Hareshkumar Kantilal",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-23",
+  "periodEndDate": null,
+  "quantityMT": 21.19,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2135.95,
+  "daysStored": 36,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.963Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd5f"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Hareshkumar Kantilal",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-31",
+  "periodEndDate": null,
+  "quantityMT": 21.505,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1685.99,
+  "daysStored": 28,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.964Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd60"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Hareshkumar Kantilal",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-31",
+  "periodEndDate": null,
+  "quantityMT": 18.125,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1421,
+  "daysStored": 28,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.965Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd61"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-16",
+  "periodEndDate": null,
+  "quantityMT": 25.335,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 3268.22,
+  "daysStored": 43,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.966Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd62"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-17",
+  "periodEndDate": null,
+  "quantityMT": 20.265,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2553.39,
+  "daysStored": 42,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.967Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd63"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-18",
+  "periodEndDate": null,
+  "quantityMT": 15.11,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1858.53,
+  "daysStored": 41,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.968Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd64"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-19",
+  "periodEndDate": null,
+  "quantityMT": 30.635,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 3676.2,
+  "daysStored": 40,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.969Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd65"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-20",
+  "periodEndDate": null,
+  "quantityMT": 14.72,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1722.24,
+  "daysStored": 39,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.970Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd66"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-21",
+  "periodEndDate": null,
+  "quantityMT": 23.355,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2662.47,
+  "daysStored": 38,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.970Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd67"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Shankar Tredarsh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-31",
+  "periodEndDate": null,
+  "quantityMT": 20.315,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1706.46,
+  "daysStored": 28,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.971Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd68"
+  },
+  "clientId": {
+    "$oid": "69e220990699e1d323a4a8fe"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Krupal Tradersh",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-19",
+  "periodEndDate": null,
+  "quantityMT": 14.235,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 1708.2,
+  "daysStored": 40,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.972Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd69"
+  },
+  "clientId": {
+    "$oid": "69e221fc0699e1d323a4a906"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f9b0699e1d323a4a8f8"
+  },
+  "clientName": "Kuber Trading ",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "CHANA (100 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-27",
+  "periodEndDate": null,
+  "quantityMT": 12.01,
+  "ratePerMTPerDay": 3.3,
+  "rentCalculated": 1268.26,
+  "daysStored": 32,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.973Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6a"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Nilesh Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-19",
+  "periodEndDate": null,
+  "quantityMT": 24.785,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2775.92,
+  "daysStored": 40,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.973Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6b"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Nilesh Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-24",
+  "periodEndDate": null,
+  "quantityMT": 25.245,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2474.01,
+  "daysStored": 35,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.974Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6c"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Nilesh Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-24",
+  "periodEndDate": null,
+  "quantityMT": 25.62,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 2510.76,
+  "daysStored": 35,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.975Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6d"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Nilesh Enterprise",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-28",
+  "periodEndDate": null,
+  "quantityMT": 19.28,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1673.5,
+  "daysStored": 31,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.976Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6e"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Madhav Puls Industries",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-19",
+  "periodEndDate": null,
+  "quantityMT": 23.91,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2869.2,
+  "daysStored": 40,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.977Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd6f"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Madhav Puls Industries",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-21",
+  "periodEndDate": null,
+  "quantityMT": 19.04,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2170.56,
+  "daysStored": 38,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.977Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd70"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "clientName": "Madhav Puls Industries",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "commodityName": "WHEAT (90 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-23",
+  "periodEndDate": null,
+  "quantityMT": 27.625,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 2983.5,
+  "daysStored": 36,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.978Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efa1d48c22fd82486ecd71"
+  },
+  "clientId": {
+    "$oid": "69e221e80699e1d323a4a905"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "clientName": "Shantilal Gordhanbhai Makadiya",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "commodityName": "WHEAT (85 PER MT)",
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "periodStartDate": "2026-03-30",
+  "periodEndDate": null,
+  "quantityMT": 19.725,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 1601.67,
+  "daysStored": 29,
+  "month": "2026-03",
+  "status": "ACTIVE",
+  "version": 1,
+  "createdAt": {
+    "$date": "2026-04-27T17:50:12.979Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-27T20:04:02.012Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559d9"
+  },
+  "inwardId": {
+    "$oid": "69e223d40699e1d323a4a909"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.355,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:13:08.739Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 426.0245,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.114Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.114Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559da"
+  },
+  "inwardId": {
+    "$oid": "69e227260699e1d323a4a90f"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.79,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:27:18.407Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 439.90099999999995,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559db"
+  },
+  "inwardId": {
+    "$oid": "69e228700699e1d323a4a916"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 12.28,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:32:48.841Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 391.7319999999999,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559dc"
+  },
+  "inwardId": {
+    "$oid": "69e228e50699e1d323a4a91e"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 19.475,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:34:45.492Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 621.2525,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.115Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559dd"
+  },
+  "inwardId": {
+    "$oid": "69e2293e0699e1d323a4a927"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 14.39,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:36:14.043Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 459.04100000000005,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.116Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.116Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559de"
+  },
+  "inwardId": {
+    "$oid": "69e229d20699e1d323a4a931"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 17.675,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:38:42.358Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 563.8325,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.116Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.116Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559df"
+  },
+  "inwardId": {
+    "$oid": "69e22a820699e1d323a4a93c"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 16.27,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:41:38.573Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 519.013,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.117Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.117Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e0"
+  },
+  "inwardId": {
+    "$oid": "69e22af80699e1d323a4a948"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 12.455,
+  "periodStartDate": {
+    "$date": "2026-04-17T12:43:36.754Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 397.31449999999995,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.117Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.117Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e1"
+  },
+  "inwardId": {
+    "$oid": "69e230320699e1d323a4a95b"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.205,
+  "periodStartDate": {
+    "$date": "2026-04-17T13:05:54.276Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 11,
+  "ratePerMTPerDay": 2.9,
+  "rentCalculated": 421.23949999999996,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e2"
+  },
+  "inwardId": {
+    "$oid": "69e6071dec8d2a885f1c14d2"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21faa0699e1d323a4a8f9"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 18.75,
+  "periodStartDate": {
+    "$date": "2026-04-20T10:59:41.149Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 8,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 450,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e3"
+  },
+  "inwardId": {
+    "$oid": "69e79cb58580b71b10d05a05"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 21.275,
+  "periodStartDate": {
+    "$date": "2026-04-21T15:50:13.658Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 416.98999999999995,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.118Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e4"
+  },
+  "inwardId": {
+    "$oid": "69e79d0f8580b71b10d05a09"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.105,
+  "periodStartDate": {
+    "$date": "2026-04-21T15:51:43.245Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 256.858,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e5"
+  },
+  "inwardId": {
+    "$oid": "69e79d6a8580b71b10d05a0d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 24.6,
+  "periodStartDate": {
+    "$date": "2026-04-21T15:53:14.292Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 482.16,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e6"
+  },
+  "inwardId": {
+    "$oid": "69e79e9a8580b71b10d05a11"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 22.22,
+  "periodStartDate": {
+    "$date": "2026-04-21T15:58:18.553Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 435.51199999999994,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.119Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e7"
+  },
+  "inwardId": {
+    "$oid": "69e79f0b8580b71b10d05a15"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 26.92,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:00:11.402Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 527.632,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e8"
+  },
+  "inwardId": {
+    "$oid": "69e7a1c88580b71b10d05a19"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 32.59,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:11:52.773Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 638.764,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559e9"
+  },
+  "inwardId": {
+    "$oid": "69e7a2778580b71b10d05a1d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 32.485,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:14:47.004Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 636.7059999999999,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ea"
+  },
+  "inwardId": {
+    "$oid": "69e7a2eb8580b71b10d05a21"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 10.23,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:16:43.215Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 200.50799999999998,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.120Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559eb"
+  },
+  "inwardId": {
+    "$oid": "69e7a36c8580b71b10d05a25"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 12.105,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:18:52.459Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 237.25799999999998,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ec"
+  },
+  "inwardId": {
+    "$oid": "69e7a4318580b71b10d05a29"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.255,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:22:09.533Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 259.798,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ed"
+  },
+  "inwardId": {
+    "$oid": "69e7a4ad8580b71b10d05a2d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 13.23,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:24:13.677Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 259.308,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.121Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ee"
+  },
+  "inwardId": {
+    "$oid": "69e7a5168580b71b10d05a31"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 29.475,
+  "periodStartDate": {
+    "$date": "2026-04-21T16:25:58.258Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 577.71,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ef"
+  },
+  "inwardId": {
+    "$oid": "69e7ae5e8580b71b10d05a35"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 15.725,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:05:34.584Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 330.225,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f0"
+  },
+  "inwardId": {
+    "$oid": "69e7af138580b71b10d05a39"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 16.185,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:08:35.419Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 339.885,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.122Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f1"
+  },
+  "inwardId": {
+    "$oid": "69e7af5d8580b71b10d05a3d"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 19.43,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:09:49.544Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 408.03,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f2"
+  },
+  "inwardId": {
+    "$oid": "69e7afcf8580b71b10d05a41"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 10.23,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:11:43.496Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 214.82999999999998,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f3"
+  },
+  "inwardId": {
+    "$oid": "69e7b00d8580b71b10d05a45"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 10.69,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:12:45.804Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 224.49,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f4"
+  },
+  "inwardId": {
+    "$oid": "69e7b15e8580b71b10d05a49"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 14.435,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:18:22.764Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 282.926,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.123Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f5"
+  },
+  "inwardId": {
+    "$oid": "69e7b18c8580b71b10d05a4d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 31.8,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:19:08.610Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 623.28,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f6"
+  },
+  "inwardId": {
+    "$oid": "69e7b1e78580b71b10d05a51"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 21.19,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:20:39.843Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 415.324,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f7"
+  },
+  "inwardId": {
+    "$oid": "69e7b2298580b71b10d05a55"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 21.505,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:21:45.950Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 421.498,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.124Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f8"
+  },
+  "inwardId": {
+    "$oid": "69e7b26d8580b71b10d05a59"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 18.125,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:22:53.236Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 355.25,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559f9"
+  },
+  "inwardId": {
+    "$oid": "69e7b3e88580b71b10d05a5d"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 25.335,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:29:12.244Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 532.035,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559fa"
+  },
+  "inwardId": {
+    "$oid": "69e7b42a8580b71b10d05a61"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 20.265,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:30:18.608Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 425.56500000000005,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.125Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559fb"
+  },
+  "inwardId": {
+    "$oid": "69e7b46d8580b71b10d05a65"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 15.11,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:31:25.648Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 317.31,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559fc"
+  },
+  "inwardId": {
+    "$oid": "69e7b4a78580b71b10d05a69"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 30.635,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:32:23.800Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 643.335,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559fd"
+  },
+  "inwardId": {
+    "$oid": "69e7b4e58580b71b10d05a6d"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 14.72,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:33:25.597Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 309.12,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.126Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559fe"
+  },
+  "inwardId": {
+    "$oid": "69e7b5208580b71b10d05a71"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 23.355,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:34:24.439Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 490.45500000000004,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.127Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.127Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf559ff"
+  },
+  "inwardId": {
+    "$oid": "69e7b5578580b71b10d05a75"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 20.315,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:35:19.558Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 426.615,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.127Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.127Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a00"
+  },
+  "inwardId": {
+    "$oid": "69e7b6368580b71b10d05a79"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 14.235,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:39:02.340Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 298.935,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a01"
+  },
+  "inwardId": {
+    "$oid": "69e7b72d8580b71b10d05a7d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f9b0699e1d323a4a8f8"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 12.01,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:43:09.200Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3.3,
+  "rentCalculated": 277.431,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a02"
+  },
+  "inwardId": {
+    "$oid": "69e7b7ac8580b71b10d05a81"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 24.785,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:45:16.886Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 485.786,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a03"
+  },
+  "inwardId": {
+    "$oid": "69e7b7f48580b71b10d05a85"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 25.245,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:46:28.494Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 494.80199999999996,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.128Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a04"
+  },
+  "inwardId": {
+    "$oid": "69e7b8328580b71b10d05a89"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 25.62,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:47:30.133Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 502.152,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a05"
+  },
+  "inwardId": {
+    "$oid": "69e7b8608580b71b10d05a8d"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 19.28,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:48:16.129Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 377.888,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a06"
+  },
+  "inwardId": {
+    "$oid": "69e7b93c8580b71b10d05a91"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 23.91,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:51:56.761Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 502.11,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a07"
+  },
+  "inwardId": {
+    "$oid": "69e7b9af8580b71b10d05a95"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 19.04,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:53:51.557Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 399.84000000000003,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.129Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a08"
+  },
+  "inwardId": {
+    "$oid": "69e7b9de8580b71b10d05a99"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 27.625,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:54:38.764Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 3,
+  "rentCalculated": 580.125,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a09"
+  },
+  "inwardId": {
+    "$oid": "69e7ba4e8580b71b10d05a9d"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 19.725,
+  "periodStartDate": {
+    "$date": "2026-04-21T17:56:30.428Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 7,
+  "ratePerMTPerDay": 2.8,
+  "rentCalculated": 386.61,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a0a"
+  },
+  "inwardId": {
+    "$oid": "69eb2a80045624e2211f3673"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20d00d60a84915b179f9"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 23.4,
+  "periodStartDate": {
+    "$date": "2026-04-24T08:32:00.974Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 4,
+  "ratePerMTPerDay": 6,
+  "rentCalculated": 561.5999999999999,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.130Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a0b"
+  },
+  "inwardId": {
+    "$oid": "69eb2af1045624e2211f367b"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 100,
+  "periodStartDate": {
+    "$date": "2026-04-24T08:33:53.181Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 4,
+  "ratePerMTPerDay": 2.5,
+  "rentCalculated": 1000,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.131Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.131Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69efc400355db8f7faf55a0c"
+  },
+  "inwardId": {
+    "$oid": "69eb2bc4045624e2211f3681"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "commodityName": null,
+  "quantityName": null,
+  "quantityMT": 2000,
+  "periodStartDate": {
+    "$date": "2026-04-24T08:37:24.298Z"
+  },
+  "periodEndDate": {
+    "$date": "2026-04-28T00:00:00.000Z"
+  },
+  "daysStored": 4,
+  "ratePerMTPerDay": 2.5,
+  "rentCalculated": 20000,
+  "createdAt": {
+    "$date": "2026-04-27T20:16:00.131Z"
+  },
+  "rateFixedAt": {
+    "$date": "2026-04-27T20:16:00.131Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f092304896a8858addcc4f"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20d00d60a84915b179f9"
+  },
+  "periodStartDate": "2026-02-02",
+  "periodEndDate": "2026-05-01",
+  "quantityMT": 23.4,
+  "status": "ACTIVE",
+  "ratePerMTPerDay": 6,
+  "rentCalculated": 0,
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-28T10:55:44.576Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T04:43:22.993Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f092304896a8858addcc50"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "periodStartDate": "2026-03-03",
+  "periodEndDate": "2026-05-01",
+  "quantityMT": 100,
+  "status": "ACTIVE",
+  "ratePerMTPerDay": 2.5,
+  "rentCalculated": 0,
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-28T10:55:44.579Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T04:43:22.995Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69f092304896a8858addcc51"
+  },
+  "clientId": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "periodStartDate": "2026-02-14",
+  "periodEndDate": "2026-05-01",
+  "quantityMT": 2000,
+  "status": "ACTIVE",
+  "ratePerMTPerDay": 2.5,
+  "rentCalculated": 0,
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-28T10:55:44.583Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-29T04:43:22.995Z"
+  }
+}]

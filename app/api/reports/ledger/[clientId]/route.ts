@@ -35,17 +35,13 @@ export async function GET(
       ? { $in: [new ObjectId(trimmedClientId), trimmedClientId] }
       : trimmedClientId;
 
-    const [bookings, transactionDocs, outwards, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
+    const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
         .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
         .find({ accountId, ...tenantFilter })
-        .sort({ date: 1 })
-        .toArray(),
-      db.collection('outwards')
-        .find({ clientId: clientIdFilter, ...tenantFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
@@ -85,39 +81,56 @@ export async function GET(
       }
     });
 
-    const transactionData: Transaction[] = Array.from(
-      new Map(
-        [
-          ...bookings.map((txn) => ({
-            _id: txn._id?.toString() || '',
-            date: txn.date,
-            direction: txn.direction,
-            mt: txn.mt,
-            clientName: txn.clientName,
-            commodityName: txn.commodityName,
-            gatePass: txn.gatePass,
-          })),
-          ...transactionDocs.map((txn) => ({
-            _id: txn._id?.toString() || '',
-            date: txn.date,
-            direction: txn.direction,
-            mt: txn.quantityMT,
-            clientName: txn.clientName || bookings[0]?.clientName || clientId,
-            commodityName: txn.commodityName,
-            gatePass: txn.gatePass || '',
-          })),
-          ...outwards.map((txn) => ({
-            _id: txn._id?.toString() || '',
-            date: txn.date,
-            direction: 'OUTWARD' as const,
-            mt: txn.quantityMT,
-            clientName: txn.clientName || bookings[0]?.clientName || clientId,
-            commodityName: txn.commodityName || commodityNameById.get(txn.commodityId?.toString() || '') || '',
-            gatePass: txn.gatePass || '',
-          })),
-        ].map((item) => [item._id, item])
-      ).values()
-    ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const normalizeTransactionKey = (txn: Transaction & { clientId?: string; warehouseId?: string }) => {
+      const clientKey = (txn.clientId || txn.clientName || '').toString().trim().toUpperCase();
+      const commodityKey = (txn.commodityName || '').toString().trim().toUpperCase();
+      const warehouseKey = (txn.warehouseId || '').toString().trim().toUpperCase();
+
+      return [
+        (txn.date || '').toString().trim(),
+        txn.direction,
+        Number(txn.mt || 0).toFixed(4),
+        clientKey,
+        commodityKey,
+        warehouseKey,
+      ].join('|');
+    };
+
+    const transactionKeys = new Set<string>();
+    const transactionData: Transaction[] = [];
+
+    const addTransaction = (txn: Transaction & { clientId?: string; warehouseId?: string }) => {
+      const key = normalizeTransactionKey(txn);
+      if (transactionKeys.has(key)) return;
+      transactionKeys.add(key);
+      transactionData.push(txn);
+    };
+
+    bookings.forEach((txn) => addTransaction({
+      _id: txn._id?.toString() || '',
+      date: txn.date,
+      direction: txn.direction,
+      mt: txn.mt,
+      clientId: txn.clientId?.toString?.() || undefined,
+      clientName: txn.clientName,
+      commodityName: txn.commodityName,
+      warehouseId: txn.warehouseId?.toString?.() || undefined,
+      gatePass: txn.gatePass,
+    } as Transaction & { clientId?: string; warehouseId?: string }));
+
+    transactionDocs.forEach((txn) => addTransaction({
+      _id: txn._id?.toString() || '',
+      date: txn.date,
+      direction: txn.direction,
+      mt: txn.quantityMT,
+      clientId: txn.clientId || undefined,
+      clientName: txn.clientName || bookings[0]?.clientName || clientId,
+      commodityName: txn.commodityName,
+      warehouseId: txn.warehouseId || undefined,
+      gatePass: txn.gatePass || '',
+    } as Transaction & { clientId?: string; warehouseId?: string }));
+
+    transactionData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const paymentData: Payment[] = paymentsDocs.map((pay) => ({
       _id: pay._id?.toString() || '',

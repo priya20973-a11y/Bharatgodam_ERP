@@ -12,13 +12,14 @@ interface SignupRequest {
   warehouseLocation: string;
   gstNumber?: string;
   role: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: string;
   createdAt: string;
 }
 
 export default function SignupRequestsPage() {
   const [requests, setRequests] = useState<SignupRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<SignupRequest | null>(null);
 
   useEffect(() => {
@@ -28,12 +29,16 @@ export default function SignupRequestsPage() {
   const fetchRequests = async () => {
     try {
       const response = await fetch('/api/admin/signup-requests');
+      const data = await response.json();
       if (response.ok) {
-        const data = await response.json();
         setRequests(data.requests);
+        setError(null);
+      } else {
+        setError(data?.message || 'Failed to load signup requests');
       }
     } catch (error) {
       console.error('Failed to fetch requests:', error);
+      setError('Failed to load signup requests');
     } finally {
       setLoading(false);
     }
@@ -91,6 +96,11 @@ export default function SignupRequestsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          {error}
+        </div>
+      )}
       <h1 className="text-3xl font-bold mb-8">Signup Requests</h1>
 
       <div className="grid gap-6">
@@ -151,13 +161,22 @@ export default function SignupRequestsPage() {
             </div>
 
             <div className="mt-4">
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {request.status.toUpperCase()}
-              </span>
+              {(() => {
+                const normalizedStatus = request.status?.toString().toLowerCase();
+                const statusLabel = request.status?.toString().toUpperCase();
+                const badgeClass =
+                  normalizedStatus === 'pending' || normalizedStatus === 'pending_approval'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : normalizedStatus === 'approved'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800';
+
+                return (
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${badgeClass}`}>
+                    {statusLabel}
+                  </span>
+                );
+              })()}
             </div>
           </div>
         ))}

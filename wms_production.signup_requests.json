@@ -1,0 +1,59 @@
+[{
+  "_id": {
+    "$oid": "69eb9859eb772f68f867ff9b"
+  },
+  "fullName": "Test User",
+  "email": "test-signup-1777047641723@example.com",
+  "password": "$2b$12$XtXNZsCMRlvTAcleEuRRDO67I7WH5mBfaofii8cJzjqTYxZlVP05K",
+  "companyName": "Test Company",
+  "phoneNumber": "+1234567890",
+  "warehouseLocation": "Test Location",
+  "gstNumber": "TEST123456789",
+  "role": "WSP",
+  "status": "pending",
+  "createdAt": {
+    "$date": "2026-04-24T16:20:41.983Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T16:20:41.983Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb98f0749d41df8bacff21"
+  },
+  "fullName": "Test User",
+  "email": "test-signup-1777047792006@example.com",
+  "password": "$2b$10$y3zhOacYPytMzNqrug1u9.zkjX74lhv4R/1KBp0jrsZ.oLeRV/5t2",
+  "companyName": "Test Company",
+  "phoneNumber": "+1234567890",
+  "warehouseLocation": "Test Location",
+  "gstNumber": "TEST123456789",
+  "status": "approved",
+  "createdAt": {
+    "$date": "2026-04-24T16:23:12.064Z"
+  },
+  "approvedAt": {
+    "$date": "2026-04-24T16:23:12.068Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb9c02821a013084aa242f"
+  },
+  "fullName": "Shruti Mehata",
+  "email": "bharatgodam.techsolution@gmail.com",
+  "password": "$2b$12$CjU0/hPIdx9P/49Tis8CSuCxWOstaY7Z1crZC8k1jwe.GLxxQvkfy",
+  "companyName": "BHARATGODAM",
+  "phoneNumber": "9082994158",
+  "warehouseLocation": "Gandhinagar",
+  "gstNumber": null,
+  "role": "WSP",
+  "status": "pending",
+  "createdAt": {
+    "$date": "2026-04-24T16:36:18.607Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T16:36:18.607Z"
+  }
+}]

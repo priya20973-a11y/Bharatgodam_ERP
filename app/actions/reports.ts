@@ -310,11 +310,51 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
               palaBags: { $ifNull: ['$palaBags', 0] },
               mt: '$quantityMT',
               storageDays: {
-                $dateDiff: {
-                  startDate: '$date',
-                  endDate: '$outwardDate',
-                  unit: 'day'
-                }
+                $max: [
+                  0,
+                  {
+                    $cond: [
+                      { $ifNull: ['$outwardDate', false] },
+                      {
+                        $dateDiff: {
+                          startDate: {
+                            $cond: [
+                              { $eq: [{ $type: '$date' }, 'date'] },
+                              '$date',
+                              { $dateFromString: { dateString: '$date' } }
+                            ]
+                          },
+                          endDate: {
+                            $cond: [
+                              { $eq: [{ $type: '$outwardDate' }, 'date'] },
+                              '$outwardDate',
+                              { $dateFromString: { dateString: '$outwardDate' } }
+                            ]
+                          },
+                          unit: 'day'
+                        }
+                      },
+                      {
+                        $add: [
+                          {
+                            $dateDiff: {
+                              startDate: {
+                                $cond: [
+                                  { $eq: [{ $type: '$date' }, 'date'] },
+                                  '$date',
+                                  { $dateFromString: { dateString: '$date' } }
+                                ]
+                              },
+                              endDate: '$$NOW',
+                              unit: 'day'
+                            }
+                          },
+                          1
+                        ]
+                      }
+                    ]
+                  }
+                ]
               },
               date: '$date',
               createdAt: '$createdAt'
@@ -335,6 +375,58 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
                   { $arrayElemAt: ['$clientAccount', 0] }
                 ]
               }
+            }
+          },
+          {
+            $lookup: {
+              from: 'ledger_entries',
+              let: {
+                clientId: '$clientId',
+                warehouseId: '$warehouseId',
+                commodityId: '$commodityId',
+                outwardDate: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }
+              },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$clientId', '$$clientId'] },
+                        { $eq: ['$warehouseId', '$$warehouseId'] },
+                        { $eq: ['$commodityId', '$$commodityId'] },
+                        { $eq: ['$periodEndDate', '$$outwardDate'] },
+                        { $eq: ['$status', 'CLOSED'] }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    durationDays: {
+                      $dateDiff: {
+                        startDate: {
+                          $cond: [
+                            { $eq: [{ $type: '$periodStartDate' }, 'date'] },
+                            '$periodStartDate',
+                            { $dateFromString: { dateString: '$periodStartDate' } }
+                          ]
+                        },
+                        endDate: {
+                          $cond: [
+                            { $eq: [{ $type: '$periodEndDate' }, 'date'] },
+                            '$periodEndDate',
+                            { $dateFromString: { dateString: '$periodEndDate' } }
+                          ]
+                        },
+                        unit: 'day'
+                      }
+                    }
+                  }
+                },
+                { $sort: { durationDays: -1 } },
+                { $limit: 1 }
+              ],
+              as: 'matchingLedger'
             }
           },
           {
@@ -388,7 +480,12 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
               pass: { $ifNull: ['$pass', ''] },
               quantityMT: '$quantityMT',
               bags: '$bagsCount',
-              storageDays: { $literal: 0 },
+              storageDays: {
+                $ifNull: [
+                  { $arrayElemAt: ['$matchingLedger.durationDays', 0] },
+                  0
+                ]
+              },
               mt: '$quantityMT',
               date: '$date',
               createdAt: '$createdAt'

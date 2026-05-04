@@ -6,6 +6,9 @@ import { appendOwnershipForMongo, getTenantFilterForMongo, isAdmin, requireSessi
 import { getDb } from '@/lib/mongodb';
 import type { IStockEntry, ILedgerEntry, IInvoiceMaster, IInvoiceLineItem, IClient, ICommodity, IWarehouse } from '@/types/schemas';
 import { ObjectId } from 'mongodb';
+import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
+import { calculateStorageDays } from '@/lib/storage-engine';
+import type { Transaction } from '@/lib/ledger-engine';
 
 /**
  * Get master data for dropdowns
@@ -319,7 +322,8 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
     clientId,
     warehouseId,
     status: { $in: ['ACTIVE', 'CLOSED'] },
-    periodStartDate: { $lte: monthEndStr },
+    periodStartDate: { $exists: true, $ne: null, $lte: monthEndStr },
+    quantityMT: { $gt: 0 },
     $or: [
       { periodEndDate: { $gte: monthStart } },
       { periodEndDate: null },
@@ -353,70 +357,58 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
     ...(tenantFilter || {}),
   });
 
-  if (existingMaster) {
-    return;
-  }
-
   // Only create invoice if ledger entries exist for this month
   if (ledgerData.length === 0) return;
 
   let totalAmount = 0;
   const lineItems: IInvoiceLineItem[] = [];
-
-  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const existingInvoiceMasterId = existingMaster?._id;
 
   // Generate line items from ledger entries ONLY - no raw transaction fallbacks
   for (const entry of ledgerData) {
-    const start = new Date(Math.max(new Date(entry.periodStartDate).getTime(), new Date(monthStart).getTime()));
+    const entryStart = entry.periodStartDate ? new Date(entry.periodStartDate) : null;
+    if (!entryStart || Number.isNaN(entryStart.getTime())) {
+      continue;
+    }
+
+    const start = new Date(Math.max(entryStart.getTime(), new Date(monthStart).getTime()));
     const monthEndDate = new Date(monthEndStr);
     const end = entry.periodEndDate
       ? new Date(Math.min(new Date(entry.periodEndDate).getTime(), monthEndDate.getTime()))
       : monthEndDate;
 
-    // Calculate day count with transaction-aware logic:
-    // - Same-day periods: always 1 day
-    // - Multi-day with real transaction on end date: EXCLUSIVE (gap only, no +1)
-    //   Reason: end date marks the outbound/transaction boundary
-    // - Multi-day with NO transaction on end date (month-end fallback): INCLUSIVE (gap + 1)
-    //   Reason: month-end is artificial boundary, count the last day
-    const startDateStr = start.toISOString().split('T')[0];
-    const endDateStr = end.toISOString().split('T')[0];
-    const periodEndDateStr = entry.periodEndDate
-      ? new Date(entry.periodEndDate).toISOString().split('T')[0]
-      : null;
-    
-    let days: number;
-    if (startDateStr === endDateStr) {
-      // Same day always counts as 1 day
-      days = 1;
-    } else {
-      // Multi-day: check if there's a real transaction on the end date
-      const hasTransactionOnEnd = periodEndDateStr === endDateStr;
-      
-      if (hasTransactionOnEnd) {
-        // Exclusive: just the gap, don't count the transaction day itself
-        days = Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
-      } else {
-        // Inclusive: gap + 1 (end date is month-end fallback, count it)
-        const gap = Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);
-        days = gap + 1;
-      }
+    if (Number.isNaN(end.getTime()) || end < start) {
+      continue;
     }
 
-    const amount = days * entry.quantityMT * entry.ratePerMTPerDay;
+    const statusType = entry.status === 'ACTIVE' ? 'ACTIVE' : 'COMPLETED';
+    const days = calculateStorageDays(start, end, statusType);
+
+    if (Number.isNaN(days) || days <= 0) {
+      continue;
+    }
+
+    const startDateStr = start.toISOString().split('T')[0];
+    const endDateStr = end.toISOString().split('T')[0];
+    const rate = Number(entry.ratePerMTPerDay ?? entry.rateFixedAt ?? entry.ratePerDayPerMT ?? entry.ratePerDay ?? 10);
+    const amount = days * entry.quantityMT * rate;
+    if (Number.isNaN(amount) || amount <= 0) {
+      continue;
+    }
 
     totalAmount += amount;
 
     lineItems.push({
       invoiceMasterId: new ObjectId(), // Will update after creating master
       commodityId: entry.commodityId,
-      commodityName: entry.commodity?.name || entry.commodityName || 'Unknown',
+      commodityName: entry.commodity?.name || entry.commodityName || entry.commodityId?.toString?.() || 'Unknown',
       daysOccupied: days,
       averageQuantityMT: entry.quantityMT,
-      ratePerMTPerDay: entry.ratePerMTPerDay,
+      ratePerMTPerDay: rate,
       totalAmount: amount,
-      periodStart: start.toISOString().split('T')[0],
-      periodEnd: end.toISOString().split('T')[0],
+      periodStart: startDateStr,
+      periodEnd: endDateStr,
+      status: entry.status || 'COMPLETED',
       createdAt: new Date(),
     });
   }
@@ -442,28 +434,46 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
   }, 0);
 
   const serial = String(maxSerial + 1).padStart(5, '0');
-  const invoiceId = `${wspInitials}/${monthAbbr}/${invoiceYear}/${serial}`;
+  const generatedInvoiceId = `${wspInitials}/${monthAbbr}/${invoiceYear}/${serial}`;
 
-  // Create invoice master
-  const invoiceMaster: IInvoiceMaster = {
-    clientId,
-    warehouseId,
-    invoiceId,
-    invoiceMonth,
-    totalAmount,
-    status: 'DRAFT',
-    generatedAt: new Date(),
-    dueDate: new Date(monthEnd.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days after month end
-    userId: userId ? new ObjectId(userId) : undefined,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  let masterId = existingInvoiceMasterId;
 
-  const masterResult = await db.collection('invoice_master').insertOne(invoiceMaster);
+  if (existingMaster) {
+    await db.collection('invoice_line_items').deleteMany({ invoiceMasterId: existingMaster._id });
+    await db.collection('invoice_master').updateOne(
+      { _id: existingMaster._id },
+      {
+        $set: {
+          totalAmount,
+          updatedAt: new Date(),
+          generatedAt: existingMaster.generatedAt || new Date(),
+        },
+      }
+    );
+  } else {
+    const invoiceMaster: IInvoiceMaster = {
+      clientId,
+      warehouseId,
+      invoiceId: generatedInvoiceId,
+      invoiceMonth,
+      totalAmount,
+      status: 'DRAFT',
+      generatedAt: new Date(),
+      dueDate: new Date(monthEnd.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days after month end
+      userId: userId ? new ObjectId(userId) : undefined,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const masterResult = await db.collection('invoice_master').insertOne(invoiceMaster);
+    masterId = masterResult.insertedId;
+  }
+
+  if (!masterId) return;
 
   // Update line items with master ID
   for (const item of lineItems) {
-    item.invoiceMasterId = masterResult.insertedId;
+    item.invoiceMasterId = masterId;
   }
 
   await db.collection('invoice_line_items').insertMany(lineItems);
@@ -477,8 +487,12 @@ export async function getLedgerSummary(clientId: string, warehouseId: string, co
   const db = await getDb();
 
   const match: any = {
-    clientId: new ObjectId(clientId),
-    warehouseId: new ObjectId(warehouseId),
+    clientId: ObjectId.isValid(clientId)
+      ? { $in: [new ObjectId(clientId), clientId] }
+      : clientId,
+    warehouseId: ObjectId.isValid(warehouseId)
+      ? { $in: [new ObjectId(warehouseId), warehouseId] }
+      : warehouseId,
     ...(!isAdmin(session) ? { userId: new ObjectId(session.user!.id) } : {}),
   };
 
@@ -486,19 +500,22 @@ export async function getLedgerSummary(clientId: string, warehouseId: string, co
     match.commodityId = new ObjectId(commodityId);
   }
 
-  const entries = await db.collection('ledger_entries').aggregate([
-    { $match: match },
-    {
-      $lookup: {
-        from: 'commodities',
-        localField: 'commodityId',
-        foreignField: '_id',
-        as: 'commodity',
-      },
-    },
-    { $unwind: { path: '$commodity', preserveNullAndEmptyArrays: true } },
-    { $sort: { periodStartDate: 1 } },
-  ]).toArray();
+  const transactions = await db.collection('transactions').find(match).sort({ date: 1 }).toArray();
+  const clientRecord = await db.collection('clients').findOne({ _id: new ObjectId(clientId) });
+  const clientName = clientRecord?.name || transactions[0]?.clientName || 'Client';
 
-  return entries;
+  const timeStateTransactions: Transaction[] = transactions.map(txn => {
+    const rawDirection = (txn.direction || '').toString().trim().toUpperCase();
+    return {
+      _id: txn._id?.toString() || '',
+      date: typeof txn.date === 'string' ? txn.date : txn.date?.toISOString?.() || '',
+      direction: rawDirection === 'OUTWARD' ? 'OUTWARD' : 'INWARD',
+      mt: txn.quantityMT,
+      clientName: txn.clientName,
+      commodityName: txn.commodityName,
+      gatePass: txn.gatePass || '',
+    };
+  });
+
+  return generateTimeStateLedger(timeStateTransactions, clientName);
 }

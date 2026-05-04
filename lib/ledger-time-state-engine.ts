@@ -52,6 +52,16 @@ function parseDate(dateStr: string): Date {
 }
 
 /**
+ * Format a date as YYYY-MM-DD using local time
+ */
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Get the first day of month for a given date
  */
 function getFirstDayOfMonth(date: Date): Date {
@@ -99,7 +109,7 @@ function getMonthBoundaries(fromDate: Date, toDate: Date): Array<{ start: Date; 
       end: periodEnd,
     });
 
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 2, 1);
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
   }
 
   return boundaries;
@@ -137,7 +147,7 @@ export function generateTimeStateLedger(
       timeStatePeriods: [],
       totalRent: 0,
       totalQuantityDays: 0,
-      calculationDate: new Date().toISOString().split('T')[0],
+      calculationDate: formatDate(new Date()),
     };
   }
 
@@ -160,8 +170,8 @@ export function generateTimeStateLedger(
 
   // Process each month
   for (const boundary of monthBoundaries) {
-    const periodStartStr = boundary.start.toISOString().split('T')[0];
-    const periodEndStr = boundary.end.toISOString().split('T')[0];
+    const periodStartStr = formatDate(boundary.start);
+    const periodEndStr = formatDate(boundary.end);
     const periodKey = `${periodStartStr}_${periodEndStr}`;
 
     // Get transactions affecting this period
@@ -179,11 +189,9 @@ export function generateTimeStateLedger(
         const txnDate = parseDate(txn.date);
 
         // Create period BEFORE transaction
-        if (txnDate > periodStart) {
-          const beforePeriodStart = periodStart.toISOString().split('T')[0];
-          const beforePeriodEnd = new Date(txnDate.getTime() - 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0];
+        if (txnDate > periodStart && currentStock > 0) {
+          const beforePeriodStart = formatDate(periodStart);
+          const beforePeriodEnd = formatDate(new Date(txnDate.getTime() - 24 * 60 * 60 * 1000));
 
           const daysInPeriod = calculateDaysBetween(periodStart, 
             new Date(txnDate.getTime() - 24 * 60 * 60 * 1000));
@@ -217,8 +225,8 @@ export function generateTimeStateLedger(
         // Create period AT transaction (single day entry to mark change)
         periods.push({
           periodNo: periodNo++,
-          periodStartDate: txn.date.split('T')[0],
-          periodEndDate: txn.date.split('T')[0],
+          periodStartDate: formatDate(txnDate),
+          periodEndDate: formatDate(txnDate),
           quantityMT: currentStock,
           status,
           daysInPeriod: 1,
@@ -228,7 +236,7 @@ export function generateTimeStateLedger(
             id: txn._id,
             direction: txn.direction,
             quantity: txn.mt,
-            date: txn.date.split('T')[0],
+            date: formatDate(txnDate),
           },
           reasonForChange: `${txn.direction} - ${txn.mt} MT (${txn.gatePass})`,
         });
@@ -240,9 +248,9 @@ export function generateTimeStateLedger(
       const lastTxnDate = parseDate(affectingTransactions[affectingTransactions.length - 1].date);
       const afterStart = new Date(lastTxnDate.getTime() + 24 * 60 * 60 * 1000);
 
-      if (afterStart <= boundary.end) {
-        const afterPeriodStart = afterStart.toISOString().split('T')[0];
-        const afterPeriodEnd = boundary.end.toISOString().split('T')[0];
+      if (afterStart <= boundary.end && currentStock > 0) {
+        const afterPeriodStart = formatDate(afterStart);
+        const afterPeriodEnd = formatDate(boundary.end);
         const daysInPeriod = calculateDaysBetween(afterStart, boundary.end);
         const rent = roundCurrency(currentStock * RATE_PER_DAY_PER_MT * daysInPeriod);
 
@@ -290,7 +298,7 @@ export function generateTimeStateLedger(
     timeStatePeriods: periods,
     totalRent,
     totalQuantityDays,
-    calculationDate: new Date().toISOString().split('T')[0],
+    calculationDate: formatDate(new Date()),
   };
 }
 

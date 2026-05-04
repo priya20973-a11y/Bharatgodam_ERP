@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const warehouseId = url.searchParams.get('warehouseId') || undefined;
-    const analytics = await getClientRevenueAnalytics(warehouseId);
+    const month = url.searchParams.get('month') || undefined;
+    const analytics = await getClientRevenueAnalytics(warehouseId, month);
     return NextResponse.json(analytics);
   } catch (error) {
     console.error('Error fetching revenue dashboard analytics:', error);

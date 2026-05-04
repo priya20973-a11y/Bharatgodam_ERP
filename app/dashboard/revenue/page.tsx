@@ -12,7 +12,24 @@ export default function RevenueDashboard() {
   const [data, setData] = useState<{ summary: any; warehouseRevenue: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedWarehouse, setSelectedWarehouse] = useState('ALL');
+  const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [warehouseOptions, setWarehouseOptions] = useState<{ label: string; value: string }[]>([]);
+  const [monthOptions, setMonthOptions] = useState<{ label: string; value: string }[]>([]);
+
+  // Generate month options (last 12 months)
+  useEffect(() => {
+    const months: { label: string; value: string }[] = [{ label: 'All Months', value: 'ALL' }];
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${year}-${month}`;
+      const label = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
+      months.push({ label, value: monthKey });
+    }
+    setMonthOptions(months);
+  }, []);
 
   useEffect(() => {
     fetchWarehouseOptions();
@@ -23,7 +40,7 @@ export default function RevenueDashboard() {
     if (data !== null) {
       loadAnalytics();
     }
-  }, [selectedWarehouse]);
+  }, [selectedWarehouse, selectedMonth]);
 
   const fetchWarehouseOptions = async () => {
     try {
@@ -43,8 +60,11 @@ export default function RevenueDashboard() {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const filter = selectedWarehouse === 'ALL' ? '' : `?warehouseId=${selectedWarehouse}`;
-      const response = await fetch(`/api/revenue-dashboard${filter}`);
+      const params = new URLSearchParams();
+      if (selectedWarehouse !== 'ALL') params.append('warehouseId', selectedWarehouse);
+      if (selectedMonth !== 'ALL') params.append('month', selectedMonth);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await fetch(`/api/revenue-dashboard${query}`);
       if (!response.ok) throw new Error('Failed to load revenue analytics');
       const analytics = await response.json();
       setData(analytics);
@@ -73,13 +93,15 @@ export default function RevenueDashboard() {
   const exportToCSV = () => {
     try {
       const rows = warehouseRevenue.flatMap((item: any) =>
-        Object.entries(item.monthlyCharges).map(([monthKey, rent]: [string, number]) => ({
-          'Warehouse Name': item.warehouseName,
-          Month: formatMonthLabel(monthKey),
-          'Rent (₹)': Math.round(rent),
-          'Owner Share (₹)': Math.round(rent * 0.6 * 100) / 100,
-          'Platform Share (₹)': Math.round(rent * 0.4 * 100) / 100,
-        }))
+        Object.entries(item.monthlyCharges)
+          .filter(([monthKey]: [string, any]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
+          .map(([monthKey, rent]: [string, number]) => ({
+            'Warehouse Name': item.warehouseName,
+            Month: formatMonthLabel(monthKey),
+            'Rent (₹)': Math.round(rent),
+            'Owner Share (₹)': Math.round(rent * 0.6 * 100) / 100,
+            'Platform Share (₹)': Math.round(rent * 0.4 * 100) / 100,
+          }))
       );
 
       if (rows.length === 0) {
@@ -117,6 +139,7 @@ export default function RevenueDashboard() {
 
   const revenueRows = warehouseRevenue.flatMap((item: any) =>
     Object.entries(item.monthlyCharges)
+      .filter(([monthKey]: [string, any]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
       .map(([monthKey, rent]: [string, number]) => ({
         warehouseId: item.warehouseId,
         warehouseName: item.warehouseName,
@@ -193,6 +216,21 @@ export default function RevenueDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   {warehouseOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <Filter className="h-3 w-3 text-slate-500" />
+              <Select value={selectedMonth} onValueChange={(value) => setSelectedMonth(value)}>
+                <SelectTrigger className="min-w-[180px]">
+                  <SelectValue placeholder="Filter by month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>

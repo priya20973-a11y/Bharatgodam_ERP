@@ -1,0 +1,81 @@
+[{
+  "_id": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "name": "Ritaben Amitkumar Vithalani-5",
+  "address": "GONDAL",
+  "totalCapacity": 1000,
+  "occupiedCapacity": 505.1650000000001,
+  "status": "ACTIVE",
+  "createdAt": {
+    "$date": "2026-04-17T11:56:57.119Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:54:38.766Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "name": "Bhalal Dharmendrabhai -7",
+  "createdAt": {
+    "$date": "2026-04-19T12:48:37.157Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:56:30.429Z"
+  },
+  "status": "ACTIVE",
+  "address": "GONDAL",
+  "availableCapacity": 0,
+  "occupiedCapacity": 390.28,
+  "totalCapacity": 1500,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "name": "Central Silo A",
+  "address": "Ahemdabad",
+  "totalCapacity": 2500,
+  "occupiedCapacity": 2081,
+  "status": "ACTIVE",
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T07:49:58.261Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:37:24.301Z"
+  },
+  "__v": 0
+},
+{
+  "_id": "warehouse-001",
+  "name": "Main Warehouse",
+  "location": "Industrial Area",
+  "capacity": 10000,
+  "createdAt": {
+    "$date": "2026-04-24T16:19:24.381Z"
+  }
+},
+{
+  "_id": "warehouse-002",
+  "name": "Secondary Warehouse",
+  "location": "Commercial Zone",
+  "capacity": 5000,
+  "createdAt": {
+    "$date": "2026-04-24T16:19:24.381Z"
+  }
+}]

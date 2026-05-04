@@ -281,6 +281,7 @@ export interface IInvoiceLineItem {
   totalAmount: number;
   periodStart: string; // ISO date
   periodEnd: string; // ISO date
+  status?: 'ACTIVE' | 'COMPLETED' | 'PARTIAL_REMOVAL' | string;
   userId?: ObjectId;
   createdAt: Date;
 }

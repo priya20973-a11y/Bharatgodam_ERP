@@ -10,7 +10,7 @@ export interface IInward extends Document {
   lotNo?: string;
   gatePass?: string;
   date: Date;
-  outwardDate: Date;
+  outwardDate?: Date;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -28,7 +28,7 @@ const InwardSchema: Schema = new Schema(
     lotNo: { type: String, trim: true },
     gatePass: { type: String, trim: true },
     date: { type: Date, default: Date.now },
-    outwardDate: { type: Date, required: true },
+    outwardDate: { type: Date },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },

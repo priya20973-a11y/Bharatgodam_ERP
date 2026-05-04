@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Box, Layers, DollarSign, Clock3 } from 'lucide-react';
 import { getDb } from '@/lib/mongodb';
-import { getTenantFilterForMongo } from '@/lib/ownership';
+import { ObjectId } from 'mongodb';
+import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
 import { getClientRevenueAnalytics } from '@/app/actions/transaction-actions';
 import TransactionsReportWrapper from '@/components/features/reports/transactions-report-wrapper';
 import WarehouseInventory from '@/components/features/warehouse/warehouse-inventory';
@@ -39,7 +40,27 @@ export default async function DashboardPage() {
   }
 
   const db = await getDb();
-  const tenantFilter = getTenantFilterForMongo(session);
+  const tenantFilter = isAdmin(session) ? {} : getTenantFilterForMongo(session);
+
+  const ownedWarehouseDocs = !isAdmin(session)
+    ? await db.collection('warehouses').find({ ...tenantFilter }).project({ _id: 1 }).toArray()
+    : [];
+
+  const ownedWarehouseIds = ownedWarehouseDocs.map((warehouse: any) => warehouse._id).filter(Boolean);
+  const ownedWarehouseIdStrings = ownedWarehouseIds.map((id: any) => id.toString());
+  const ownedWarehouseObjectIds = ownedWarehouseIds.filter((id: any) => id instanceof ObjectId);
+
+  const warehouseMatch: any = {};
+  if (!isAdmin(session)) {
+    warehouseMatch.warehouseId = {
+      $in: [...ownedWarehouseIdStrings, ...ownedWarehouseObjectIds],
+    };
+  }
+
+  const transactionMatch: Record<string, unknown> = {
+    ...tenantFilter,
+    ...warehouseMatch,
+  };
 
   const now = new Date();
   const currentYearStart = new Date(now.getFullYear(), 0, 1);
@@ -47,7 +68,6 @@ export default async function DashboardPage() {
   const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
   const previousYearEnd = new Date(now.getFullYear(), 0, 1);
 
-  const transactionMatch: Record<string, unknown> = { ...tenantFilter };
   const currentYearStartStr = currentYearStart.toISOString().slice(0, 10);
   const currentYearEndStr = currentYearEnd.toISOString().slice(0, 10);
   const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
@@ -250,30 +270,16 @@ export default async function DashboardPage() {
     }
   ]).toArray();
 
-  const [invoiceReceivablesResult, paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, transactionInvoiceCountResult, ledgerEntryCount] = await Promise.all([
-    db.collection('invoice_master').aggregate([
-      {
-        $project: {
-          totalAmount: 1,
-          paidAmount: { $ifNull: ['$paidAmount', 0] },
-          pendingAmount: {
-            $max: [
-              { $subtract: ['$totalAmount', { $ifNull: ['$paidAmount', 0] }] },
-              0
-            ]
-          },
-          status: 1
-        }
-      },
-      { $match: { ...tenantFilter, status: { $ne: 'PAID' }, pendingAmount: { $gt: 0 } } },
-      { $group: { _id: null, totalPendingReceivables: { $sum: '$pendingAmount' } } }
-    ]).toArray(),
+  const warehouseFilter = tenantFilter;
+  const clientFilter = tenantFilter;
+
+  const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, transactionInvoiceCountResult, ledgerEntryCount] = await Promise.all([
     db.collection('payments').aggregate([
       { $match: { ...tenantFilter, status: 'COMPLETED' } },
       { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
     ]).toArray(),
-    db.collection('warehouses').countDocuments({ ...tenantFilter, status: 'ACTIVE' }),
-    db.collection('clients').countDocuments({ ...tenantFilter, status: 'ACTIVE' }),
+    db.collection('warehouses').countDocuments(warehouseFilter),
+    db.collection('clients').countDocuments(clientFilter),
     db.collection('invoice_master').countDocuments({ ...tenantFilter }),
     db.collection('invoices').countDocuments({ ...tenantFilter }),
     db.collection('transactions').aggregate([
@@ -322,11 +328,9 @@ export default async function DashboardPage() {
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
   const inwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'INWARD')?.count ?? 0;
   const outwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'OUTWARD')?.count ?? 0;
-  const commodityBreakdown = transactionAnalytics?.commodityBreakdown ?? [];
 
   const revenueAnalytics = await getClientRevenueAnalytics();
   const totalRevenue = revenueAnalytics?.summary?.totalRevenue ?? paymentsReceivedResult[0]?.totalRevenue ?? 0;
-  const pendingReceivables = invoiceReceivablesResult[0]?.totalPendingReceivables ?? 0;
 
   const masterLinks = [
     { name: 'Active Warehouses', value: activeWarehouseCount, href: '/dashboard/warehouses' },
@@ -358,13 +362,6 @@ export default async function DashboardPage() {
       color: 'text-emerald-600',
       bg: 'bg-emerald-100',
     },
-    {
-      name: 'Pending Receivables',
-      value: formatCurrency(pendingReceivables),
-      icon: Clock3,
-      color: 'text-orange-600',
-      bg: 'bg-orange-100',
-    },
   ];
 
   return (
@@ -376,11 +373,11 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           const cardContent = (
-            <div className="overflow-hidden rounded-3xl bg-white p-6 shadow-sm border border-slate-100 hover:border-slate-300 transition">
+            <div className="w-full overflow-hidden rounded-3xl bg-white p-6 shadow-sm border border-slate-100 hover:border-slate-300 transition">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-slate-500">{stat.name}</p>
@@ -394,11 +391,11 @@ export default async function DashboardPage() {
           );
 
           return stat.href ? (
-            <Link key={stat.name} href={stat.href} className="block">
+            <Link key={stat.name} href={stat.href} className="block w-full">
               {cardContent}
             </Link>
           ) : (
-            <div key={stat.name}>{cardContent}</div>
+            <div key={stat.name} className="w-full">{cardContent}</div>
           );
         })}
       </div>
@@ -436,28 +433,6 @@ export default async function DashboardPage() {
           </div>
           <TransactionsReportWrapper />
         </div>
-      </div>
-
-      <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">Current Inventory by Commodity</h3>
-            <p className="text-sm text-slate-500">Net stock from inward and outward transactions.</p>
-          </div>
-        </div>
-
-        {commodityBreakdown.length === 0 ? (
-          <div className="mt-6 text-slate-600">No current inventory records available.</div>
-        ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {commodityBreakdown.map((item: any) => (
-              <div key={item.commodityName} className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
-                <p className="text-sm text-slate-500">{item.commodityName}</p>
-                <p className="mt-3 text-2xl font-semibold text-slate-900">{formatNumber(item.totalMt)}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Warehouse Inventory Section */}

@@ -12,7 +12,7 @@ import { differenceInDays, max, min, startOfMonth, endOfMonth, isLastDayOfMonth 
  * - ACTIVE periods are inclusive of the end date.
  * - COMPLETED periods are exclusive of the end date (transaction boundary).
  */
-function calculateStorageDays(
+export function calculateStorageDays(
   fromDate: string | Date,
   toDate: string | Date,
   status: 'ACTIVE' | 'COMPLETED'

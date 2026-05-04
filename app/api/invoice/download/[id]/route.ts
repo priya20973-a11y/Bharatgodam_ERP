@@ -167,6 +167,7 @@ async function buildInvoiceFromLedger(db: any, id: string, warehouseId?: string,
     totalAmount: Number(item.rent ?? 0),
     periodStart: item.fromDate || '',
     periodEnd: item.toDate || '',
+    status: item.status || 'COMPLETED',
     createdAt: new Date(),
   }));
 
@@ -223,6 +224,34 @@ export async function GET(
       warehouse = await db.collection('warehouses').findOne({ _id: invoiceMaster.warehouseId, ...tenantFilter });
       const lineItems = await db.collection('invoice_line_items').find({ invoiceMasterId: invoiceMaster._id }).toArray();
 
+      if (lineItems.some((item: any) => !item.status) && invoiceMaster.clientId && invoiceMaster.warehouseId && invoiceMaster.invoiceMonth) {
+        const ledgerResult = await getClientMonthlyLedger(
+          invoiceMaster.clientId.toString(),
+          invoiceMaster.invoiceMonth,
+          invoiceMaster.warehouseId.toString(),
+          tenantFilter
+        );
+
+        if (ledgerResult.success && ledgerResult.data?.months?.length) {
+          const ledgerInvoice = ledgerResult.data.months[0];
+          const ledgerRowStatusMap = new Map<string, string>();
+
+          ledgerInvoice.rows.forEach((row: any) => {
+            const key = `${row.fromDate || ''}|${row.toDate || ''}|${row.commodity || ''}|${row.qty ?? ''}|${row.days ?? ''}`;
+            ledgerRowStatusMap.set(key, row.status || 'COMPLETED');
+          });
+
+          lineItems.forEach((item: any) => {
+            if (!item.status) {
+              const key = `${item.periodStart || ''}|${item.periodEnd || ''}|${item.commodityName || ''}|${item.averageQuantityMT ?? ''}|${item.daysOccupied ?? ''}`;
+              if (ledgerRowStatusMap.has(key)) {
+                item.status = ledgerRowStatusMap.get(key);
+              }
+            }
+          });
+        }
+      }
+
       if (!client || !warehouse) {
         return NextResponse.json({ error: 'Client or warehouse not found' }, { status: 404 });
       }
@@ -245,7 +274,7 @@ export async function GET(
           quantityMT: Number(item.averageQuantityMT ?? 0),
           daysTotal: Number(item.daysOccupied ?? 0),
           rentTotal: Number(item.totalAmount ?? 0),
-          status: invoiceMaster.status || 'DRAFT',
+          status: item.status || 'COMPLETED',
           commodityName: item.commodityName || '',
         })),
         warehouseId: invoiceMaster.warehouseId?.toString(),

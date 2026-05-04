@@ -1,0 +1,1872 @@
+[{
+  "_id": {
+    "$oid": "69e223d40699e1d323a4a909"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 13.355,
+  "bagsCount": 264,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "1",
+  "date": {
+    "$date": "2026-03-14T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:13:08.739Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:13:08.739Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e227260699e1d323a4a90f"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 13.79,
+  "bagsCount": 270,
+  "stackNo": "4",
+  "lotNo": "1",
+  "gatePass": "4",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:27:18.407Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:27:18.407Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e228700699e1d323a4a916"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 12.28,
+  "bagsCount": 242,
+  "stackNo": "4",
+  "lotNo": "1",
+  "gatePass": "5",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:32:48.841Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:32:48.841Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e228e50699e1d323a4a91e"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 19.475,
+  "bagsCount": 386,
+  "stackNo": "5",
+  "lotNo": "1",
+  "gatePass": "6",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-04-24T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:34:45.492Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:34:45.492Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e2293e0699e1d323a4a927"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 14.39,
+  "bagsCount": 283,
+  "stackNo": "5",
+  "lotNo": "1",
+  "gatePass": "6",
+  "date": {
+    "$date": "2026-03-17T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-04-24T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:36:14.043Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:36:14.043Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e229d20699e1d323a4a931"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 17.675,
+  "bagsCount": 349,
+  "stackNo": "15",
+  "lotNo": "2",
+  "gatePass": "18",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:38:42.358Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:38:42.358Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22a820699e1d323a4a93c"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 16.27,
+  "bagsCount": 321,
+  "stackNo": "17",
+  "lotNo": "3",
+  "gatePass": "20",
+  "date": {
+    "$date": "2026-03-20T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:41:38.573Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:41:38.573Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22af80699e1d323a4a948"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 12.455,
+  "bagsCount": 242,
+  "stackNo": "21",
+  "lotNo": "2/3",
+  "gatePass": "24",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T12:43:36.754Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:43:36.754Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e230320699e1d323a4a95b"
+  },
+  "clientId": {
+    "$oid": "69e1b5232a0f589ce50e12f4"
+  },
+  "commodityId": {
+    "$oid": "69e21f450699e1d323a4a8f3"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 13.205,
+  "bagsCount": 260,
+  "stackNo": "37",
+  "lotNo": "1",
+  "gatePass": "48",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-17T13:05:54.276Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T13:05:54.276Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e6071dec8d2a885f1c14d2"
+  },
+  "clientId": {
+    "$oid": "69e137aa4c5cd55a18e497e9"
+  },
+  "commodityId": {
+    "$oid": "69e21faa0699e1d323a4a8f9"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 18.75,
+  "bagsCount": 474,
+  "stackNo": "6",
+  "lotNo": "1",
+  "gatePass": "8",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-20T10:59:41.149Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-20T10:59:41.149Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79cb58580b71b10d05a05"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 21.275,
+  "bagsCount": 419,
+  "stackNo": "23",
+  "lotNo": "2",
+  "gatePass": "30",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:50:13.658Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:50:13.658Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79d0f8580b71b10d05a09"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 13.105,
+  "bagsCount": 258,
+  "stackNo": "38",
+  "lotNo": "7",
+  "gatePass": "49",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:51:43.245Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:51:43.245Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79d6a8580b71b10d05a0d"
+  },
+  "clientId": {
+    "$oid": "69e221350699e1d323a4a902"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 24.6,
+  "bagsCount": 485,
+  "stackNo": "41",
+  "lotNo": "20",
+  "gatePass": "53",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:53:14.292Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:53:14.292Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79e9a8580b71b10d05a11"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 22.22,
+  "bagsCount": 449,
+  "stackNo": "29",
+  "lotNo": "7",
+  "gatePass": "35",
+  "date": {
+    "$date": "2026-03-25T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T15:58:18.553Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:58:18.553Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79f0b8580b71b10d05a15"
+  },
+  "clientId": {
+    "$oid": "69e222cb0699e1d323a4a908"
+  },
+  "commodityId": {
+    "$oid": "69e21fbb0699e1d323a4a8fa"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 26.92,
+  "bagsCount": 551,
+  "stackNo": "30",
+  "lotNo": "8",
+  "gatePass": "36",
+  "date": {
+    "$date": "2026-03-26T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:00:11.402Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:00:11.402Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a1c88580b71b10d05a19"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 32.59,
+  "bagsCount": 640,
+  "stackNo": "22",
+  "lotNo": "1",
+  "gatePass": "25",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:11:52.773Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:11:52.773Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a2778580b71b10d05a1d"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 32.485,
+  "bagsCount": 640,
+  "stackNo": "28",
+  "lotNo": "6",
+  "gatePass": "34",
+  "date": {
+    "$date": "2026-03-25T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:14:47.004Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:14:47.004Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a2eb8580b71b10d05a21"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 10.23,
+  "bagsCount": 201,
+  "stackNo": "32",
+  "lotNo": "10",
+  "gatePass": "38",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:16:43.215Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:16:43.215Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a36c8580b71b10d05a25"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 12.105,
+  "bagsCount": 240,
+  "stackNo": "32",
+  "lotNo": "11",
+  "gatePass": "39",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:18:52.459Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:18:52.459Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a4318580b71b10d05a29"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 13.255,
+  "bagsCount": 260,
+  "stackNo": "36",
+  "lotNo": "14",
+  "gatePass": "45",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:22:09.533Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:22:09.533Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a4ad8580b71b10d05a2d"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 13.23,
+  "bagsCount": 260,
+  "stackNo": "36",
+  "lotNo": "13",
+  "gatePass": "46",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:24:13.677Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:24:13.677Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a5168580b71b10d05a31"
+  },
+  "clientId": {
+    "$oid": "69e2211a0699e1d323a4a901"
+  },
+  "commodityId": {
+    "$oid": "69e21f8d0699e1d323a4a8f7"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 29.475,
+  "bagsCount": 581,
+  "stackNo": "36",
+  "lotNo": "15",
+  "gatePass": "47",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T16:25:58.258Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:25:58.258Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7ae5e8580b71b10d05a35"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 15.725,
+  "bagsCount": 311,
+  "stackNo": "2",
+  "lotNo": "1",
+  "gatePass": "2",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:05:34.584Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:05:34.584Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7af138580b71b10d05a39"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 16.185,
+  "bagsCount": 320,
+  "stackNo": "2",
+  "lotNo": "2",
+  "gatePass": "7",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:08:35.419Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:08:35.419Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7af5d8580b71b10d05a3d"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 19.43,
+  "bagsCount": 385,
+  "stackNo": "2",
+  "lotNo": "3",
+  "gatePass": "9",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:09:49.544Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:09:49.544Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7afcf8580b71b10d05a41"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 10.23,
+  "bagsCount": 202,
+  "stackNo": "7",
+  "lotNo": "4",
+  "gatePass": "10",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:11:43.496Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:11:43.496Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b00d8580b71b10d05a45"
+  },
+  "clientId": {
+    "$oid": "69e220820699e1d323a4a8fd"
+  },
+  "commodityId": {
+    "$oid": "69e21f7c0699e1d323a4a8f6"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 10.69,
+  "bagsCount": 211,
+  "stackNo": "11",
+  "lotNo": "5",
+  "gatePass": "14",
+  "date": {
+    "$date": "2026-03-18T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:12:45.804Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:12:45.804Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b15e8580b71b10d05a49"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 14.435,
+  "bagsCount": 280,
+  "stackNo": "24",
+  "lotNo": "4",
+  "gatePass": "27",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:18:22.764Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:18:22.764Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b18c8580b71b10d05a4d"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 31.8,
+  "bagsCount": 600,
+  "stackNo": "24",
+  "lotNo": "4",
+  "gatePass": "28",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:19:08.610Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:19:08.610Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b1e78580b71b10d05a51"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 21.19,
+  "bagsCount": 380,
+  "stackNo": "24",
+  "lotNo": "5",
+  "gatePass": "31",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:20:39.843Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:20:39.843Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b2298580b71b10d05a55"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 21.505,
+  "bagsCount": 400,
+  "stackNo": "40",
+  "lotNo": "18",
+  "gatePass": "51",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:21:45.950Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:21:45.950Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b26d8580b71b10d05a59"
+  },
+  "clientId": {
+    "$oid": "69e221650699e1d323a4a903"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 18.125,
+  "bagsCount": 360,
+  "stackNo": "40",
+  "lotNo": "19",
+  "gatePass": "52",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:22:53.236Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:22:53.236Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b3e88580b71b10d05a5d"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 25.335,
+  "bagsCount": 500,
+  "stackNo": "3",
+  "lotNo": "1",
+  "gatePass": "3",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:29:12.244Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:29:12.244Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b42a8580b71b10d05a61"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 20.265,
+  "bagsCount": 400,
+  "stackNo": "9",
+  "lotNo": "2",
+  "gatePass": "12",
+  "date": {
+    "$date": "2026-03-17T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:30:18.608Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:30:18.608Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b46d8580b71b10d05a65"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 15.11,
+  "bagsCount": 298,
+  "stackNo": "10",
+  "lotNo": "2",
+  "gatePass": "13",
+  "date": {
+    "$date": "2026-03-18T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:31:25.648Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:31:25.648Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b4a78580b71b10d05a69"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 30.635,
+  "bagsCount": 604,
+  "stackNo": "12",
+  "lotNo": "3",
+  "gatePass": "15",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:32:23.800Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:32:23.800Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b4e58580b71b10d05a6d"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 14.72,
+  "bagsCount": 290,
+  "stackNo": "18",
+  "lotNo": "3",
+  "gatePass": "21",
+  "date": {
+    "$date": "2026-03-20T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:33:25.597Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:33:25.597Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b5208580b71b10d05a71"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 23.355,
+  "bagsCount": 460,
+  "stackNo": "20",
+  "lotNo": "4",
+  "gatePass": "23",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:34:24.439Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:34:24.439Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b5578580b71b10d05a75"
+  },
+  "clientId": {
+    "$oid": "69e220c80699e1d323a4a900"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 20.315,
+  "bagsCount": 400,
+  "stackNo": "39",
+  "lotNo": "4",
+  "gatePass": "50",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:35:19.558Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:35:19.558Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b6368580b71b10d05a79"
+  },
+  "clientId": {
+    "$oid": "69e220990699e1d323a4a8fe"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 14.235,
+  "bagsCount": 282,
+  "stackNo": "13",
+  "lotNo": "6",
+  "gatePass": "16",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:39:02.340Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:39:02.340Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b72d8580b71b10d05a7d"
+  },
+  "clientId": {
+    "$oid": "69e221fc0699e1d323a4a906"
+  },
+  "commodityId": {
+    "$oid": "69e21f9b0699e1d323a4a8f8"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 12.01,
+  "bagsCount": 239,
+  "stackNo": "31",
+  "lotNo": "9",
+  "gatePass": "37",
+  "date": {
+    "$date": "2026-03-27T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:43:09.200Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:43:09.200Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b7ac8580b71b10d05a81"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 24.785,
+  "bagsCount": 491,
+  "stackNo": "14",
+  "lotNo": "1",
+  "gatePass": "17",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:45:16.886Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:45:16.886Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b7f48580b71b10d05a85"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 25.245,
+  "bagsCount": 499,
+  "stackNo": "26",
+  "lotNo": "2",
+  "gatePass": "32",
+  "date": {
+    "$date": "2026-03-24T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:46:28.494Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:46:28.494Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b8328580b71b10d05a89"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 25.62,
+  "bagsCount": 500,
+  "stackNo": "26",
+  "lotNo": "2",
+  "gatePass": "33",
+  "date": {
+    "$date": "2026-03-24T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:47:30.133Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:47:30.133Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b8608580b71b10d05a8d"
+  },
+  "clientId": {
+    "$oid": "69e221af0699e1d323a4a904"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 19.28,
+  "bagsCount": 375,
+  "stackNo": "34",
+  "lotNo": "3",
+  "gatePass": "43",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:48:16.129Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:48:16.129Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b93c8580b71b10d05a91"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 23.91,
+  "bagsCount": 480,
+  "stackNo": "16",
+  "lotNo": "1",
+  "gatePass": "19",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:51:56.761Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:51:56.761Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b9af8580b71b10d05a95"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 19.04,
+  "bagsCount": 385,
+  "stackNo": "19",
+  "lotNo": "2",
+  "gatePass": "22",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:53:51.557Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:53:51.557Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b9de8580b71b10d05a99"
+  },
+  "clientId": {
+    "$oid": "69e220b00699e1d323a4a8ff"
+  },
+  "commodityId": {
+    "$oid": "69e21f570699e1d323a4a8f4"
+  },
+  "warehouseId": {
+    "$oid": "69e220090699e1d323a4a8fb"
+  },
+  "quantityMT": 27.625,
+  "bagsCount": 485,
+  "stackNo": "25",
+  "lotNo": "3",
+  "gatePass": "29",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:54:38.764Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:54:38.764Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7ba4e8580b71b10d05a9d"
+  },
+  "clientId": {
+    "$oid": "69e221e80699e1d323a4a905"
+  },
+  "commodityId": {
+    "$oid": "69e21f6c0699e1d323a4a8f5"
+  },
+  "warehouseId": {
+    "$oid": "69e2201b0699e1d323a4a8fc"
+  },
+  "quantityMT": 19.725,
+  "bagsCount": 390,
+  "stackNo": "35",
+  "lotNo": "12",
+  "gatePass": "44",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-31T00:00:00.000Z"
+  },
+  "createdAt": {
+    "$date": "2026-04-21T17:56:30.428Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:56:30.428Z"
+  },
+  "__v": 0,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb2a80045624e2211f3673"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "commodityId": {
+    "$oid": "69eb20d00d60a84915b179f9"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "quantityMT": 23.4,
+  "bagsCount": 234,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "1",
+  "date": {
+    "$date": "2026-02-02T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-01T00:00:00.000Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T08:32:00.974Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:32:00.974Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb2af1045624e2211f367b"
+  },
+  "clientId": {
+    "$oid": "69eb213c0d60a84915b179fa"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "quantityMT": 100,
+  "bagsCount": 1000,
+  "stackNo": "2",
+  "lotNo": "2",
+  "gatePass": "4",
+  "date": {
+    "$date": "2026-03-03T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-01T00:00:00.000Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T08:33:53.181Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:33:53.181Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69eb2bc4045624e2211f3681"
+  },
+  "clientId": {
+    "$oid": "69eb218a0d60a84915b179fb"
+  },
+  "commodityId": {
+    "$oid": "69eb20b90d60a84915b179f8"
+  },
+  "warehouseId": {
+    "$oid": "69eb20a60d60a84915b179f7"
+  },
+  "quantityMT": 2000,
+  "bagsCount": 20000,
+  "stackNo": "6",
+  "lotNo": "6",
+  "gatePass": "6",
+  "date": {
+    "$date": "2026-02-14T00:00:00.000Z"
+  },
+  "outwardDate": {
+    "$date": "2026-05-01T00:00:00.000Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM",
+  "createdAt": {
+    "$date": "2026-04-24T08:37:24.298Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:37:24.298Z"
+  },
+  "__v": 0
+}]

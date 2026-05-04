@@ -83,7 +83,7 @@ export async function POST(req: Request) {
       warehouseLocation,
       gstNumber: gstNumber || null,
       role: normalizedRole,
-      status: 'pending', // pending, approved, rejected
+      status: 'PENDING_APPROVAL',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

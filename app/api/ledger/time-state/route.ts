@@ -5,12 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
 import { ILedgerTimeState } from '@/types/schemas';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
-import { Transaction } from '@/lib/ledger-engine';
 
-const DB_NAME = 'warehouse_db';
 const LEDGER_TIME_STATE_COLLECTION = 'ledger_time_state';
 
 /**
@@ -29,8 +27,7 @@ async function handleGet(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db(DB_NAME);
+    const db = await getDb();
 
     // Retrieve all time-state entries for this account, sorted by period start date
     const entries = await db
@@ -77,8 +74,7 @@ async function handlePost(request: NextRequest) {
     // Generate time-state ledger from transactions
     const timeStateLedger = generateTimeStateLedger(transactions, clientName);
 
-    const client = await clientPromise;
-    const db = client.db(DB_NAME);
+    const db = await getDb();
     const collection = db.collection<ILedgerTimeState>(LEDGER_TIME_STATE_COLLECTION);
 
     // Delete existing entries for this account (replace with new calculation)

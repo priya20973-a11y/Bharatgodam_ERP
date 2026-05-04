@@ -1,0 +1,2027 @@
+[{
+  "_id": {
+    "$oid": "69e223d40699e1d323a4a90a"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-14T00:00:00.000Z"
+  },
+  "quantityMT": 13.355,
+  "bagsCount": 264,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "1",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e223d40699e1d323a4a909",
+  "createdAt": {
+    "$date": "2026-04-17T12:13:08.745Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:13:08.745Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e227260699e1d323a4a910"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 13.79,
+  "bagsCount": 270,
+  "stackNo": "4",
+  "lotNo": "1",
+  "gatePass": "4",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e227260699e1d323a4a90f",
+  "createdAt": {
+    "$date": "2026-04-17T12:27:18.411Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:27:18.411Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e228700699e1d323a4a917"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 12.28,
+  "bagsCount": 242,
+  "stackNo": "4",
+  "lotNo": "1",
+  "gatePass": "5",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e228700699e1d323a4a916",
+  "createdAt": {
+    "$date": "2026-04-17T12:32:48.844Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:32:48.844Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e228e50699e1d323a4a91f"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 19.475,
+  "bagsCount": 386,
+  "stackNo": "5",
+  "lotNo": "1",
+  "gatePass": "6",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e228e50699e1d323a4a91e",
+  "createdAt": {
+    "$date": "2026-04-17T12:34:45.494Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:34:45.494Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e2293e0699e1d323a4a928"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-17T00:00:00.000Z"
+  },
+  "quantityMT": 14.39,
+  "bagsCount": 283,
+  "stackNo": "5",
+  "lotNo": "1",
+  "gatePass": "6",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e2293e0699e1d323a4a927",
+  "createdAt": {
+    "$date": "2026-04-17T12:36:14.047Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:36:14.047Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e229d20699e1d323a4a932"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "quantityMT": 17.675,
+  "bagsCount": 349,
+  "stackNo": "15",
+  "lotNo": "2",
+  "gatePass": "18",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e229d20699e1d323a4a931",
+  "createdAt": {
+    "$date": "2026-04-17T12:38:42.362Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:38:42.362Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22a820699e1d323a4a93d"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-20T00:00:00.000Z"
+  },
+  "quantityMT": 16.27,
+  "bagsCount": 321,
+  "stackNo": "17",
+  "lotNo": "3",
+  "gatePass": "20",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e22a820699e1d323a4a93c",
+  "createdAt": {
+    "$date": "2026-04-17T12:41:38.578Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:41:38.578Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22af80699e1d323a4a949"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "quantityMT": 12.455,
+  "bagsCount": 242,
+  "stackNo": "21",
+  "lotNo": "2/3",
+  "gatePass": "24",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e22af80699e1d323a4a948",
+  "createdAt": {
+    "$date": "2026-04-17T12:43:36.755Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:43:36.755Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22b680699e1d323a4a956"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 13.995,
+  "stackNo": "33",
+  "lotNo": "1",
+  "gatePass": "40",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69e22b680699e1d323a4a955",
+  "createdAt": {
+    "$date": "2026-04-17T12:45:28.107Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:45:28.107Z"
+  },
+  "bagsCount": 320,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22b9c0699e1d323a4a958"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 17.145,
+  "stackNo": "33",
+  "lotNo": "1",
+  "gatePass": "41",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69e22b9c0699e1d323a4a957",
+  "createdAt": {
+    "$date": "2026-04-17T12:46:20.539Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:46:20.539Z"
+  },
+  "bagsCount": 340,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e22bbe0699e1d323a4a95a"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 17.075,
+  "stackNo": "33",
+  "lotNo": "1",
+  "gatePass": "42",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69e22bbe0699e1d323a4a959",
+  "createdAt": {
+    "$date": "2026-04-17T12:46:54.774Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T12:46:54.774Z"
+  },
+  "bagsCount": 340,
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e230320699e1d323a4a95c"
+  },
+  "accountId": "69e1b5232a0f589ce50e12f4",
+  "clientId": "69e1b5232a0f589ce50e12f4",
+  "commodityId": "69e21f450699e1d323a4a8f3",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Sureshwar Corporation",
+  "commodityName": "WHEAT (87 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 13.205,
+  "bagsCount": 260,
+  "stackNo": "37",
+  "lotNo": "1",
+  "gatePass": "48",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e230320699e1d323a4a95b",
+  "createdAt": {
+    "$date": "2026-04-17T13:05:54.279Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-17T13:05:54.279Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e6071dec8d2a885f1c14d3"
+  },
+  "accountId": "69e137aa4c5cd55a18e497e9",
+  "clientId": "69e137aa4c5cd55a18e497e9",
+  "commodityId": "69e21faa0699e1d323a4a8f9",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Radhe Trading ",
+  "commodityName": "SEESAM SEED (WHITE) (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 18.75,
+  "bagsCount": 474,
+  "stackNo": "6",
+  "lotNo": "1",
+  "gatePass": "8",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e6071dec8d2a885f1c14d2",
+  "createdAt": {
+    "$date": "2026-04-20T10:59:41.156Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-20T10:59:41.156Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79cb58580b71b10d05a06"
+  },
+  "accountId": "69e221350699e1d323a4a902",
+  "clientId": "69e221350699e1d323a4a902",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Ankitkumar Makadiya",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "quantityMT": 21.275,
+  "bagsCount": 419,
+  "stackNo": "23",
+  "lotNo": "2",
+  "gatePass": "30",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e79cb58580b71b10d05a05",
+  "createdAt": {
+    "$date": "2026-04-21T15:50:13.665Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:50:13.665Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79d0f8580b71b10d05a0a"
+  },
+  "accountId": "69e221350699e1d323a4a902",
+  "clientId": "69e221350699e1d323a4a902",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Ankitkumar Makadiya",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 13.105,
+  "bagsCount": 258,
+  "stackNo": "38",
+  "lotNo": "7",
+  "gatePass": "49",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e79d0f8580b71b10d05a09",
+  "createdAt": {
+    "$date": "2026-04-21T15:51:43.248Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:51:43.248Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79d6a8580b71b10d05a0e"
+  },
+  "accountId": "69e221350699e1d323a4a902",
+  "clientId": "69e221350699e1d323a4a902",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Ankitkumar Makadiya",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "quantityMT": 24.6,
+  "bagsCount": 485,
+  "stackNo": "41",
+  "lotNo": "20",
+  "gatePass": "53",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e79d6a8580b71b10d05a0d",
+  "createdAt": {
+    "$date": "2026-04-21T15:53:14.294Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:53:14.294Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79e9a8580b71b10d05a12"
+  },
+  "accountId": "69e222cb0699e1d323a4a908",
+  "clientId": "69e222cb0699e1d323a4a908",
+  "commodityId": "69e21fbb0699e1d323a4a8fa",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Brother",
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-25T00:00:00.000Z"
+  },
+  "quantityMT": 22.22,
+  "bagsCount": 449,
+  "stackNo": "29",
+  "lotNo": "7",
+  "gatePass": "35",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e79e9a8580b71b10d05a11",
+  "createdAt": {
+    "$date": "2026-04-21T15:58:18.557Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T15:58:18.557Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e79f0b8580b71b10d05a16"
+  },
+  "accountId": "69e222cb0699e1d323a4a908",
+  "clientId": "69e222cb0699e1d323a4a908",
+  "commodityId": "69e21fbb0699e1d323a4a8fa",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Brother",
+  "commodityName": "MUSTARD SEED (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-26T00:00:00.000Z"
+  },
+  "quantityMT": 26.92,
+  "bagsCount": 551,
+  "stackNo": "30",
+  "lotNo": "8",
+  "gatePass": "36",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e79f0b8580b71b10d05a15",
+  "createdAt": {
+    "$date": "2026-04-21T16:00:11.406Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:00:11.406Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a1c88580b71b10d05a1a"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "quantityMT": 32.59,
+  "bagsCount": 640,
+  "stackNo": "22",
+  "lotNo": "1",
+  "gatePass": "25",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a1c88580b71b10d05a19",
+  "createdAt": {
+    "$date": "2026-04-21T16:11:52.776Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:11:52.776Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a2778580b71b10d05a1e"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-25T00:00:00.000Z"
+  },
+  "quantityMT": 32.485,
+  "bagsCount": 640,
+  "stackNo": "28",
+  "lotNo": "6",
+  "gatePass": "34",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a2778580b71b10d05a1d",
+  "createdAt": {
+    "$date": "2026-04-21T16:14:47.007Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:14:47.007Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a2eb8580b71b10d05a22"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 10.23,
+  "bagsCount": 201,
+  "stackNo": "32",
+  "lotNo": "10",
+  "gatePass": "38",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a2eb8580b71b10d05a21",
+  "createdAt": {
+    "$date": "2026-04-21T16:16:43.217Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:16:43.217Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a36c8580b71b10d05a26"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 12.105,
+  "bagsCount": 240,
+  "stackNo": "32",
+  "lotNo": "11",
+  "gatePass": "39",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a36c8580b71b10d05a25",
+  "createdAt": {
+    "$date": "2026-04-21T16:18:52.461Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:18:52.461Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a4318580b71b10d05a2a"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 13.255,
+  "bagsCount": 260,
+  "stackNo": "36",
+  "lotNo": "14",
+  "gatePass": "45",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a4318580b71b10d05a29",
+  "createdAt": {
+    "$date": "2026-04-21T16:22:09.536Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:22:09.536Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a4ad8580b71b10d05a2e"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 13.23,
+  "bagsCount": 260,
+  "stackNo": "36",
+  "lotNo": "13",
+  "gatePass": "46",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a4ad8580b71b10d05a2d",
+  "createdAt": {
+    "$date": "2026-04-21T16:24:13.680Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:24:13.680Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7a5168580b71b10d05a32"
+  },
+  "accountId": "69e2211a0699e1d323a4a901",
+  "clientId": "69e2211a0699e1d323a4a901",
+  "commodityId": "69e21f8d0699e1d323a4a8f7",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Chotai Enterprise",
+  "commodityName": "CHANA (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 29.475,
+  "bagsCount": 581,
+  "stackNo": "36",
+  "lotNo": "15",
+  "gatePass": "47",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7a5168580b71b10d05a31",
+  "createdAt": {
+    "$date": "2026-04-21T16:25:58.262Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T16:25:58.262Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7ae5e8580b71b10d05a36"
+  },
+  "accountId": "69e220820699e1d323a4a8fd",
+  "clientId": "69e220820699e1d323a4a8fd",
+  "commodityId": "69e21f7c0699e1d323a4a8f6",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Dharam Enterprise",
+  "commodityName": "CHANA (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 15.725,
+  "bagsCount": 311,
+  "stackNo": "2",
+  "lotNo": "1",
+  "gatePass": "2",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7ae5e8580b71b10d05a35",
+  "createdAt": {
+    "$date": "2026-04-21T17:05:34.587Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:05:34.587Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7af138580b71b10d05a3a"
+  },
+  "accountId": "69e220820699e1d323a4a8fd",
+  "clientId": "69e220820699e1d323a4a8fd",
+  "commodityId": "69e21f7c0699e1d323a4a8f6",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Dharam Enterprise",
+  "commodityName": "CHANA (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 16.185,
+  "bagsCount": 320,
+  "stackNo": "2",
+  "lotNo": "2",
+  "gatePass": "7",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7af138580b71b10d05a39",
+  "createdAt": {
+    "$date": "2026-04-21T17:08:35.423Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:08:35.423Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7af5d8580b71b10d05a3e"
+  },
+  "accountId": "69e220820699e1d323a4a8fd",
+  "clientId": "69e220820699e1d323a4a8fd",
+  "commodityId": "69e21f7c0699e1d323a4a8f6",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Dharam Enterprise",
+  "commodityName": "CHANA (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 19.43,
+  "bagsCount": 385,
+  "stackNo": "2",
+  "lotNo": "3",
+  "gatePass": "9",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7af5d8580b71b10d05a3d",
+  "createdAt": {
+    "$date": "2026-04-21T17:09:49.548Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:09:49.548Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7afcf8580b71b10d05a42"
+  },
+  "accountId": "69e220820699e1d323a4a8fd",
+  "clientId": "69e220820699e1d323a4a8fd",
+  "commodityId": "69e21f7c0699e1d323a4a8f6",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Dharam Enterprise",
+  "commodityName": "CHANA (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 10.23,
+  "bagsCount": 202,
+  "stackNo": "7",
+  "lotNo": "4",
+  "gatePass": "10",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7afcf8580b71b10d05a41",
+  "createdAt": {
+    "$date": "2026-04-21T17:11:43.499Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:11:43.499Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b00d8580b71b10d05a46"
+  },
+  "accountId": "69e220820699e1d323a4a8fd",
+  "clientId": "69e220820699e1d323a4a8fd",
+  "commodityId": "69e21f7c0699e1d323a4a8f6",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Dharam Enterprise",
+  "commodityName": "CHANA (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-18T00:00:00.000Z"
+  },
+  "quantityMT": 10.69,
+  "bagsCount": 211,
+  "stackNo": "11",
+  "lotNo": "5",
+  "gatePass": "14",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b00d8580b71b10d05a45",
+  "createdAt": {
+    "$date": "2026-04-21T17:12:45.806Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:12:45.806Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b15e8580b71b10d05a4a"
+  },
+  "accountId": "69e221650699e1d323a4a903",
+  "clientId": "69e221650699e1d323a4a903",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Hareshkumar Kantilal",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "quantityMT": 14.435,
+  "bagsCount": 280,
+  "stackNo": "24",
+  "lotNo": "4",
+  "gatePass": "27",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b15e8580b71b10d05a49",
+  "createdAt": {
+    "$date": "2026-04-21T17:18:22.766Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:18:22.766Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b18c8580b71b10d05a4e"
+  },
+  "accountId": "69e221650699e1d323a4a903",
+  "clientId": "69e221650699e1d323a4a903",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Hareshkumar Kantilal",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "quantityMT": 31.8,
+  "bagsCount": 600,
+  "stackNo": "24",
+  "lotNo": "4",
+  "gatePass": "28",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b18c8580b71b10d05a4d",
+  "createdAt": {
+    "$date": "2026-04-21T17:19:08.612Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:19:08.612Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b1e78580b71b10d05a52"
+  },
+  "accountId": "69e221650699e1d323a4a903",
+  "clientId": "69e221650699e1d323a4a903",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Hareshkumar Kantilal",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "quantityMT": 21.19,
+  "bagsCount": 380,
+  "stackNo": "24",
+  "lotNo": "5",
+  "gatePass": "31",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b1e78580b71b10d05a51",
+  "createdAt": {
+    "$date": "2026-04-21T17:20:39.845Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:20:39.845Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b2298580b71b10d05a56"
+  },
+  "accountId": "69e221650699e1d323a4a903",
+  "clientId": "69e221650699e1d323a4a903",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Hareshkumar Kantilal",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "quantityMT": 21.505,
+  "bagsCount": 400,
+  "stackNo": "40",
+  "lotNo": "18",
+  "gatePass": "51",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b2298580b71b10d05a55",
+  "createdAt": {
+    "$date": "2026-04-21T17:21:45.952Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:21:45.952Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b26d8580b71b10d05a5a"
+  },
+  "accountId": "69e221650699e1d323a4a903",
+  "clientId": "69e221650699e1d323a4a903",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Hareshkumar Kantilal",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "quantityMT": 18.125,
+  "bagsCount": 360,
+  "stackNo": "40",
+  "lotNo": "19",
+  "gatePass": "52",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b26d8580b71b10d05a59",
+  "createdAt": {
+    "$date": "2026-04-21T17:22:53.239Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:22:53.239Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b3e88580b71b10d05a5e"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-16T00:00:00.000Z"
+  },
+  "quantityMT": 25.335,
+  "bagsCount": 500,
+  "stackNo": "3",
+  "lotNo": "1",
+  "gatePass": "3",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b3e88580b71b10d05a5d",
+  "createdAt": {
+    "$date": "2026-04-21T17:29:12.250Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:29:12.250Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b42a8580b71b10d05a62"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-17T00:00:00.000Z"
+  },
+  "quantityMT": 20.265,
+  "bagsCount": 400,
+  "stackNo": "9",
+  "lotNo": "2",
+  "gatePass": "12",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b42a8580b71b10d05a61",
+  "createdAt": {
+    "$date": "2026-04-21T17:30:18.611Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:30:18.611Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b46d8580b71b10d05a66"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-18T00:00:00.000Z"
+  },
+  "quantityMT": 15.11,
+  "bagsCount": 298,
+  "stackNo": "10",
+  "lotNo": "2",
+  "gatePass": "13",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b46d8580b71b10d05a65",
+  "createdAt": {
+    "$date": "2026-04-21T17:31:25.651Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:31:25.651Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b4a78580b71b10d05a6a"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "quantityMT": 30.635,
+  "bagsCount": 604,
+  "stackNo": "12",
+  "lotNo": "3",
+  "gatePass": "15",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b4a78580b71b10d05a69",
+  "createdAt": {
+    "$date": "2026-04-21T17:32:23.801Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:32:23.801Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b4e58580b71b10d05a6e"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-20T00:00:00.000Z"
+  },
+  "quantityMT": 14.72,
+  "bagsCount": 290,
+  "stackNo": "18",
+  "lotNo": "3",
+  "gatePass": "21",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b4e58580b71b10d05a6d",
+  "createdAt": {
+    "$date": "2026-04-21T17:33:25.599Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:33:25.599Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b5208580b71b10d05a72"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "quantityMT": 23.355,
+  "bagsCount": 460,
+  "stackNo": "20",
+  "lotNo": "4",
+  "gatePass": "23",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b5208580b71b10d05a71",
+  "createdAt": {
+    "$date": "2026-04-21T17:34:24.441Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:34:24.441Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b5578580b71b10d05a76"
+  },
+  "accountId": "69e220c80699e1d323a4a900",
+  "clientId": "69e220c80699e1d323a4a900",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Shankar Tredarsh",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-31T00:00:00.000Z"
+  },
+  "quantityMT": 20.315,
+  "bagsCount": 400,
+  "stackNo": "39",
+  "lotNo": "4",
+  "gatePass": "50",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b5578580b71b10d05a75",
+  "createdAt": {
+    "$date": "2026-04-21T17:35:19.560Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:35:19.560Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b6368580b71b10d05a7a"
+  },
+  "accountId": "69e220990699e1d323a4a8fe",
+  "clientId": "69e220990699e1d323a4a8fe",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Krupal Tredars",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "quantityMT": 14.235,
+  "bagsCount": 282,
+  "stackNo": "13",
+  "lotNo": "6",
+  "gatePass": "16",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b6368580b71b10d05a79",
+  "createdAt": {
+    "$date": "2026-04-21T17:39:02.343Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:39:02.343Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b72d8580b71b10d05a7e"
+  },
+  "accountId": "69e221fc0699e1d323a4a906",
+  "clientId": "69e221fc0699e1d323a4a906",
+  "commodityId": "69e21f9b0699e1d323a4a8f8",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Kuber Trading ",
+  "commodityName": "CHANA (100 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-27T00:00:00.000Z"
+  },
+  "quantityMT": 12.01,
+  "bagsCount": 239,
+  "stackNo": "31",
+  "lotNo": "9",
+  "gatePass": "37",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b72d8580b71b10d05a7d",
+  "createdAt": {
+    "$date": "2026-04-21T17:43:09.203Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:43:09.203Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b7ac8580b71b10d05a82"
+  },
+  "accountId": "69e221af0699e1d323a4a904",
+  "clientId": "69e221af0699e1d323a4a904",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Nilesh Enterprise",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "quantityMT": 24.785,
+  "bagsCount": 491,
+  "stackNo": "14",
+  "lotNo": "1",
+  "gatePass": "17",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b7ac8580b71b10d05a81",
+  "createdAt": {
+    "$date": "2026-04-21T17:45:16.889Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:45:16.889Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b7f48580b71b10d05a86"
+  },
+  "accountId": "69e221af0699e1d323a4a904",
+  "clientId": "69e221af0699e1d323a4a904",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Nilesh Enterprise",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-24T00:00:00.000Z"
+  },
+  "quantityMT": 25.245,
+  "bagsCount": 499,
+  "stackNo": "26",
+  "lotNo": "2",
+  "gatePass": "32",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b7f48580b71b10d05a85",
+  "createdAt": {
+    "$date": "2026-04-21T17:46:28.496Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:46:28.496Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b8328580b71b10d05a8a"
+  },
+  "accountId": "69e221af0699e1d323a4a904",
+  "clientId": "69e221af0699e1d323a4a904",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Nilesh Enterprise",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-24T00:00:00.000Z"
+  },
+  "quantityMT": 25.62,
+  "bagsCount": 500,
+  "stackNo": "26",
+  "lotNo": "2",
+  "gatePass": "33",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b8328580b71b10d05a89",
+  "createdAt": {
+    "$date": "2026-04-21T17:47:30.135Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:47:30.135Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b8608580b71b10d05a8e"
+  },
+  "accountId": "69e221af0699e1d323a4a904",
+  "clientId": "69e221af0699e1d323a4a904",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Nilesh Enterprise",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-28T00:00:00.000Z"
+  },
+  "quantityMT": 19.28,
+  "bagsCount": 375,
+  "stackNo": "34",
+  "lotNo": "3",
+  "gatePass": "43",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b8608580b71b10d05a8d",
+  "createdAt": {
+    "$date": "2026-04-21T17:48:16.132Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:48:16.132Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b93c8580b71b10d05a92"
+  },
+  "accountId": "69e220b00699e1d323a4a8ff",
+  "clientId": "69e220b00699e1d323a4a8ff",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Madhav Puls Industries",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-19T00:00:00.000Z"
+  },
+  "quantityMT": 23.91,
+  "bagsCount": 480,
+  "stackNo": "16",
+  "lotNo": "1",
+  "gatePass": "19",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b93c8580b71b10d05a91",
+  "createdAt": {
+    "$date": "2026-04-21T17:51:56.764Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:51:56.764Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b9af8580b71b10d05a96"
+  },
+  "accountId": "69e220b00699e1d323a4a8ff",
+  "clientId": "69e220b00699e1d323a4a8ff",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Madhav Puls Industries",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-21T00:00:00.000Z"
+  },
+  "quantityMT": 19.04,
+  "bagsCount": 385,
+  "stackNo": "19",
+  "lotNo": "2",
+  "gatePass": "22",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b9af8580b71b10d05a95",
+  "createdAt": {
+    "$date": "2026-04-21T17:53:51.559Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:53:51.559Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7b9de8580b71b10d05a9a"
+  },
+  "accountId": "69e220b00699e1d323a4a8ff",
+  "clientId": "69e220b00699e1d323a4a8ff",
+  "commodityId": "69e21f570699e1d323a4a8f4",
+  "warehouseId": "69e220090699e1d323a4a8fb",
+  "clientName": "Madhav Puls Industries",
+  "commodityName": "WHEAT (90 PER MT)",
+  "warehouseName": "Ritaben Amitkumar Vithalani-5",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-23T00:00:00.000Z"
+  },
+  "quantityMT": 27.625,
+  "bagsCount": 485,
+  "stackNo": "25",
+  "lotNo": "3",
+  "gatePass": "29",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7b9de8580b71b10d05a99",
+  "createdAt": {
+    "$date": "2026-04-21T17:54:38.766Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:54:38.766Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69e7ba4e8580b71b10d05a9e"
+  },
+  "accountId": "69e221e80699e1d323a4a905",
+  "clientId": "69e221e80699e1d323a4a905",
+  "commodityId": "69e21f6c0699e1d323a4a8f5",
+  "warehouseId": "69e2201b0699e1d323a4a8fc",
+  "clientName": "Shantilal Gordhanbhai Makadiya",
+  "commodityName": "WHEAT (85 PER MT)",
+  "warehouseName": "Bhalal Dharmendrabhai -7",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-30T00:00:00.000Z"
+  },
+  "quantityMT": 19.725,
+  "bagsCount": 390,
+  "stackNo": "35",
+  "lotNo": "12",
+  "gatePass": "44",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69e7ba4e8580b71b10d05a9d",
+  "createdAt": {
+    "$date": "2026-04-21T17:56:30.430Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-21T17:56:30.430Z"
+  },
+  "userEmail": "bharatgodam.techsolutions@gmail.com",
+  "userId": {
+    "$oid": "69eaf253f99dac99d279ad5c"
+  }
+},
+{
+  "_id": {
+    "$oid": "69eb2a80045624e2211f3674"
+  },
+  "accountId": "69eb213c0d60a84915b179fa",
+  "clientId": "69eb213c0d60a84915b179fa",
+  "commodityId": "69eb20d00d60a84915b179f9",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Shekhar Mehata",
+  "commodityName": "CASTERSEED",
+  "warehouseName": "Central Silo A",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-02-02T00:00:00.000Z"
+  },
+  "quantityMT": 23.4,
+  "bagsCount": 234,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "1",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69eb2a80045624e2211f3673",
+  "createdAt": {
+    "$date": "2026-04-24T08:32:00.983Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:32:00.983Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+},
+{
+  "_id": {
+    "$oid": "69eb2ab5045624e2211f3678"
+  },
+  "accountId": "69eb213c0d60a84915b179fa",
+  "clientId": "69eb213c0d60a84915b179fa",
+  "commodityId": "69eb20d00d60a84915b179f9",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Shekhar Mehata",
+  "commodityName": "CASTERSEED",
+  "warehouseName": "Central Silo A",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-02-27T00:00:00.000Z"
+  },
+  "quantityMT": 2.4,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "2",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69eb2ab5045624e2211f3677",
+  "createdAt": {
+    "$date": "2026-04-24T08:32:53.037Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:32:53.037Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+},
+{
+  "_id": {
+    "$oid": "69eb2acc045624e2211f367a"
+  },
+  "accountId": "69eb213c0d60a84915b179fa",
+  "clientId": "69eb213c0d60a84915b179fa",
+  "commodityId": "69eb20d00d60a84915b179f9",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Shekhar Mehata",
+  "commodityName": "CASTERSEED",
+  "warehouseName": "Central Silo A",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-04-15T00:00:00.000Z"
+  },
+  "quantityMT": 20,
+  "stackNo": "1",
+  "lotNo": "1",
+  "gatePass": "3",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69eb2acc045624e2211f3679",
+  "createdAt": {
+    "$date": "2026-04-24T08:33:16.421Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:33:16.421Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+},
+{
+  "_id": {
+    "$oid": "69eb2af1045624e2211f367c"
+  },
+  "accountId": "69eb213c0d60a84915b179fa",
+  "clientId": "69eb213c0d60a84915b179fa",
+  "commodityId": "69eb20b90d60a84915b179f8",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Shekhar Mehata",
+  "commodityName": "MAIZE",
+  "warehouseName": "Central Silo A",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-03-03T00:00:00.000Z"
+  },
+  "quantityMT": 100,
+  "bagsCount": 1000,
+  "stackNo": "2",
+  "lotNo": "2",
+  "gatePass": "4",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69eb2af1045624e2211f367b",
+  "createdAt": {
+    "$date": "2026-04-24T08:33:53.185Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:33:53.185Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+},
+{
+  "_id": {
+    "$oid": "69eb2b9e045624e2211f3680"
+  },
+  "accountId": "69eb213c0d60a84915b179fa",
+  "clientId": "69eb213c0d60a84915b179fa",
+  "commodityId": "69eb20b90d60a84915b179f8",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Shekhar Mehata",
+  "commodityName": "MAIZE",
+  "warehouseName": "Central Silo A",
+  "direction": "OUTWARD",
+  "type": "OUTWARD",
+  "date": {
+    "$date": "2026-04-14T00:00:00.000Z"
+  },
+  "quantityMT": 20,
+  "stackNo": "2",
+  "lotNo": "1",
+  "gatePass": "5",
+  "status": "COMPLETED",
+  "sourceType": "outward",
+  "sourceId": "69eb2b9e045624e2211f367f",
+  "createdAt": {
+    "$date": "2026-04-24T08:36:46.651Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:36:46.651Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+},
+{
+  "_id": {
+    "$oid": "69eb2bc4045624e2211f3682"
+  },
+  "accountId": "69eb218a0d60a84915b179fb",
+  "clientId": "69eb218a0d60a84915b179fb",
+  "commodityId": "69eb20b90d60a84915b179f8",
+  "warehouseId": "69eb20a60d60a84915b179f7",
+  "clientName": "Vatsal Trivedi",
+  "commodityName": "MAIZE",
+  "warehouseName": "Central Silo A",
+  "direction": "INWARD",
+  "type": "INWARD",
+  "date": {
+    "$date": "2026-02-14T00:00:00.000Z"
+  },
+  "quantityMT": 2000,
+  "bagsCount": 20000,
+  "stackNo": "6",
+  "lotNo": "6",
+  "gatePass": "6",
+  "status": "COMPLETED",
+  "sourceType": "inward",
+  "sourceId": "69eb2bc4045624e2211f3681",
+  "createdAt": {
+    "$date": "2026-04-24T08:37:24.303Z"
+  },
+  "updatedAt": {
+    "$date": "2026-04-24T08:37:24.303Z"
+  },
+  "userId": {
+    "$oid": "69e2426276c28abbe885745d"
+  },
+  "userEmail": "TESTIFY@GMAIL.COM"
+}]
