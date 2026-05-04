@@ -219,8 +219,8 @@ export default function ClientInvoicesPage() {
 
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
-    const warehouseQuery = invoice.warehouseId ? `?warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    const url = `/api/invoice/html/${invoiceId}${warehouseQuery}`;
+    const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
+    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${warehouseQuery}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

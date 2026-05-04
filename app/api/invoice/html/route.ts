@@ -3,15 +3,12 @@ import { generateMonthlyInvoiceHTML } from '@/app/actions/monthly-invoice-pdf';
 import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 import { resolveMonthlyInvoiceFromId } from '@/app/api/invoice/utils';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
     const session = await requireSession();
     const tenantFilter = getTenantFilterForMongo(session);
 
-    const { id } = await params;
+    const id = request.nextUrl.searchParams.get('id') || '';
     const warehouseId = request.nextUrl.searchParams.get('warehouseId') || undefined;
 
     const monthlyInvoice = await resolveMonthlyInvoiceFromId(id, warehouseId, tenantFilter);

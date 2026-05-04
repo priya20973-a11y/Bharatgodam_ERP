@@ -150,7 +150,7 @@ export default function InvoiceReportPage() {
       return;
     }
 
-    const url = `/api/invoice/html/${encodeURIComponent(invoiceId)}`;
+    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
