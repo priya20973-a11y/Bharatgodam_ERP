@@ -32,12 +32,11 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
     setInvoices(initialInvoices);
   }, [initialInvoices]);
 
-  // Handle PDF Export
+  // Handle invoice export via HTML print preview
   const handleExportPDF = (invoiceId: string) => {
-    // Open the PDF download route
-    const pdfUrl = `/api/invoice/download/${invoiceId}`;
-    window.open(pdfUrl, '_blank');
-    toast.success('PDF download started');
+    const url = `/api/invoice/html/${encodeURIComponent(invoiceId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    toast.success('Invoice preview opened in a new tab');
   };
 
   // NEW: Optimistic UI Hook / Toggle Logic

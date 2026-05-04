@@ -217,35 +217,11 @@ export default function ClientInvoicesPage() {
     }
   };
 
-  // Download invoice as PDF (from backend API)
-  const handleDownloadInvoice = async (invoice: MonthlyInvoice) => {
-    const invoiceId = invoice.invoiceId || invoice.bookingId;
+  const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
+    const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `?warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    setDownloading(invoiceId);
-    try {
-      // Fetch PDF from backend API
-      const res = await fetch(`/api/invoice/download/${invoiceId}${warehouseQuery}`);
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Failed to fetch PDF: ${res.status} ${errorText}`);
-      }
-      const pdfBuffer = await res.arrayBuffer();
-      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Invoice_${invoice.clientName.replace(/\s+/g, '_')}_${invoice.month}_${invoice.year}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('Invoice PDF downloaded successfully');
-    } catch (error) {
-      console.error('Failed to download invoice PDF:', error);
-      toast.error('Failed to download invoice PDF');
-    } finally {
-      setDownloading(null);
-    }
+    const url = `/api/invoice/html/${invoiceId}${warehouseQuery}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Record payment for invoice

@@ -138,42 +138,20 @@ export default function InvoiceReportPage() {
     }
   };
 
-  const downloadInvoicePDF = async () => {
+  const downloadInvoicePDF = () => {
     if (!invoiceData.master) {
       toast.error('No invoice data to download');
       return;
     }
 
-    setIsDownloading(true);
-    try {
-      // Use the backend endpoint to fetch the PDF (summary format)
-      const invoiceId = invoiceData.master._id;
-      if (!invoiceId) {
-        toast.error('Invoice ID not found');
-        setIsDownloading(false);
-        return;
-      }
-      const response = await fetch(`/api/invoice/download/${invoiceId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch invoice PDF');
-      }
-      const blob = await response.blob();
-      // Create a download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Invoice_${invoiceId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success('Invoice PDF downloaded successfully!');
-    } catch (error) {
-      console.error('PDF download error:', error);
-      toast.error('Failed to download invoice PDF');
-    } finally {
-      setIsDownloading(false);
+    const invoiceId = String(invoiceData.master._id || '');
+    if (!invoiceId) {
+      toast.error('Invoice ID not found');
+      return;
     }
+
+    const url = `/api/invoice/html/${encodeURIComponent(invoiceId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const getStatusBadge = (status: string) => {
