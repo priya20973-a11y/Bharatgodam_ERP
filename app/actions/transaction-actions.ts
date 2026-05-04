@@ -560,7 +560,7 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
       const startDate = parseIsoDate(entry.periodStartDate);
       let endDate = parseIsoDate(entry.periodEndDate);
-      const today = parseIsoDate(new Date());
+      const today: Date = parseIsoDate(new Date()) ?? new Date();
 
       if (!endDate && startDate) {
         if (entry.status === 'ACTIVE') {
