@@ -210,6 +210,52 @@ export async function resolveMonthlyInvoiceFromId(id: string, warehouseId: strin
 
     const lineItems = await db.collection('invoice_line_items').find({ invoiceMasterId: invoiceMaster._id }).toArray();
 
+    let ledgerInvoice: any = null;
+    if (invoiceMaster.clientId && invoiceMaster.warehouseId && invoiceMaster.invoiceMonth) {
+      const ledgerResult = await getClientMonthlyLedger(
+        invoiceMaster.clientId.toString(),
+        invoiceMaster.invoiceMonth,
+        invoiceMaster.warehouseId.toString(),
+        tenantFilter
+      );
+
+      if (ledgerResult.success && ledgerResult.data?.months?.length) {
+        ledgerInvoice = ledgerResult.data.months[0];
+      }
+    }
+
+    if (ledgerInvoice) {
+      const [yearPart, monthPart] = invoiceMaster.invoiceMonth.split('-');
+      const month = monthNames[Number(monthPart) - 1] || monthPart;
+      const year = Number(yearPart) || new Date().getFullYear();
+
+      return {
+        bookingId: invoiceMaster.clientId?.toString() || id,
+        invoiceNumber: invoiceMaster.invoiceId || id,
+        clientName: client.name || client.clientName || '',
+        panNumber: resolveClientPan(client),
+        gstNumber: resolveClientGst(client),
+        month,
+        year,
+        periods: ledgerInvoice.rows.map((item: any) => ({
+          startDate: item.fromDate || '',
+          endDate: item.toDate || '',
+          quantityMT: Number(item.qty ?? 0),
+          daysTotal: Number(item.days ?? 0),
+          rentTotal: Number(item.rent ?? 0),
+          status: item.status || 'COMPLETED',
+          commodityName: item.commodity || '',
+        })),
+        warehouseId: invoiceMaster.warehouseId?.toString(),
+        warehouseName: warehouse.name || '',
+        totalRent: Number(ledgerInvoice.summary.totalRent ?? invoiceMaster.totalAmount ?? 0),
+        previousBalance: Number(ledgerInvoice.summary.previousBalance ?? 0),
+        currentPayments: Number(ledgerInvoice.summary.payments ?? 0),
+        newBalance: Number(ledgerInvoice.summary.outstanding ?? invoiceMaster.totalAmount ?? 0),
+        invoiceDate: invoiceMaster.generatedAt?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+      };
+    }
+
     if (lineItems.some((item: any) => !item.status) && invoiceMaster.clientId && invoiceMaster.warehouseId && invoiceMaster.invoiceMonth) {
       const ledgerResult = await getClientMonthlyLedger(
         invoiceMaster.clientId.toString(),
@@ -219,10 +265,10 @@ export async function resolveMonthlyInvoiceFromId(id: string, warehouseId: strin
       );
 
       if (ledgerResult.success && ledgerResult.data?.months?.length) {
-        const ledgerInvoice = ledgerResult.data.months[0];
+        const ledgerInvoiceForStatus = ledgerResult.data.months[0];
         const ledgerRowStatusMap = new Map<string, string>();
 
-        ledgerInvoice.rows.forEach((row: any) => {
+        ledgerInvoiceForStatus.rows.forEach((row: any) => {
           const key = `${row.fromDate || ''}|${row.toDate || ''}|${row.commodity || ''}|${row.qty ?? ''}|${row.days ?? ''}`;
           ledgerRowStatusMap.set(key, row.status || 'COMPLETED');
         });

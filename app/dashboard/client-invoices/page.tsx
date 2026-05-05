@@ -265,7 +265,7 @@ export default function ClientInvoicesPage() {
           Monthly Invoices
         </h1>
         <p className="text-slate-500 mt-2">
-          View and download monthly invoices with storage rent details based on TIME-STATE system
+          View monthly invoices in an HTML preview page for easy printing and saving.
         </p>
       </div>
 
@@ -517,7 +517,7 @@ export default function ClientInvoicesPage() {
                           ) : (
                             <Download className="h-4 w-4 mr-2" />
                           )}
-                          Download
+                          Open Invoice
                         </Button>
                       </div>
                     </div>

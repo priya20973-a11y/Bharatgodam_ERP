@@ -138,9 +138,9 @@ export default function InvoiceReportPage() {
     }
   };
 
-  const downloadInvoicePDF = () => {
+  const openInvoicePreview = () => {
     if (!invoiceData.master) {
-      toast.error('No invoice data to download');
+      toast.error('No invoice data to preview');
       return;
     }
 
@@ -255,7 +255,7 @@ export default function InvoiceReportPage() {
                   <div className="flex items-center gap-2">
                     {getStatusBadge(invoiceData.master.status)}
                     <Button
-                      onClick={downloadInvoicePDF}
+                      onClick={openInvoicePreview}
                       disabled={isDownloading}
                       size="sm"
                       variant="outline"
@@ -264,12 +264,12 @@ export default function InvoiceReportPage() {
                       {isDownloading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Downloading...
+                          Opening...
                         </>
                       ) : (
                         <>
                           <Download className="h-4 w-4 mr-2" />
-                          Download PDF
+                          Open Invoice
                         </>
                       )}
                     </Button>

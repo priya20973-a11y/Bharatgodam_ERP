@@ -253,14 +253,14 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
                 </td>
 
                 <td className="px-6 py-4 text-right space-x-3">
-                  {/* PDF Download Action */}
+                  {/* HTML Preview Action */}
                   {isClient && (
                     <button
                       onClick={() => handleExportPDF(inv.id)}
                       className="inline-flex items-center justify-center px-4 py-2 border border-slate-300 shadow-sm text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 transition-colors"
                     >
                       <FileDown className="w-4 h-4 mr-2 text-indigo-500" />
-                      Export PDF
+                      Open Invoice
                     </button>
                   )}
                 </td>
