@@ -666,28 +666,37 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
     }
 
     // Build query for invoice masters
-    const query: any = { clientId: clientObjectId };
-    if (month) {
-      query.invoiceMonth = month;
-    }
+    const invoiceMasterBaseQuery: any = { clientId: clientObjectId };
     if (warehouseId && warehouseId !== '' && warehouseId !== 'ALL') {
       // Warehouse ID comes as string from dropdown, handle both ObjectId and string types
       try {
         const warehouseObjectId = new ObjectId(warehouseId);
-        // Try to match either as ObjectId or as string
-        query.warehouseId = { $in: [warehouseObjectId, warehouseId] };
+        invoiceMasterBaseQuery.warehouseId = { $in: [warehouseObjectId, warehouseId] };
       } catch {
-        // If not valid ObjectId, just match as string
-        query.warehouseId = warehouseId;
+        invoiceMasterBaseQuery.warehouseId = warehouseId;
       }
     }
 
-    const invoiceMasterQuery: any = Object.keys(tenantFilter).length
-      ? { $and: [query, tenantFilter] }
-      : query;
+    const invoiceMasterReturnQuery = { ...invoiceMasterBaseQuery } as any;
+    if (month) {
+      invoiceMasterReturnQuery.invoiceMonth = month;
+    }
+
+    const invoiceMasterBalanceQuery: any = Object.keys(tenantFilter).length
+      ? { $and: [invoiceMasterBaseQuery, tenantFilter] }
+      : invoiceMasterBaseQuery;
+
+    const invoiceMasterReturnQueryWithTenant: any = Object.keys(tenantFilter).length
+      ? { $and: [invoiceMasterReturnQuery, tenantFilter] }
+      : invoiceMasterReturnQuery;
+
+    const allInvoiceMasters = await db.collection('invoice_master')
+      .find(invoiceMasterBalanceQuery)
+      .sort({ invoiceMonth: -1 })
+      .toArray() as IInvoiceMaster[];
 
     const invoiceMasters = await db.collection('invoice_master')
-      .find(invoiceMasterQuery)
+      .find(invoiceMasterReturnQueryWithTenant)
       .sort({ invoiceMonth: -1 })
       .toArray() as IInvoiceMaster[];
 
@@ -727,9 +736,53 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
         }
       }
 
+      const invoiceQueryBase: any = { clientId: clientId };
+      if (warehouseId && warehouseId !== '' && warehouseId !== 'ALL') {
+        try {
+          const warehouseObjectId = new ObjectId(warehouseId);
+          const warehouse = await db.collection('warehouses').findOne({ _id: warehouseObjectId });
+          if (warehouse?.name) {
+            invoiceQueryBase.$or = [
+              { warehouseName: warehouse.name },
+              { warehouseId }
+            ];
+          } else {
+            invoiceQueryBase.warehouseId = warehouseId;
+          }
+        } catch {
+          invoiceQueryBase.$or = [
+            { warehouseName: warehouseId },
+            { warehouseId }
+          ];
+        }
+      }
+
+      const invoiceQueryReturn: any = { ...invoiceQueryBase };
+      if (month) {
+        const [yearPart, monthPart] = month.split('-');
+        const yearValue = parseInt(yearPart, 10);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = monthNames[parseInt(monthPart, 10) - 1] || '';
+        const cycleName = `${yearPart}-${monthPart}`;
+
+        invoiceQueryReturn.$or = [
+          { month: `${monthName} ${yearValue}`, year: yearValue },
+          { cycleName }
+        ];
+      }
+
+      const newInvoiceQueryForBalance: any = Object.keys(tenantFilter).length
+        ? { $and: [invoiceQueryBase, tenantFilter] }
+        : invoiceQueryBase;
+
       const newInvoiceQuery: any = Object.keys(tenantFilter).length
-        ? { $and: [invoiceQuery, tenantFilter] }
-        : invoiceQuery;
+        ? { $and: [invoiceQueryReturn, tenantFilter] }
+        : invoiceQueryReturn;
+
+      const allNewInvoices = await db.collection('invoices')
+        .find(newInvoiceQueryForBalance)
+        .sort({ year: -1, month: -1, createdAt: -1 })
+        .toArray();
 
       const newInvoices = await db.collection('invoices')
         .find(newInvoiceQuery)
@@ -762,7 +815,7 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
           };
         });
 
-        const previousInvoicesTotal = newInvoices
+        const previousInvoicesTotal = allNewInvoices
           .filter(inv => {
             const invYear = inv.year || new Date().getFullYear();
             const invMonthParts = (inv.month || '').split(' ');
@@ -861,7 +914,7 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
             };
           });
 
-        const previousInvoicesTotal = invoiceMasters
+        const previousInvoicesTotal = allInvoiceMasters
           .filter(inv => {
             const invDate = new Date(inv.invoiceMonth + '-01');
             const currentDate = new Date(master.invoiceMonth + '-01');
@@ -938,18 +991,29 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
     const db = await getDb();
     const clientObjectId = new ObjectId(clientId);
 
+    let invoiceIdValue: any = null;
+    if (invoiceId) {
+      try {
+        invoiceIdValue = new ObjectId(invoiceId);
+      } catch {
+        invoiceIdValue = invoiceId;
+      }
+    }
+
     const payment = appendOwnership({
       clientId: clientObjectId,
+      accountId: clientId,
       amount: amount,
+      date: new Date(paymentDate),
       paymentDate: new Date(paymentDate),
-      invoiceId: invoiceId ? new ObjectId(invoiceId) : null,
+      invoiceId: invoiceIdValue,
       notes: notes || '',
       createdAt: new Date(),
       status: 'COMPLETED'
     }, session);
 
     const result = await db.collection('payments').insertOne(payment);
-    return { success: true, paymentId: result.insertedId };
+    return { success: true, paymentId: result.insertedId.toString() };
   } catch (error: any) {
     console.error('[recordPayment] Error:', error);
     return { success: false, message: error.message || 'Failed to record payment' };

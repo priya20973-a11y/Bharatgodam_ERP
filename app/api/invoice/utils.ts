@@ -95,7 +95,6 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
 
   const invoiceMonth = `${yearPart}-${monthPart}`;
   const resolvedWarehouseId = warehouseId || (warehouseParts.length ? warehouseParts.join('-') : undefined);
-  if (!resolvedWarehouseId) return null;
 
   const ledgerResult = await getClientMonthlyLedger(clientId, invoiceMonth, resolvedWarehouseId, tenantFilter);
   if (!ledgerResult.success || !ledgerResult.data?.months?.length) {
@@ -106,28 +105,32 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
   const client = await findClientDocument(db, clientId, tenantFilter);
   if (!client) return null;
 
-  const resolvedWarehouse = await db.collection('warehouses').findOne({ _id: new ObjectId(resolvedWarehouseId), ...tenantFilter });
-  if (!resolvedWarehouse) return null;
+  const resolvedWarehouse = resolvedWarehouseId
+    ? await db.collection('warehouses').findOne({ _id: new ObjectId(resolvedWarehouseId), ...tenantFilter })
+    : null;
 
   const month = monthNames[Number(monthPart) - 1] || monthPart;
   const year = Number(yearPart);
   const invoiceMonthString = invoiceMonth;
 
-  const wspInitials = resolvedWarehouse.name?.split(' ').map((word: string) => word.charAt(0).toUpperCase()).join('') || 'UNKNOWN';
-  const invoiceIdPattern = `^${wspInitials}/${month}/${yearPart}/\\d{5}$`;
-  const existingInvoices = await db.collection('invoice_master')
-    .find({ warehouseId: new ObjectId(resolvedWarehouseId), invoiceMonth: invoiceMonthString, invoiceId: { $regex: invoiceIdPattern }, ...tenantFilter })
-    .project({ invoiceId: 1 })
-    .toArray();
+  let invoiceNumber = `INV/${month}/${yearPart}/00000`;
+  if (resolvedWarehouseId && resolvedWarehouse) {
+    const wspInitials = resolvedWarehouse.name?.split(' ').map((word: string) => word.charAt(0).toUpperCase()).join('') || 'UNKNOWN';
+    const invoiceIdPattern = `^${wspInitials}/${month}/${yearPart}/\\d{5}$`;
+    const existingInvoices = await db.collection('invoice_master')
+      .find({ warehouseId: new ObjectId(resolvedWarehouseId), invoiceMonth: invoiceMonthString, invoiceId: { $regex: invoiceIdPattern }, ...tenantFilter })
+      .project({ invoiceId: 1 })
+      .toArray();
 
-  const maxSerial = existingInvoices.reduce((max: number, inv: any) => {
-    const match = inv.invoiceId?.match(/\/(\d{5})$/);
-    if (!match) return max;
-    return Math.max(max, Number(match[1]));
-  }, 0);
+    const maxSerial = existingInvoices.reduce((max: number, inv: any) => {
+      const match = inv.invoiceId?.match(/\/(\d{5})$/);
+      if (!match) return max;
+      return Math.max(max, Number(match[1]));
+    }, 0);
 
-  const serial = String(maxSerial + 1).padStart(5, '0');
-  const invoiceNumber = `${wspInitials}/${month}/${yearPart}/${serial}`;
+    const serial = String(maxSerial + 1).padStart(5, '0');
+    invoiceNumber = `${wspInitials}/${month}/${yearPart}/${serial}`;
+  }
 
   const monthEnd = new Date(`${invoiceMonthString}-01`);
   monthEnd.setMonth(monthEnd.getMonth() + 1);
@@ -140,7 +143,6 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
 
   const invoiceMaster: any = {
     clientId: new ObjectId(clientId),
-    warehouseId: new ObjectId(resolvedWarehouseId),
     invoiceId: invoiceNumber,
     invoiceMonth: invoiceMonthString,
     totalAmount: Number(ledgerInvoice.summary.totalRent ?? 0),
@@ -152,8 +154,15 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
     updatedAt: new Date(),
   };
 
-  const masterResult = await db.collection('invoice_master').insertOne(invoiceMaster);
-  const masterId = masterResult.insertedId;
+  if (resolvedWarehouseId) {
+    invoiceMaster.warehouseId = new ObjectId(resolvedWarehouseId);
+  }
+
+  let masterId: any = null;
+  if (resolvedWarehouseId) {
+    const masterResult = await db.collection('invoice_master').insertOne(invoiceMaster);
+    masterId = masterResult.insertedId;
+  }
 
   const lineItems = ledgerInvoice.rows.map((item: any) => ({
     invoiceMasterId: masterId,
@@ -168,7 +177,7 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
     createdAt: new Date(),
   }));
 
-  if (lineItems.length > 0) {
+  if (lineItems.length > 0 && masterId) {
     await db.collection('invoice_line_items').insertMany(lineItems as any[]);
   }
 
@@ -190,7 +199,7 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
       commodityName: item.commodity || '',
     })),
     warehouseId: resolvedWarehouseId,
-    warehouseName: resolvedWarehouse.name || '',
+    warehouseName: resolvedWarehouse?.name || '',
     totalRent: Number(ledgerInvoice.summary.totalRent ?? 0),
     previousBalance: Number(ledgerInvoice.summary.previousBalance ?? 0),
     currentPayments: Number(ledgerInvoice.summary.payments ?? 0),

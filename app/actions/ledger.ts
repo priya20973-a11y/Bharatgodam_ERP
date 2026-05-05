@@ -481,6 +481,11 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   const monthlyLedgers: ClientMonthLedger[] = [];
   let runningBalance = 0;
 
+  const monthPaymentBalances: Record<string, number> = {};
+  sortedMonthKeys.forEach((monthKey) => {
+    monthPaymentBalances[monthKey] = roundCurrency(paymentsByMonth[monthKey] || 0);
+  });
+
   // preserve each warehouse-specific invoice separately, but keep month ordering for balances
   Array.from(grouped.entries())
     .sort(([aKey, a], [bKey, b]) => {
@@ -491,8 +496,19 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
       const invoiceId = group.warehouseId ? `${clientId}-${group.month}-${group.warehouseId}` : `${clientId}-${group.month}`;
       const totalRent = roundCurrency(group.rows.reduce((sum, row) => sum + row.rent, 0));
       const invoiceSpecificPayments = roundCurrency(paymentsByInvoice[invoiceId] || 0);
-      const paymentsForMonth = invoiceSpecificPayments || roundCurrency(paymentsByMonth[group.month] || 0);
       const previousBalance = roundCurrency(runningBalance);
+
+      let paymentsForMonth = 0;
+      if (invoiceSpecificPayments > 0) {
+        paymentsForMonth = invoiceSpecificPayments;
+      } else {
+        const remainingMonthPayments = roundCurrency(monthPaymentBalances[group.month] || 0);
+        const maxPayable = roundCurrency(Math.max(0, previousBalance + totalRent));
+        const allocated = Math.min(remainingMonthPayments, maxPayable);
+        paymentsForMonth = allocated;
+        monthPaymentBalances[group.month] = roundCurrency(remainingMonthPayments - allocated);
+      }
+
       const outstanding = roundCurrency(previousBalance + totalRent - paymentsForMonth);
 
       monthlyLedgers.push({

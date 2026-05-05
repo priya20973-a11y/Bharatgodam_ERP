@@ -570,29 +570,26 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
       return { success: false, message: 'Client not found' };
     }
 
-    // Build query for invoice masters
-    const query: any = { clientId: clientObjectId };
-    if (month) {
-      query.invoiceMonth = month;
-    }
+    // Build base query for invoice masters used for balance calculation
+    const invoiceMasterBaseQuery: any = { clientId: clientObjectId };
     if (warehouseId && warehouseId !== '' && warehouseId !== 'ALL') {
-      // Validate warehouse exists in master
       await validateWarehouseId(warehouseId);
-      // Warehouse ID comes as string from dropdown, handle both ObjectId and string types
       try {
         const warehouseObjectId = new ObjectId(warehouseId);
-        // Try to match either as ObjectId or as string
-        query.warehouseId = { $in: [warehouseObjectId, warehouseId] };
+        invoiceMasterBaseQuery.warehouseId = { $in: [warehouseObjectId, warehouseId] };
       } catch {
-        // If not valid ObjectId, just match as string
-        query.warehouseId = warehouseId;
+        invoiceMasterBaseQuery.warehouseId = warehouseId;
       }
     }
 
-    const invoiceMasters = await db.collection('invoice_master')
-      .find(query)
+    const allInvoiceMasters = await db.collection('invoice_master')
+      .find(invoiceMasterBaseQuery)
       .sort({ invoiceMonth: -1 })
       .toArray() as IInvoiceMaster[];
+
+    const invoiceMasters = month
+      ? allInvoiceMasters.filter(master => master.invoiceMonth === month)
+      : allInvoiceMasters;
 
     if (invoiceMasters.length === 0) {
       return { success: true, data: [] };
@@ -648,7 +645,7 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
           commodityName: item.commodityName || item.commodityId?.toString() || ''
         }));
 
-      const previousInvoicesTotal = invoiceMasters
+      const previousInvoicesTotal = allInvoiceMasters
         .filter(inv => {
           const invDate = new Date(inv.invoiceMonth + '-01');
           const currentDate = new Date(master.invoiceMonth + '-01');
@@ -729,7 +726,9 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
 
     const payment = {
       clientId: clientObjectId,
+      accountId: clientId,
       amount: amount,
+      date: new Date(paymentDate),
       paymentDate: new Date(paymentDate),
       invoiceId: invoiceIdValue,
       notes: notes || '',

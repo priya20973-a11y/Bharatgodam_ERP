@@ -31,8 +31,8 @@ export async function GET(
     const db = await getDb();
 
     const accountId = trimmedClientId;
-    const clientIdFilter = ObjectId.isValid(trimmedClientId)
-      ? { $in: [new ObjectId(trimmedClientId), trimmedClientId] }
+    const clientIdQuery = ObjectId.isValid(trimmedClientId)
+      ? new ObjectId(trimmedClientId)
       : trimmedClientId;
 
     const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
@@ -45,7 +45,13 @@ export async function GET(
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
-        .find({ accountId, ...tenantFilter })
+        .find({
+          $or: [
+            { accountId },
+            { clientId: clientIdQuery }
+          ],
+          ...tenantFilter
+        })
         .sort({ date: 1 })
         .toArray(),
       db.collection('invoice_master')
@@ -134,7 +140,7 @@ export async function GET(
 
     const paymentData: Payment[] = paymentsDocs.map((pay) => ({
       _id: pay._id?.toString() || '',
-      date: pay.date,
+      date: pay.paymentDate || pay.date,
       amount: pay.amount,
       clientName: pay.clientName || bookings[0]?.clientName || clientId,
     }));

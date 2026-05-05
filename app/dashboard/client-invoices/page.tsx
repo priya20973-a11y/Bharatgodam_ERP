@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
-import { getClientOptions, getClientInvoicesByClientId, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
+import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/ledger';
 import { toast } from 'react-hot-toast';
 
@@ -226,13 +226,22 @@ export default function ClientInvoicesPage() {
 
   // Record payment for invoice
   const handleRecordPayment = async (invoice: MonthlyInvoice) => {
-    if (!paymentAmount || !invoice.invoiceId) return;
+    if (!invoice.invoiceId) {
+      toast.error('Invoice ID is missing. Cannot record payment.');
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
 
     setRecordingPayment(true);
     try {
       const result = await recordPayment(
         invoice.bookingId,
-        parseFloat(paymentAmount),
+        amount,
         new Date().toISOString().split('T')[0],
         invoice.invoiceId,
         `Payment for ${invoice.month} ${invoice.year} invoice`

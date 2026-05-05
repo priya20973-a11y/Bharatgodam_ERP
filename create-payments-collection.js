@@ -31,6 +31,7 @@ async function createPaymentsCollection() {
 
     // Create indexes
     await db.collection('payments').createIndex({ clientId: 1, paymentDate: -1 });
+    await db.collection('payments').createIndex({ accountId: 1, paymentDate: -1 });
     await db.collection('payments').createIndex({ invoiceId: 1 });
     console.log('✅ Created payment indexes');
 
