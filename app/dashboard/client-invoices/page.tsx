@@ -221,7 +221,7 @@ export default function ClientInvoicesPage() {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
     const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${warehouseQuery}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener');
   };
 
   // Record payment for invoice

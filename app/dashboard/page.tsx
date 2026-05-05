@@ -22,6 +22,61 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value);
 }
 
+function getPreviousMonthKey(date: Date) {
+  const prevMonth = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+  return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthEnd(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function parseDateValue(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  const normalized = String(value).slice(0, 10);
+  const parsed = new Date(`${normalized}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function countInvoicePeriodsFromLedgerEntries(entries: any[], lastMonthEnd: Date) {
+  const invoicePeriodKeys = new Set<string>();
+
+  entries.forEach((entry) => {
+    const startDate = parseDateValue(entry.periodStartDate);
+    if (!startDate) return;
+
+    let endDate = parseDateValue(entry.periodEndDate);
+    if (!endDate) {
+      endDate = lastMonthEnd;
+    }
+
+    if (endDate > lastMonthEnd) {
+      endDate = lastMonthEnd;
+    }
+
+    if (startDate > lastMonthEnd) return;
+
+    let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
+
+    while (current <= endDate) {
+      const monthKey = getMonthKey(current);
+      const clientId = entry.clientId?.toString?.() || '';
+      const warehouseId = entry.warehouseId?.toString?.() || '';
+      invoicePeriodKeys.add(`${clientId}::${warehouseId}::${monthKey}`);
+      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+      if (current > lastMonthEnd) break;
+    }
+  });
+
+  return invoicePeriodKeys.size;
+}
+
 function buildDayLabels(currentMonth: Date) {
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   return Array.from({ length: daysInMonth }, (_, index) => {
@@ -272,57 +327,77 @@ export default async function DashboardPage() {
 
   const warehouseFilter = tenantFilter;
   const clientFilter = tenantFilter;
+  const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
+    ? (tenantFilter as any).$or
+    : [];
+  const invoiceMasterFilter = isAdmin(session)
+    ? {}
+    : {
+        $or: [
+          ...ownershipFilters,
+          { clientEmail: session.user.email }
+        ]
+      };
+  const invoiceFilter = isAdmin(session)
+    ? {}
+    : {
+        $or: [
+          ...ownershipFilters,
+          { clientEmail: session.user.email }
+        ]
+      };
 
-  const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, transactionInvoiceCountResult, ledgerEntryCount] = await Promise.all([
+  const lastInvoiceMonthKey = getPreviousMonthKey(now);
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, ledgerEntries, ledgerEntryCount] = await Promise.all([
     db.collection('payments').aggregate([
       { $match: { ...tenantFilter, status: 'COMPLETED' } },
       { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
     ]).toArray(),
     db.collection('warehouses').countDocuments(warehouseFilter),
     db.collection('clients').countDocuments(clientFilter),
-    db.collection('invoice_master').countDocuments({ ...tenantFilter }),
-    db.collection('invoices').countDocuments({ ...tenantFilter }),
-    db.collection('transactions').aggregate([
-      {
-        $match: tenantFilter
-      },
-      {
-        $project: {
-          clientId: 1,
-          warehouseId: 1,
-          monthKey: {
-            $cond: [
-              { $eq: [{ $type: '$date' }, 'date'] },
-              { $dateToString: { format: '%Y-%m', date: '$date' } },
-              { $substrCP: ['$date', 0, 7] }
-            ]
-          }
+    db.collection('invoice_master').countDocuments({
+      $and: [
+        invoiceMasterFilter,
+        {
+          $or: [
+            { invoiceMonth: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
+            { generatedAt: { $exists: true, $lt: currentMonthStart } },
+            { createdAt: { $exists: true, $lt: currentMonthStart } }
+          ]
         }
-      },
-      {
-        $match: {
-          clientId: { $exists: true, $ne: null },
-          monthKey: { $exists: true, $ne: '' }
+      ]
+    }),
+    db.collection('invoices').countDocuments({
+      $and: [
+        invoiceFilter,
+        {
+          $or: [
+            { cycleName: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
+            { generatedAt: { $exists: true, $lt: currentMonthStart } },
+            { createdAt: { $exists: true, $lt: currentMonthStart } }
+          ]
         }
-      },
-      {
-        $group: {
-          _id: {
-            clientId: '$clientId',
-            warehouseId: '$warehouseId',
-            monthKey: '$monthKey'
-          }
-        }
-      },
-      { $count: 'invoicePeriods' }
-    ]).toArray(),
+      ]
+    }),
+    db.collection('ledger_entries').find({
+      ...tenantFilter,
+      periodStartDate: { $exists: true, $ne: null },
+      quantityMT: { $gt: 0 }
+    }).project({ clientId: 1, warehouseId: 1, periodStartDate: 1, periodEndDate: 1 }).toArray(),
     db.collection('ledger_entries').countDocuments({ ...tenantFilter })
   ]);
 
   const invoiceMasterCountValue = invoiceMasterCount ?? 0;
   const formalInvoiceCountValue = formalInvoiceCount ?? 0;
-  const ledgerInvoiceCount = transactionInvoiceCountResult?.[0]?.invoicePeriods ?? 0;
-  const invoiceCount = ledgerInvoiceCount; // Use transaction periods as invoice count
+  const ledgerInvoiceCount = countInvoicePeriodsFromLedgerEntries(ledgerEntries, getMonthEnd(new Date(lastInvoiceMonthKey + '-01')));
+  const invoiceCount = ledgerInvoiceCount > 0
+    ? ledgerInvoiceCount
+    : invoiceMasterCountValue > 0
+      ? invoiceMasterCountValue
+      : formalInvoiceCountValue;
+  const ledgerEntryCountValue = ledgerEntryCount ?? 0;
 
   const totalTransactions = transactionAnalytics?.totals?.[0]?.totalTransactions ?? 0;
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
@@ -336,7 +411,7 @@ export default async function DashboardPage() {
     { name: 'Active Warehouses', value: activeWarehouseCount, href: '/dashboard/warehouses' },
     { name: 'Active Clients', value: activeClientCount, href: '/dashboard/clients' },
     { name: 'Invoices', value: invoiceCount, href: '/dashboard/client-invoices' },
-    { name: 'Ledger Entries', value: ledgerEntryCount, href: '/dashboard/ledger' }
+    { name: 'Ledger Entries', value: ledgerEntryCountValue, href: '/dashboard/ledger' }
   ];
 
   const stats = [
@@ -370,6 +445,9 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Command Center</h1>
         <p className="text-slate-500">
           Welcome back, {session.user?.email} • Role: {(session.user as any)?.role}
+        </p>
+        <p className="text-slate-500 mt-2">
+          Transactions under this account: {formatNumber(totalTransactions)}
         </p>
       </div>
 

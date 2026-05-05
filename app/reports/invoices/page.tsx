@@ -151,7 +151,7 @@ export default function InvoiceReportPage() {
     }
 
     const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener');
   };
 
   const getStatusBadge = (status: string) => {

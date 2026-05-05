@@ -449,10 +449,28 @@ export async function generateMonthlyInvoicePDF(invoice: MonthlyInvoiceData): Pr
 
     const html = await generateMonthlyInvoiceHTML(invoice);
 
-    // Launch browser
-    const browser = await puppeteer.default.launch({
+    const launchOptions: any = {
       headless: true,
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process',
+        '--disable-gpu',
+      ],
+    };
+
+    const executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROME_PATH ||
+      process.env.CHROME_EXECUTABLE_PATH;
+
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    // Launch browser
+    const browser = await puppeteer.default.launch(launchOptions);
 
     const page = await browser.newPage();
 

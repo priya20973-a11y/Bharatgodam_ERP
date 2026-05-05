@@ -93,7 +93,9 @@ export async function fetchUserInvoices() {
 }
 
 /**
- * Fetch invoice master records for the current user
+ * Fetch formal invoice records for the current user.
+ * The invoices page is driven by the `invoices` collection, so the dashboard count
+ * should prefer this newer invoice store over legacy `invoice_master` data.
  */
 export async function fetchInvoiceMasters() {
   const session = await requireSession();

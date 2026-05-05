@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateMonthlyInvoicePDF } from '@/app/actions/monthly-invoice-pdf';
+import { generateMonthlyInvoiceHTML } from '@/app/actions/monthly-invoice-pdf';
 import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 import { resolveMonthlyInvoiceFromId } from '@/app/api/invoice/utils';
 
@@ -19,22 +19,22 @@ export async function GET(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
-    const pdfBuffer = await generateMonthlyInvoicePDF(monthlyInvoice);
+    const html = await generateMonthlyInvoiceHTML(monthlyInvoice);
+    const printableHtml = html.replace(
+      '<body>',
+      `<body><div style="padding:12px;background:#f8fafc;color:#0f172a;font-size:13px;text-align:center;">Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.</div>`
+    );
 
-    return new NextResponse(pdfBuffer as any, {
+    return new NextResponse(printableHtml, {
       status: 200,
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${monthlyInvoice.bookingId.replace(/\//g, '_')}.pdf"`,
+        'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-cache, no-store',
       },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to generate invoice';
+    const message = error instanceof Error ? error.message : 'Failed to render invoice';
     console.error('Invoice download error:', error);
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    return new NextResponse(message, { status: 500 });
   }
 }

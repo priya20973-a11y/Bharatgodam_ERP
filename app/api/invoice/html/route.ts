@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store',
       },
     });
   } catch (error: unknown) {

@@ -35,7 +35,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
   // Handle invoice export via HTML print preview
   const handleExportPDF = (invoiceId: string) => {
     const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(url, '_blank', 'noopener');
     toast.success('Invoice preview opened in a new tab');
   };
 
