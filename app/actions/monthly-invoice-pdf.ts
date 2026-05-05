@@ -443,60 +443,9 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
  * Returns buffer that can be sent to client for download
  */
 export async function generateMonthlyInvoicePDF(invoice: MonthlyInvoiceData): Promise<Buffer> {
-  try {
-    // Dynamic import for puppeteer to avoid bundling issues
-    const puppeteer = await import('puppeteer');
-
-    const html = await generateMonthlyInvoiceHTML(invoice);
-
-    const launchOptions: any = {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process',
-        '--disable-gpu',
-      ],
-    };
-
-    const executablePath =
-      process.env.PUPPETEER_EXECUTABLE_PATH ||
-      process.env.CHROME_PATH ||
-      process.env.CHROME_EXECUTABLE_PATH;
-
-    if (executablePath) {
-      launchOptions.executablePath = executablePath;
-    }
-
-    // Launch browser
-    const browser = await puppeteer.default.launch(launchOptions);
-
-    const page = await browser.newPage();
-
-    // Set content and generate PDF
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfData = await page.pdf({
-      format: 'A4',
-      margin: {
-        top: '10mm',
-        right: '10mm',
-        bottom: '10mm',
-        left: '10mm',
-      },
-      preferCSSPageSize: true,
-    });
-
-    await browser.close();
-
-    return Buffer.from(pdfData);
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    // If puppeteer fails, return HTML as fallback
-    throw new Error(
-      'PDF generation not available. Please check server configuration.'
-    );
-  }
+  throw new Error(
+    'PDF generation is disabled for this deployment. Use generateMonthlyInvoiceHTML to render invoice previews instead.'
+  );
 }
 
 /**
@@ -510,23 +459,8 @@ export async function generateInvoicePDFAndSave(
   filename?: string;
   message: string;
 }> {
-  try {
-    const pdfBuffer = await generateMonthlyInvoicePDF(invoice);
-
-    // Create filename
-    const filename = `Invoice_${invoice.clientName.replace(/\s+/g, '_')}_${invoice.month}_${invoice.year}_${Date.now()}.pdf`;
-
-    return {
-      success: true,
-      url: `/api/invoices/download?filename=${encodeURIComponent(filename)}`,
-      filename,
-      message: 'Invoice PDF generated successfully',
-    };
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to generate invoice PDF';
-    return {
-      success: false,
-      message: errorMessage,
-    };
-  }
+  return {
+    success: false,
+    message: 'PDF generation is disabled for this deployment. Please use the HTML invoice preview route instead.',
+  };
 }

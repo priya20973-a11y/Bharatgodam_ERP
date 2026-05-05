@@ -33,7 +33,6 @@
     "mongoose": "^9.4.1",
     "next": "16.2.1",
     "next-auth": "^4.24.13",
-    "puppeteer": "^24.40.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",

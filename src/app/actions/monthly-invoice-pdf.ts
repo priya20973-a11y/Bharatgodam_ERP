@@ -1,7 +1,5 @@
 'use server';
 
-import puppeteer, { Browser } from 'puppeteer';
-
 interface MonthlyInvoice {
   bookingId: string;
   clientName: string;
@@ -25,62 +23,18 @@ interface MonthlyInvoice {
   previousBalance?: number;
 }
 
-let browserInstance: Browser | null = null;
-
-/**
- * Get or create a singleton browser instance for performance
- */
-async function getBrowser(): Promise<Browser> {
-  if (!browserInstance) {
-    browserInstance = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  }
-  return browserInstance;
-}
-
 /**
  * Closes the browser instance when done
  */
 export async function closeBrowser(): Promise<void> {
-  if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
-  }
+  return;
 }
 
 /**
  * Generate PDF from monthly invoice HTML
  */
 export async function generateMonthlyInvoicePDF(invoice: MonthlyInvoice): Promise<Buffer> {
-  try {
-    const html = await generateMonthlyInvoiceHTML(invoice);
-
-    // Launch browser and generate PDF
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-
-    // Set content and wait for rendering
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    // Generate PDF with precise formatting
-    const rawPdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-      width: '210mm',
-      height: '297mm',
-      preferCSSPageSize: true,
-    });
-
-    await page.close();
-
-    return Buffer.from(rawPdf);
-  } catch (error) {
-    console.error('Failed to generate monthly invoice PDF:', error);
-    throw error;
-  }
+  throw new Error('PDF generation is disabled for this deployment. Use HTML preview instead.');
 }
 
 function formatBillingMonth(month: string | number | undefined): string {
