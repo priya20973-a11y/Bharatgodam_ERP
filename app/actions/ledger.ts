@@ -400,7 +400,8 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
     console.log(`CLIENT ${clientId}: Generating periods for group ${key} with ${group.txns.length} transactions, rate: ${rate}`);
 
-    const periods = generateStoragePeriods(group.txns, month, rate);
+    // Generate full storage history for the client, then filter by month later.
+    const periods = generateStoragePeriods(group.txns, undefined, rate);
 
     console.log(`CLIENT ${clientId}: Generated ${periods.length} periods for group ${key}:`, periods);
 

@@ -12,48 +12,28 @@ interface InvoicePDFExporterProps {
 }
 
 /**
- * React component for generating and downloading invoice PDFs
+ * Invoice Exporter (HTML-based, Vercel-safe)
  */
-export default function InvoicePDFExporter({ invoiceData, fileName }: InvoicePDFExporterProps) {
+export default function InvoicePDFExporter({ invoiceData }: InvoicePDFExporterProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleGenerateAndDownload = async () => {
+  const handleGenerateAndDownload = () => {
     try {
       setIsGenerating(true);
-      toast.loading('Generating PDF...');
 
-      const response = await fetch('/api/invoices/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(invoiceData),
-      });
+      const invoiceId = invoiceData?.metadata?.invoiceNo;
 
-      toast.dismiss();
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate PDF');
+      if (!invoiceId) {
+        throw new Error('Invoice ID not found');
       }
 
-      // Get PDF as blob
-      const blob = await response.blob();
+      // Open HTML invoice in new tab
+      window.open(`/api/invoice/html?id=${invoiceId}`, '_blank');
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = url;
-      downloadLink.download = fileName || `${invoiceData.metadata.invoiceNo.replace(/\//g, '_')}.pdf`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Invoice downloaded successfully!');
+      toast.success('Invoice opened! Press Ctrl+P to download as PDF.');
     } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate PDF');
+      console.error('Invoice error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to open invoice');
     } finally {
       setIsGenerating(false);
     }
@@ -69,12 +49,12 @@ export default function InvoicePDFExporter({ invoiceData, fileName }: InvoicePDF
       {isGenerating ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          Generating...
+          Opening...
         </>
       ) : (
         <>
           <Download className="h-4 w-4" />
-          Download Invoice PDF
+          View / Download Invoice
         </>
       )}
     </Button>
