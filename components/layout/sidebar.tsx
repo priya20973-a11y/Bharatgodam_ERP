@@ -7,8 +7,9 @@ import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine
 import LogoutButton from '@/components/features/auth/logout-button';
 import type { Session } from 'next-auth';
 
-const navItems = [
+const wspNavItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Profile', href: '/dashboard/profile', icon: Settings },
   { name: 'Warehouse Master', href: '/dashboard/warehouses', icon: Box },
   { name: 'Commodity Master', href: '/dashboard/commodities', icon: Package },
   { name: 'Client Master', href: '/dashboard/clients', icon: Users },
@@ -18,7 +19,7 @@ const navItems = [
   { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
   { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
   { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
-  { name: 'Revenue Split', href: '/dashboard/revenue', icon: DollarSign },
+  { name: 'Revenue split for Storage Charges', href: '/dashboard/revenue', icon: DollarSign },
 ];
 
 const adminNavItems = [
@@ -35,7 +36,10 @@ export default function Sidebar({ session }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const isAdmin = session?.user && (session.user as any).role === 'ADMIN';
-  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
+  const wspItemsForAdmin = wspNavItems.filter((item) => item.name !== 'Profile');
+  const allNavItems = isAdmin
+    ? [...wspItemsForAdmin, ...adminNavItems]
+    : wspNavItems;
 
   return (
     <>

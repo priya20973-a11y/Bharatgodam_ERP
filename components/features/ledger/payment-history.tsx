@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Payment } from '@/lib/ledger-engine';
-import { Plus, Calendar, DollarSign, Package } from 'lucide-react';
+import { Plus, Calendar, DollarSign, Package, Trash } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -31,6 +31,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
 }) => {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [selectedLineItem, setSelectedLineItem] = useState<string>('');
   const [formData, setFormData] = useState({
     amount: '',
@@ -83,6 +84,32 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
       toast.error('Failed to record payment');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!window.confirm('Do you want to remove this payment record?')) {
+      return;
+    }
+
+    setDeletingPaymentId(paymentId);
+    try {
+      const response = await fetch(`/api/reports/ledger?paymentId=${encodeURIComponent(paymentId)}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to remove payment');
+      }
+
+      toast.success('Payment record removed successfully');
+      onPaymentAdded?.();
+    } catch (error) {
+      console.error('Error removing payment:', error);
+      toast.error('Failed to remove payment');
+    } finally {
+      setDeletingPaymentId(null);
     }
   };
 
@@ -222,6 +249,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
                 <th className="px-4 py-3 text-right font-semibold text-slate-700">Amount</th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-700">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -243,6 +271,17 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                     <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
                       Recorded
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePayment(payment._id)}
+                      disabled={deletingPaymentId === payment._id}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash className="h-3.5 w-3.5 mr-1" />
+                      {deletingPaymentId === payment._id ? 'Removing' : 'Remove'}
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -6,8 +6,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
 import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
-import { getClientMonthlyLedger } from '@/app/actions/ledger';
+import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 import { toast } from 'react-hot-toast';
+
+interface AdditionalChargeItem {
+  id?: string;
+  name: string;
+  amount: number;
+  note?: string;
+}
+
+interface PaymentAllocationRow {
+  id: string;
+  name: string;
+  charge: number;
+  paid: string;
+  previousPaid: number;
+}
+
+interface PaymentAllocationEntry {
+  id: string;
+  name: string;
+  charge: number;
+  amount: number;
+}
 
 interface MonthlyInvoice {
   bookingId: string;
@@ -28,10 +50,23 @@ interface MonthlyInvoice {
   totalRent: number;
   previousBalance?: number;
   paymentsReceived?: number;
+  additionalCharges?: number;
+  additionalChargeItems?: AdditionalChargeItem[];
   outstandingBalance?: number;
   invoiceDate: string;
   invoiceId?: string;
 }
+
+const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: AdditionalChargeItem, index: number) => {
+  if (item.id) return String(item.id);
+  const cleanName = String(item.name || 'additional')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+  const amountToken = Math.round(Number(item.amount || 0) * 100);
+  return `${invoiceId || 'invoice'}-additional-${cleanName}-${amountToken}-${index}`;
+};
 
 export default function ClientInvoicesPage() {
   const [clients, setClients] = useState<{ label: string; value: string }[]>([]);
@@ -47,9 +82,11 @@ export default function ClientInvoicesPage() {
   const [transactionError, setTransactionError] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [accountBalance, setAccountBalance] = useState<any>(null);
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [paymentAllocations, setPaymentAllocations] = useState<Record<string, PaymentAllocationRow[]>>({});
+  const [summaryPaymentAmounts, setSummaryPaymentAmounts] = useState<Record<string, string>>({});
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [savingChargeFor, setSavingChargeFor] = useState<string | null>(null);
 
   // Load clients and warehouses on mount
   useEffect(() => {
@@ -178,6 +215,13 @@ export default function ClientInvoicesPage() {
         const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
           const invoiceWarehouseId = invoice.warehouseId || warehouseId || undefined;
           const invoiceWarehouseName = invoice.warehouseName || warehouse?.label || '';
+          const invoiceIdValue = invoiceWarehouseId ? `${clientId}-${invoice.month}-${invoiceWarehouseId}` : `${clientId}-${invoice.month}`;
+          const additionalChargeItems = (invoice.additionalChargeItems || []).map((item: any, idx: number) => ({
+            id: item.id ? String(item.id) : getAdditionalChargeItemRowId(invoiceIdValue, item, idx),
+            name: item.name,
+            amount: Number(item.amount || 0),
+            note: item.note || '',
+          }));
           return {
             bookingId: clientId,
             clientName: client?.label || result.data.clientName || '',
@@ -197,13 +241,42 @@ export default function ClientInvoicesPage() {
             totalRent: Number(invoice.summary.totalRent ?? 0),
             previousBalance: Number(invoice.summary.previousBalance ?? 0),
             paymentsReceived: Number(invoice.summary.payments ?? 0),
+            additionalCharges: 0,
+            additionalChargeItems,
             outstandingBalance: Number(invoice.summary.outstanding ?? 0),
             invoiceDate: new Date().toISOString().split('T')[0],
-            invoiceId: invoiceWarehouseId ? `${clientId}-${invoice.month}-${invoiceWarehouseId}` : `${clientId}-${invoice.month}`,
+            invoiceId: invoiceIdValue,
           };
         });
 
         setInvoices(transformedInvoices);
+
+        const invoiceIds = transformedInvoices.map((invoice) => invoice.invoiceId || '').filter(Boolean);
+        if (invoiceIds.length > 0) {
+          try {
+            const query = invoiceIds.map((id) => encodeURIComponent(id)).join(',');
+            const response = await fetch(`/api/invoice/adjustments?invoiceIds=${query}`);
+            const result = await response.json();
+            if (response.ok && result.success && result.data) {
+              const adjustedInvoices = transformedInvoices.map((invoice) => {
+                const adjustments = result.data[invoice.invoiceId || '']?.additionalChargeItems || [];
+                return {
+                  ...invoice,
+                  additionalCharges: Number(result.data[invoice.invoiceId || '']?.additionalCharges || 0),
+                  additionalChargeItems: adjustments.map((item: any, idx: number) => ({
+                    id: item.id || `${invoice.invoiceId}-additional-${idx}`,
+                    name: item.name,
+                    amount: item.amount,
+                    note: item.note || '',
+                  })),
+                };
+              });
+              setInvoices(adjustedInvoices);
+            }
+          } catch (error) {
+            console.error('Failed to load invoice adjustments:', error);
+          }
+        }
       } else {
         toast.error(result.message || 'Failed to load invoices');
         setInvoices([]);
@@ -220,8 +293,363 @@ export default function ClientInvoicesPage() {
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${warehouseQuery}`;
+    const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}`;
     window.open(url, '_blank', 'noopener');
+  };
+
+  const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+  const getInitialPaymentAllocationRows = (invoice: MonthlyInvoice) => {
+    const previousBalanceAmount = roundCurrency(Number(invoice.previousBalance || 0));
+    const previousBalanceRows: PaymentAllocationRow[] = previousBalanceAmount > 0
+      ? [{
+          id: 'previousBalance',
+          name: 'Previous Balance',
+          charge: previousBalanceAmount,
+          paid: '',
+          previousPaid: 0,
+        }]
+      : [];
+
+    const rentRow: PaymentAllocationRow = {
+      id: 'rent',
+      name: 'Total Monthly Charges',
+      charge: getTotalMonthlyCharges(invoice),
+      paid: '',
+      previousPaid: 0,
+    };
+
+    const rows: PaymentAllocationRow[] = [
+      ...previousBalanceRows,
+      rentRow,
+    ];
+
+    return rows.map((row) => ({
+      ...row,
+      previousPaid: 0,
+    }));
+  };
+
+  const buildPaymentAllocationRowsFromSavedPayments = (
+    invoice: MonthlyInvoice,
+    paymentRecords: Array<{ paymentId: string; paymentDate?: string; allocations?: Array<{ id: string; name: string; charge: number; amount: number }> }>
+  ) => {
+    const initialRows = getInitialPaymentAllocationRows(invoice);
+    if (!paymentRecords || !paymentRecords.length) {
+      return initialRows;
+    }
+
+    const allocationTotals = new Map<string, number>();
+    paymentRecords.forEach((payment) => {
+      (payment.allocations || []).forEach((allocation) => {
+        const current = allocationTotals.get(allocation.id) || 0;
+        allocationTotals.set(allocation.id, roundCurrency(current + Number(allocation.amount || 0)));
+      });
+    });
+
+    if (allocationTotals.has('allCharges')) {
+      return [
+        {
+          id: 'allCharges',
+          name: 'All Charges',
+          charge: getTotalChargeAmount(invoice),
+          paid: '',
+          previousPaid: allocationTotals.get('allCharges') || 0,
+        },
+      ];
+    }
+
+    return initialRows.map((row) => ({
+      ...row,
+      previousPaid: allocationTotals.get(row.id) ?? row.previousPaid,
+      paid: '',
+    }));
+  };
+
+  const buildPaymentAllocationRows = (invoice: MonthlyInvoice, existingRows: PaymentAllocationRow[] = []) => {
+    const initialRows = getInitialPaymentAllocationRows(invoice);
+
+    if (!existingRows.length) {
+      return initialRows;
+    }
+
+    const paidMap = new Map(existingRows.map((row) => [row.id, row.paid]));
+    const previousPaidMap = new Map(existingRows.map((row) => [row.id, row.previousPaid]));
+    const initialPreviousPaidMap = new Map(initialRows.map((row) => [row.id, row.previousPaid]));
+
+    return initialRows.map((row) => ({
+      ...row,
+      paid: paidMap.get(row.id) ?? '',
+      previousPaid: previousPaidMap.get(row.id) ?? initialPreviousPaidMap.get(row.id) ?? row.previousPaid,
+    }));
+  };
+
+  useEffect(() => {
+    if (invoices.length === 0) return;
+    setPaymentAllocations((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      invoices.forEach((invoice) => {
+        if (!invoice.invoiceId) return;
+
+        const existingRows = next[invoice.invoiceId] || [];
+        const previousBalanceRowsCount = Number(invoice.previousBalance && Number(invoice.previousBalance) > 0 ? 1 : 0);
+        const expectedRowCount = previousBalanceRowsCount + 1;
+
+        if (!existingRows.length || existingRows.length !== expectedRowCount) {
+          next[invoice.invoiceId] = buildPaymentAllocationRows(invoice, existingRows);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [invoices]);
+
+  const loadSavedPaymentAllocations = async (invoiceIds: string[]) => {
+    if (!invoiceIds.length) return;
+
+    const updatedAllocations: Record<string, PaymentAllocationRow[]> = {};
+    await Promise.all(
+      invoiceIds.filter(Boolean).map(async (invoiceId) => {
+        try {
+          const response = await fetch(`/api/reports/ledger?invoiceId=${encodeURIComponent(invoiceId)}`);
+          if (!response.ok) return;
+          const result = await response.json();
+          if (!result.success || !Array.isArray(result.data)) return;
+
+          const invoice = findInvoiceById(invoiceId);
+          if (!invoice) return;
+
+          updatedAllocations[invoiceId] = buildPaymentAllocationRowsFromSavedPayments(invoice, result.data);
+        } catch (error) {
+          console.error('Failed to load saved payment allocations:', error);
+        }
+      })
+    );
+
+    setPaymentAllocations((prev) => ({ ...prev, ...updatedAllocations }));
+  };
+
+  useEffect(() => {
+    if (!invoices.length) return;
+    const invoiceIds = invoices.map((invoice) => invoice.invoiceId || '').filter(Boolean);
+    loadSavedPaymentAllocations(invoiceIds);
+  }, [invoices]);
+
+  const findInvoiceById = (invoiceId: string) => invoices.find((invoice) => invoice.invoiceId === invoiceId);
+
+  const getPaymentAllocationRows = (invoice: MonthlyInvoice) => {
+    const rows = paymentAllocations[invoice.invoiceId || ''];
+    return rows && rows.length ? rows : buildPaymentAllocationRows(invoice);
+  };
+
+  const getTotalPaidAmount = (invoice: MonthlyInvoice) => {
+    return getPaymentAllocationRows(invoice).reduce((sum, row) => sum + (parseFloat(row.paid) || 0), 0);
+  };
+
+  const getSummaryPaymentAmount = (invoice: MonthlyInvoice) => {
+    const invoiceId = invoice.invoiceId || '';
+    if (summaryPaymentAmounts[invoiceId] !== undefined) {
+      return summaryPaymentAmounts[invoiceId];
+    }
+    const totalPaid = getTotalPaidAmount(invoice);
+    return totalPaid ? totalPaid.toFixed(2) : '';
+  };
+
+  const getTotalMonthlyCharges = (invoice: MonthlyInvoice) => {
+    return Number(invoice.totalRent || 0) + getAdjustmentTotal(invoice);
+  };
+
+  const getTotalChargeAmount = (invoice: MonthlyInvoice) => {
+    return getPaymentAllocationRows(invoice).reduce((sum, row) => sum + Number(row.charge || 0), 0);
+  };
+
+  const getTotalPreviousPaidAmount = (invoice: MonthlyInvoice) => {
+    return getPaymentAllocationRows(invoice).reduce((sum, row) => sum + Number(row.previousPaid || 0), 0);
+  };
+
+  const getInvoicePaymentsReceived = (invoice: MonthlyInvoice) => {
+    const rows = getPaymentAllocationRows(invoice);
+    const totalPayments = rows.reduce((sum, row) => sum + Number(row.previousPaid || 0) + (parseFloat(row.paid) || 0), 0);
+    return totalPayments > 0 ? totalPayments : Number(invoice.paymentsReceived || 0);
+  };
+
+  const getOutstandingAmount = (invoice: MonthlyInvoice) => {
+    const totalOutstanding = getTotalChargeAmount(invoice) - getInvoicePaymentsReceived(invoice);
+    return Math.max(0, roundCurrency(totalOutstanding));
+  };
+
+  const getRentPaidAmount = (invoice: MonthlyInvoice) => {
+    return getTotalPaidAmount(invoice);
+  };
+
+  const handleUpdatePaymentAllocation = (invoiceId: string, rowId: string, value: string) => {
+    if (rowId === 'allCharges') {
+      const invoice = findInvoiceById(invoiceId);
+      const maxPayment = invoice ? roundCurrency(getTotalChargeAmount(invoice) - getTotalPreviousPaidAmount(invoice)) : 0;
+      const decimalPattern = /^\d*(\.\d*)?$/;
+      if (!decimalPattern.test(value) && value !== '.') {
+        return;
+      }
+
+      const normalizedValue =
+        value === '' || value === '.' || value.endsWith('.')
+          ? value
+          : (() => {
+              const numericValue = parseFloat(value);
+              if (Number.isNaN(numericValue)) return '';
+              return String(Math.min(Math.max(numericValue, 0), maxPayment).toFixed(2));
+            })();
+
+      setSummaryPaymentAmounts((prev) => ({
+        ...prev,
+        [invoiceId]: normalizedValue,
+      }));
+      setSelectedInvoiceId(invoiceId);
+      return;
+    }
+
+    setPaymentAllocations((prev) => {
+      const invoice = findInvoiceById(invoiceId);
+      const existingRows = prev[invoiceId] || (invoice ? buildPaymentAllocationRows(invoice) : []);
+      return {
+        ...prev,
+        [invoiceId]: existingRows.map((row) => {
+          if (row.id !== rowId) return row;
+          const numericValue = parseFloat(value);
+          const maxPayment = roundCurrency(row.charge - row.previousPaid);
+          const normalizedValue = Number.isNaN(numericValue)
+            ? ''
+            : String(Math.min(Math.max(numericValue, 0), maxPayment).toFixed(2));
+          return { ...row, paid: normalizedValue };
+        }),
+      };
+    });
+    setSelectedInvoiceId(invoiceId);
+  };
+
+  const getAdjustmentTotal = (invoice: MonthlyInvoice) => {
+    if (invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) {
+      return invoice.additionalChargeItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    }
+    return Number(invoice.additionalCharges || 0);
+  };
+
+  const handleUpdateAdjustmentItem = (invoiceId: string, index: number, field: 'name' | 'amount', value: string) => {
+    setInvoices((prev) =>
+      prev.map((item) => {
+        if (item.invoiceId !== invoiceId) return item;
+        const updatedItems = (item.additionalChargeItems || []).map((chargeItem, idx) =>
+          idx === index
+            ? {
+                ...chargeItem,
+                [field]: field === 'amount' ? value : value,
+                amount: field === 'amount' ? Number(value) || 0 : chargeItem.amount,
+              }
+            : chargeItem
+        );
+        return {
+          ...item,
+          additionalChargeItems: updatedItems,
+          additionalCharges: updatedItems.reduce((sum, chargeItem) => sum + Number(chargeItem.amount || 0), 0),
+        };
+      })
+    );
+  };
+
+  const handleAddAdjustmentRow = (invoice: MonthlyInvoice) => {
+    if (!invoice.invoiceId) {
+      toast.error('Invoice ID missing');
+      return;
+    }
+    setInvoices((prev) =>
+      prev.map((item) =>
+        item.invoiceId === invoice.invoiceId
+          ? {
+              ...item,
+              additionalChargeItems: [
+                ...(item.additionalChargeItems || []),
+                { id: `${invoice.invoiceId}-additional-${Date.now()}`, name: '', amount: 0 },
+              ],
+            }
+          : item
+      )
+    );
+  };
+
+  const handleRemoveAdjustmentRow = (invoice: MonthlyInvoice, index: number) => {
+    if (!invoice.invoiceId) return;
+    setInvoices((prev) =>
+      prev.map((item) =>
+        item.invoiceId === invoice.invoiceId
+          ? {
+              ...item,
+              additionalChargeItems: (item.additionalChargeItems || []).filter((_, idx) => idx !== index),
+              additionalCharges: (item.additionalChargeItems || [])
+                .filter((_, idx) => idx !== index)
+                .reduce((sum, chargeItem) => sum + Number(chargeItem.amount || 0), 0),
+            }
+          : item
+      )
+    );
+  };
+
+  const handleUpdateAdditionalCharges = async (invoice: MonthlyInvoice) => {
+    if (!invoice.invoiceId) {
+      toast.error('Invoice identifier missing for adjustment');
+      return;
+    }
+
+    const items = (invoice.additionalChargeItems || []).map((item) => ({
+      name: String(item.name || '').trim(),
+      amount: Number(item.amount || 0),
+      note: item.note || '',
+    }));
+
+    if (items.some((item) => !item.name)) {
+      toast.error('Please provide a description for all additional charge rows.');
+      return;
+    }
+
+    if (items.some((item) => Number.isNaN(item.amount) || item.amount < 0)) {
+      toast.error('Enter a valid non-negative amount for all additional charge rows.');
+      return;
+    }
+
+    setSavingChargeFor(invoice.invoiceId);
+    try {
+      const response = await fetch(`/api/invoices/${encodeURIComponent(invoice.invoiceId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additionalChargeItems: items }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        const updatedItems = result.data?.additionalChargeItems ?? items;
+        const updatedSum = Number(result.data?.additionalCharges ?? updatedItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+        setInvoices((prev) =>
+          prev.map((item) =>
+            item.invoiceId === invoice.invoiceId
+              ? {
+                  ...item,
+                  additionalChargeItems: updatedItems,
+                  additionalCharges: updatedSum,
+                }
+              : item
+          )
+        );
+        toast.success('Additional charges updated successfully');
+      } else {
+        toast.error(result.message || 'Failed to update additional charges');
+      }
+    } catch (error) {
+      console.error('Failed to save additional charges:', error);
+      toast.error('Failed to update additional charges');
+    } finally {
+      setSavingChargeFor(null);
+    }
   };
 
   // Record payment for invoice
@@ -231,8 +659,31 @@ export default function ClientInvoicesPage() {
       return;
     }
 
-    const amount = parseFloat(paymentAmount);
-    if (Number.isNaN(amount) || amount <= 0) {
+    const rows = getPaymentAllocationRows(invoice);
+    const totalPaidValue = roundCurrency(parseFloat(summaryPaymentAmounts[invoice.invoiceId || ''] ?? String(getTotalPaidAmount(invoice))) || 0);
+    const allocations = [
+      {
+        id: 'allCharges',
+        name: 'All Charges',
+        charge: getTotalChargeAmount(invoice),
+        amount: totalPaidValue,
+      },
+    ].filter((row) => row.amount > 0);
+
+    const totalOutstandingBeforePayment = getOutstandingAmount(invoice);
+    if (totalPaidValue > totalOutstandingBeforePayment) {
+      toast.error(`Paid amount cannot exceed outstanding amount of ₹${totalOutstandingBeforePayment.toFixed(2)}`);
+      return;
+    }
+
+    const amount = allocations.reduce((sum, entry) => sum + entry.amount, 0);
+    if (amount <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    const rawValue = summaryPaymentAmounts[invoice.invoiceId || ''] ?? String(getTotalPaidAmount(invoice));
+    if (rawValue.trim() === '' || rawValue === '.' || Number.isNaN(parseFloat(rawValue))) {
       toast.error('Please enter a valid payment amount');
       return;
     }
@@ -244,14 +695,31 @@ export default function ClientInvoicesPage() {
         amount,
         new Date().toISOString().split('T')[0],
         invoice.invoiceId,
-        `Payment for ${invoice.month} ${invoice.year} invoice`
+        `Payment for ${invoice.month} ${invoice.year} invoice`,
+        allocations
       );
 
       if (result.success) {
         toast.success('Payment recorded successfully');
-        setPaymentAmount('');
         setSelectedInvoiceId(null);
-        // Refresh the invoices to show updated balances
+        setSummaryPaymentAmounts((prev) => {
+          const next = { ...prev };
+          delete next[invoice.invoiceId || ''];
+          return next;
+        });
+        setPaymentAllocations((prev) => ({
+          ...prev,
+          [invoice.invoiceId || '']: [
+            {
+              id: 'allCharges',
+              name: 'All Charges',
+              charge: getTotalChargeAmount(invoice),
+              paid: '',
+              previousPaid: getTotalPreviousPaidAmount(invoice) + totalPaidValue,
+            },
+          ],
+        }));
+
         if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
           await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
         }
@@ -263,6 +731,43 @@ export default function ClientInvoicesPage() {
       toast.error('Failed to record payment');
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const handleResetInvoicePayments = async (invoice: MonthlyInvoice) => {
+    if (!invoice.invoiceId) {
+      toast.error('Invoice ID is missing. Cannot reset payments.');
+      return;
+    }
+
+    if (!window.confirm('Reset recorded payments for this invoice? This will zero out Payments Received and allow a fresh payment entry.')) {
+      return;
+    }
+
+    try {
+      const invoiceIdParam = encodeURIComponent(invoice.invoiceId);
+      const accountIdParam = encodeURIComponent(invoice.bookingId);
+      const monthParam = encodeURIComponent(selectedMonth || '');
+      const response = await fetch(`/api/reports/ledger?invoiceId=${invoiceIdParam}&accountId=${accountIdParam}&month=${monthParam}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        toast.success('Invoice payments reset successfully');
+        setPaymentAllocations((prev) => {
+          const next = { ...prev };
+          delete next[invoice.invoiceId || ''];
+          return next;
+        });
+        if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
+          await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
+        }
+      } else {
+        toast.error(result.message || 'Failed to reset invoice payments');
+      }
+    } catch (error) {
+      console.error('Failed to reset invoice payments:', error);
+      toast.error('Failed to reset invoice payments');
     }
   };
 
@@ -511,9 +1016,9 @@ export default function ClientInvoicesPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-3xl font-bold text-slate-900">
-                        ₹{(invoice.totalRent || 0).toLocaleString('en-IN')}
+                        ₹{(Number(invoice.totalRent || 0) + getAdjustmentTotal(invoice)).toLocaleString('en-IN')}
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">Monthly Rent</p>
+                      <p className="text-xs text-slate-500 mt-1">Total Monthly Charges</p>
                       <div className="flex gap-2 mt-3">
                         <Button
                           size="sm"
@@ -577,10 +1082,18 @@ export default function ClientInvoicesPage() {
                   </div>
 
                   {/* Summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-slate-50 rounded-lg border">
                     <div>
                       <p className="text-xs text-slate-600">Monthly Storage Rent</p>
                       <p className="text-lg font-bold text-slate-900">₹{(invoice.totalRent || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600">Additional Charges</p>
+                      <p className="text-lg font-bold text-slate-900">₹{getAdjustmentTotal(invoice).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600">Total Monthly Charges</p>
+                      <p className="text-lg font-bold text-slate-900">₹{(Number(invoice.totalRent || 0) + getAdjustmentTotal(invoice)).toLocaleString('en-IN')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Previous Balance</p>
@@ -588,43 +1101,181 @@ export default function ClientInvoicesPage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Payments Received</p>
-                      <p className="text-lg font-bold text-green-600">-₹{(invoice.paymentsReceived || 0).toLocaleString('en-IN')}</p>
+                      <p className="text-lg font-bold text-green-600">-₹{getInvoicePaymentsReceived(invoice).toLocaleString('en-IN')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600">Outstanding Balance</p>
-                      <p className={`text-lg font-bold ${(invoice.outstandingBalance || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ₹{(Math.abs(invoice.outstandingBalance || 0)).toLocaleString('en-IN')}
+                      <p className={`text-lg font-bold ${getOutstandingAmount(invoice) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        ₹{getOutstandingAmount(invoice).toLocaleString('en-IN')}
                       </p>
                     </div>
                   </div>
 
-                  {/* Payment Input Section */}
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 mr-4">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Record Payment for this Invoice</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            placeholder="Enter payment amount"
-                            value={selectedInvoiceId === invoice.invoiceId ? paymentAmount : ''}
-                            onChange={(e) => {
-                              setPaymentAmount(e.target.value);
-                              setSelectedInvoiceId(invoice.invoiceId || null);
-                            }}
-                            className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                  {/* Payment and Adjustment Input Section */}
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Additional Charge Entries</p>
+                            <p className="text-xs text-slate-500">Add a description and amount for each additional charge row.</p>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => handleAddAdjustmentRow(invoice)}>
+                            Add Charge Row
+                          </Button>
+                        </div>
+
+                        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                          <table className="w-full text-sm">
+                            <thead className="bg-slate-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-700">Description</th>
+                                <th className="px-3 py-2 text-right font-semibold text-slate-700">Charge (₹)</th>
+                                <th className="px-3 py-2 text-center font-semibold text-slate-700">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {(invoice.additionalChargeItems || []).length === 0 ? (
+                                <tr>
+                                  <td colSpan={3} className="px-3 py-4 text-center text-slate-500">
+                                    No additional charge rows added yet.
+                                  </td>
+                                </tr>
+                              ) : (
+                                (invoice.additionalChargeItems || []).map((item, idx) => (
+                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="text"
+                                        value={item.name}
+                                        onChange={(e) => handleUpdateAdjustmentItem(invoice.invoiceId || '', idx, 'name', e.target.value)}
+                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Description"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={item.amount?.toString() || ''}
+                                        onChange={(e) => handleUpdateAdjustmentItem(invoice.invoiceId || '', idx, 'amount', e.target.value)}
+                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 text-right focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0.00"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                      <Button size="sm" variant="outline" onClick={() => handleRemoveAdjustmentRow(invoice, idx)}>
+                                        Remove
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div className="text-sm text-slate-700">
+                          Total additional charge amount: <span className="font-semibold">₹{getAdjustmentTotal(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdateAdditionalCharges(invoice)}
+                          disabled={!invoice.invoiceId || savingChargeFor === invoice.invoiceId}
+                        >
+                          {savingChargeFor === invoice.invoiceId ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : null}
+                          Save Charges
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Payment Allocation</p>
+                          <p className="text-xs text-slate-500">Enter how much is paid against each charge line item, including total monthly charges and additional charges.</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-600">Total Monthly Charges Paid</p>
+                          <p className="text-lg font-semibold text-slate-900">₹{getRentPaidAmount(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          <p className="text-xs text-slate-500 mt-1">This value includes the total monthly charge payment allocation.</p>
+                        </div>
+                      </div>
+                      {Number(invoice.previousBalance || 0) > 0 ? (
+                        <div className="rounded-lg border border-slate-200 bg-slate-100 p-3">
+                          <p className="text-sm font-semibold text-slate-700">Previous Balance</p>
+                          <p className="text-lg font-bold text-slate-900">₹{Number(invoice.previousBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                      ) : null}
+
+                      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-100">
+                            <tr>
+                              <th className="px-3 py-2 text-right font-semibold text-slate-700">Charge Amount</th>
+                              <th className="px-3 py-2 text-right font-semibold text-slate-700">Previous Payment</th>
+                              <th className="px-3 py-2 text-right font-semibold text-slate-700">Paid Amount</th>
+                              <th className="px-3 py-2 text-right font-semibold text-slate-700">Outstanding Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {(() => {
+                              const totalCharge = getTotalChargeAmount(invoice);
+                              const totalPreviousPaid = getTotalPreviousPaidAmount(invoice);
+                              const totalPaid = parseFloat(getSummaryPaymentAmount(invoice)) || 0;
+                              const totalOutstanding = getOutstandingAmount(invoice);
+
+                              return (
+                                <tr className="bg-white">
+                                  <td className="px-3 py-2 text-right">₹{totalCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">₹{totalPreviousPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      pattern="[0-9]*[.,]?[0-9]*"
+                                      value={getSummaryPaymentAmount(invoice)}
+                                      onChange={(e) => handleUpdatePaymentAllocation(invoice.invoiceId || '', 'allCharges', e.target.value)}
+                                      className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 text-right focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="0.00"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-slate-900">
+                                    ₹{totalOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-center">
+                        {invoice.paymentsReceived && invoice.paymentsReceived > 0 ? (
                           <Button
                             size="sm"
+                            variant="destructive"
+                            onClick={() => handleResetInvoicePayments(invoice)}
+                          >
+                            Reset Payments
+                          </Button>
+                        ) : <div />}
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleRecordPayment(invoice)}
-                            disabled={recordingPayment || !paymentAmount || selectedInvoiceId !== invoice.invoiceId}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={recordingPayment}
                           >
                             {recordingPayment ? (
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : (
-                              <BookOpen className="h-4 w-4 mr-2" />
-                            )}
+                            ) : null}
                             Record Payment
                           </Button>
                         </div>

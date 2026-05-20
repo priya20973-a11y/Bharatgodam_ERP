@@ -30,7 +30,10 @@ export default async function ConsolidatedInvoicePage({ params }: ConsolidatedIn
   const totalBookings = bookings.length;
   const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const totalRent = ledgerSummary.totalRent;
-  const totalBalance = ledgerSummary.balance;
+  const totalPaid = ledgerSummary.rentPaid ?? ledgerSummary.totalPaid;
+  const totalBalance = ledgerSummary.rentPaid !== undefined
+    ? Math.max(ledgerSummary.totalRent - ledgerSummary.rentPaid, 0)
+    : ledgerSummary.balance;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -81,8 +84,8 @@ export default async function ConsolidatedInvoicePage({ params }: ConsolidatedIn
               </div>
               <InvoiceSummary
                 totalRent={ledgerSummary.totalRent}
-                totalPaid={ledgerSummary.totalPaid}
-                totalBalance={ledgerSummary.balance}
+                totalPaid={totalPaid}
+                totalBalance={totalBalance}
               />
             </div>
 

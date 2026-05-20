@@ -15,7 +15,12 @@ export default async function UsersManagementPage() {
     redirect('/dashboard');
   }
 
-  const users = await getAllUsers() as User[];
+  const users = (await getAllUsers() as User[])
+    .sort((a, b) => {
+      if (a.role === 'ADMIN' && b.role !== 'ADMIN') return -1;
+      if (a.role !== 'ADMIN' && b.role === 'ADMIN') return 1;
+      return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+    });
 
   return <UsersManagementClient users={users} />;
 }

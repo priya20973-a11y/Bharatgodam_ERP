@@ -47,6 +47,25 @@ export interface MatchedRecord {
   totalMT?: number;
 }
 
+export interface InvoiceAdjustmentItem {
+  id?: string;
+  name: string;
+  amount: number;
+  note?: string;
+}
+
+export interface InvoiceAdjustmentSummary {
+  invoiceId: string;
+  invoiceMonth?: string;
+  invoiceDate?: string;
+  dueDate?: string;
+  status?: string;
+  totalAmount: number;
+  additionalCharges: number;
+  totalInvoiceAmount: number;
+  additionalChargeItems: InvoiceAdjustmentItem[];
+}
+
 export interface LedgerEntry {
   _id: string;
   clientId: string;
@@ -68,9 +87,12 @@ export interface LedgerSummary {
   ledgerSteps: LedgerStep[];
   totalRent: number;
   totalPaid: number;
+  rentPaid?: number;
   balance: number;
   paymentHistory: Payment[];
   calculationDate: string; // Today's date when calculation was run
+  invoiceSummaries?: InvoiceAdjustmentSummary[];
+  invoiceOutstandingTotal?: number;
 }
 
 export interface AggregatedLedgerSummary extends LedgerSummary {
@@ -272,6 +294,7 @@ export function calculateLedger(
   const totalRent = roundCurrency(ledgerSteps.reduce((sum, step) => sum + step.rentAmount, 0));
   const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const totalPaid = roundCurrency(sortedPayments.reduce((sum, p) => sum + p.amount, 0));
+  const rentPaid = roundCurrency(Math.min(totalPaid, totalRent));
 
   // Balance = Total Rent - Total Paid
   const balance = roundCurrency(totalRent - totalPaid);
@@ -285,6 +308,7 @@ export function calculateLedger(
     ledgerSteps,
     totalRent,
     totalPaid,
+    rentPaid,
     balance,
     paymentHistory: sortedPayments,
     calculationDate: formatDateToString(calculationDate),

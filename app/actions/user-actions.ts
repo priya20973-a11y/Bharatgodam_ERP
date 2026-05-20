@@ -312,6 +312,75 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
   }
 }
 
+export async function updateUserProfile(userId: string, updates: {
+  fullName?: string;
+  companyName?: string;
+  phoneNumber?: string;
+  warehouseLocation?: string;
+  gstNumber?: string;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    const session = await requireSession();
+    if (session.user.role !== 'ADMIN') {
+      return { success: false, message: 'Unauthorized' };
+    }
+
+    let objectId;
+    try {
+      objectId = new ObjectId(userId);
+    } catch (error) {
+      return { success: false, message: 'Invalid userId format' };
+    }
+
+    const db = await getDb();
+    const usersCollection = db.collection('users');
+    const user = await usersCollection.findOne({ _id: objectId });
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+
+    await usersCollection.updateOne(
+      { _id: objectId },
+      {
+        $set: {
+          fullName: updates.fullName?.trim() || '',
+          companyName: updates.companyName?.trim() || '',
+          phoneNumber: updates.phoneNumber?.trim() || '',
+          warehouseLocation: updates.warehouseLocation?.trim() || '',
+          gstNumber: updates.gstNumber?.trim() || '',
+          updatedAt: new Date(),
+        }
+      }
+    );
+
+    revalidatePath('/dashboard/settings/users');
+    return { success: true, message: 'Profile updated successfully' };
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    return { success: false, message: `Database error: ${error instanceof Error ? error.message : 'Unknown error'}` };
+  }
+}
+
+export async function updateUserProfileAction(
+  userId: string,
+  fullName: string,
+  companyName: string,
+  phoneNumber: string,
+  warehouseLocation: string,
+  gstNumber: string
+) {
+  const result = await updateUserProfile(userId, {
+    fullName,
+    companyName,
+    phoneNumber,
+    warehouseLocation,
+    gstNumber,
+  });
+  if (!result.success) {
+    throw new Error(result.message);
+  }
+}
+
 export async function getUserById(userId: string): Promise<User | null> {
   try {
     const db = await getDb();

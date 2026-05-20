@@ -45,6 +45,13 @@ interface IInvoiceLineItem {
   createdAt: Date;
 }
 
+interface PaymentAllocationDetail {
+  id: string;
+  name: string;
+  charge: number;
+  amount: number;
+}
+
 export interface ReportFilter {
   startDate?: string;
   endDate?: string;
@@ -710,10 +717,39 @@ export async function getCommodityOptions() {
   }
 }
 
-export async function recordPayment(clientId: string, amount: number, paymentDate: string, invoiceId?: string, notes?: string) {
+export async function recordPayment(
+  clientId: string,
+  amount: number,
+  paymentDate: string,
+  invoiceId?: string,
+  notes?: string,
+  allocations: PaymentAllocationDetail[] = []
+) {
   try {
     const db = await getDb();
     const clientObjectId = new ObjectId(clientId);
+
+    const paymentAmountPaise = Math.round(amount * 100);
+    const allocationTotalPaise = allocations.reduce((sum, allocation) => {
+      const valuePaise = Math.round((allocation.amount || 0) * 100);
+      return sum + valuePaise;
+    }, 0);
+
+    if (allocations.length > 0 && allocationTotalPaise !== paymentAmountPaise) {
+      return {
+        success: false,
+        message: 'Payment allocations must sum to the total payment amount.',
+      };
+    }
+
+    const cleanedAllocations = allocations
+      .map((allocation) => ({
+        id: String(allocation.id),
+        name: String(allocation.name || ''),
+        charge: Number(allocation.charge || 0),
+        amount: Number((allocation.amount || 0).toFixed(2)),
+      }))
+      .filter((allocation) => allocation.amount > 0);
 
     let invoiceIdValue: string | ObjectId | null = null;
     if (invoiceId) {
@@ -732,8 +768,9 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
       paymentDate: new Date(paymentDate),
       invoiceId: invoiceIdValue,
       notes: notes || '',
+      allocations: cleanedAllocations,
       createdAt: new Date(),
-      status: 'COMPLETED'
+      status: 'COMPLETED',
     };
 
     const result = await db.collection('payments').insertOne(payment);

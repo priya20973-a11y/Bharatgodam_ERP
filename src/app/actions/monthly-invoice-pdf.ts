@@ -21,6 +21,9 @@ interface MonthlyInvoice {
   warehouseName?: string;
   totalRent: number;
   previousBalance?: number;
+  additionalCharges?: number;
+  currentPayments?: number;
+  newBalance?: number;
 }
 
 /**
@@ -54,7 +57,9 @@ function formatBillingMonth(month: string | number | undefined): string {
   };
   return mapping[key] || normalized.replace(/\s+/g, '').toUpperCase();
 }
-
+function roundCurrency(value: number) {
+  return Math.round(value * 100) / 100;
+}
 function getInvoiceNumber(invoice: MonthlyInvoice): string {
   if (invoice.invoiceNumber) {
     return invoice.invoiceNumber;
@@ -74,7 +79,10 @@ function getInvoiceNumber(invoice: MonthlyInvoice): string {
 export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promise<string> {
   const totalAmount = invoice.totalRent || 0;
   const previousBalance = invoice.previousBalance || 0;
-  const grandTotal = totalAmount + previousBalance;
+  const additionalCharges = invoice.additionalCharges || 0;
+  const currentPayments = invoice.currentPayments || 0;
+  const newBalance = invoice.newBalance !== undefined ? invoice.newBalance : roundCurrency(totalAmount + previousBalance + additionalCharges - currentPayments);
+  const grandTotal = roundCurrency(totalAmount + previousBalance + additionalCharges);
 
   const periods = invoice.periods || [];
 
@@ -324,15 +332,27 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promi
                     <span>Total Monthly Rent (All Commodities):</span>
                     <span class="amount">₹${totalAmount.toLocaleString('en-IN')}</span>
                 </div>
+                ${additionalCharges > 0 ? `
+                <div class="total-row">
+                    <span>Additional Charges:</span>
+                    <span class="amount">₹${additionalCharges.toLocaleString('en-IN')}</span>
+                </div>
+                ` : ''}
                 ${previousBalance > 0 ? `
                 <div class="total-row">
                     <span>Previous Balance:</span>
                     <span class="amount">₹${previousBalance.toLocaleString('en-IN')}</span>
                 </div>
                 ` : ''}
+                ${currentPayments > 0 ? `
+                <div class="total-row">
+                    <span>Payments Received:</span>
+                    <span class="amount">-₹${currentPayments.toLocaleString('en-IN')}</span>
+                </div>
+                ` : ''}
                 <div class="total-row grand-total">
                     <span>Total Amount Due:</span>
-                    <span class="amount">₹${grandTotal.toLocaleString('en-IN')}</span>
+                    <span class="amount">₹${newBalance.toLocaleString('en-IN')}</span>
                 </div>
             </div>
         </div>

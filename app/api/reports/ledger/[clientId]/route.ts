@@ -3,9 +3,8 @@ import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo } from '@/lib/ownership';
-import { calculateLedger } from '@/lib/ledger-engine';
+import { getInternalLedgerData } from '@/app/actions/internal-ledger';
 import { ObjectId } from 'mongodb';
-import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
 
 export async function GET(
   req: Request,
@@ -159,25 +158,10 @@ export async function GET(
       totalMT: booking.direction === 'INWARD' ? booking.mt : -booking.mt,
     }));
 
-    const ledgerSummary = calculateLedger(
-      transactionData,
-      paymentData,
-      bookings[0]?.clientName || clientId,
-      outstandingInvoices,
-      commodityRates
-    );
+    const ledgerSummary = await getInternalLedgerData(accountId, tenantFilter);
 
     return NextResponse.json(
-      {
-        success: true,
-        data: {
-          ...ledgerSummary,
-          transactions: transactionData,
-          matchedRecords,
-          recordCount: matchedRecords.length,
-          isAggregated: matchedRecords.length > 1,
-        },
-      },
+      { success: true, data: ledgerSummary },
       { status: 200 }
     );
   } catch (error: any) {

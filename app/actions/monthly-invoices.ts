@@ -27,6 +27,13 @@ export interface MonthlyInvoiceData {
   previousBalance?: number;
   currentPayments?: number;
   newBalance?: number;
+  additionalCharges?: number;
+  additionalChargeItems?: Array<{
+    id?: string;
+    name: string;
+    amount: number;
+    note?: string;
+  }>;
   invoiceDate: string;
   invoiceNumber?: string;
 }

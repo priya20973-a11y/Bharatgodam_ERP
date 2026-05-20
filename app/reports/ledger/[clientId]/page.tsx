@@ -45,6 +45,7 @@ export default async function LedgerPage({ params }: LedgerPageProps) {
         <LedgerCalculator 
           clientId={decodedClientId}
           clientName={decodedClientId}
+          showInvoiceAdjustments={true}
         />
 
         {/* Footer Info */}

@@ -55,6 +55,7 @@ export default function LedgerDashboard() {
           <LedgerCalculator
             clientId={selectedClient._id}
             clientName={selectedClient.name}
+            showInvoiceAdjustments={true}
           />
         </div>
       </div>

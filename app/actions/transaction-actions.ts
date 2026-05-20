@@ -12,7 +12,7 @@ import { revalidatePath } from 'next/cache';
 import { calculateRent } from '@/lib/pricing-engine';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession } from '@/lib/ownership';
+import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
 
 async function createTransactionSession() {
   await connectToDatabase();
@@ -436,25 +436,61 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
     } catch (error) {
       console.log('[getClientRevenueAnalytics] No session found, proceeding without tenant filter');
     }
-    
-    const tenantFilter = session ? getTenantFilterForMongo(session) : {};
-    console.log('[getClientRevenueAnalytics] Tenant filter applied');
-    
+
+    const tenantFilter = session
+      ? getTenantFilterForMongo(session)
+      : {};
+    console.log('[getClientRevenueAnalytics] Tenant filter applied', tenantFilter);
+
     const db = mongoose.connection.db;
     if (!db) throw new Error('Database connection not established');
 
+    const isAdminUser = session ? isAdmin(session) : false;
+    let warehouseOwnerFilter: any = {};
+    let warehouseObjectId: mongoose.Types.ObjectId | null = null;
+
+    if (warehouseId && warehouseId !== 'ALL') {
+      try {
+        warehouseObjectId = new mongoose.Types.ObjectId(warehouseId);
+      } catch (error) {
+        console.warn('[getClientRevenueAnalytics] Invalid warehouseId provided:', warehouseId);
+      }
+    }
+
+    if (isAdminUser && warehouseObjectId) {
+      const selectedWarehouse = await db.collection('warehouses').findOne({ _id: warehouseObjectId });
+      if (selectedWarehouse) {
+        const ownerClauses: any[] = [];
+        if (selectedWarehouse.userId) ownerClauses.push({ userId: selectedWarehouse.userId });
+        if (selectedWarehouse.userEmail) ownerClauses.push({ userEmail: selectedWarehouse.userEmail });
+        if (ownerClauses.length > 0) {
+          warehouseOwnerFilter = { $or: ownerClauses };
+        }
+      }
+    }
+
+    const ownershipFilter = isAdminUser && warehouseObjectId && Object.keys(warehouseOwnerFilter).length > 0
+      ? warehouseOwnerFilter
+      : session
+        ? tenantFilter
+        : {};
+
+    const ledgerQuery: any = {};
+    if (warehouseObjectId) {
+      const filters = [{ warehouseId: warehouseObjectId }];
+      if (Object.keys(ownershipFilter).length > 0) {
+        filters.push(ownershipFilter);
+      }
+      ledgerQuery.$and = filters;
+    } else if (Object.keys(ownershipFilter).length > 0) {
+      Object.assign(ledgerQuery, ownershipFilter);
+    }
+
     // Get all ledger entries
-    const allLedgerEntries = await db.collection('ledger_entries').find(session ? { ...tenantFilter } : {}).toArray();
+    const allLedgerEntries = await db.collection('ledger_entries').find(ledgerQuery).toArray();
     console.log('[getClientRevenueAnalytics] Total ledger entries:', allLedgerEntries.length);
 
-    // Filter by warehouse if provided
-    let filteredEntries = allLedgerEntries;
-    if (warehouseId && warehouseId !== 'ALL') {
-      const warehouseObjectId = new mongoose.Types.ObjectId(warehouseId);
-      filteredEntries = allLedgerEntries.filter(entry =>
-        entry.warehouseId.toString() === warehouseObjectId.toString()
-      );
-    }
+    const filteredEntries = allLedgerEntries;
 
     // Build lookup sets for warehouses, commodities, clients, and inward records
     const warehouseIds = new Set<string>();
@@ -498,7 +534,7 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
     }).toArray();
 
     const outwardFilter: any = {
-      ...(session ? tenantFilter : {}),
+      ...(Object.keys(ownershipFilter).length > 0 ? ownershipFilter : (session ? tenantFilter : {})),
       warehouseId: { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) }
     };
     if (clientIds.size > 0) {

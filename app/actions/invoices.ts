@@ -181,6 +181,19 @@ export async function getUnifiedFinancials(
       ? {}
       : { $or: [tenantFilter, { userEmail: session.user.email }] };
 
+    const clientObjectId = ObjectId.isValid(trimmedId) ? new ObjectId(trimmedId) : null;
+    const paymentQuery: any = { ...sharedFilter };
+    if (clientObjectId) {
+      const clientExists = await db.collection('clients').findOne({ _id: clientObjectId, ...sharedFilter });
+      if (clientExists) {
+        paymentQuery.$or = [{ accountId: trimmedId }, { clientId: clientObjectId }];
+      } else {
+        paymentQuery.accountId = trimmedId;
+      }
+    } else {
+      paymentQuery.accountId = trimmedId;
+    }
+
     const [bookings, transactionDocs, paymentDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
         .find({ accountId: trimmedId, ...sharedFilter })
@@ -191,7 +204,7 @@ export async function getUnifiedFinancials(
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')
-        .find({ accountId: trimmedId, ...sharedFilter })
+        .find(paymentQuery)
         .sort({ date: 1 })
         .toArray(),
       db.collection('invoices')

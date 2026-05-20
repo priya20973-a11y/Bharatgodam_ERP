@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight, UserPlus } from 'lucide-react';
+import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // <-- Native Next.js Router
 import { signIn } from 'next-auth/react'; // <-- Import NextAuth signIn
 
@@ -49,9 +50,14 @@ export default function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       {/* Centered Card */}
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-xl border border-gray-100">
-        
-        {/* Header Section */}
         <div className="text-center">
+          <Image
+            src="/bharatgodam-logo.png"
+            alt="BharatGodam Logo"
+            width={160}
+            height={80}
+            className="mx-auto h-20 w-auto"
+          />
           <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
             Sign in to your account
           </h2>

@@ -1,14 +1,25 @@
 'use client';
 
-import { activateUserAction, deactivateUserAction, deleteUserAction, resetUserPasswordAction, type User } from '@/app/actions/user-actions';
+import { activateUserAction, deactivateUserAction, deleteUserAction, resetUserPasswordAction, updateUserProfileAction, type User } from '@/app/actions/user-actions';
 import { Users, Mail, Shield, UserCheck, UserX, Trash2, AlertTriangle, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
 
 export default function UsersManagementClient({ users }: { users: User[] }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [resetModal, setResetModal] = useState<{ userId: string; tempPassword: string } | null>(null);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editableUser, setEditableUser] = useState({
+    fullName: '',
+    companyName: '',
+    phoneNumber: '',
+    warehouseLocation: '',
+    gstNumber: '',
+  });
 
   const generateTemporaryPassword = () => {
     // Generate a readable password with mix of uppercase, lowercase, numbers
@@ -80,6 +91,53 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
     );
   };
 
+  const startEditingUser = (user: User) => {
+    setEditingUserId(user._id);
+    setEditableUser({
+      fullName: user.fullName ?? '',
+      companyName: user.companyName ?? '',
+      phoneNumber: user.phoneNumber ?? '',
+      warehouseLocation: user.warehouseLocation ?? '',
+      gstNumber: user.gstNumber ?? '',
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingUserId(null);
+    setEditableUser({
+      fullName: '',
+      companyName: '',
+      phoneNumber: '',
+      warehouseLocation: '',
+      gstNumber: '',
+    });
+  };
+
+  const handleFieldChange = (field: keyof typeof editableUser, value: string) => {
+    setEditableUser((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveProfile = async (userId: string) => {
+    try {
+      await updateUserProfileAction(
+        userId,
+        editableUser.fullName,
+        editableUser.companyName,
+        editableUser.phoneNumber,
+        editableUser.warehouseLocation,
+        editableUser.gstNumber
+      );
+      startTransition(() => {
+        router.refresh();
+      });
+      cancelEditing();
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile.');
+    }
+  };
+
   return (
     <div className="w-full">
       <div className="mb-8">
@@ -88,7 +146,7 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
           User Management
         </h1>
         <p className="text-slate-500 mt-1">
-          View and manage all WSP/Picker user accounts, their access levels, and account status.
+          View and manage all WSP user accounts, their access levels, and account status.
         </p>
       </div>
 
@@ -120,17 +178,23 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                             {user.fullName}
                           </div>
                         )}
-                        {(user.companyName || user.warehouseLocation || user.gstNumber) && (
-                          <div className="text-sm text-slate-500 mt-1">
-                            {user.companyName && <span>{user.companyName}</span>}
-                            {user.warehouseLocation && (
-                              <span className="ml-2">Warehouse: {user.warehouseLocation}</span>
-                            )}
-                            {user.gstNumber && (
-                              <span className="ml-2">GST: {user.gstNumber}</span>
-                            )}
+                        <div className="text-sm text-slate-500 mt-1 space-y-1">
+                          <div>
+                            <strong>Full Name:</strong> {user.fullName || 'Not provided'}
                           </div>
-                        )}
+                          <div>
+                            <strong>Phone:</strong> {user.phoneNumber || 'Not provided'}
+                          </div>
+                          <div>
+                            <strong>Company:</strong> {user.companyName || 'Not provided'}
+                          </div>
+                          <div>
+                            <strong>Warehouse:</strong> {user.warehouseLocation || 'Not provided'}
+                          </div>
+                          <div>
+                            <strong>GST:</strong> {user.gstNumber || 'Not provided'}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -171,7 +235,7 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2">
                       {user.createdAt && (
                         <span className="text-sm text-slate-500 hidden md:block">
                           Created: {new Date(user.createdAt).toLocaleDateString('en-GB')}
@@ -179,7 +243,16 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                       )}
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant={editingUserId === user._id ? 'secondary' : 'outline'}
+                          size="sm"
+                          onClick={() => (editingUserId === user._id ? cancelEditing() : startEditingUser(user))}
+                        >
+                          {editingUserId === user._id ? 'Close Editor' : 'Edit Profile'}
+                        </Button>
+
                         {user.role !== 'ADMIN' && (
                           <>
                             {(user.status || 'ACTIVE') === 'ACTIVE' ? (
@@ -240,6 +313,80 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                     </div>
                   </div>
                 </div>
+                {editingUserId === user._id && (
+                  <div className="px-6 pb-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="space-y-1 text-sm text-slate-700">
+                          <span>Full Name</span>
+                          <input
+                            type="text"
+                            value={editableUser.fullName}
+                            onChange={(e) => handleFieldChange('fullName', e.target.value)}
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                          />
+                        </label>
+
+                        <label className="space-y-1 text-sm text-slate-700">
+                          <span>Phone Number</span>
+                          <input
+                            type="text"
+                            value={editableUser.phoneNumber}
+                            onChange={(e) => handleFieldChange('phoneNumber', e.target.value)}
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                          />
+                        </label>
+
+                        <label className="space-y-1 text-sm text-slate-700">
+                          <span>Company</span>
+                          <input
+                            type="text"
+                            value={editableUser.companyName}
+                            onChange={(e) => handleFieldChange('companyName', e.target.value)}
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                          />
+                        </label>
+
+                        <label className="space-y-1 text-sm text-slate-700">
+                          <span>Warehouse Location</span>
+                          <input
+                            type="text"
+                            value={editableUser.warehouseLocation}
+                            onChange={(e) => handleFieldChange('warehouseLocation', e.target.value)}
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                          />
+                        </label>
+
+                        <label className="space-y-1 text-sm text-slate-700 md:col-span-2">
+                          <span>GST Number</span>
+                          <input
+                            type="text"
+                            value={editableUser.gstNumber}
+                            onChange={(e) => handleFieldChange('gstNumber', e.target.value)}
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => handleSaveProfile(user._id.toString())}
+                          disabled={isPending}
+                        >
+                          Save Profile
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={cancelEditing}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}

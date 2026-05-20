@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { Box, Layers, DollarSign, Clock3 } from 'lucide-react';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
+import { getTenantFilterForMongo, isAdmin, isWsp } from '@/lib/ownership';
 import { getClientRevenueAnalytics } from '@/app/actions/transaction-actions';
 import TransactionsReportWrapper from '@/components/features/reports/transactions-report-wrapper';
 import WarehouseInventory from '@/components/features/warehouse/warehouse-inventory';
@@ -446,9 +446,11 @@ export default async function DashboardPage() {
         <p className="text-slate-500">
           Welcome back, {session.user?.email} • Role: {(session.user as any)?.role}
         </p>
-        <p className="text-slate-500 mt-2">
-          Transactions under this account: {formatNumber(totalTransactions)}
-        </p>
+        {!isWsp(session) && (
+          <p className="text-slate-500 mt-2">
+            Transactions under this account: {formatNumber(totalTransactions)}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">

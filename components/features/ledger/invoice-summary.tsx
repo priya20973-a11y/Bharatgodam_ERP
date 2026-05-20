@@ -3,10 +3,14 @@
 import React from 'react';
 import { TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
 interface InvoiceSummaryProps {
   totalRent: number;
   totalPaid: number;
   totalBalance: number;
+  additionalCharges?: number;
+  showInvoiceAdjustments?: boolean;
   isLoading?: boolean;
 }
 
@@ -14,6 +18,8 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
   totalRent,
   totalPaid,
   totalBalance,
+  additionalCharges = 0,
+  showInvoiceAdjustments = false,
   isLoading = false,
 }) => {
   const balanceStatus =
@@ -29,6 +35,9 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
     );
   }
 
+  const displayTotal = showInvoiceAdjustments ? roundCurrency(totalRent + additionalCharges) : totalRent;
+  const totalLabel = showInvoiceAdjustments ? 'Total Monthly Charges' : 'Total Rent';
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Total Rent Card */}
@@ -36,17 +45,19 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-1">
-              Total Rent
+              {totalLabel}
             </p>
             <p className="text-3xl font-black text-indigo-900">
-              ₹{totalRent.toLocaleString('en-IN')}
+              ₹{displayTotal.toLocaleString('en-IN')}
             </p>
           </div>
           <div className="h-10 w-10 rounded-lg bg-indigo-200 flex items-center justify-center">
             <TrendingUp className="h-5 w-5 text-indigo-600" />
           </div>
         </div>
-        <p className="text-xs text-indigo-700">Storage rent for the period</p>
+        <p className="text-xs text-indigo-700">
+          {showInvoiceAdjustments ? 'Rent plus invoice adjustments for the period' : 'Storage rent for the period'}
+        </p>
       </div>
 
       {/* Total Paid Card */}

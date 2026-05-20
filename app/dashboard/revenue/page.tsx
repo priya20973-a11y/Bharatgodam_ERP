@@ -49,7 +49,7 @@ export default function RevenueDashboard() {
       const result = await response.json();
       const options = result.warehouses?.map((warehouse: any) => ({
         label: warehouse.name,
-        value: warehouse._id || warehouse.id,
+        value: String(warehouse.id || warehouse._id),
       })) || [];
       setWarehouseOptions([{ label: 'All Warehouses', value: 'ALL' }, ...options]);
     } catch (error) {
@@ -163,8 +163,8 @@ const rows = warehouseRevenue.flatMap((item: any) => {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Revenue Distribution</h1>
-        <p className="text-slate-500">Monitor the 60/40 profit split between Warehouse Owners and the Platform.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Revenue split for Storage Charges</h1>
+        <p className="text-slate-500">Monitor the 60/40 Revenue split for Storage Charges between Warehouse Owners and the Platform.</p>
       </div>
 
       {/* Summary Cards */}

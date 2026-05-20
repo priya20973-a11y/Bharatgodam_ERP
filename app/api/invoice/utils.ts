@@ -1,8 +1,29 @@
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { getClientMonthlyLedger } from '@/app/actions/ledger';
+import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+async function findInvoiceAdjustments(db: any, invoiceId: string, masterId?: string) {
+  const query: any = { $or: [{ invoiceId }] };
+  if (masterId) {
+    query.$or.push({ masterId });
+  }
+  return db.collection('invoice_adjustments').find(query).toArray();
+}
+
+function normalizeAdjustmentItems(items: any[]) {
+  return (items || []).map((item) => ({
+    id: item._id?.toString(),
+    name: item.name || item.note || 'Additional Charge',
+    amount: Number((item.amount ?? item.additionalCharges) || 0),
+    note: item.note || '',
+  }));
+}
+
+function sumAdjustmentItems(items: any[]) {
+  return (items || []).reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+}
 
 async function findClientDocument(db: any, clientId: string, tenantFilter: any) {
   if (!clientId?.trim()) return null;
@@ -181,6 +202,10 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
     await db.collection('invoice_line_items').insertMany(lineItems as any[]);
   }
 
+  const adjustments = await findInvoiceAdjustments(db, id);
+  const additionalChargeItems = normalizeAdjustmentItems(adjustments);
+  const additionalCharges = sumAdjustmentItems(additionalChargeItems);
+
   return {
     bookingId: clientId,
     invoiceNumber,
@@ -204,6 +229,8 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
     previousBalance: Number(ledgerInvoice.summary.previousBalance ?? 0),
     currentPayments: Number(ledgerInvoice.summary.payments ?? 0),
     newBalance: Number(ledgerInvoice.summary.outstanding ?? 0),
+    additionalCharges,
+    additionalChargeItems,
     invoiceDate: new Date().toISOString().split('T')[0],
   };
 }
@@ -211,6 +238,10 @@ export async function buildMonthlyInvoiceFromLedger(db: any, id: string, warehou
 export async function resolveMonthlyInvoiceFromId(id: string, warehouseId: string | undefined, tenantFilter: any) {
   const db = await getDb();
   const invoiceMaster = await findInvoiceMasterByIdentifier(db, id, tenantFilter);
+
+  const adjustments = await findInvoiceAdjustments(db, id, invoiceMaster?._id?.toString());
+  const additionalChargeItems = normalizeAdjustmentItems(adjustments);
+  const additionalCharges = sumAdjustmentItems(additionalChargeItems);
 
   if (invoiceMaster) {
     const client = await db.collection('clients').findOne({ _id: invoiceMaster.clientId, ...tenantFilter });
@@ -261,7 +292,8 @@ export async function resolveMonthlyInvoiceFromId(id: string, warehouseId: strin
         previousBalance: Number(ledgerInvoice.summary.previousBalance ?? 0),
         currentPayments: Number(ledgerInvoice.summary.payments ?? 0),
         newBalance: Number(ledgerInvoice.summary.outstanding ?? invoiceMaster.totalAmount ?? 0),
-        invoiceDate: invoiceMaster.generatedAt?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        additionalCharges,
+        additionalChargeItems,
       };
     }
 
@@ -320,6 +352,8 @@ export async function resolveMonthlyInvoiceFromId(id: string, warehouseId: strin
       previousBalance: 0,
       currentPayments: 0,
       newBalance: Number(invoiceMaster.totalAmount ?? 0),
+      additionalCharges,
+      additionalChargeItems,
       invoiceDate: invoiceMaster.generatedAt?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
     };
   }

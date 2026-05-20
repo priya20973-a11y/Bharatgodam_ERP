@@ -116,12 +116,17 @@ async function getInvoiceNumber(invoice: MonthlyInvoiceData): Promise<string> {
 }
 
 function getTotalDue(invoice: MonthlyInvoiceData): number {
-  if (invoice.newBalance !== undefined && invoice.newBalance !== null) {
-    return invoice.newBalance;
-  }
   const previous = invoice.previousBalance || 0;
   const payments = invoice.currentPayments || 0;
-  return Math.max(0, invoice.totalRent + previous - payments);
+  const adjustment = invoice.additionalCharges || 0;
+  if (invoice.newBalance !== undefined && invoice.newBalance !== null) {
+    return invoice.newBalance + adjustment;
+  }
+  return Math.max(0, invoice.totalRent + adjustment + previous - payments);
+}
+
+function getTotalMonthlyCharges(invoice: MonthlyInvoiceData): number {
+  return Number(invoice.totalRent || 0) + Number(invoice.additionalCharges || 0);
 }
 
 export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): Promise<string> {
@@ -131,11 +136,61 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const contactPhone = '+91 9913305200';
   const logoSrc = await getLogoDataUri();
   const invoiceDate = formatInvoiceDate(invoice.invoiceDate);
-  const totalDue = getTotalDue(invoice);
-  const totalQty = invoice.periods.reduce((sum, period) => sum + (period.quantityMT || 0), 0);
-  const firstCommodity = invoice.periods[0]?.commodityName || 'General';
+  const adjustmentTotal = invoice.additionalCharges !== undefined
+    ? Number(invoice.additionalCharges)
+    : (invoice.additionalChargeItems || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalMonthlyCharges = Number(invoice.totalRent || 0) + adjustmentTotal;
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
+  const adjustmentRows = (invoice.additionalChargeItems || [])
+    .map(
+      (item) => `
+        <tr>
+          <td>${item.name || 'Additional Charge'}</td>
+          <td class="amount">₹${formatAmount(item.amount || 0)}</td>
+        </tr>
+      `
+    )
+    .join('');
+
+  const showAdjustmentSection = invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0;
+  const additionalChargesTable = showAdjustmentSection ? `
+    <div class="table-wrapper" style="margin-top: 20px;">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="amount">Charge (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${adjustmentRows}
+        </tbody>
+      </table>
+    </div>
+  ` : '';
+
+  const monthlyRentChargesSection = showAdjustmentSection ? `
+    <div class="summary-row" style="margin: 18px 0 8px;">
+      <div class="summary-box">
+        <div class="summary-item">
+          <span>Monthly Rent Charges</span>
+          <span>₹${formatAmount(invoice.totalRent)}</span>
+        </div>
+      </div>
+    </div>
+  ` : '';
+
+  const totalAdditionalChargesSection = showAdjustmentSection ? `
+    <div class="summary-row" style="margin: 8px 0 20px;">
+      <div class="summary-box">
+        <div class="summary-item">
+          <span>Total Additional Charges</span>
+          <span>₹${formatAmount(adjustmentTotal)}</span>
+        </div>
+      </div>
+    </div>
+  ` : '';
 
   const periodsList = invoice.periods
     .map(
@@ -276,6 +331,9 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           color: #111827;
           background: #f8fafc;
         }
+        .items-table th.amount {
+          text-align: right;
+        }
         .items-table td {
           vertical-align: middle;
         }
@@ -328,7 +386,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         .summary-item.total {
           font-weight: 800;
           color: #0f6f2c;
-          font-size: 15px;
+          font-size: 14px;
           margin-top: 8px;
           border-top: 1px solid #e2e8f0;
           padding-top: 10px;
@@ -411,6 +469,10 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
             </table>
           </div>
 
+          ${monthlyRentChargesSection}
+          ${additionalChargesTable}
+          ${totalAdditionalChargesSection}
+
           <div class="summary-row">
             <div class="bank-details">
               <strong>Bank Details</strong>
@@ -424,9 +486,15 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 <span>Monthly Rent</span>
                 <span>₹${formatAmount(invoice.totalRent)}</span>
               </div>
+              ${(invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) ? `
+                <div class="summary-item">
+                  <span>Additional Charges</span>
+                  <span>₹${formatAmount(adjustmentTotal)}</span>
+                </div>
+              ` : ''}
               <div class="summary-item total">
-                <span>Total Due</span>
-                <span>₹${formatAmount(totalDue)}</span>
+                <span>Total Monthly Charges</span>
+                <span>₹${formatAmount(totalMonthlyCharges)}</span>
               </div>
             </div>
           </div>

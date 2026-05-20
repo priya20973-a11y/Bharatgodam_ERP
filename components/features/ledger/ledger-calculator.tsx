@@ -10,6 +10,25 @@ import { MatchedRecordsHeader } from './matched-records-header';
 import { Download, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+interface InvoiceAdjustmentItem {
+  id?: string;
+  name: string;
+  amount: number;
+  note?: string;
+}
+
+interface InvoiceAdjustmentSummary {
+  invoiceId: string;
+  invoiceMonth?: string;
+  invoiceDate?: string;
+  dueDate?: string;
+  status?: string;
+  totalAmount: number;
+  additionalCharges: number;
+  totalInvoiceAmount: number;
+  additionalChargeItems: InvoiceAdjustmentItem[];
+}
+
 interface AggregatedLedgerData extends LedgerSummary {
   matchedRecords?: any[];
   recordCount?: number;
@@ -20,11 +39,13 @@ interface AggregatedLedgerData extends LedgerSummary {
 interface LedgerCalculatorProps {
   clientId: string;
   clientName?: string;
+  showInvoiceAdjustments?: boolean;
 }
 
 export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   clientId,
   clientName = clientId,
+  showInvoiceAdjustments = false,
 }) => {
   // Prevent rendering if clientId is empty
   if (!clientId || !clientId.trim()) {
@@ -184,6 +205,26 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     return lastStep.inventoryBalances || {};
   }, [ledgerData]);
 
+  const totalAdditionalCharges = useMemo(() => {
+    if (!ledgerData?.invoiceSummaries?.length) return 0;
+    return ledgerData.invoiceSummaries.reduce((sum, invoice) => sum + invoice.additionalCharges, 0);
+  }, [ledgerData]);
+
+  const summaryTotalPaid = useMemo(() => {
+    if (!ledgerData) return 0;
+    return showInvoiceAdjustments ? ledgerData.totalPaid : ledgerData.rentPaid ?? ledgerData.totalPaid;
+  }, [ledgerData, showInvoiceAdjustments]);
+
+  const summaryTotalBalance = useMemo(() => {
+    if (!ledgerData) return 0;
+    if (showInvoiceAdjustments) {
+      return roundCurrency(ledgerData.totalRent + totalAdditionalCharges - (ledgerData.totalPaid ?? 0));
+    }
+    return ledgerData.rentPaid !== undefined
+      ? Math.max(ledgerData.totalRent - ledgerData.rentPaid, 0)
+      : ledgerData.balance;
+  }, [ledgerData, showInvoiceAdjustments, totalAdditionalCharges]);
+
   const fetchLedger = async () => {
     const trimmedClientId = clientId.trim();
     if (!trimmedClientId) {
@@ -269,10 +310,35 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     });
 
     lines.push('');
+    const displayTotalPaid = showInvoiceAdjustments ? ledgerData.totalPaid : ledgerData.rentPaid ?? ledgerData.totalPaid;
+    const displayTotalBalance = showInvoiceAdjustments
+      ? roundCurrency(ledgerData.totalRent + (ledgerData.invoiceSummaries?.reduce((sum, invoice) => sum + invoice.additionalCharges, 0) || 0) - (ledgerData.totalPaid ?? 0))
+      : ledgerData.rentPaid !== undefined
+        ? Math.max(ledgerData.totalRent - ledgerData.rentPaid, 0)
+        : ledgerData.balance;
     lines.push('SUMMARY');
     lines.push(`Total Rent,${formatDecimal(ledgerData.totalRent)}`);
-    lines.push(`Total Paid,${formatDecimal(ledgerData.totalPaid)}`);
-    lines.push(`Outstanding Balance,${formatDecimal(ledgerData.balance)}`);
+    lines.push(`Total Paid,${formatDecimal(displayTotalPaid)}`);
+    if (showInvoiceAdjustments && ledgerData.invoiceSummaries?.length) {
+      lines.push(`Total Additional Charges,${formatDecimal(totalAdditionalCharges)}`);
+    }
+    lines.push(`Outstanding Balance,${formatDecimal(displayTotalBalance)}`);
+
+    if (showInvoiceAdjustments && ledgerData.invoiceSummaries?.length) {
+      lines.push('');
+      lines.push('INVOICE ADJUSTMENTS');
+      lines.push('Invoice Id,Invoice Month,Status,Invoice Amount,Additional Charges,Total Invoice Amount');
+      ledgerData.invoiceSummaries.forEach((invoice) => {
+        lines.push(
+          `${invoice.invoiceId},${invoice.invoiceMonth || ''},${invoice.status || ''},${formatDecimal(
+            invoice.totalAmount
+          )},${formatDecimal(invoice.additionalCharges)},${formatDecimal(invoice.totalInvoiceAmount)}`
+        );
+      });
+      if (ledgerData.invoiceOutstandingTotal !== undefined) {
+        lines.push(`Total Invoice Outstanding,${formatDecimal(ledgerData.invoiceOutstandingTotal)}`);
+      }
+    }
 
     const csv = lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -345,11 +411,84 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       {ledgerData && (
         <InvoiceSummary
           totalRent={ledgerData.totalRent}
-          totalPaid={ledgerData.totalPaid}
-          totalBalance={ledgerData.balance}
+          totalPaid={summaryTotalPaid}
+          totalBalance={summaryTotalBalance}
+          additionalCharges={totalAdditionalCharges}
+          showInvoiceAdjustments={showInvoiceAdjustments}
           isLoading={isLoading}
         />
       )}
+
+      {showInvoiceAdjustments && ledgerData?.invoiceSummaries?.length ? (
+        (() => {
+          const adjustmentInvoices = ledgerData.invoiceSummaries.filter((invoice) => invoice.additionalCharges > 0);
+          if (adjustmentInvoices.length === 0) return null;
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold text-slate-700">Internal Invoice Charges</h2>
+                <p className="text-xs text-slate-500 mt-1">Total additional invoice charges reflected only in the internal ledger report.</p>
+                <div className="mt-4 text-3xl font-bold text-emerald-700">₹{formatDecimal(
+                  adjustmentInvoices.reduce((sum, invoice) => sum + invoice.additionalCharges, 0)
+                )}</div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold text-slate-700">Invoices with Additional Charges</h2>
+                <p className="text-xs text-slate-500 mt-1">Each invoice shown here has an actual additional charge entry.</p>
+                <div className="mt-4 text-sm text-slate-700">
+                  {adjustmentInvoices.slice(0, 3).map((invoice) => (
+                    <div key={invoice.invoiceId} className="mb-3 border-b border-slate-100 pb-3 last:border-b-0">
+                      <div className="font-semibold text-slate-900">{invoice.invoiceId}</div>
+                      <div className="text-slate-600">₹{formatDecimal(invoice.additionalCharges)} additional</div>
+                    </div>
+                  ))}
+                  {adjustmentInvoices.length > 3 && (
+                    <div className="text-xs text-slate-500">And {adjustmentInvoices.length - 3} more invoice(s)...</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      ) : null}
+
+      {showInvoiceAdjustments && ledgerData?.invoiceSummaries?.length ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900">Invoice Adjustment Summary</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Invoice-wise additional charge details and outstanding totals for this client's internal ledger.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Invoice</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Month</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-700">Rent Amount</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-700">Additional Charges</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-700">Total Invoice Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledgerData.invoiceSummaries.map((invoice) => (
+                  <tr key={invoice.invoiceId} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-slate-900 font-medium">{invoice.invoiceId}</td>
+                    <td className="px-4 py-3 text-slate-700">{invoice.invoiceMonth || 'N/A'}</td>
+                    <td className="px-4 py-3 text-slate-700">{invoice.status || 'Unknown'}</td>
+                    <td className="px-4 py-3 text-right text-slate-900">₹{formatDecimal(invoice.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right text-amber-700">₹{formatDecimal(invoice.additionalCharges)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700">₹{formatDecimal(invoice.totalInvoiceAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       {/* View Mode Toggle */}
       {ledgerData && (

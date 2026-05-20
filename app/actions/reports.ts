@@ -985,11 +985,47 @@ export async function getCommodityOptions() {
   }
 }
 
-export async function recordPayment(clientId: string, amount: number, paymentDate: string, invoiceId?: string, notes?: string) {
+interface PaymentAllocationDetail {
+  id: string;
+  name: string;
+  charge: number;
+  amount: number;
+}
+
+export async function recordPayment(
+  clientId: string,
+  amount: number,
+  paymentDate: string,
+  invoiceId?: string,
+  notes?: string,
+  allocations: PaymentAllocationDetail[] = []
+) {
   try {
     const session = await requireSession();
     const db = await getDb();
     const clientObjectId = new ObjectId(clientId);
+
+    const paymentAmountPaise = Math.round(amount * 100);
+    const allocationTotalPaise = allocations.reduce((sum, allocation) => {
+      const valuePaise = Math.round((allocation.amount || 0) * 100);
+      return sum + valuePaise;
+    }, 0);
+
+    if (allocations.length > 0 && allocationTotalPaise !== paymentAmountPaise) {
+      return {
+        success: false,
+        message: 'Payment allocations must equal the total payment amount.',
+      };
+    }
+
+    const cleanedAllocations = allocations
+      .map((allocation) => ({
+        id: String(allocation.id),
+        name: String(allocation.name || ''),
+        charge: Number(allocation.charge || 0),
+        amount: Number((allocation.amount || 0).toFixed(2)),
+      }))
+      .filter((allocation) => allocation.amount > 0);
 
     let invoiceIdValue: any = null;
     if (invoiceId) {
@@ -1008,6 +1044,7 @@ export async function recordPayment(clientId: string, amount: number, paymentDat
       paymentDate: new Date(paymentDate),
       invoiceId: invoiceIdValue,
       notes: notes || '',
+      allocations: cleanedAllocations,
       createdAt: new Date(),
       status: 'COMPLETED'
     }, session);
@@ -1025,9 +1062,19 @@ export async function getClientPayments(clientId: string, startDate?: string, en
     const session = await requireSession();
     const db = await getDb();
     const tenantFilter = getTenantFilterForMongo(session);
-    const clientObjectId = new ObjectId(clientId);
+    const clientObjectId = ObjectId.isValid(clientId) ? new ObjectId(clientId) : null;
 
-    const query: any = { clientId: clientObjectId, ...tenantFilter };
+    const query: any = {
+      ...tenantFilter,
+    };
+    if (clientObjectId) {
+      query.$or = [
+        { clientId: clientObjectId },
+        { accountId: clientId },
+      ];
+    } else {
+      query.accountId = clientId;
+    }
     if (startDate) query.paymentDate = { ...query.paymentDate, $gte: new Date(startDate) };
     if (endDate) query.paymentDate = { ...query.paymentDate, $lte: new Date(endDate) };
 

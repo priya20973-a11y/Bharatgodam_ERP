@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import TransactionsReport from './transactions-report';
 import { getDb } from '@/lib/mongodb';
-import { getTenantFilterForMongo } from '@/lib/ownership';
+import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export default async function TransactionsReportWrapper() {
@@ -238,6 +238,15 @@ export default async function TransactionsReportWrapper() {
       return `${direction}|${date}|${clientId}|${commodityId}|${warehouseId}|${quantityMT}|${gatePass}`;
     };
 
+    const isValidTransactionRecord = (record: any) => {
+      const hasWarehouse = !!((record.warehouseId || record.warehouse?._id || record.warehouseName || '').toString().trim());
+      const hasClient = !!((record.clientId || record.client?._id || record.clientName || '').toString().trim());
+      const hasCommodity = !!((record.commodityId || record.commodity?._id || record.commodityName || '').toString().trim());
+      const quantity = Number(record.quantityMT || record.quantity || 0);
+      const hasQuantity = Number.isFinite(quantity) && quantity > 0;
+      return hasWarehouse && hasClient && hasCommodity && hasQuantity;
+    };
+
     const existingSourceKeys = new Set(
       transactions.map((t: any) => {
         const sourceType = t.sourceType || 'transactions';
@@ -272,11 +281,16 @@ export default async function TransactionsReportWrapper() {
       return !existingSourceKeys.has(key) && !existingRecordKeys.has(getRecordKey(t));
     });
 
-    const combinedTransactions = [
+    const baseCombinedRecords = [
       ...transactions,
       ...stockEntryRecords,
       ...legacyRecords,
-    ].map((t: any) => ({
+    ];
+
+    const combinedTransactions = (isAdmin(session)
+      ? baseCombinedRecords.filter(isValidTransactionRecord)
+      : baseCombinedRecords
+    ).map((t: any) => ({
       _id: t._id?.toString(),
       direction: t.direction || t.type || 'INWARD',
       date: t.direction === 'OUTWARD' ? (t.actualOutwardDate || t.inwardDate || t.date || t.createdAt) : (t.inwardDate || t.date || t.createdAt),

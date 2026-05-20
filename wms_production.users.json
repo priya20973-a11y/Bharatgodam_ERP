@@ -3,6 +3,7 @@
     "$oid": "69e2426276c28abbe885745d"
   },
   "email": "TESTIFY@GMAIL.COM",
+  "companyName": "BGTEST",
   "password": "$2b$12$0sMqoCyjNhTCrMgNJGPZKuKEPA8ZAm6JE02SpORVTJL98miW0DhNa",
   "role": "WSP",
   "createdAt": {

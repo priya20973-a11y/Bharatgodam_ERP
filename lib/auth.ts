@@ -38,6 +38,11 @@ export const authOptions: NextAuthOptions = {
           id: user._id.toString(),
           email: user.email,
           role: user.role?.toString().toUpperCase(),
+          fullName: user.fullName || '',
+          companyName: user.companyName || '',
+          phoneNumber: user.phoneNumber || '',
+          warehouseLocation: user.warehouseLocation || '',
+          gstNumber: user.gstNumber || null,
         };
       },
     }),
@@ -52,6 +57,11 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role?.toString().toUpperCase();
+        token.fullName = (user as any).fullName || '';
+        token.companyName = (user as any).companyName || '';
+        token.phoneNumber = (user as any).phoneNumber || '';
+        token.warehouseLocation = (user as any).warehouseLocation || '';
+        token.gstNumber = (user as any).gstNumber || null;
       }
       return token;
     },
@@ -60,6 +70,11 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
+        (session.user as any).fullName = token.fullName;
+        (session.user as any).companyName = token.companyName;
+        (session.user as any).phoneNumber = token.phoneNumber;
+        (session.user as any).warehouseLocation = token.warehouseLocation;
+        (session.user as any).gstNumber = token.gstNumber;
       }
       return session;
     },

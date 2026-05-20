@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState } from 'react';
 import { Mail, Lock, User, Phone, Building, MapPin, FileText, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -29,7 +30,7 @@ export default function SignupPage() {
     if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
     if (!formData.companyName.trim()) newErrors.companyName = 'Company/WSP name is required';
     if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
-    if (!formData.warehouseLocation.trim()) newErrors.warehouseLocation = 'Warehouse location is required';
+    if (!formData.warehouseLocation.trim()) newErrors.warehouseLocation = 'Location is required';
 
     // Email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -97,6 +98,13 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-xl border border-gray-100">
         <div className="text-center">
+          <Image
+            src="/bharatgodam-logo.png"
+            alt="BharatGodam Logo"
+            width={160}
+            height={80}
+            className="mx-auto h-20 w-auto"
+          />
           <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
             Create WSP Account
           </h2>
@@ -234,9 +242,9 @@ export default function SignupPage() {
               {errors.phoneNumber && <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>}
             </div>
 
-            {/* Warehouse Location */}
+            {/* Location */}
             <div>
-              <label htmlFor="warehouseLocation" className="sr-only">Warehouse Location</label>
+              <label htmlFor="warehouseLocation" className="sr-only">Location</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <MapPin className="h-5 w-5 text-gray-400" />
@@ -249,7 +257,7 @@ export default function SignupPage() {
                   value={formData.warehouseLocation}
                   onChange={handleInputChange}
                   className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Warehouse Location"
+                  placeholder="Location"
                 />
               </div>
               {errors.warehouseLocation && <p className="mt-1 text-sm text-red-600">{errors.warehouseLocation}</p>}
