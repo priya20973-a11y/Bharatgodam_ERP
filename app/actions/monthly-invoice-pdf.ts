@@ -168,8 +168,10 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
     )
     .join('');
 
-  const showAdjustmentSection = invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0;
-  const additionalChargesTable = showAdjustmentSection ? `
+  const showAdjustmentSection =
+    (invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) || adjustmentTotal > 0;
+  const additionalChargesTable = showAdjustmentSection
+    ? `
     <div class="table-wrapper" style="margin-top: 20px;">
       <table class="items-table">
         <thead>
@@ -179,11 +181,17 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           </tr>
         </thead>
         <tbody>
-          ${adjustmentRows}
+          ${adjustmentRows || `
+            <tr>
+              <td>Additional Charges</td>
+              <td class="amount">₹${formatAmount(adjustmentTotal)}</td>
+            </tr>
+          `}
         </tbody>
       </table>
     </div>
-  ` : '';
+  `
+    : '';
 
   const monthlyRentChargesSection = showAdjustmentSection ? `
     <div class="summary-row" style="margin: 18px 0 8px;">
@@ -501,7 +509,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 <span>Monthly Rent</span>
                 <span>₹${formatAmount(invoice.totalRent)}</span>
               </div>
-              ${(invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) ? `
+              ${adjustmentTotal > 0 ? `
                 <div class="summary-item">
                   <span>Additional Charges</span>
                   <span>₹${formatAmount(adjustmentTotal)}</span>
