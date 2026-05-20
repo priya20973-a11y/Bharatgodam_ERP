@@ -8,7 +8,7 @@ import { UserPlus2, X } from 'lucide-react';
 import { getClients } from '@/app/actions/client-actions';
 import { Toaster } from 'react-hot-toast';
 
-export default function ClientListWrapper({ initialClients }: { initialClients: any[] }) {
+export default function ClientListWrapper({ initialClients, initialCommodities }: { initialClients: any[]; initialCommodities: any[] }) {
   const [clients, setClients] = useState(initialClients);
   const [isAdding, setIsAdding] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
@@ -40,6 +40,7 @@ export default function ClientListWrapper({ initialClients }: { initialClients: 
         <div className="mb-6">
           <ClientForm 
             client={editingClient} 
+            availableCommodities={initialCommodities}
             onSuccess={refreshData} 
           />
         </div>
@@ -47,6 +48,7 @@ export default function ClientListWrapper({ initialClients }: { initialClients: 
 
       <ClientList 
         clients={clients} 
+        commodities={initialCommodities}
         onEdit={(client) => {
           setIsAdding(false);
           setEditingClient({
@@ -57,7 +59,8 @@ export default function ClientListWrapper({ initialClients }: { initialClients: 
             mobile: client.mobile,
             panNumber: client.panNumber || '',
             aadharNumber: client.aadharNumber || '',
-            gstNumber: client.gstNumber || ''
+            gstNumber: client.gstNumber || '',
+            commodityIds: client.commodityIds || [],
           });
         }} 
       />

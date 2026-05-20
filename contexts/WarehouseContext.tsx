@@ -114,6 +114,7 @@ export const WarehouseProvider: React.FC<WarehouseProviderProps> = ({ children }
   const addClient = (clientData: Omit<Client, 'id'>) => {
     const newClient: Client = {
       ...clientData,
+      commodityIds: clientData.commodityIds || [],
       id: Date.now().toString(),
     };
     setClients(prev => [...prev, newClient]);

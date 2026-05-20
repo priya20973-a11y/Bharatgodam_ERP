@@ -56,6 +56,7 @@ export async function GET() {
         panNumber: client.panNumber || client.panCard || '',
         aadharNumber: client.aadharNumber || client.adhaarNumber || '',
         gstNumber: client.gstNumber || client.gst || client.gstin || '',
+        commodityIds: Array.isArray(client.commodityIds) ? client.commodityIds.map((id: any) => id?.toString?.() || id) : [],
       }));
 
       return NextResponse.json({
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, type, address, mobile, panNumber, aadharNumber, gstNumber, otherDetails } = body;
+    const { name, type, address, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds } = body;
 
     if (!name || !type || !address || !mobile || !panNumber || !aadharNumber || !gstNumber) {
       return NextResponse.json({
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
       aadharNumber,
       gstNumber,
       otherDetails: otherDetails || '',
+      commodityIds: Array.isArray(commodityIds) ? commodityIds : [],
       createdAt: new Date(),
       updatedAt: new Date(),
     }, session);

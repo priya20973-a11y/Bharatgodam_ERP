@@ -8,6 +8,7 @@ export interface IClient extends Document {
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  commodityIds?: mongoose.Types.ObjectId[];
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -27,6 +28,7 @@ const ClientSchema: Schema = new Schema(
     panNumber: { type: String, required: true },
     aadharNumber: { type: String, required: true },
     gstNumber: { type: String, required: true },
+    commodityIds: [{ type: Schema.Types.ObjectId, ref: 'Commodity' }],
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },

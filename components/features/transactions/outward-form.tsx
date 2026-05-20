@@ -60,6 +60,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<OutwardFormValues>({
@@ -68,7 +69,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       clientId: searchParams.get('clientId') || '',
       commodityId: searchParams.get('commodityId') || '',
       warehouseId: searchParams.get('warehouseId') || '',
-      quantityMT: 0,
+      quantityMT: undefined,
       bagsCount: undefined,
       stackNo: '',
       lotNo: '',
@@ -78,6 +79,21 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
   });
 
   const watchedValues = useWatch({ control });
+
+  const selectedClient = clients.find(client => client._id?.toString() === watchedValues.clientId);
+  const allowedCommodities = selectedClient?.commodityIds?.length
+    ? commodities.filter(commodity => selectedClient.commodityIds?.includes(commodity._id?.toString?.() || commodity._id))
+    : commodities;
+
+  useEffect(() => {
+    if (!watchedValues.clientId || !watchedValues.commodityId || !selectedClient?.commodityIds?.length) {
+      return;
+    }
+
+    if (!selectedClient.commodityIds.includes(watchedValues.commodityId)) {
+      setValue('commodityId', '');
+    }
+  }, [watchedValues.clientId, watchedValues.commodityId, selectedClient?.commodityIds, setValue]);
 
   const reportUrl = React.useMemo(() => {
     const clientName = clients.find(c => c._id === watchedValues.clientId)?.name;
@@ -156,7 +172,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
             clientId: '',
             commodityId: '',
             warehouseId: '',
-            quantityMT: 0,
+            quantityMT: undefined,
             bagsCount: undefined,
             stackNo: '',
             lotNo: '',
@@ -225,8 +241,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                   <SelectValue placeholder="Search Commodity..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {commodities && commodities.length > 0 ? (
-                    commodities.filter(c => c && c._id && c.name).map(c => (
+                  {allowedCommodities && allowedCommodities.length > 0 ? (
+                    allowedCommodities.filter(c => c && c._id && c.name).map(c => (
                       <SelectItem key={c._id.toString()} value={c._id.toString()}>
                         {c.name}
                       </SelectItem>
@@ -238,6 +254,9 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
               </Select>
             )}
           />
+          {selectedClient?.commodityIds?.length ? (
+            <p className="text-xs text-slate-500 mt-1">Showing commodities assigned to {selectedClient.name}.</p>
+          ) : null}
           {errors.commodityId && <p className="text-xs text-red-500">{errors.commodityId.message}</p>}
         </div>
       </div>
@@ -293,8 +312,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                 step="0.01"
                 placeholder="0.00"
                 className={errors.quantityMT ? 'border-red-500' : ''}
-                value={isNaN(field.value) ? '' : field.value}
-                onChange={(e) => field.onChange(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
+                value={field.value ?? ''}
+                onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
               />
             )}
           />

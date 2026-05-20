@@ -24,6 +24,11 @@ export default function InwardBookingForm() {
     storageDays: 1,
   });
 
+  const selectedClient = clients.find(client => client.id === formData.clientId);
+  const allowedCommodities = selectedClient?.commodityIds?.length
+    ? commodities.filter(commodity => selectedClient.commodityIds?.includes(commodity.id))
+    : commodities;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -33,7 +38,17 @@ export default function InwardBookingForm() {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'clientId' && prev.commodityId) {
+        const client = clients.find(c => c.id === value);
+        const isValidCommodity = client?.commodityIds?.includes(prev.commodityId);
+        if (!isValidCommodity) {
+          next.commodityId = '';
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,13 +141,16 @@ export default function InwardBookingForm() {
               <SelectValue placeholder="Select commodity" />
             </SelectTrigger>
             <SelectContent>
-              {commodities.map(commodity => (
+              {allowedCommodities.map(commodity => (
                 <SelectItem key={commodity.id} value={commodity.id}>
                   {commodity.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {selectedClient?.commodityIds?.length ? (
+            <p className="text-xs text-slate-500 mt-1">Showing commodities assigned to {selectedClient.name}.</p>
+          ) : null}
         </div>
 
         <div>

@@ -1,4 +1,5 @@
 import { getClients } from '@/app/actions/client-actions';
+import { fetchCommodities } from '@/app/actions/commodities';
 import ClientListWrapper from '@/components/features/clients/client-list-wrapper';
 
 export const metadata = {
@@ -6,7 +7,7 @@ export const metadata = {
 };
 
 export default async function ClientsPage() {
-  const clients = await getClients();
+  const [clients, commodities] = await Promise.all([getClients(), fetchCommodities()]);
 
   return (
     <div className="space-y-6">
@@ -17,7 +18,7 @@ export default async function ClientsPage() {
         </p>
       </div>
 
-      <ClientListWrapper initialClients={clients} />
+      <ClientListWrapper initialClients={clients} initialCommodities={commodities} />
     </div>
   );
 }

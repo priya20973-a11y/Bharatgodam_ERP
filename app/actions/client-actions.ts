@@ -75,6 +75,7 @@ export async function createClient(data: {
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  commodityIds?: string[];
 }) {
   await connectToDatabase();
   try {
@@ -95,6 +96,7 @@ export async function updateClient(id: string, data: Partial<{
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  commodityIds?: string[];
 }>) {
   await connectToDatabase();
   try {

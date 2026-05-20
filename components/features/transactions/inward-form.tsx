@@ -67,6 +67,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<InwardFormValues>({
@@ -77,8 +78,8 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
       warehouseId: searchParams.get('warehouseId') || '',
       inwardDate: searchParams.get('date') || new Date().toISOString().split('T')[0],
       outwardDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      quantityMT: 0,
-      bagsCount: 0,
+      quantityMT: undefined,
+      bagsCount: undefined,
       stackNo: '',
       lotNo: '',
       gatePass: '',
@@ -86,6 +87,21 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
   });
 
   const watchedValues = useWatch({ control });
+
+  const selectedClient = clients.find(client => client._id?.toString() === watchedValues.clientId);
+  const allowedCommodities = selectedClient?.commodityIds?.length
+    ? commodities.filter(commodity => selectedClient.commodityIds?.includes(commodity._id?.toString?.() || commodity._id))
+    : commodities;
+
+  useEffect(() => {
+    if (!watchedValues.clientId || !watchedValues.commodityId || !selectedClient?.commodityIds?.length) {
+      return;
+    }
+
+    if (!selectedClient.commodityIds.includes(watchedValues.commodityId)) {
+      setValue('commodityId', '');
+    }
+  }, [watchedValues.clientId, watchedValues.commodityId, selectedClient?.commodityIds, setValue]);
 
   const reportUrl = React.useMemo(() => {
     const clientName = clients.find(c => c._id === watchedValues.clientId)?.name;
@@ -166,8 +182,8 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
             warehouseId: '',
             inwardDate: new Date().toISOString().split('T')[0],
             outwardDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            quantityMT: 0,
-            bagsCount: 0,
+            quantityMT: undefined,
+            bagsCount: undefined,
             stackNo: '',
             lotNo: '',
             gatePass: '',
@@ -231,8 +247,12 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     <SelectValue placeholder="Search Commodity..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {commodities && commodities.length > 0 ? (
-                      commodities.filter(c => c && c._id && c.name).map(c => <SelectItem key={c._id.toString()} value={c._id.toString()}>{c.name}</SelectItem>)
+                    {allowedCommodities && allowedCommodities.length > 0 ? (
+                      allowedCommodities.filter(c => c && c._id && c.name).map(c => (
+                        <SelectItem key={c._id.toString()} value={c._id.toString()}>
+                          {c.name}
+                        </SelectItem>
+                      ))
                     ) : (
                       <SelectItem value="none" disabled>No commodities available</SelectItem>
                     )}
@@ -240,6 +260,9 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                 </Select>
               )}
             />
+            {selectedClient?.commodityIds?.length ? (
+              <p className="text-xs text-slate-500 mt-1">Showing commodities assigned to {selectedClient.name}.</p>
+            ) : null}
             {errors.commodityId && <p className="text-xs text-red-500">{errors.commodityId.message}</p>}
           </div>
         </div>
@@ -295,8 +318,8 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     step="0.01"
                     placeholder="0.00"
                     className={errors.quantityMT ? 'border-red-500' : ''}
-                    value={isNaN(field.value) ? '' : field.value}
-                    onChange={(e) => field.onChange(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
                   />
                 )}
               />
@@ -312,10 +335,10 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     id={bagsId}
                     name="bagsCount"
                     type="number" 
-                    placeholder="0"
+                    placeholder="Enter number of bags"
                     className={errors.bagsCount ? 'border-red-500' : ''}
-                    value={isNaN(field.value) ? '' : field.value}
-                    onChange={(e) => field.onChange(isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber)}
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
                   />
                 )}
               />

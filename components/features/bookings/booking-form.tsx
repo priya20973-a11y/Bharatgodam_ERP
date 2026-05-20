@@ -79,14 +79,20 @@ export default function BookingForm({ commodities }: BookingFormProps) {
   const [availableStock, setAvailableStock] = useState<number | null>(null);
   const [isCheckingStock, setIsCheckingStock] = useState(false);
 
-  // Watch fields strictly for the Live Invoice Estimator Preview
+  const watchedClient = watch('clientName');
   const watchedMT = watch('mt') || 0;
   const watchedDays = watch('storageDays') || 1;
   const watchedDate = watch('date');
   const watchedCommodity = watch('commodityName');
   const watchedDirection = watch('direction');
   const watchedWarehouse = watch('warehouseName');
-  const selectedRate = mergedCommodities.find(c => c.name === watchedCommodity)?.baseRate ?? 0;
+
+  const selectedClient = clients.find(client => client.name === watchedClient);
+  const allowedCommodities = selectedClient?.commodityIds?.length
+    ? mergedCommodities.filter(c => selectedClient.commodityIds?.includes(c._id))
+    : mergedCommodities;
+
+  const selectedRate = allowedCommodities.find(c => c.name === watchedCommodity)?.baseRate ?? 0;
 
   useEffect(() => {
     if (watchedDirection === 'INWARD') {
@@ -122,6 +128,17 @@ export default function BookingForm({ commodities }: BookingFormProps) {
 
     fetchWarehouses();
   }, []);
+
+  useEffect(() => {
+    if (!watchedCommodity || !selectedClient?.commodityIds?.length) {
+      return;
+    }
+
+    const commodityAllowed = allowedCommodities.some(c => c.name === watchedCommodity);
+    if (!commodityAllowed) {
+      setValue('commodityName', '');
+    }
+  }, [watchedClient, watchedCommodity, selectedClient?.commodityIds, allowedCommodities, setValue]);
 
   useEffect(() => {
     const validateCommodityStock = async () => {
@@ -375,12 +392,15 @@ export default function BookingForm({ commodities }: BookingFormProps) {
                   className="w-full rounded-md border border-blue-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 bg-blue-50 font-semibold uppercase"
                 >
                   <option value="">— Select Commodity —</option>
-                  {mergedCommodities.map(c => (
+                  {allowedCommodities.map(c => (
                     <option key={c._id} value={c.name}>
                       {c.name} — ₹{c.baseRate}/{c.unit}
                     </option>
                   ))}
                 </select>
+                {selectedClient?.commodityIds?.length ? (
+                  <p className="text-xs text-slate-500 mt-1">Showing commodities assigned to {selectedClient.name}.</p>
+                ) : null}
                 {watchedCommodity && selectedRate > 0 && (
                   <p className="text-[10px] text-blue-600 font-bold mt-1">
                     ✓ Active rate: ₹{selectedRate}/MT — will be used for billing

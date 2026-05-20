@@ -20,6 +20,7 @@ export interface Client {
   address: string;
   type: 'Farmer' | 'FPO' | 'Company';
   mobile: string;
+  commodityIds?: string[];
   otherDetails?: string;
 }
 
