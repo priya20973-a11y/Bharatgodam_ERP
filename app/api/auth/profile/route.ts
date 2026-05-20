@@ -27,6 +27,11 @@ export async function GET() {
         phoneNumber: user.phoneNumber || '',
         warehouseLocation: user.warehouseLocation || '',
         gstNumber: user.gstNumber || null,
+        bankName: user.bankName || null,
+        bankAccountNumber: user.bankAccountNumber || null,
+        ifscCode: user.ifscCode || null,
+        bankBranch: user.bankBranch || null,
+        companyLogo: user.companyLogo || null,
       },
     });
   } catch (error: any) {
@@ -46,14 +51,20 @@ export async function PATCH(req: Request) {
     const session = await requireSession();
     const userId = session.user.id;
     const body = await req.json();
-    const { fullName, companyName, phoneNumber, warehouseLocation, gstNumber } = body;
+    const { fullName, companyName, phoneNumber, address, warehouseLocation, gstNumber, bankName, bankAccountNumber, ifscCode, bankBranch, companyLogo } = body;
 
     const updates: Record<string, unknown> = {};
     if (fullName !== undefined) updates.fullName = fullName;
     if (companyName !== undefined) updates.companyName = companyName;
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
+    if (address !== undefined) updates.address = address || null;
     if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
     if (gstNumber !== undefined) updates.gstNumber = gstNumber || null;
+    if (bankName !== undefined) updates.bankName = bankName || null;
+    if (bankAccountNumber !== undefined) updates.bankAccountNumber = bankAccountNumber || null;
+    if (ifscCode !== undefined) updates.ifscCode = ifscCode || null;
+    if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
+    if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -91,6 +102,11 @@ export async function PATCH(req: Request) {
         phoneNumber: user.phoneNumber || '',
         warehouseLocation: user.warehouseLocation || '',
         gstNumber: user.gstNumber || null,
+        bankName: user.bankName || null,
+        bankAccountNumber: user.bankAccountNumber || null,
+        ifscCode: user.ifscCode || null,
+        bankBranch: user.bankBranch || null,
+        companyLogo: user.companyLogo || null,
       },
     });
   } catch (error: any) {

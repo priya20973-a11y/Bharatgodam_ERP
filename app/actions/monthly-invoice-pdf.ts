@@ -6,21 +6,35 @@ import { ObjectId } from 'mongodb';
 
 let cachedLogoDataUri: string | null = null;
 
-async function getLogoDataUri(): Promise<string> {
-  if (cachedLogoDataUri) return cachedLogoDataUri;
+async function getLogoDataUri(logoUrl?: string): Promise<string> {
+  if (logoUrl && logoUrl.startsWith('data:')) {
+    return logoUrl;
+  }
 
-  const logoUrl = 'https://drive.google.com/uc?export=download&id=1wto5h8b-d-Cp6qJVnbaJWcCg_VBtWZrj';
+  if (!logoUrl && cachedLogoDataUri) return cachedLogoDataUri;
+
+  const defaultLogoUrl = 'https://drive.google.com/uc?export=download&id=1wto5h8b-d-Cp6qJVnbaJWcCg_VBtWZrj';
+  const fetchUrl = logoUrl || defaultLogoUrl;
+
   try {
-    const response = await fetch(logoUrl);
+    const response = await fetch(fetchUrl);
     if (!response.ok) {
       throw new Error(`Failed to download logo: ${response.status}`);
     }
     const contentType = response.headers.get('content-type') || 'image/png';
     const buffer = Buffer.from(await response.arrayBuffer());
-    cachedLogoDataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
-    return cachedLogoDataUri;
+    const dataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
+
+    if (!logoUrl) {
+      cachedLogoDataUri = dataUri;
+    }
+
+    return dataUri;
   } catch (error) {
     console.error('Logo fetch failed:', error);
+    if (!logoUrl && cachedLogoDataUri) {
+      return cachedLogoDataUri;
+    }
     return '';
   }
 }
@@ -130,11 +144,12 @@ function getTotalMonthlyCharges(invoice: MonthlyInvoiceData): number {
 }
 
 export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): Promise<string> {
-  const companyName = 'AGRI CROP CARE';
-  const companyAddress = 'Agri crop care Warehouse, Vraj 3, Patidad road, Gundala, Gondal';
-  const contactEmail = 'agricropwl@outlook.com';
-  const contactPhone = '+91 9913305200';
-  const logoSrc = await getLogoDataUri();
+  const companyName = invoice.companyName || 'AGRI CROP CARE';
+  const companyAddress = invoice.companyAddress || 'Agri crop care Warehouse, Vraj 3, Patidad road, Gundala, Gondal';
+  const contactEmail = invoice.companyEmail || 'agricropwl@outlook.com';
+  const contactPhone = invoice.companyPhone || '+91 9913305200';
+  const logoSrc = await getLogoDataUri(invoice.companyLogo || undefined);
+  const logoAlt = `${companyName} Logo`;
   const invoiceDate = formatInvoiceDate(invoice.invoiceDate);
   const adjustmentTotal = invoice.additionalCharges !== undefined
     ? Number(invoice.additionalCharges)
@@ -424,7 +439,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         <div class="invoice-body">
           <div class="header-row">
             <div class="logo-block">
-              ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="Agri Crop Care Logo" />` : `<div class="company-name">${companyName}</div>`}
+              ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : `<div class="company-name">${companyName}</div>`}
               <div>
                 <div class="company-name">${companyName}</div>
                 <div class="company-details">
@@ -476,10 +491,10 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           <div class="summary-row">
             <div class="bank-details">
               <strong>Bank Details</strong>
-              <p>Bank Name : ICICI BANK GONDAL</p>
-              <p>A/c. No. : 048605008597</p>
-              <p>IFSC Code : ICIC0000486</p>
-              <p>PAN No. : BGNPR6060H</p>
+              <p>Bank Name : ${invoice.bankName || 'ICICI BANK GONDAL'}</p>
+              <p>A/c. No. : ${invoice.bankAccountNumber || '048605008597'}</p>
+              <p>IFSC Code : ${invoice.ifscCode || 'ICIC0000486'}</p>
+              ${invoice.bankBranch ? `<p>Branch : ${invoice.bankBranch}</p>` : ''}
             </div>
             <div class="summary-box">
               <div class="summary-item">

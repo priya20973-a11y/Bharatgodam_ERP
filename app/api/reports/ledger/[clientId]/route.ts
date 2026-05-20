@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo } from '@/lib/ownership';
 import { getInternalLedgerData } from '@/app/actions/internal-ledger';
 import { ObjectId } from 'mongodb';
+import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
 
 export async function GET(
   req: Request,

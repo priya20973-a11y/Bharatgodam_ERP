@@ -703,6 +703,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
             <PaymentHistory
               payments={ledgerData.paymentHistory}
               clientName={ledgerData.clientName}
+              accountId={clientId}
               isLoading={isLoading}
               onPaymentAdded={fetchLedger}
               lineItems={lineItems}

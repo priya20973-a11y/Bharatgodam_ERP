@@ -17,14 +17,73 @@ interface LineItem {
 interface PaymentHistoryProps {
   payments: Payment[];
   clientName: string;
+  accountId?: string;
   isLoading?: boolean;
   onPaymentAdded?: () => void;
   lineItems?: LineItem[];
 }
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const IST_DATE_TIME_LOCAL_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+const toISTDateTimeLocalString = (date: Date) => {
+  const utcMillis = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds(),
+    date.getUTCMilliseconds()
+  );
+  const istDate = new Date(utcMillis + IST_OFFSET_MS);
+  const year = istDate.getUTCFullYear();
+  const month = pad(istDate.getUTCMonth() + 1);
+  const day = pad(istDate.getUTCDate());
+  const hour = pad(istDate.getUTCHours());
+  const minute = pad(istDate.getUTCMinutes());
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+};
+
+const parseISTDateTimeLocal = (dateTimeLocal: string) => {
+  const [datePart, timePart = '00:00'] = dateTimeLocal.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  if ([year, month, day, hour, minute].some((value) => Number.isNaN(value))) {
+    return new Date(dateTimeLocal);
+  }
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute) - IST_OFFSET_MS;
+  return new Date(utcMs);
+};
+
+const parsePaymentDateValue = (value: string | Date | undefined) => {
+  if (!value) return undefined;
+  if (typeof value === 'string') {
+    if (IST_DATE_TIME_LOCAL_REGEX.test(value)) {
+      return parseISTDateTimeLocal(value);
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  return value;
+};
+
+const formatPaymentDateInIST = (value: string | Date | undefined) => {
+  const date = parsePaymentDateValue(value);
+  if (!date) return '—';
+  return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
 export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
   payments,
   clientName,
+  accountId,
   isLoading = false,
   onPaymentAdded,
   lineItems = [],
@@ -35,18 +94,26 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
   const [selectedLineItem, setSelectedLineItem] = useState<string>('');
   const [formData, setFormData] = useState({
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    date: toISTDateTimeLocalString(new Date()),
   });
+
+  const getSelectedInvoiceId = () => {
+    if (!selectedLineItem) return undefined;
+    const [type, id] = selectedLineItem.split('-', 2);
+    if (type === 'invoice') return id;
+    return undefined;
+  };
 
   // Auto-fill amount when line item is selected
   const handleLineItemSelect = (itemId: string) => {
     setSelectedLineItem(itemId);
     const item = lineItems.find(li => li.id === itemId);
     if (item) {
+      const itemDate = parsePaymentDateValue(item.date) || new Date();
       setFormData(prev => ({
         ...prev,
         amount: item.amount.toString(),
-        date: item.date || new Date().toISOString().split('T')[0],
+        date: toISTDateTimeLocalString(itemDate),
       }));
     }
   };
@@ -66,6 +133,8 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
         },
         body: JSON.stringify({
           clientName,
+          accountId: accountId || undefined,
+          invoiceId: getSelectedInvoiceId(),
           amount: Number(formData.amount),
           date: formData.date,
         }),
@@ -76,7 +145,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
       }
 
       toast.success('Payment recorded successfully');
-      setFormData({ amount: '', date: new Date().toISOString().split('T')[0] });
+      setFormData({ amount: '', date: toISTDateTimeLocalString(new Date()) });
       setShowAddPayment(false);
       onPaymentAdded?.();
     } catch (error) {
@@ -189,10 +258,10 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
-                Date
+                Date & time (IST)
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
                 className="w-full px-3 py-2 rounded-lg border border-indigo-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -224,7 +293,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                 onClick={() => {
                   setShowAddPayment(false);
                   setSelectedLineItem('');
-                  setFormData({ amount: '', date: new Date().toISOString().split('T')[0] });
+                  setFormData({ amount: '', date: toISTDateTimeLocalString(new Date()) });
                 }}
                 className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:border-slate-400 transition-colors"
               >
@@ -262,7 +331,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                 >
                   <td className="px-4 py-3 text-slate-700 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-slate-400" />
-                    {String(payment.date || '')}
+                    {formatPaymentDateInIST(payment.date || (payment as any).paymentDate)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
                     ₹{payment.amount.toLocaleString('en-IN')}

@@ -23,6 +23,15 @@ export interface MonthlyInvoiceData {
   }>;
   warehouseId?: string;
   warehouseName?: string;
+  companyName?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyLogo?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  bankBranch?: string;
   totalRent: number;
   previousBalance?: number;
   currentPayments?: number;

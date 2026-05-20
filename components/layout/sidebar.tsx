@@ -59,7 +59,15 @@ export default function Sidebar({ session }: SidebarProps) {
         <div className="flex h-full flex-col">
           {/* Logo Setup */}
           <div className="flex h-28 shrink-0 items-center px-6 border-b sidebar-border">
-            <img src="/bharatgodam-logo.png" alt="BharatGodam Logo" className="h-20 w-auto" />
+            {session?.user?.companyLogo ? (
+              <img
+                src={session.user.companyLogo}
+                alt={`${session.user.companyName || 'Company'} Logo`}
+                className="h-20 w-auto rounded-md object-contain"
+              />
+            ) : (
+              <img src="/bharatgodam-logo.png" alt="BharatGodam Logo" className="h-20 w-auto" />
+            )}
           </div>
 
           {/* Navigation Links */}

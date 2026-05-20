@@ -14,9 +14,16 @@ export default function SignupPage() {
     confirmPassword: '',
     companyName: '',
     phoneNumber: '',
+    address: '',
     warehouseLocation: '',
     gstNumber: '',
+    bankName: '',
+    bankAccountNumber: '',
+    ifscCode: '',
+    bankBranch: '',
+    companyLogo: '',
   });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,6 +66,33 @@ export default function SignupPage() {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrors(prev => ({ ...prev, companyLogo: 'Please upload a valid image file.' }));
+      return;
+    }
+
+    const maxSize = 1024 * 1024; // 1MB
+    if (file.size > maxSize) {
+      setErrors(prev => ({ ...prev, companyLogo: 'Logo file must be 1MB or smaller.' }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setFormData(prev => ({ ...prev, companyLogo: result }));
+        setLogoPreview(result);
+        setErrors(prev => ({ ...prev, companyLogo: '' }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,6 +276,25 @@ export default function SignupPage() {
               {errors.phoneNumber && <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>}
             </div>
 
+            {/* Address (Optional) */}
+            <div>
+              <label htmlFor="address" className="sr-only">Address</label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="address"
+                  name="address"
+                  type="text"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                  placeholder="Address (Optional)"
+                />
+              </div>
+            </div>
+
             {/* Location */}
             <div>
               <label htmlFor="warehouseLocation" className="sr-only">Location</label>
@@ -280,6 +333,73 @@ export default function SignupPage() {
                   placeholder="GST Number (Optional)"
                 />
               </div>
+            </div>
+
+            {/* Bank Details (Optional) */}
+            <div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">Bank Details (Optional)</p>
+                <input
+                  id="bankName"
+                  name="bankName"
+                  type="text"
+                  value={formData.bankName}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                  placeholder="Bank Name"
+                />
+                <input
+                  id="bankAccountNumber"
+                  name="bankAccountNumber"
+                  type="text"
+                  value={formData.bankAccountNumber}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                  placeholder="Account Number"
+                />
+                <input
+                  id="ifscCode"
+                  name="ifscCode"
+                  type="text"
+                  value={formData.ifscCode}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                  placeholder="IFSC Code"
+                />
+                <input
+                  id="bankBranch"
+                  name="bankBranch"
+                  type="text"
+                  value={formData.bankBranch}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+                  placeholder="Branch / IFSC Branch"
+                />
+              </div>
+            </div>
+
+            {/* Company Logo Upload */}
+            <div>
+              <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
+                Company/WSP Logo (Optional)
+              </label>
+              <input
+                id="companyLogo"
+                name="companyLogo"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="mt-2 block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <p className="mt-2 text-xs text-gray-500">Optional logo upload for your WSP account. Max 1MB.</p>
+              {errors.companyLogo && <p className="mt-1 text-sm text-red-600">{errors.companyLogo}</p>}
+              {logoPreview && (
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="mt-3 h-24 w-auto rounded-md border border-gray-200 object-contain"
+                />
+              )}
             </div>
           </div>
 

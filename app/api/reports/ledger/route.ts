@@ -3,6 +3,19 @@ import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongodb';
 import { appendOwnership, requireSession } from '@/lib/ownership';
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const parseISTDateTimeLocal = (dateTimeLocal: string) => {
+  const [datePart, timePart = '00:00'] = dateTimeLocal.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  if ([year, month, day, hour, minute].some((value) => Number.isNaN(value))) {
+    return new Date(dateTimeLocal);
+  }
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute) - IST_OFFSET_MS;
+  return new Date(utcMs);
+};
+
 export async function GET(req: Request) {
   try {
     const session = await requireSession();
@@ -18,11 +31,32 @@ export async function GET(req: Request) {
 
     const db = await getDb();
     const filter: any = { status: 'COMPLETED' };
+    const accountId = url.searchParams.get('accountId');
+    const month = url.searchParams.get('month');
 
-    if (ObjectId.isValid(invoiceId)) {
-      filter.invoiceId = { $in: [new ObjectId(invoiceId), invoiceId] };
+    if (invoiceId) {
+      if (ObjectId.isValid(invoiceId)) {
+        filter.invoiceId = { $in: [new ObjectId(invoiceId), invoiceId] };
+      } else {
+        filter.invoiceId = invoiceId;
+      }
+    } else if (accountId) {
+      filter.accountId = accountId;
     } else {
-      filter.invoiceId = invoiceId;
+      return NextResponse.json(
+        { success: false, message: 'invoiceId or accountId is required' },
+        { status: 400 }
+      );
+    }
+
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const [year, monthPart] = month.split('-');
+      const monthStart = new Date(`${year}-${monthPart}-01T00:00:00.000Z`);
+      const monthEnd = new Date(Date.UTC(Number(year), Number(monthPart), 0, 23, 59, 59, 999));
+      filter.$or = [
+        { paymentDate: { $gte: monthStart, $lte: monthEnd } },
+        { date: { $gte: monthStart, $lte: monthEnd } },
+      ];
     }
 
     const payments = await db.collection('payments')
@@ -56,7 +90,7 @@ export async function POST(req: Request) {
     const session = await requireSession();
 
     const body = await req.json();
-    const { accountId, clientName, amount, date } = body;
+    const { accountId, clientName, invoiceId, amount, date, allocations } = body;
 
     if ((!accountId || !String(accountId).trim()) && (!clientName || !String(clientName).trim())) {
       return NextResponse.json(
@@ -72,15 +106,45 @@ export async function POST(req: Request) {
       );
     }
 
+    const parsedPaymentDate = parseISTDateTimeLocal(date);
+    if (Number.isNaN(parsedPaymentDate.getTime())) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid payment date' },
+        { status: 400 }
+      );
+    }
+
     const db = await getDb();
+
+    let invoiceIdValue: string | ObjectId | null = null;
+    if (invoiceId) {
+      try {
+        invoiceIdValue = new ObjectId(invoiceId);
+      } catch {
+        invoiceIdValue = invoiceId;
+      }
+    }
+
+    const allocationEntries = Array.isArray(allocations)
+      ? allocations.map((allocation: any) => ({
+          id: String(allocation.id || ''),
+          name: String(allocation.name || ''),
+          charge: Number(allocation.charge || 0),
+          amount: Number(allocation.amount || 0),
+        }))
+      : [];
 
     const paymentDocument = appendOwnership({
       accountId: accountId?.trim() || null,
       clientName: clientName?.trim() || '',
       amount: Number(amount),
-      date: new Date(date).toISOString().split('T')[0],
+      date: parsedPaymentDate,
+      paymentDate: parsedPaymentDate,
+      invoiceId: invoiceIdValue,
+      allocations: allocationEntries,
       recordedBy: session.user?.email,
       createdAt: new Date(),
+      status: 'COMPLETED',
     }, session);
 
     const result = await db.collection('payments').insertOne(paymentDocument);

@@ -209,7 +209,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
                         paymentErrors[inv.id] ? 'border-red-300 focus:ring-red-500' : 'border-slate-300'
                       }`}
                       min="0"
-                      step="0.01"
+                      step="1"
                     />
                     {(updatingPaymentId === inv.id || isPending) && (
                       <Loader2 className="w-4 h-4 text-slate-400 animate-spin absolute right-2 top-2.5" />

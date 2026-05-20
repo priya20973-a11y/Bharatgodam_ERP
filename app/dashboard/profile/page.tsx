@@ -11,8 +11,14 @@ interface ProfileData {
   role: string;
   companyName?: string;
   phoneNumber?: string;
+  address?: string | null;
   warehouseLocation?: string;
   gstNumber?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  ifscCode?: string | null;
+  bankBranch?: string | null;
+  companyLogo?: string | null;
 }
 
 const initialProfileForm = {
@@ -20,8 +26,14 @@ const initialProfileForm = {
   email: '',
   companyName: '',
   phoneNumber: '',
+  address: '',
   warehouseLocation: '',
   gstNumber: '',
+  bankName: '',
+  bankAccountNumber: '',
+  ifscCode: '',
+  bankBranch: '',
+  companyLogo: '',
 };
 
 const initialPasswordForm = {
@@ -35,6 +47,7 @@ export default function ProfilePage() {
   const { data: session, status } = useSession();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState(initialPasswordForm);
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -70,9 +83,16 @@ export default function ProfilePage() {
         email: data.user.email || '',
         companyName: data.user.companyName || '',
         phoneNumber: data.user.phoneNumber || '',
+        address: data.user.address || '',
         warehouseLocation: data.user.warehouseLocation || '',
         gstNumber: data.user.gstNumber || '',
+        bankName: data.user.bankName || '',
+        bankAccountNumber: data.user.bankAccountNumber || '',
+        ifscCode: data.user.ifscCode || '',
+        bankBranch: data.user.bankBranch || '',
+        companyLogo: data.user.companyLogo || '',
       });
+      setLogoPreview(data.user.companyLogo || null);
     } catch (err) {
       setError('Unable to load profile data.');
       console.error(err);
@@ -227,12 +247,68 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Company Logo</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  if (!file.type.startsWith('image/')) {
+                    setError('Please upload a valid image file.');
+                    return;
+                  }
+                  if (file.size > 1024 * 1024) {
+                    setError('Logo file size must be 1MB or smaller.');
+                    return;
+                  }
+
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = reader.result;
+                    if (typeof result === 'string') {
+                      setProfileForm({ ...profileForm, companyLogo: result });
+                      setLogoPreview(result);
+                      setError(null);
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }}
+                className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <p className="text-xs text-slate-500">Optional company logo for your account. Max 1MB.</p>
+            </label>
+
+            <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Phone Number</span>
               <input
                 type="text"
                 value={profileForm.phoneNumber}
                 onChange={(event) => setProfileForm({ ...profileForm, phoneNumber: event.target.value })}
                 className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Logo Preview</span>
+              <div className="h-32 w-full overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                {logoPreview ? (
+                  <img
+                    src={logoPreview}
+                    alt="Company logo preview"
+                    className="h-full w-full object-contain"
+                  />
+                ) : null}
+              </div>
+            </div>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Address</span>
+              <textarea
+                rows={3}
+                value={profileForm.address}
+                onChange={(event) => setProfileForm({ ...profileForm, address: event.target.value })}
+                className="w-full min-h-[5rem] max-h-36 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
             </label>
 
@@ -255,6 +331,46 @@ export default function ProfilePage() {
                 className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
             </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Bank Name</span>
+              <input
+                type="text"
+                value={profileForm.bankName}
+                onChange={(event) => setProfileForm({ ...profileForm, bankName: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Account Number</span>
+              <input
+                type="text"
+                value={profileForm.bankAccountNumber}
+                onChange={(event) => setProfileForm({ ...profileForm, bankAccountNumber: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">IFSC Code</span>
+              <input
+                type="text"
+                value={profileForm.ifscCode}
+                onChange={(event) => setProfileForm({ ...profileForm, ifscCode: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Branch</span>
+              <input
+                type="text"
+                value={profileForm.bankBranch}
+                onChange={(event) => setProfileForm({ ...profileForm, bankBranch: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
           </div>
 
           <div className="mt-6 flex items-center gap-3">
@@ -273,8 +389,14 @@ export default function ProfilePage() {
                 email: profile?.email || '',
                 companyName: profile?.companyName || '',
                 phoneNumber: profile?.phoneNumber || '',
+                address: profile?.address || '',
                 warehouseLocation: profile?.warehouseLocation || '',
                 gstNumber: profile?.gstNumber || '',
+                bankName: profile?.bankName || '',
+                bankAccountNumber: profile?.bankAccountNumber || '',
+                ifscCode: profile?.ifscCode || '',
+                bankBranch: profile?.bankBranch || '',
+                companyLogo: profile?.companyLogo || '',
               });
               setMessage(null);
               setError(null);

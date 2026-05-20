@@ -87,6 +87,11 @@ export default function ClientInvoicesPage() {
   const [summaryPaymentAmounts, setSummaryPaymentAmounts] = useState<Record<string, string>>({});
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [savingChargeFor, setSavingChargeFor] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   // Load clients and warehouses on mount
   useEffect(() => {
@@ -179,8 +184,8 @@ export default function ClientInvoicesPage() {
       return;
     }
 
-    // If month is also selected, load filtered invoices (warehouse is optional)
-    if (selectedMonth) {
+    // Load invoices only when client, warehouse and month are selected
+    if (selectedMonth && selectedWarehouse && selectedWarehouse !== 'ALL') {
       await loadInvoices(clientId, selectedWarehouse, selectedMonth);
     }
   };
@@ -196,7 +201,12 @@ export default function ClientInvoicesPage() {
   // Handle month selection
   const handleMonthChange = async (month: string) => {
     setSelectedMonth(month);
-    if (selectedClient && selectedClient !== 'ALL') {
+    if (
+      selectedClient &&
+      selectedClient !== 'ALL' &&
+      selectedWarehouse &&
+      selectedWarehouse !== 'ALL'
+    ) {
       await loadInvoices(selectedClient, selectedWarehouse, month);
     }
   };
@@ -332,7 +342,7 @@ export default function ClientInvoicesPage() {
 
   const buildPaymentAllocationRowsFromSavedPayments = (
     invoice: MonthlyInvoice,
-    paymentRecords: Array<{ paymentId: string; paymentDate?: string; allocations?: Array<{ id: string; name: string; charge: number; amount: number }> }>
+    paymentRecords: Array<{ paymentId: string; paymentDate?: string; amount?: number; allocations?: Array<{ id: string; name: string; charge: number; amount: number }> }>
   ) => {
     const initialRows = getInitialPaymentAllocationRows(invoice);
     if (!paymentRecords || !paymentRecords.length) {
@@ -341,10 +351,22 @@ export default function ClientInvoicesPage() {
 
     const allocationTotals = new Map<string, number>();
     paymentRecords.forEach((payment) => {
-      (payment.allocations || []).forEach((allocation) => {
-        const current = allocationTotals.get(allocation.id) || 0;
-        allocationTotals.set(allocation.id, roundCurrency(current + Number(allocation.amount || 0)));
-      });
+      const allocations = payment.allocations || [];
+      if (allocations.length > 0) {
+        allocations.forEach((allocation) => {
+          const current = allocationTotals.get(allocation.id) || 0;
+          allocationTotals.set(
+            allocation.id,
+            roundCurrency(current + Number(allocation.amount || 0))
+          );
+        });
+      } else {
+        const current = allocationTotals.get('allCharges') || 0;
+        allocationTotals.set(
+          'allCharges',
+          roundCurrency(current + Number(payment.amount || 0))
+        );
+      }
     });
 
     if (allocationTotals.has('allCharges')) {
@@ -411,23 +433,49 @@ export default function ClientInvoicesPage() {
     if (!invoiceIds.length) return;
 
     const updatedAllocations: Record<string, PaymentAllocationRow[]> = {};
-    await Promise.all(
+    const invoiceResults = await Promise.all(
       invoiceIds.filter(Boolean).map(async (invoiceId) => {
         try {
           const response = await fetch(`/api/reports/ledger?invoiceId=${encodeURIComponent(invoiceId)}`);
-          if (!response.ok) return;
+          if (!response.ok) return null;
           const result = await response.json();
-          if (!result.success || !Array.isArray(result.data)) return;
+          if (!result.success || !Array.isArray(result.data)) return null;
 
           const invoice = findInvoiceById(invoiceId);
-          if (!invoice) return;
+          if (!invoice) return null;
 
-          updatedAllocations[invoiceId] = buildPaymentAllocationRowsFromSavedPayments(invoice, result.data);
+          return { invoiceId, rows: buildPaymentAllocationRowsFromSavedPayments(invoice, result.data) };
         } catch (error) {
           console.error('Failed to load saved payment allocations:', error);
+          return null;
         }
       })
     );
+
+    invoiceResults.forEach((item) => {
+      if (item?.invoiceId && item.rows) {
+        updatedAllocations[item.invoiceId] = item.rows;
+      }
+    });
+
+    if (Object.keys(updatedAllocations).length === 0 && selectedClient && selectedMonth && invoiceIds.length === 1) {
+      try {
+        const response = await fetch(
+          `/api/reports/ledger?accountId=${encodeURIComponent(selectedClient)}&month=${encodeURIComponent(selectedMonth)}`
+        );
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            const invoice = findInvoiceById(invoiceIds[0]);
+            if (invoice) {
+              updatedAllocations[invoiceIds[0]] = buildPaymentAllocationRowsFromSavedPayments(invoice, result.data);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load account payments for invoice allocations:', error);
+      }
+    }
 
     setPaymentAllocations((prev) => ({ ...prev, ...updatedAllocations }));
   };
@@ -463,7 +511,7 @@ export default function ClientInvoicesPage() {
   };
 
   const getTotalChargeAmount = (invoice: MonthlyInvoice) => {
-    return getPaymentAllocationRows(invoice).reduce((sum, row) => sum + Number(row.charge || 0), 0);
+    return roundCurrency(getTotalMonthlyCharges(invoice) + Number(invoice.previousBalance || 0));
   };
 
   const getTotalPreviousPaidAmount = (invoice: MonthlyInvoice) => {
@@ -481,8 +529,10 @@ export default function ClientInvoicesPage() {
     return Math.max(0, roundCurrency(totalOutstanding));
   };
 
-  const getRentPaidAmount = (invoice: MonthlyInvoice) => {
-    return getTotalPaidAmount(invoice);
+  const getTotalChargesPaidThisMonth = (invoice: MonthlyInvoice) => {
+    return getPaymentAllocationRows(invoice)
+      .filter((row) => row.id !== 'previousBalance')
+      .reduce((sum, row) => sum + Number(row.previousPaid || 0) + (parseFloat(row.paid) || 0), 0);
   };
 
   const handleUpdatePaymentAllocation = (invoiceId: string, rowId: string, value: string) => {
@@ -494,14 +544,19 @@ export default function ClientInvoicesPage() {
         return;
       }
 
-      const normalizedValue =
-        value === '' || value === '.' || value.endsWith('.')
-          ? value
-          : (() => {
-              const numericValue = parseFloat(value);
-              if (Number.isNaN(numericValue)) return '';
-              return String(Math.min(Math.max(numericValue, 0), maxPayment).toFixed(2));
-            })();
+      const normalizedValue = (() => {
+        if (value === '' || value === '.' || value.endsWith('.')) {
+          return value;
+        }
+
+        const numericValue = parseFloat(value);
+        if (Number.isNaN(numericValue)) {
+          return '';
+        }
+
+        const clampedValue = Math.min(Math.max(numericValue, 0), maxPayment);
+        return value.includes('.') ? value : String(Math.trunc(clampedValue));
+      })();
 
       setSummaryPaymentAmounts((prev) => ({
         ...prev,
@@ -693,7 +748,7 @@ export default function ClientInvoicesPage() {
       const result = await recordPayment(
         invoice.bookingId,
         amount,
-        new Date().toISOString().split('T')[0],
+        new Date().toISOString(),
         invoice.invoiceId,
         `Payment for ${invoice.month} ${invoice.year} invoice`,
         allocations
@@ -793,47 +848,66 @@ export default function ClientInvoicesPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
-              <Select value={selectedClient} onValueChange={handleClientChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a client..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.value} value={client.value}>
-                      {client.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {hasMounted ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
+                  <Select value={selectedClient} onValueChange={handleClientChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.value} value={client.value}>
+                          {client.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse (Optional)</label>
-              <Select value={selectedWarehouse} onValueChange={handleWarehouseChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a warehouse..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((warehouse) => (
-                    <SelectItem key={warehouse.value} value={warehouse.value}>
-                      {warehouse.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse *</label>
+                  <Select value={selectedWarehouse} onValueChange={handleWarehouseChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((warehouse) => (
+                        <SelectItem key={warehouse.value} value={warehouse.value}>
+                          {warehouse.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month *</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => handleMonthChange(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month *</label>
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
+                  <div className="h-11 rounded-md border border-slate-200 bg-slate-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse *</label>
+                  <div className="h-11 rounded-md border border-slate-200 bg-slate-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month *</label>
+                  <div className="h-11 rounded-md border border-slate-200 bg-slate-100" />
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -924,7 +998,7 @@ export default function ClientInvoicesPage() {
             <div className="py-8 text-center text-red-600">{transactionError}</div>
           ) : transactions.length === 0 ? (
             <div className="py-8 text-center text-slate-500">
-              Select a client and optionally a warehouse/month to view inward/outward transactions.
+              Select a client, warehouse and month to view inward/outward transactions.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -983,7 +1057,7 @@ export default function ClientInvoicesPage() {
               <CardContent className="flex items-center justify-center py-12">
                 <p className="text-slate-600 text-center">
                   <span className="block mb-2">📅 Please select an invoice month to view invoices</span>
-                  <span className="text-sm text-slate-500">Warehouse selection is optional</span>
+                  <span className="text-sm text-slate-500">Warehouse selection is required</span>
                 </p>
               </CardContent>
             </Card>
@@ -1202,9 +1276,9 @@ export default function ClientInvoicesPage() {
                           <p className="text-xs text-slate-500">Enter how much is paid against each charge line item, including total monthly charges and additional charges.</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-slate-600">Total Monthly Charges Paid</p>
-                          <p className="text-lg font-semibold text-slate-900">₹{getRentPaidAmount(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                          <p className="text-xs text-slate-500 mt-1">This value includes the total monthly charge payment allocation.</p>
+                          <p className="text-xs text-slate-600">Total Charges Paid this month</p>
+                          <p className="text-lg font-semibold text-slate-900">₹{getTotalChargesPaidThisMonth(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          <p className="text-xs text-slate-500 mt-1">This value is the sum of all paid charge amounts recorded for this invoice month.</p>
                         </div>
                       </div>
                       {Number(invoice.previousBalance || 0) > 0 ? (
@@ -1237,13 +1311,13 @@ export default function ClientInvoicesPage() {
                                   <td className="px-3 py-2 text-right text-slate-600">₹{totalPreviousPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                   <td className="px-3 py-2 text-right">
                                     <input
-                                      type="text"
-                                      inputMode="decimal"
-                                      pattern="[0-9]*[.,]?[0-9]*"
+                                      type="number"
+                                      min="0"
+                                      step="1"
                                       value={getSummaryPaymentAmount(invoice)}
                                       onChange={(e) => handleUpdatePaymentAllocation(invoice.invoiceId || '', 'allCharges', e.target.value)}
                                       className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 text-right focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                      placeholder="0.00"
+                                      placeholder="0"
                                     />
                                   </td>
                                   <td className="px-3 py-2 text-right font-medium text-slate-900">

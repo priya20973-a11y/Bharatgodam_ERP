@@ -9,8 +9,14 @@ interface SignupRequest {
   email: string;
   companyName: string;
   phoneNumber: string;
+  address?: string;
   warehouseLocation: string;
   gstNumber?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  bankBranch?: string;
+  companyLogo?: string | null;
   role: string;
   status: string;
   createdAt: string;
@@ -106,14 +112,21 @@ export default function SignupRequestsPage() {
       <div className="grid gap-6">
         {requests.map((request) => (
           <div key={request._id} className="bg-white rounded-lg shadow-md p-6 border">
-            <div className="flex justify-between items-start mb-4">
-              <div>
+            <div className="flex justify-between items-start mb-4 gap-4">
+              <div className="flex-1">
                 <h3 className="text-xl font-semibold">{request.fullName}</h3>
                 <p className="text-gray-600">{request.email}</p>
                 <p className="text-sm text-gray-500">
                   Requested on {new Date(request.createdAt).toLocaleDateString()}
                 </p>
               </div>
+              {request.companyLogo && (
+                <img
+                  src={request.companyLogo}
+                  alt={`${request.companyName} logo`}
+                  className="h-16 w-auto rounded-md border border-slate-200 object-contain"
+                />
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setSelectedRequest(request)}
@@ -148,10 +161,40 @@ export default function SignupRequestsPage() {
                 <Phone size={16} className="text-gray-500" />
                 <span>{request.phoneNumber}</span>
               </div>
+              {request.address && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Address:</span>
+                  <span>{request.address}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <MapPin size={16} className="text-gray-500" />
                 <span>{request.warehouseLocation}</span>
               </div>
+              {request.bankName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Bank:</span>
+                  <span>{request.bankName}</span>
+                </div>
+              )}
+              {request.bankAccountNumber && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">A/C:</span>
+                  <span>{request.bankAccountNumber}</span>
+                </div>
+              )}
+              {request.ifscCode && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">IFSC:</span>
+                  <span>{request.ifscCode}</span>
+                </div>
+              )}
+              {request.bankBranch && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Branch:</span>
+                  <span>{request.bankBranch}</span>
+                </div>
+              )}
               {request.gstNumber && (
                 <div className="flex items-center gap-2">
                   <FileText size={16} className="text-gray-500" />
@@ -197,8 +240,25 @@ export default function SignupRequestsPage() {
               <div><strong>Full Name:</strong> {selectedRequest.fullName}</div>
               <div><strong>Email:</strong> {selectedRequest.email}</div>
               <div><strong>Company:</strong> {selectedRequest.companyName}</div>
+              {selectedRequest.companyLogo && (
+                <div className="pt-2">
+                  <strong>Logo:</strong>
+                  <div className="mt-2">
+                    <img
+                      src={selectedRequest.companyLogo}
+                      alt={`${selectedRequest.companyName} logo`}
+                      className="h-24 w-auto rounded-md border border-slate-200 object-contain"
+                    />
+                  </div>
+                </div>
+              )}
               <div><strong>Phone:</strong> {selectedRequest.phoneNumber}</div>
+              {selectedRequest.address && <div><strong>Address:</strong> {selectedRequest.address}</div>}
               <div><strong>Location:</strong> {selectedRequest.warehouseLocation}</div>
+              {selectedRequest.bankName && <div><strong>Bank Name:</strong> {selectedRequest.bankName}</div>}
+              {selectedRequest.bankAccountNumber && <div><strong>Account Number:</strong> {selectedRequest.bankAccountNumber}</div>}
+              {selectedRequest.ifscCode && <div><strong>IFSC Code:</strong> {selectedRequest.ifscCode}</div>}
+              {selectedRequest.bankBranch && <div><strong>Branch:</strong> {selectedRequest.bankBranch}</div>}
               {selectedRequest.gstNumber && <div><strong>GST:</strong> {selectedRequest.gstNumber}</div>}
               <div><strong>Role:</strong> {selectedRequest.role}</div>
               <div><strong>Status:</strong> {selectedRequest.status}</div>

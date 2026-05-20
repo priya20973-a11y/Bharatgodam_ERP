@@ -43,6 +43,10 @@ export const authOptions: NextAuthOptions = {
           phoneNumber: user.phoneNumber || '',
           warehouseLocation: user.warehouseLocation || '',
           gstNumber: user.gstNumber || null,
+          bankName: user.bankName || null,
+          bankAccountNumber: user.bankAccountNumber || null,
+          ifscCode: user.ifscCode || null,
+          bankBranch: user.bankBranch || null,
         };
       },
     }),
@@ -62,6 +66,11 @@ export const authOptions: NextAuthOptions = {
         token.phoneNumber = (user as any).phoneNumber || '';
         token.warehouseLocation = (user as any).warehouseLocation || '';
         token.gstNumber = (user as any).gstNumber || null;
+        token.bankName = (user as any).bankName || null;
+        token.bankAccountNumber = (user as any).bankAccountNumber || null;
+        token.ifscCode = (user as any).ifscCode || null;
+        token.bankBranch = (user as any).bankBranch || null;
+        token.companyLogo = (user as any).companyLogo || null;
       }
       return token;
     },
@@ -75,6 +84,11 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).phoneNumber = token.phoneNumber;
         (session.user as any).warehouseLocation = token.warehouseLocation;
         (session.user as any).gstNumber = token.gstNumber;
+        (session.user as any).bankName = token.bankName || null;
+        (session.user as any).bankAccountNumber = token.bankAccountNumber || null;
+        (session.user as any).ifscCode = token.ifscCode || null;
+        (session.user as any).bankBranch = token.bankBranch || null;
+        (session.user as any).companyLogo = token.companyLogo || null;
       }
       return session;
     },

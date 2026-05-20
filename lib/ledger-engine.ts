@@ -159,13 +159,15 @@ export function calculateLedger(
   transactions: Transaction[],
   payments: Payment[],
   clientName: string,
-  outstandingInvoices: number = 0,
+  _outstandingInvoices: number = 0,
   commodityRates: Map<string, number> = new Map()
 ): LedgerSummary {
   // Sort transactions by date
   const sortedTransactions = [...transactions].sort((a, b) => {
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
+
+  void _outstandingInvoices;
 
   const normalizeCommodityName = (value: string): string => value?.trim().toUpperCase();
 
@@ -178,8 +180,7 @@ export function calculateLedger(
   };
 
   const ledgerSteps: LedgerStep[] = [];
-  let inventory = new Map<string, number>();
-  let currentCommodity = '';
+  const inventory = new Map<string, number>();
   let stepNo = 1;
 
   // If no transactions, return empty ledger
@@ -257,13 +258,11 @@ export function calculateLedger(
     }
   }
 
-  // Final period: from last transaction to yesterday's as-of date
+  // Final period: from last transaction to today's as-of date
   if (sortedTransactions.length > 0) {
     const lastTxnDate = parseDate(sortedTransactions[sortedTransactions.length - 1].date);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const asOfDate = new Date(now);
-    asOfDate.setDate(asOfDate.getDate() - 1);
+    const asOfDate = new Date();
+    asOfDate.setHours(0, 0, 0, 0);
 
     const daysDiff = calculateDaysDifference(lastTxnDate, asOfDate);
     const totalQuantity = Array.from(inventory.values()).reduce((sum, qty) => sum + qty, 0);
@@ -301,7 +300,6 @@ export function calculateLedger(
 
   const calculationDate = new Date();
   calculationDate.setHours(0, 0, 0, 0);
-  calculationDate.setDate(calculationDate.getDate() - 1);
 
   return {
     clientName,
