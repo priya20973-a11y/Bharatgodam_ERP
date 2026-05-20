@@ -443,6 +443,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       </style>
     </head>
     <body>
+      <!-- invoice-html-version: 2 | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} -->
       <div class="invoice-container">
         <div class="invoice-body">
           <div class="header-row">
