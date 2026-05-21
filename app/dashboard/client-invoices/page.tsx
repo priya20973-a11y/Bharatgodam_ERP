@@ -692,7 +692,7 @@ export default function ClientInvoicesPage() {
       const result = await saveInvoiceAdditionalCharges(invoice.invoiceId, items);
 
       if (result?.success) {
-        const updatedSum = Number(result.additionalCharges ?? items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+        const updatedSum = Number(result.data?.additionalCharges ?? items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
         setInvoices((prev) =>
           prev.map((item) =>
             item.invoiceId === invoice.invoiceId
@@ -707,7 +707,7 @@ export default function ClientInvoicesPage() {
         router.refresh();
         toast.success('Additional charges saved successfully');
       } else {
-        toast.error('Failed to save additional charges');
+        toast.error(result?.error ?? 'Failed to save additional charges');
       }
     } catch (error) {
       console.error('Failed to save additional charges:', error);

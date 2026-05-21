@@ -50,190 +50,232 @@ export async function saveInvoiceAdditionalCharge(
   description: string,
   amount: number
 ) {
-  const parsed = invoiceChargeSchema.parse({ invoiceId, description, amount });
+  try {
+    const parsed = invoiceChargeSchema.parse({ invoiceId, description, amount });
+    const safeAmount = Number(parsed.amount);
+    if (Number.isNaN(safeAmount)) {
+      throw new Error('Amount must be a valid number');
+    }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    throw new Error('Unauthorized');
-  }
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      throw new Error('Unauthorized');
+    }
 
-  const db = await getDb();
-  const invoiceCollection = db.collection<InvoiceDocument>('invoices');
+    const db = await getDb();
+    const invoiceCollection = db.collection<InvoiceDocument>('invoices');
+    const invoiceObjectId = ObjectId.isValid(parsed.invoiceId)
+      ? new ObjectId(parsed.invoiceId)
+      : undefined;
 
-  const invoiceDoc = await invoiceCollection.findOne({
-    $or: [
-      { _id: ObjectId.isValid(parsed.invoiceId) ? new ObjectId(parsed.invoiceId) : undefined },
-      { invoiceNumber: parsed.invoiceId },
-      { invoiceId: parsed.invoiceId },
-    ].filter(Boolean),
-  });
+    const invoiceDoc = await invoiceCollection.findOne({
+      $or: [
+        invoiceObjectId ? { _id: invoiceObjectId } : undefined,
+        { invoiceNumber: parsed.invoiceId },
+        { invoiceId: parsed.invoiceId },
+      ].filter(Boolean),
+    });
 
-  const invoiceMaster =
-    invoiceDoc ??
-    (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
+    const invoiceMaster =
+      invoiceDoc ??
+      (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
 
-  if (!invoiceMaster) {
-    throw new Error('Please save the baseline invoice before adding extra charges.');
-  }
+    if (!invoiceMaster) {
+      throw new Error('Please save the baseline invoice before adding extra charges.');
+    }
 
-  const additionalCharge = {
-    description: parsed.description,
-    amount: Number(parsed.amount.toFixed(2)),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+    const additionalCharge = {
+      description: parsed.description,
+      amount: Number(safeAmount.toFixed(2)),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-  const existingCharges = Array.isArray(invoiceDoc?.additionalChargeItems)
-    ? invoiceDoc.additionalChargeItems
-    : [];
+    const existingCharges = Array.isArray(invoiceDoc?.additionalChargeItems)
+      ? invoiceDoc.additionalChargeItems
+      : [];
 
-  const updatedCharges = [...existingCharges, additionalCharge];
-  const chargeTotal = updatedCharges.reduce(
-    (sum, item) => sum + Number(item.amount || 0),
-    0
-  );
-
-  const baseStorageAmount = Number(
-    invoiceMaster.baseStorageCharges ??
-      invoiceMaster.subtotal ??
-      invoiceMaster.totalAmount ??
+    const updatedCharges = [...existingCharges, additionalCharge];
+    const chargeTotal = updatedCharges.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
       0
-  );
-  const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
-
-  const grandTotal = Number(
-    (baseStorageAmount + chargeTotal + taxAmount).toFixed(2)
-  );
-
-  if (invoiceDoc) {
-    await invoiceCollection.updateOne(
-      { _id: invoiceDoc._id },
-      {
-        $push: {
-          additionalChargeItems: additionalCharge,
-        },
-        $set: {
-          additionalCharges: Number(chargeTotal.toFixed(2)),
-          grandTotal,
-          updatedAt: new Date(),
-        },
-      }
     );
+
+    const baseStorageAmount = Number(
+      invoiceMaster.baseStorageCharges ??
+        invoiceMaster.subtotal ??
+        invoiceMaster.totalAmount ??
+        0
+    );
+    const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
+    const grandTotal = Number(
+      (baseStorageAmount + chargeTotal + taxAmount).toFixed(2)
+    );
+
+    if (invoiceDoc) {
+      await invoiceCollection.updateOne(
+        { _id: invoiceDoc._id },
+        {
+          $push: {
+            additionalChargeItems: additionalCharge,
+          },
+          $set: {
+            additionalCharges: Number(chargeTotal.toFixed(2)),
+            grandTotal,
+            updatedAt: new Date(),
+          },
+        }
+      );
+    }
+
+    await db.collection('invoice_adjustments').insertOne({
+      invoiceId: parsed.invoiceId,
+      name: parsed.description,
+      amount: Number(safeAmount.toFixed(2)),
+      note: '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    revalidatePath('/dashboard/client-invoices');
+    revalidatePath('/dashboard/invoices');
+
+    return {
+      success: true,
+      data: {
+        invoiceId: parsed.invoiceId,
+        additionalCharges: Number(chargeTotal.toFixed(2)),
+        grandTotal,
+      },
+    };
+  } catch (error) {
+    console.error('DETAILED_ERROR:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred while saving the charge.',
+    };
   }
-
-  // Maintain compatibility with the current invoice preview / adjustment lookup path.
-  await db.collection('invoice_adjustments').insertOne({
-    invoiceId: parsed.invoiceId,
-    name: parsed.description,
-    amount: Number(parsed.amount.toFixed(2)),
-    note: '',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  revalidatePath('/dashboard/client-invoices');
-  revalidatePath('/dashboard/invoices');
-
-  return {
-    success: true,
-    additionalCharge: additionalCharge,
-    additionalCharges: Number(chargeTotal.toFixed(2)),
-    grandTotal,
-  };
 }
 
 export async function saveInvoiceAdditionalCharges(
   invoiceId: string,
   additionalCharges: Array<{ description: string; amount: number }>
 ) {
-  const parsed = invoiceChargesBatchSchema.parse({ invoiceId, additionalCharges });
+  try {
+    const parsed = invoiceChargesBatchSchema.parse({ invoiceId, additionalCharges });
 
-  if (!parsed.additionalCharges || parsed.additionalCharges.length === 0) {
-    throw new Error('At least one charge row must be provided.');
-  }
+    if (!parsed.additionalCharges || parsed.additionalCharges.length === 0) {
+      throw new Error('At least one charge row must be provided.');
+    }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    throw new Error('Unauthorized');
-  }
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      throw new Error('Unauthorized');
+    }
 
-  const db = await getDb();
-  const invoiceCollection = db.collection<InvoiceDocument>('invoices');
+    const db = await getDb();
+    const invoiceCollection = db.collection<InvoiceDocument>('invoices');
+    const invoiceObjectId = ObjectId.isValid(parsed.invoiceId)
+      ? new ObjectId(parsed.invoiceId)
+      : undefined;
 
-  const invoiceDoc = await invoiceCollection.findOne({
-    $or: [
-      { _id: ObjectId.isValid(parsed.invoiceId) ? new ObjectId(parsed.invoiceId) : undefined },
-      { invoiceNumber: parsed.invoiceId },
-      { invoiceId: parsed.invoiceId },
-    ].filter(Boolean),
-  });
+    const invoiceDoc = await invoiceCollection.findOne({
+      $or: [
+        invoiceObjectId ? { _id: invoiceObjectId } : undefined,
+        { invoiceNumber: parsed.invoiceId },
+        { invoiceId: parsed.invoiceId },
+      ].filter(Boolean),
+    });
 
-  const invoiceMaster =
-    invoiceDoc ??
-    (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
+    const invoiceMaster =
+      invoiceDoc ??
+      (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
 
-  if (!invoiceMaster) {
-    throw new Error('Please save the baseline invoice before adding extra charges.');
-  }
+    if (!invoiceMaster) {
+      throw new Error('Please save the baseline invoice before adding extra charges.');
+    }
 
-  const normalizedCharges = parsed.additionalCharges.map((item) => ({
-    description: item.description,
-    amount: Number(item.amount.toFixed(2)),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }));
-
-  const chargeTotal = normalizedCharges.reduce(
-    (sum, item) => sum + Number(item.amount || 0),
-    0
-  );
-
-  const baseStorageAmount = Number(
-    invoiceMaster.baseStorageCharges ??
-      invoiceMaster.subtotal ??
-      invoiceMaster.totalAmount ??
-      0
-  );
-  const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
-  const grandTotal = Number((baseStorageAmount + chargeTotal + taxAmount).toFixed(2));
-
-  if (invoiceDoc) {
-    await invoiceCollection.updateOne(
-      { _id: invoiceDoc._id },
-      {
-        $set: {
-          additionalChargeItems: normalizedCharges,
-          additionalCharges: Number(chargeTotal.toFixed(2)),
-          grandTotal,
-          updatedAt: new Date(),
-        },
+    const normalizedCharges = parsed.additionalCharges.map((item) => {
+      const safeAmount = Number(item.amount);
+      if (Number.isNaN(safeAmount)) {
+        throw new Error('Each charge amount must be a valid number');
       }
+
+      return {
+        description: item.description,
+        amount: Number(safeAmount.toFixed(2)),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    });
+
+    const chargeTotal = normalizedCharges.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
     );
-  }
 
-  await db.collection('invoice_adjustments').deleteMany({
-    invoiceId: parsed.invoiceId,
-  });
+    const baseStorageAmount = Number(
+      invoiceMaster.baseStorageCharges ??
+        invoiceMaster.subtotal ??
+        invoiceMaster.totalAmount ??
+        0
+    );
+    const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
+    const grandTotal = Number((baseStorageAmount + chargeTotal + taxAmount).toFixed(2));
 
-  if (normalizedCharges.length > 0) {
-    await db.collection('invoice_adjustments').insertMany(
-      normalizedCharges.map((item) => ({
+    if (invoiceDoc) {
+      await invoiceCollection.updateOne(
+        { _id: invoiceDoc._id },
+        {
+          $set: {
+            additionalChargeItems: normalizedCharges,
+            additionalCharges: Number(chargeTotal.toFixed(2)),
+            grandTotal,
+            updatedAt: new Date(),
+          },
+        }
+      );
+    }
+
+    await db.collection('invoice_adjustments').deleteMany({
+      invoiceId: parsed.invoiceId,
+    });
+
+    if (normalizedCharges.length > 0) {
+      await db.collection('invoice_adjustments').insertMany(
+        normalizedCharges.map((item) => ({
+          invoiceId: parsed.invoiceId,
+          name: item.description,
+          amount: item.amount,
+          note: '',
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        }))
+      );
+    }
+
+    revalidatePath('/dashboard/client-invoices');
+    revalidatePath('/dashboard/invoices');
+
+    return {
+      success: true,
+      data: {
         invoiceId: parsed.invoiceId,
-        name: item.description,
-        amount: item.amount,
-        note: '',
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      }))
-    );
+        additionalCharges: Number(chargeTotal.toFixed(2)),
+        grandTotal,
+      },
+    };
+  } catch (error) {
+    console.error('DETAILED_ERROR:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred while saving additional charges.',
+    };
   }
-
-  revalidatePath('/dashboard/client-invoices');
-  revalidatePath('/dashboard/invoices');
-
-  return {
-    success: true,
-    additionalCharges: Number(chargeTotal.toFixed(2)),
-    grandTotal,
-  };
 }
