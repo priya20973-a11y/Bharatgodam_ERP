@@ -13,7 +13,7 @@ import { toast } from 'react-hot-toast';
 interface AdditionalChargeItem {
   id?: string;
   name: string;
-  amount: number;
+  amount: number | string;
   note?: string;
 }
 
@@ -608,7 +608,7 @@ export default function ClientInvoicesPage() {
             ...chargeItem,
             id: chargeItem.id || getAdditionalChargeItemRowId(invoiceId, chargeItem, idx),
             name: field === 'name' ? value : chargeItem.name,
-            amount: field === 'amount' ? Number(value) || 0 : chargeItem.amount,
+            amount: field === 'amount' ? value : chargeItem.amount,
           };
         });
 
@@ -636,7 +636,7 @@ export default function ClientInvoicesPage() {
                 {
                   id: `${invoice.invoiceId}-additional-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                   name: '',
-                  amount: 0,
+                  amount: '',
                 },
               ],
             }
