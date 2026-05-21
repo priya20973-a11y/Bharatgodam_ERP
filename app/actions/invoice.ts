@@ -64,6 +64,8 @@ export async function saveInvoiceAdditionalCharge(
 
     const db = await getDb();
     const invoiceCollection = db.collection<InvoiceDocument>('invoices');
+    const adjustmentCollection = db.collection('invoice_adjustments');
+
     const invoiceObjectId = ObjectId.isValid(parsed.invoiceId)
       ? new ObjectId(parsed.invoiceId)
       : undefined;
@@ -82,10 +84,6 @@ export async function saveInvoiceAdditionalCharge(
       invoiceDoc ??
       (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
 
-    if (!invoiceMaster) {
-      throw new Error('Please save the baseline invoice before adding extra charges.');
-    }
-
     const additionalCharge = {
       description: parsed.description,
       amount: Number(safeAmount.toFixed(2)),
@@ -93,28 +91,16 @@ export async function saveInvoiceAdditionalCharge(
       updatedAt: new Date(),
     };
 
-    const existingCharges = Array.isArray(invoiceDoc?.additionalChargeItems)
-      ? invoiceDoc.additionalChargeItems
-      : [];
-
-    const updatedCharges = [...existingCharges, additionalCharge];
-    const chargeTotal = updatedCharges.reduce(
-      (sum, item) => sum + Number(item.amount || 0),
-      0
-    );
-
-    const baseStorageAmount = Number(
-      invoiceMaster.baseStorageCharges ??
-        invoiceMaster.subtotal ??
-        invoiceMaster.totalAmount ??
-        0
-    );
-    const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
-    const grandTotal = Number(
-      (baseStorageAmount + chargeTotal + taxAmount).toFixed(2)
-    );
-
     if (invoiceDoc) {
+      const existingCharges = Array.isArray(invoiceDoc.additionalChargeItems)
+        ? invoiceDoc.additionalChargeItems
+        : [];
+      const updatedCharges = [...existingCharges, additionalCharge];
+      const chargeTotal = updatedCharges.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
       const updateResult = await invoiceCollection.updateOne(
         { _id: invoiceDoc._id },
         {
@@ -126,7 +112,6 @@ export async function saveInvoiceAdditionalCharge(
           },
           $set: {
             additionalCharges: Number(chargeTotal.toFixed(2)),
-            grandTotal,
             updatedAt: new Date(),
           },
         }
@@ -137,14 +122,19 @@ export async function saveInvoiceAdditionalCharge(
       }
     }
 
-    await db.collection('invoice_adjustments').insertOne({
+    const insertResult = await adjustmentCollection.insertOne({
       invoiceId: parsed.invoiceId,
+      masterId: invoiceMaster?._id?.toString(),
       name: parsed.description,
       amount: Number(safeAmount.toFixed(2)),
       note: '',
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    if (!insertResult.acknowledged) {
+      throw new Error('Failed to persist additional charge');
+    }
 
     revalidatePath('/dashboard/client-invoices');
     revalidatePath('/dashboard/invoices');
@@ -153,8 +143,13 @@ export async function saveInvoiceAdditionalCharge(
       success: true,
       data: {
         invoiceId: parsed.invoiceId,
-        additionalCharges: Number(chargeTotal.toFixed(2)),
-        grandTotal,
+        additionalChargeItems: [
+          {
+            description: additionalCharge.description,
+            amount: additionalCharge.amount,
+          },
+        ],
+        additionalCharges: Number(additionalCharge.amount.toFixed(2)),
       },
     };
   } catch (error) {
@@ -213,10 +208,6 @@ export async function saveInvoiceAdditionalCharges(
       invoiceDoc ??
       (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
 
-    if (!invoiceMaster) {
-      throw new Error('Please save the baseline invoice before adding extra charges.');
-    }
-
     const normalizedCharges = parsed.additionalCharges.map((item) => {
       const safeAmount = Number(item.amount);
       if (Number.isNaN(safeAmount)) {
@@ -237,18 +228,16 @@ export async function saveInvoiceAdditionalCharges(
     );
 
     const baseStorageAmount = Number(
-      invoiceMaster.baseStorageCharges ??
-        invoiceMaster.subtotal ??
-        invoiceMaster.totalAmount ??
+      invoiceMaster?.baseStorageCharges ??
+        invoiceMaster?.subtotal ??
+        invoiceMaster?.totalAmount ??
         0
     );
-    const taxAmount = Number(invoiceMaster.taxAmount ?? 0);
+    const taxAmount = Number(invoiceMaster?.taxAmount ?? 0);
     const grandTotal = Number((baseStorageAmount + chargeTotal + taxAmount).toFixed(2));
 
     if (invoiceDoc) {
-      const previousChargeTotal = Array.isArray(invoiceDoc.additionalCharges)
-        ? invoiceDoc.additionalCharges.reduce((sum, item) => sum + Number(item.amount || 0), 0)
-        : 0;
+      const previousChargeTotal = Number(invoiceDoc.additionalCharges ?? 0);
       const baseAmount = Number(invoiceDoc.totalAmount ?? 0) - previousChargeTotal;
       const newTotalAmount = Number((baseAmount + chargeTotal).toFixed(2));
 
@@ -275,9 +264,10 @@ export async function saveInvoiceAdditionalCharges(
     });
 
     if (normalizedCharges.length > 0) {
-      await db.collection('invoice_adjustments').insertMany(
+      const insertResult = await db.collection('invoice_adjustments').insertMany(
         normalizedCharges.map((item) => ({
           invoiceId: parsed.invoiceId,
+          masterId: invoiceMaster?._id?.toString(),
           name: item.description,
           amount: item.amount,
           note: '',
@@ -285,6 +275,10 @@ export async function saveInvoiceAdditionalCharges(
           updatedAt: item.updatedAt,
         }))
       );
+
+      if (!insertResult.acknowledged) {
+        throw new Error('Failed to persist additional charges');
+      }
     }
 
     revalidatePath('/dashboard/client-invoices');
@@ -294,6 +288,10 @@ export async function saveInvoiceAdditionalCharges(
       success: true,
       data: {
         invoiceId: parsed.invoiceId,
+        additionalChargeItems: normalizedCharges.map((item) => ({
+          name: item.description,
+          amount: item.amount,
+        })),
         additionalCharges: Number(chargeTotal.toFixed(2)),
         grandTotal,
       },
