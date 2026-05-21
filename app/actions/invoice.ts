@@ -68,12 +68,14 @@ export async function saveInvoiceAdditionalCharge(
       ? new ObjectId(parsed.invoiceId)
       : undefined;
 
+    const searchFilters: Array<Record<string, unknown>> = [];
+    if (invoiceObjectId) {
+      searchFilters.push({ _id: invoiceObjectId });
+    }
+    searchFilters.push({ invoiceNumber: parsed.invoiceId }, { invoiceId: parsed.invoiceId });
+
     const invoiceDoc = await invoiceCollection.findOne({
-      $or: [
-        invoiceObjectId ? { _id: invoiceObjectId } : undefined,
-        { invoiceNumber: parsed.invoiceId },
-        { invoiceId: parsed.invoiceId },
-      ].filter(Boolean),
+      $or: searchFilters,
     });
 
     const invoiceMaster =
@@ -182,23 +184,14 @@ export async function saveInvoiceAdditionalCharges(
       ? new ObjectId(parsed.invoiceId)
       : undefined;
 
-    const invoiceDoc = await invoiceCollection.findOne({
-      $or: [
-        invoiceObjectId ? { _id: invoiceObjectId } : undefined,
-        { invoiceNumber: parsed.invoiceId },
-        { invoiceId: parsed.invoiceId },
-      ].filter(Boolean),
-    });
+  const searchFilters: Array<Record<string, unknown>> = [];
+  if (invoiceObjectId) {
+    searchFilters.push({ _id: invoiceObjectId });
+  }
+  searchFilters.push({ invoiceNumber: parsed.invoiceId }, { invoiceId: parsed.invoiceId });
 
-    const invoiceMaster =
-      invoiceDoc ??
-      (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
-
-    if (!invoiceMaster) {
-      throw new Error('Please save the baseline invoice before adding extra charges.');
-    }
-
-    const normalizedCharges = parsed.additionalCharges.map((item) => {
+  const invoiceDoc = await invoiceCollection.findOne({
+    $or: searchFilters,
       const safeAmount = Number(item.amount);
       if (Number.isNaN(safeAmount)) {
         throw new Error('Each charge amount must be a valid number');
