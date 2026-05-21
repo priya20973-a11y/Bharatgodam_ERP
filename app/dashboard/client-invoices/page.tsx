@@ -671,8 +671,8 @@ export default function ClientInvoicesPage() {
       amount: Number(item.amount || 0),
     }));
 
-    if (items.length === 0) {
-      toast.error('Add at least one charge row before saving.');
+    if (items.length === 0 && Number(invoice.additionalCharges || 0) === 0) {
+      toast.error('No additional charges to save.');
       return;
     }
 
