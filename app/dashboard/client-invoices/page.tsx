@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
 import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
+import { saveInvoiceAdditionalCharges } from '@/app/actions/invoice';
 import { toast } from 'react-hot-toast';
 
 interface AdditionalChargeItem {
@@ -667,12 +668,16 @@ export default function ClientInvoicesPage() {
     }
 
     const items = (invoice.additionalChargeItems || []).map((item) => ({
-      name: String(item.name || '').trim(),
+      description: String(item.name || '').trim(),
       amount: Number(item.amount || 0),
-      note: item.note || '',
     }));
 
-    if (items.some((item) => !item.name)) {
+    if (items.length === 0) {
+      toast.error('Add at least one charge row before saving.');
+      return;
+    }
+
+    if (items.some((item) => !item.description)) {
       toast.error('Please provide a description for all additional charge rows.');
       return;
     }
@@ -684,34 +689,29 @@ export default function ClientInvoicesPage() {
 
     setSavingChargeFor(invoice.invoiceId);
     try {
-      const response = await fetch(`/api/invoices/${encodeURIComponent(invoice.invoiceId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additionalChargeItems: items }),
-      });
-      const result = await response.json();
-      if (response.ok && result.success) {
-        const updatedItems = result.data?.additionalChargeItems ?? items;
-        const updatedSum = Number(result.data?.additionalCharges ?? updatedItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+      const result = await saveInvoiceAdditionalCharges(invoice.invoiceId, items);
+
+      if (result?.success) {
+        const updatedSum = Number(result.additionalCharges ?? items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
         setInvoices((prev) =>
           prev.map((item) =>
             item.invoiceId === invoice.invoiceId
               ? {
                   ...item,
-                  additionalChargeItems: updatedItems,
                   additionalCharges: updatedSum,
                 }
               : item
           )
         );
+
         router.refresh();
-        toast.success('Additional charges updated successfully');
+        toast.success('Additional charges saved successfully');
       } else {
-        toast.error(result.message || 'Failed to update additional charges');
+        toast.error('Failed to save additional charges');
       }
     } catch (error) {
       console.error('Failed to save additional charges:', error);
-      toast.error('Failed to update additional charges');
+      toast.error(error instanceof Error ? error.message : 'Failed to update additional charges');
     } finally {
       setSavingChargeFor(null);
     }
