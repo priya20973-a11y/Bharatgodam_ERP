@@ -115,19 +115,26 @@ export async function saveInvoiceAdditionalCharge(
     );
 
     if (invoiceDoc) {
-      await invoiceCollection.updateOne(
+      const updateResult = await invoiceCollection.updateOne(
         { _id: invoiceDoc._id },
         {
           $push: {
+            additionalCharges: additionalCharge,
             additionalChargeItems: additionalCharge,
           },
+          $inc: {
+            totalAmount: Number(safeAmount.toFixed(2)),
+          },
           $set: {
-            additionalCharges: Number(chargeTotal.toFixed(2)),
             grandTotal,
             updatedAt: new Date(),
           },
         }
       );
+
+      if (!updateResult.acknowledged || updateResult.modifiedCount === 0) {
+        throw new Error('No matching invoice found to update');
+      }
     }
 
     await db.collection('invoice_adjustments').insertOne({
@@ -160,6 +167,14 @@ export async function saveInvoiceAdditionalCharge(
           : 'An unexpected error occurred while saving the charge.',
     };
   }
+}
+
+export async function saveAdditionalCharge(
+  invoiceId: string,
+  description: string,
+  amount: number
+) {
+  return saveInvoiceAdditionalCharge(invoiceId, description, amount);
 }
 
 export async function saveInvoiceAdditionalCharges(
@@ -231,17 +246,28 @@ export async function saveInvoiceAdditionalCharges(
     const grandTotal = Number((baseStorageAmount + chargeTotal + taxAmount).toFixed(2));
 
     if (invoiceDoc) {
-      await invoiceCollection.updateOne(
+      const previousChargeTotal = Array.isArray(invoiceDoc.additionalCharges)
+        ? invoiceDoc.additionalCharges.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+        : 0;
+      const baseAmount = Number(invoiceDoc.totalAmount ?? 0) - previousChargeTotal;
+      const newTotalAmount = Number((baseAmount + chargeTotal).toFixed(2));
+
+      const updateResult = await invoiceCollection.updateOne(
         { _id: invoiceDoc._id },
         {
           $set: {
+            additionalCharges: normalizedCharges,
             additionalChargeItems: normalizedCharges,
-            additionalCharges: Number(chargeTotal.toFixed(2)),
+            totalAmount: newTotalAmount,
             grandTotal,
             updatedAt: new Date(),
           },
         }
       );
+
+      if (!updateResult.acknowledged || updateResult.modifiedCount === 0) {
+        throw new Error('No matching invoice found to update');
+      }
     }
 
     await db.collection('invoice_adjustments').deleteMany({
