@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,6 +90,7 @@ export default function ClientInvoicesPage() {
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [savingChargeFor, setSavingChargeFor] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setHasMounted(true);
@@ -702,6 +704,7 @@ export default function ClientInvoicesPage() {
               : item
           )
         );
+        router.refresh();
         toast.success('Additional charges updated successfully');
       } else {
         toast.error(result.message || 'Failed to update additional charges');
@@ -1105,7 +1108,7 @@ export default function ClientInvoicesPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => handleDownloadInvoice(invoice)}
-                          disabled={downloading === invoice.bookingId}
+                          disabled={downloading === invoice.bookingId || savingChargeFor === invoice.invoiceId}
                         >
                           {downloading === invoice.bookingId ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
