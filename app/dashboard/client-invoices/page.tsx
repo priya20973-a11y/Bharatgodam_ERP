@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
 import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
-import { saveInvoiceAdditionalCharges } from '@/app/actions/invoice';
 import { toast } from 'react-hot-toast';
 
 interface AdditionalChargeItem {
@@ -689,32 +688,42 @@ export default function ClientInvoicesPage() {
 
     setSavingChargeFor(invoice.invoiceId);
     try {
-      const result = await saveInvoiceAdditionalCharges(invoice.invoiceId, items);
+      const response = await fetch('/api/invoice/adjustments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invoiceId: invoice.invoiceId,
+          additionalCharges: items,
+        }),
+      });
 
-      if (result?.success) {
-        const updatedSum = Number(result.data?.additionalCharges ?? items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
-        const savedItems = result.data?.additionalChargeItems ?? items.map((item) => ({ name: item.description, amount: item.amount }));
-
-        setInvoices((prev) =>
-          prev.map((item) =>
-            item.invoiceId === invoice.invoiceId
-              ? {
-                  ...item,
-                  additionalCharges: updatedSum,
-                  additionalChargeItems: savedItems,
-                }
-              : item
-          )
-        );
-
-        if (selectedClient && selectedWarehouse && selectedMonth) {
-          await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
-        }
-
-        toast.success('Additional charges saved successfully');
-      } else {
-        toast.error(result?.error ?? 'Failed to save additional charges');
+      const result = await response.json();
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Failed to save additional charges');
       }
+
+      const updatedSum = Number(result.data?.additionalCharges ?? items.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+      const savedItems = result.data?.additionalChargeItems ?? items.map((item) => ({ name: item.description, amount: item.amount }));
+
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.invoiceId === invoice.invoiceId
+            ? {
+                ...item,
+                additionalCharges: updatedSum,
+                additionalChargeItems: savedItems,
+              }
+            : item
+        )
+      );
+
+      if (selectedClient && selectedWarehouse && selectedMonth) {
+        await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
+      }
+
+      toast.success('Additional charges saved successfully');
     } catch (error) {
       console.error('Failed to save additional charges:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update additional charges');
