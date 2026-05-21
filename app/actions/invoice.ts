@@ -7,6 +7,26 @@ import { ObjectId } from 'mongodb';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+type AdditionalChargeItem = {
+  description: string;
+  amount: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type InvoiceDocument = {
+  _id: ObjectId;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  additionalChargeItems?: AdditionalChargeItem[];
+  additionalCharges?: number;
+  grandTotal?: number;
+  baseStorageCharges?: number;
+  subtotal?: number;
+  totalAmount?: number;
+  taxAmount?: number;
+};
+
 const invoiceChargeSchema = z.object({
   invoiceId: z.string().min(1, 'Invoice ID is required'),
   description: z.string().trim().min(1, 'Description is required'),
@@ -38,8 +58,9 @@ export async function saveInvoiceAdditionalCharge(
   }
 
   const db = await getDb();
+  const invoiceCollection = db.collection<InvoiceDocument>('invoices');
 
-  const invoiceDoc = await db.collection('invoices').findOne({
+  const invoiceDoc = await invoiceCollection.findOne({
     $or: [
       { _id: ObjectId.isValid(parsed.invoiceId) ? new ObjectId(parsed.invoiceId) : undefined },
       { invoiceNumber: parsed.invoiceId },
@@ -85,7 +106,7 @@ export async function saveInvoiceAdditionalCharge(
   );
 
   if (invoiceDoc) {
-    await db.collection('invoices').updateOne(
+    await invoiceCollection.updateOne(
       { _id: invoiceDoc._id },
       {
         $push: {
@@ -137,8 +158,9 @@ export async function saveInvoiceAdditionalCharges(
   }
 
   const db = await getDb();
+  const invoiceCollection = db.collection<InvoiceDocument>('invoices');
 
-  const invoiceDoc = await db.collection('invoices').findOne({
+  const invoiceDoc = await invoiceCollection.findOne({
     $or: [
       { _id: ObjectId.isValid(parsed.invoiceId) ? new ObjectId(parsed.invoiceId) : undefined },
       { invoiceNumber: parsed.invoiceId },
@@ -176,7 +198,7 @@ export async function saveInvoiceAdditionalCharges(
   const grandTotal = Number((baseStorageAmount + chargeTotal + taxAmount).toFixed(2));
 
   if (invoiceDoc) {
-    await db.collection('invoices').updateOne(
+    await invoiceCollection.updateOne(
       { _id: invoiceDoc._id },
       {
         $set: {
