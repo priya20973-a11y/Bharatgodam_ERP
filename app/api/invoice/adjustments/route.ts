@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
+import { requireSession, getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
@@ -126,19 +126,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await db.collection('invoice_adjustments').deleteMany({ invoiceId: parsed.invoiceId });
+    const ownershipFields = appendOwnershipForMongo({}, session);
+
+    await db.collection('invoice_adjustments').deleteMany({
+      invoiceId: parsed.invoiceId,
+      ...ownershipFields,
+    });
 
     if (normalizedCharges.length > 0) {
       const insertResult = await db.collection('invoice_adjustments').insertMany(
-        normalizedCharges.map((item) => ({
-          invoiceId: parsed.invoiceId,
-          masterId: invoiceMaster?._id?.toString(),
-          name: item.description,
-          amount: item.amount,
-          note: '',
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-        }))
+        normalizedCharges.map((item) =>
+          appendOwnershipForMongo({
+            invoiceId: parsed.invoiceId,
+            masterId: invoiceMaster?._id?.toString(),
+            name: item.description,
+            amount: item.amount,
+            note: '',
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+          }, session)
+        )
       );
 
       if (!insertResult.acknowledged) {

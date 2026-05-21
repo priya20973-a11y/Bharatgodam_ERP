@@ -3,6 +3,7 @@
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { appendOwnershipForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -122,15 +123,20 @@ export async function saveInvoiceAdditionalCharge(
       }
     }
 
-    const insertResult = await adjustmentCollection.insertOne({
-      invoiceId: parsed.invoiceId,
-      masterId: invoiceMaster?._id?.toString(),
-      name: parsed.description,
-      amount: Number(safeAmount.toFixed(2)),
-      note: '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    const insertResult = await adjustmentCollection.insertOne(
+      appendOwnershipForMongo(
+        {
+          invoiceId: parsed.invoiceId,
+          masterId: invoiceMaster?._id?.toString(),
+          name: parsed.description,
+          amount: Number(safeAmount.toFixed(2)),
+          note: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        session
+      )
+    );
 
     if (!insertResult.acknowledged) {
       throw new Error('Failed to persist additional charge');
@@ -259,21 +265,29 @@ export async function saveInvoiceAdditionalCharges(
       }
     }
 
+    const ownershipFields = appendOwnershipForMongo({}, session);
+
     await db.collection('invoice_adjustments').deleteMany({
       invoiceId: parsed.invoiceId,
+      ...ownershipFields,
     });
 
     if (normalizedCharges.length > 0) {
       const insertResult = await db.collection('invoice_adjustments').insertMany(
-        normalizedCharges.map((item) => ({
-          invoiceId: parsed.invoiceId,
-          masterId: invoiceMaster?._id?.toString(),
-          name: item.description,
-          amount: item.amount,
-          note: '',
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-        }))
+        normalizedCharges.map((item) =>
+          appendOwnershipForMongo(
+            {
+              invoiceId: parsed.invoiceId,
+              masterId: invoiceMaster?._id?.toString(),
+              name: item.description,
+              amount: item.amount,
+              note: '',
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+            },
+            session
+          )
+        )
       );
 
       if (!insertResult.acknowledged) {
