@@ -42,6 +42,15 @@ export async function GET(request: NextRequest) {
         monthlyInvoice
       );
 
+    console.log('Invoice HTML generation details', {
+      invoiceId: id,
+      warehouseId,
+      invoiceNumber: monthlyInvoice.invoiceNumber,
+      additionalCharges: monthlyInvoice.additionalCharges,
+      additionalChargeItemsCount:
+        monthlyInvoice.additionalChargeItems?.length ?? 0,
+    });
+
     const printableHtml = html.replace(
       '<body>',
       `<body>
@@ -65,7 +74,7 @@ export async function GET(request: NextRequest) {
         'Content-Type':
           'text/html; charset=utf-8',
         'Cache-Control':
-          'no-cache, no-store',
+          'no-store, no-cache, must-revalidate, max-age=0',
       },
     });
   } catch (error: unknown) {

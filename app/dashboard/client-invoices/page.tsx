@@ -65,7 +65,8 @@ const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: Addit
     .replace(/^-+|-+$/g, '')
     .slice(0, 32);
   const amountToken = Math.round(Number(item.amount || 0) * 100);
-  return `${invoiceId || 'invoice'}-additional-${cleanName}-${amountToken}-${index}`;
+  const randomToken = Math.random().toString(36).slice(2, 8);
+  return `${invoiceId || 'invoice'}-additional-${cleanName}-${amountToken}-${index}-${randomToken}`;
 };
 
 export default function ClientInvoicesPage() {
@@ -593,18 +594,22 @@ export default function ClientInvoicesPage() {
   };
 
   const handleUpdateAdjustmentItem = (invoiceId: string, index: number, field: 'name' | 'amount', value: string) => {
+    if (!invoiceId) return;
+
     setInvoices((prev) =>
       prev.map((item) => {
         if (item.invoiceId !== invoiceId) return item;
-        const updatedItems = (item.additionalChargeItems || []).map((chargeItem, idx) =>
-          idx === index
-            ? {
-                ...chargeItem,
-                [field]: field === 'amount' ? value : value,
-                amount: field === 'amount' ? Number(value) || 0 : chargeItem.amount,
-              }
-            : chargeItem
-        );
+
+        const updatedItems = (item.additionalChargeItems || []).map((chargeItem, idx) => {
+          if (idx !== index) return chargeItem;
+          return {
+            ...chargeItem,
+            id: chargeItem.id || getAdditionalChargeItemRowId(invoiceId, chargeItem, idx),
+            name: field === 'name' ? value : chargeItem.name,
+            amount: field === 'amount' ? Number(value) || 0 : chargeItem.amount,
+          };
+        });
+
         return {
           ...item,
           additionalChargeItems: updatedItems,
@@ -626,7 +631,11 @@ export default function ClientInvoicesPage() {
               ...item,
               additionalChargeItems: [
                 ...(item.additionalChargeItems || []),
-                { id: `${invoice.invoiceId}-additional-${Date.now()}`, name: '', amount: 0 },
+                {
+                  id: `${invoice.invoiceId}-additional-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  name: '',
+                  amount: 0,
+                },
               ],
             }
           : item
@@ -637,17 +646,15 @@ export default function ClientInvoicesPage() {
   const handleRemoveAdjustmentRow = (invoice: MonthlyInvoice, index: number) => {
     if (!invoice.invoiceId) return;
     setInvoices((prev) =>
-      prev.map((item) =>
-        item.invoiceId === invoice.invoiceId
-          ? {
-              ...item,
-              additionalChargeItems: (item.additionalChargeItems || []).filter((_, idx) => idx !== index),
-              additionalCharges: (item.additionalChargeItems || [])
-                .filter((_, idx) => idx !== index)
-                .reduce((sum, chargeItem) => sum + Number(chargeItem.amount || 0), 0),
-            }
-          : item
-      )
+      prev.map((item) => {
+        if (item.invoiceId !== invoice.invoiceId) return item;
+        const updatedItems = (item.additionalChargeItems || []).filter((_, idx) => idx !== index);
+        return {
+          ...item,
+          additionalChargeItems: updatedItems,
+          additionalCharges: updatedItems.reduce((sum, chargeItem) => sum + Number(chargeItem.amount || 0), 0),
+        };
+      })
     );
   };
 
@@ -1217,7 +1224,7 @@ export default function ClientInvoicesPage() {
                                 </tr>
                               ) : (
                                 (invoice.additionalChargeItems || []).map((item, idx) => (
-                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                  <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                                     <td className="px-3 py-2">
                                       <input
                                         type="text"
