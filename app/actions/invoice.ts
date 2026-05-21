@@ -62,8 +62,8 @@ export async function saveInvoiceAdditionalCharge(
     updatedAt: new Date(),
   };
 
-  const existingCharges = Array.isArray(invoiceRecord.additionalChargeItems)
-    ? invoiceRecord.additionalChargeItems
+  const existingCharges = Array.isArray(invoiceDoc?.additionalChargeItems)
+    ? invoiceDoc.additionalChargeItems
     : [];
 
   const updatedCharges = [...existingCharges, additionalCharge];
