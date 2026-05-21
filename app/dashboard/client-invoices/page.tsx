@@ -671,11 +671,6 @@ export default function ClientInvoicesPage() {
       amount: Number(item.amount || 0),
     }));
 
-    if (items.length === 0 && Number(invoice.additionalCharges || 0) === 0) {
-      toast.error('No additional charges to save.');
-      return;
-    }
-
     if (items.some((item) => !item.description)) {
       toast.error('Please provide a description for all additional charge rows.');
       return;
