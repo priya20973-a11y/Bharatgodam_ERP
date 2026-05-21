@@ -119,13 +119,13 @@ export async function saveInvoiceAdditionalCharge(
         { _id: invoiceDoc._id },
         {
           $push: {
-            additionalCharges: additionalCharge,
             additionalChargeItems: additionalCharge,
           },
           $inc: {
             totalAmount: Number(safeAmount.toFixed(2)),
           },
           $set: {
+            additionalCharges: Number(chargeTotal.toFixed(2)),
             grandTotal,
             updatedAt: new Date(),
           },
@@ -256,7 +256,7 @@ export async function saveInvoiceAdditionalCharges(
         { _id: invoiceDoc._id },
         {
           $set: {
-            additionalCharges: normalizedCharges,
+            additionalCharges: Number(chargeTotal.toFixed(2)),
             additionalChargeItems: normalizedCharges,
             totalAmount: newTotalAmount,
             grandTotal,
