@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { LedgerSummary, LedgerStep } from '@/lib/ledger-engine';
 import { LedgerTable } from './ledger-table';
 import { InvoiceSummary } from './invoice-summary';
-import { TransactionTimeline, CommodityTransactionTimeline } from './transaction-timeline';
+import { CommodityTransactionTimeline } from './transaction-timeline';
 import { PaymentHistory } from './payment-history';
 import { MatchedRecordsHeader } from './matched-records-header';
 import { Download, RefreshCw } from 'lucide-react';
@@ -29,11 +29,18 @@ interface InvoiceAdjustmentSummary {
   additionalChargeItems: InvoiceAdjustmentItem[];
 }
 
+interface WarehouseLedgerBreakdown {
+  warehouseId: string;
+  warehouseName: string;
+  ledgerSummary: LedgerSummary;
+}
+
 interface AggregatedLedgerData extends LedgerSummary {
   matchedRecords?: any[];
   recordCount?: number;
   isAggregated?: boolean;
   transactions?: any[];
+  warehouseBreakdowns?: WarehouseLedgerBreakdown[];
 }
 
 interface LedgerCalculatorProps {
@@ -52,32 +59,14 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     return null;
   }
 
-  type LedgerViewMode = 'detail' | 'month' | 'inventory';
-
-  interface MonthChargeSummary {
-    monthKey: string;
-    monthLabel: string;
-    totalDays: number;
-    totalQuantityDays: number;
-    totalRent: number;
-    endingBalances: { [commodity: string]: number };
-  }
-
-  interface MonthInventoryRecord {
-    monthKey: string;
-    monthLabel: string;
-    startingBalances: { [commodity: string]: number };
-    inwardMovements: { [commodity: string]: number };
-    outwardMovements: { [commodity: string]: number };
-    endingBalances: { [commodity: string]: number };
-  }
-
   const [ledgerData, setLedgerData] = useState<AggregatedLedgerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [lineItems, setLineItems] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<LedgerViewMode>('detail');
+
+  const warehouseBreakdowns = ledgerData?.warehouseBreakdowns ?? [];
+  const showWarehouseBreakdowns = warehouseBreakdowns.length > 0;
 
   const formatDecimal = (value: number) =>
     value.toLocaleString(undefined, {
@@ -87,116 +76,9 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
 
   const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
-  const getMonthWiseCharges = (steps: LedgerStep[]): MonthChargeSummary[] => {
-    const monthMap = new Map<string, MonthChargeSummary>();
-    const msPerDay = 24 * 60 * 60 * 1000;
-
-    const daysBetween = (start: Date, end: Date) =>
-      Math.ceil((end.getTime() - start.getTime()) / msPerDay);
-
-    steps.forEach((step) => {
-      const stepStart = new Date(step.startDate);
-      const stepEnd = new Date(step.endDate);
-      let cursor = new Date(stepStart);
-      cursor.setHours(0, 0, 0, 0);
-      const normalizedEnd = new Date(stepEnd);
-      normalizedEnd.setHours(0, 0, 0, 0);
-
-      while (cursor < normalizedEnd) {
-        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-        const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
-        const bucketDays = daysBetween(cursor, bucketEnd);
-        const quantityDays = step.quantityMT * bucketDays;
-        const rent = roundCurrency(step.quantityMT * step.ratePerDayPerMT * bucketDays);
-        const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
-        const monthLabel = cursor.toLocaleString('default', {
-          month: 'short',
-          year: 'numeric',
-        });
-
-        if (monthMap.has(monthKey)) {
-          const existing = monthMap.get(monthKey)!;
-          existing.totalDays += bucketDays;
-          existing.totalQuantityDays += quantityDays;
-          existing.totalRent = roundCurrency(existing.totalRent + rent);
-          existing.endingBalances = step.inventoryBalances;
-        } else {
-          monthMap.set(monthKey, {
-            monthKey,
-            monthLabel,
-            totalDays: bucketDays,
-            totalQuantityDays: quantityDays,
-            totalRent: rent,
-            endingBalances: step.inventoryBalances,
-          });
-        }
-
-        cursor = bucketEnd;
-      }
-    });
-
-    return Array.from(monthMap.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  };
-
-  const getMonthWiseInventoryRecords = (steps: LedgerStep[], transactions: any[]): MonthInventoryRecord[] => {
-    const monthMap = new Map<string, MonthInventoryRecord>();
-    const normalizeCommodityName = (name: string) => name?.trim().toUpperCase();
-
-    // Get all transactions with full data
-    const allTransactions = transactions
-      .filter(tx => tx)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // Track running inventory balances
-    const runningBalances: { [commodity: string]: number } = {};
-
-    // Process transactions chronologically
-    allTransactions.forEach(tx => {
-      const txDate = new Date(tx.date);
-      const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = txDate.toLocaleString('default', {
-        month: 'short',
-        year: 'numeric',
-      });
-
-      if (!monthMap.has(monthKey)) {
-        // Initialize month record with current running balances as starting balances
-        monthMap.set(monthKey, {
-          monthKey,
-          monthLabel,
-          startingBalances: { ...runningBalances },
-          inwardMovements: {},
-          outwardMovements: {},
-          endingBalances: { ...runningBalances },
-        });
-      }
-
-      const record = monthMap.get(monthKey)!;
-      const commodity = normalizeCommodityName(tx.commodityName);
-
-      // Update movements and ending balances
-      if (tx.direction === 'INWARD') {
-        record.inwardMovements[commodity] = (record.inwardMovements[commodity] || 0) + tx.mt;
-        record.endingBalances[commodity] = (record.endingBalances[commodity] || 0) + tx.mt;
-        runningBalances[commodity] = (runningBalances[commodity] || 0) + tx.mt;
-      } else {
-        record.outwardMovements[commodity] = (record.outwardMovements[commodity] || 0) + tx.mt;
-        record.endingBalances[commodity] = Math.max(0, (record.endingBalances[commodity] || 0) - tx.mt);
-        runningBalances[commodity] = Math.max(0, (runningBalances[commodity] || 0) - tx.mt);
-      }
-    });
-
-    return Array.from(monthMap.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  };
-
-  const monthWiseCharges = useMemo(
-    () => (ledgerData ? getMonthWiseCharges(ledgerData.ledgerSteps) : []),
-    [ledgerData]
-  );
-
-  const monthWiseInventoryRecords = useMemo(
-    () => (ledgerData ? getMonthWiseInventoryRecords(ledgerData.ledgerSteps, transactions) : []),
-    [ledgerData, transactions]
+  const adjustmentInvoices = useMemo(
+    () => ledgerData?.invoiceSummaries?.filter((invoice) => invoice.additionalCharges > 0) ?? [],
+    [ledgerData?.invoiceSummaries]
   );
 
   const currentBalances = useMemo(() => {
@@ -301,11 +183,17 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       'Step No,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹)'
     );
 
-    ledgerData.ledgerSteps.forEach((step) => {
+    // Optionally filter ledger steps by selected month
+    const stepsToExport = ledgerData.ledgerSteps;
+
+    lines.push('Step No,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Rent Days,Transaction Id,Transaction GatePass');
+    stepsToExport.forEach((step) => {
+      const txId = step.transaction?.id || '';
+      const gatePass = step.transaction?.gatePass || '';
       lines.push(
         `${step.stepNo},${step.startDate},${step.endDate},${step.daysDifference},${formatDecimal(
           step.quantityMT
-        )},${formatDecimal(step.ratePerDayPerMT)},${formatDecimal(step.rentAmount)}`
+        )},${formatDecimal(step.ratePerDayPerMT)},${formatDecimal(step.rentAmount)},${step.daysDifference || ''},${txId},${gatePass}`
       );
     });
 
@@ -319,16 +207,16 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     lines.push('SUMMARY');
     lines.push(`Total Rent,${formatDecimal(ledgerData.totalRent)}`);
     lines.push(`Total Paid,${formatDecimal(displayTotalPaid)}`);
-    if (showInvoiceAdjustments && ledgerData.invoiceSummaries?.length) {
+    if (showInvoiceAdjustments && adjustmentInvoices.length > 0) {
       lines.push(`Total Additional Charges,${formatDecimal(totalAdditionalCharges)}`);
     }
     lines.push(`Outstanding Balance,${formatDecimal(displayTotalBalance)}`);
 
-    if (showInvoiceAdjustments && ledgerData.invoiceSummaries?.length) {
+    if (showInvoiceAdjustments && adjustmentInvoices.length > 0) {
       lines.push('');
       lines.push('INVOICE ADJUSTMENTS');
       lines.push('Invoice Id,Invoice Month,Status,Invoice Amount,Additional Charges,Total Invoice Amount');
-      ledgerData.invoiceSummaries.forEach((invoice) => {
+      adjustmentInvoices.forEach((invoice) => {
         lines.push(
           `${invoice.invoiceId},${invoice.invoiceMonth || ''},${invoice.status || ''},${formatDecimal(
             invoice.totalAmount
@@ -345,7 +233,8 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ledger-${clientId}-${new Date().toISOString().split('T')[0]}.csv`;
+    const datePart = new Date().toISOString().split('T')[0];
+    a.download = `ledger-${clientId}-${datePart}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Ledger exported successfully');
@@ -419,41 +308,67 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
         />
       )}
 
-      {showInvoiceAdjustments && ledgerData?.invoiceSummaries?.length ? (
-        (() => {
-          const adjustmentInvoices = ledgerData.invoiceSummaries.filter((invoice) => invoice.additionalCharges > 0);
-          if (adjustmentInvoices.length === 0) return null;
-
-          return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-slate-700">Internal Invoice Charges</h2>
-                <p className="text-xs text-slate-500 mt-1">Total additional invoice charges reflected only in the internal ledger report.</p>
-                <div className="mt-4 text-3xl font-bold text-emerald-700">₹{formatDecimal(
-                  adjustmentInvoices.reduce((sum, invoice) => sum + invoice.additionalCharges, 0)
-                )}</div>
-              </div>
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                <h2 className="text-sm font-semibold text-slate-700">Invoices with Additional Charges</h2>
-                <p className="text-xs text-slate-500 mt-1">Each invoice shown here has an actual additional charge entry.</p>
-                <div className="mt-4 text-sm text-slate-700">
-                  {adjustmentInvoices.slice(0, 3).map((invoice) => (
-                    <div key={invoice.invoiceId} className="mb-3 border-b border-slate-100 pb-3 last:border-b-0">
-                      <div className="font-semibold text-slate-900">{invoice.invoiceId}</div>
-                      <div className="text-slate-600">₹{formatDecimal(invoice.additionalCharges)} additional</div>
-                    </div>
-                  ))}
-                  {adjustmentInvoices.length > 3 && (
-                    <div className="text-xs text-slate-500">And {adjustmentInvoices.length - 3} more invoice(s)...</div>
-                  )}
+      {ledgerData && showWarehouseBreakdowns && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900">Warehouse Breakdown</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              {warehouseBreakdowns.length === 1
+                ? 'This client has ledger data for one warehouse. The warehouse details are shown below.'
+                : 'This client has transactions in multiple warehouses. Each warehouse ledger is shown separately.'}
+            </p>
+          </div>
+          <div className="space-y-6 p-6">
+            {warehouseBreakdowns.map((warehouse) => (
+              <div key={warehouse.warehouseId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{warehouse.warehouseName}</div>
+                    <div className="text-xs text-slate-500">Warehouse ID: {warehouse.warehouseId}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Total Rent</div>
+                    <div className="text-xl font-bold text-emerald-700">₹{formatDecimal(warehouse.ledgerSummary.totalRent)}</div>
+                  </div>
                 </div>
+                <LedgerTable
+                  steps={warehouse.ledgerSummary.ledgerSteps}
+                  isLoading={isLoading}
+                />
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showInvoiceAdjustments && adjustmentInvoices.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <h2 className="text-sm font-semibold text-slate-700">Internal Invoice Charges</h2>
+            <p className="text-xs text-slate-500 mt-1">Total additional invoice charges reflected only in the internal ledger report.</p>
+            <div className="mt-4 text-3xl font-bold text-emerald-700">₹{formatDecimal(
+              adjustmentInvoices.reduce((sum, invoice) => sum + invoice.additionalCharges, 0)
+            )}</div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <h2 className="text-sm font-semibold text-slate-700">Invoices with Additional Charges</h2>
+            <p className="text-xs text-slate-500 mt-1">Each invoice shown here has an actual additional charge entry.</p>
+            <div className="mt-4 text-sm text-slate-700">
+              {adjustmentInvoices.slice(0, 3).map((invoice) => (
+                <div key={invoice.invoiceId} className="mb-3 border-b border-slate-100 pb-3 last:border-b-0">
+                  <div className="font-semibold text-slate-900">{invoice.invoiceId}</div>
+                  <div className="text-slate-600">₹{formatDecimal(invoice.additionalCharges)} additional</div>
+                </div>
+              ))}
+              {adjustmentInvoices.length > 3 && (
+                <div className="text-xs text-slate-500">And {adjustmentInvoices.length - 3} more invoice(s)...</div>
+              )}
             </div>
-          );
-        })()
+          </div>
+        </div>
       ) : null}
 
-      {showInvoiceAdjustments && ledgerData?.invoiceSummaries?.length ? (
+      {showInvoiceAdjustments && adjustmentInvoices.length > 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
             <h2 className="text-lg font-semibold text-slate-900">Invoice Adjustment Summary</h2>
@@ -474,7 +389,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {ledgerData.invoiceSummaries.map((invoice) => (
+                {adjustmentInvoices.map((invoice) => (
                   <tr key={invoice.invoiceId} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-slate-900 font-medium">{invoice.invoiceId}</td>
                     <td className="px-4 py-3 text-slate-700">{invoice.invoiceMonth || 'N/A'}</td>
@@ -490,45 +405,9 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
         </div>
       ) : null}
 
-      {/* View Mode Toggle */}
       {ledgerData && (
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-sm text-slate-600">Choose how you want to view the ledger data.</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode('detail')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                viewMode === 'detail'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Detailed Ledger
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('month')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                viewMode === 'month'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Month-wise Charges
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('inventory')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                viewMode === 'inventory'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Month-wise Inventory
-            </button>
-          </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-sm text-slate-600">Ledger data is now presented cumulatively with historical balances retained.</p>
         </div>
       )}
 
@@ -537,165 +416,69 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
         {/* Left Column: Transactions */}
         <div className="lg:col-span-1">
           {ledgerData && (
-            <CommodityTransactionTimeline
-              transactions={ledgerData.transactions || ledgerData.ledgerSteps
-                .filter((step) => step.transaction)
-                .map((step) => ({
-                  _id: step.transaction?.id || '',
-                  date: step.startDate,
-                  direction: step.transaction?.direction || 'INWARD',
-                  mt: step.quantityMT,
-                  clientName: ledgerData.clientName,
-                  commodityName: step.commodity || 'Various',
-                  gatePass: step.transaction?.gatePass || '',
-                }))}
-              isLoading={isLoading}
-            />
+            <>
+              <div className="mb-4 text-sm text-slate-600">Transactions</div>
+
+              <CommodityTransactionTimeline
+                transactions={
+                  transactions.length > 0
+                    ? transactions
+                    : ledgerData.ledgerSteps
+                        .filter((step) => step.transaction)
+                        .map((step) => ({
+                          _id: step.transaction?.id || '',
+                          date: step.startDate,
+                          direction: step.transaction?.direction || 'INWARD',
+                          mt: step.quantityMT,
+                          clientName: ledgerData.clientName,
+                          commodityName: step.commodity || 'Various',
+                          gatePass: step.transaction?.gatePass || '',
+                          rentAmount: step.rentAmount,
+                          rentDays: step.daysDifference,
+                        }))
+                }
+                isLoading={isLoading}
+              />
+
+              <div className="mt-6 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                  <h3 className="text-md font-semibold text-slate-900">Invoice / Booking Items</h3>
+                  <p className="text-sm text-slate-600 mt-1">All invoice and booking line items for this client.</p>
+                </div>
+                <div className="p-4">
+                  {lineItems.length === 0 ? (
+                    <div className="py-8 text-center text-slate-500">No invoice or booking items available.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {lineItems.map((item) => (
+                        <div key={item.id || `${item.type}-${item.date}-${item.amount}`} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">{item.description || item.type || 'Item'}</div>
+                              <div className="text-xs text-slate-500 mt-1">{item.date ? new Date(item.date).toLocaleDateString() : 'No date'}</div>
+                            </div>
+                            <div className="text-right text-sm text-slate-700">
+                              <div className="font-semibold">₹{formatDecimal(Number(item.amount || 0))}</div>
+                              <div className="text-xs text-slate-500">{item.type || 'invoice/booking'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
         {/* Right Column: Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {ledgerData && viewMode === 'detail' && (
+          {ledgerData && (
             <LedgerTable
               steps={ledgerData.ledgerSteps}
               isLoading={isLoading}
             />
-          )}
-
-          {ledgerData && viewMode === 'month' && (
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-              <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">Month-wise Charges</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Aggregated rent charges by calendar month for the selected client.
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Month</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Days</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Quantity Days</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Avg Qty (MT)</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Rent (₹)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Ending Inventory (MT)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthWiseCharges.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                          No month-wise charges available.
-                        </td>
-                      </tr>
-                    ) : (
-                      monthWiseCharges.map((month) => (
-                        <tr key={month.monthKey} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-900">{month.monthLabel}</td>
-                          <td className="px-4 py-3 text-right text-slate-700">{month.totalDays}</td>
-                          <td className="px-4 py-3 text-right text-slate-700">{formatDecimal(month.totalQuantityDays)}</td>
-                          <td className="px-4 py-3 text-right text-slate-900">
-                            {month.totalDays > 0 ? formatDecimal(month.totalQuantityDays / month.totalDays) : '0.00'}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold text-emerald-700">₹{formatDecimal(month.totalRent)}</td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {Object.entries(month.endingBalances).length === 0
-                              ? 'No inventory'
-                              : Object.entries(month.endingBalances)
-                                  .map(([commodity, qty]) => `${commodity}: ${formatDecimal(qty)}`)
-                                  .join(', ')}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Current Inventory Balances */}
-              {Object.keys(currentBalances).length > 0 && (
-                <div className="mt-6 bg-slate-50 rounded-lg border border-slate-200 p-4">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Current Inventory Balances</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.entries(currentBalances).map(([commodity, qty]) => (
-                      <div key={commodity} className="bg-white rounded-lg border border-slate-200 p-3">
-                        <div className="text-sm text-slate-600">{commodity}</div>
-                        <div className="text-lg font-semibold text-slate-900">{formatDecimal(qty)} MT</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {ledgerData && viewMode === 'inventory' && (
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-              <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">Month-wise Inventory Records</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Inventory movements and balances by calendar month for the selected client.
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Month</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Starting Balance (MT)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Inward (MT)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Outward (MT)</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Ending Balance (MT)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthWiseInventoryRecords.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                          No inventory records available.
-                        </td>
-                      </tr>
-                    ) : (
-                      monthWiseInventoryRecords.map((record) => (
-                        <tr key={record.monthKey} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-900 font-medium">{record.monthLabel}</td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {Object.entries(record.startingBalances).length === 0
-                              ? 'No inventory'
-                              : Object.entries(record.startingBalances)
-                                  .map(([commodity, qty]) => `${commodity}: ${formatDecimal(qty)}`)
-                                  .join(', ')}
-                          </td>
-                          <td className="px-4 py-3 text-green-700">
-                            {Object.entries(record.inwardMovements).length === 0
-                              ? 'None'
-                              : Object.entries(record.inwardMovements)
-                                  .map(([commodity, qty]) => `${commodity}: ${formatDecimal(qty)}`)
-                                  .join(', ')}
-                          </td>
-                          <td className="px-4 py-3 text-red-700">
-                            {Object.entries(record.outwardMovements).length === 0
-                              ? 'None'
-                              : Object.entries(record.outwardMovements)
-                                  .map(([commodity, qty]) => `${commodity}: ${formatDecimal(qty)}`)
-                                  .join(', ')}
-                          </td>
-                          <td className="px-4 py-3 text-slate-900 font-medium">
-                            {Object.entries(record.endingBalances).length === 0
-                              ? 'No inventory'
-                              : Object.entries(record.endingBalances)
-                                  .map(([commodity, qty]) => `${commodity}: ${formatDecimal(qty)}`)
-                                  .join(', ')}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           )}
 
           {/* Payment History */}

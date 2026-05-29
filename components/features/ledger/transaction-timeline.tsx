@@ -123,13 +123,18 @@ export const CommodityTransactionTimeline: React.FC<CommodityTransactionTimeline
                             Client: {txn.clientName}
                           </p>
                         </div>
-                        <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
+                        <div className="flex flex-col items-end">
+                          <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
                           isInward
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'bg-orange-100 text-orange-700'
                         }`}>
                           {formatDecimal(txn.mt)} MT
                         </span>
+                          {(txn as any).rentAmount !== undefined && (
+                            <div className="text-xs text-slate-500 mt-1">Rent: ₹{formatDecimal((txn as any).rentAmount)} · Days: {(txn as any).rentDays ?? '—'}</div>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-slate-500 mt-2">
                         <span className="font-semibold">Date:</span> {txn.date}
@@ -213,13 +218,18 @@ export const TransactionTimeline: React.FC<TransactionTimelineProps> = ({
                     </p>
                     <p className="text-xs text-slate-600 mt-0.5">{txn.commodityName}</p>
                   </div>
-                  <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
-                    isInward
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-orange-100 text-orange-700'
-                  }`}>
-                    {formatDecimal(txn.mt)} MT
-                  </span>
+                      <div className="flex flex-col items-end">
+                        <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
+                          isInward
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {formatDecimal(txn.mt)} MT
+                        </span>
+                        {(txn as any).rentAmount !== undefined && (
+                          <div className="text-xs text-slate-500 mt-1">Rent: ₹{formatDecimal((txn as any).rentAmount)} · Days: {(txn as any).rentDays ?? '—'}</div>
+                        )}
+                      </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-3">
                   <span className="font-semibold">Date:</span> {txn.date}

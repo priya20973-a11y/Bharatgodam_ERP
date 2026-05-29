@@ -15,6 +15,7 @@ export default function RevenueDashboard() {
   const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [warehouseOptions, setWarehouseOptions] = useState<{ label: string; value: string }[]>([]);
   const [monthOptions, setMonthOptions] = useState<{ label: string; value: string }[]>([]);
+  const [warehouseTransactions, setWarehouseTransactions] = useState<any[]>([]);
 
   // Generate month options (last 12 months)
   useEffect(() => {
@@ -34,13 +35,43 @@ export default function RevenueDashboard() {
   useEffect(() => {
     fetchWarehouseOptions();
     loadAnalytics();
+    loadWarehouseTransactions();
   }, []);
 
   useEffect(() => {
-    if (data !== null) {
-      loadAnalytics();
-    }
+    loadAnalytics();
+    loadWarehouseTransactions();
   }, [selectedWarehouse, selectedMonth]);
+
+  const getMonthRange = (monthKey: string) => {
+    const [year, month] = monthKey.split('-');
+    const startDate = `${year}-${month}-01`;
+    const nextMonth = new Date(Number(year), Number(month) - 1 + 1, 1);
+    nextMonth.setDate(nextMonth.getDate() - 1);
+    const endDate = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(nextMonth.getDate()).padStart(2, '0')}`;
+    return { startDate, endDate };
+  };
+
+  const loadWarehouseTransactions = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (selectedWarehouse !== 'ALL') params.append('warehouseId', selectedWarehouse);
+      if (selectedMonth !== 'ALL') {
+        params.append('month', selectedMonth);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await fetch(`/api/revenue-dashboard/ledger-periods${query}`);
+      if (!response.ok) {
+        setWarehouseTransactions([]);
+        return;
+      }
+      const json = await response.json();
+      setWarehouseTransactions(json.periods || []);
+    } catch (error) {
+      console.error('Failed to load ledger periods:', error);
+      setWarehouseTransactions([]);
+    }
+  };
 
   const fetchWarehouseOptions = async () => {
     try {
@@ -90,30 +121,91 @@ export default function RevenueDashboard() {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
   };
 
+  const getTransactionMonth = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return '';
+    return formatMonthLabel(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+  };
+
   const exportToCSV = () => {
     try {
       type MonthlyCharges = Record<string, number>;
 
-const rows = warehouseRevenue.flatMap((item: any) => {
-  const charges = item.monthlyCharges as MonthlyCharges;
+      const warehouseMonthTotals = warehouseTransactions
+        .filter((period) => selectedMonth === 'ALL' || period.month === selectedMonth)
+        .reduce(
+          (acc: Record<string, { warehouseName: string; month: string; amount: number }>, period: any) => {
+            const warehouseName = period.warehouseName || 'Unknown Warehouse';
+            const month = period.month || '';
+            const key = `${warehouseName}||${month}`;
+            const amount = typeof period.rentTotal === 'number' ? period.rentTotal : Number(period.rentTotal || 0);
 
-  return (Object.entries(charges) as [string, number][])
-    .filter(([monthKey]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
-    .map(([monthKey, rent]) => ({
-      'Warehouse Name': item.warehouseName,
-      Month: formatMonthLabel(monthKey),
-      'Rent (₹)': Math.round(rent),
-      'Owner Share (₹)': Math.round(rent * 0.6 * 100) / 100,
-      'Platform Share (₹)': Math.round(rent * 0.4 * 100) / 100,
-    }));
-});
+            if (!acc[key]) {
+              acc[key] = { warehouseName, month, amount: 0 };
+            }
+            acc[key].amount += amount;
+            return acc;
+          },
+          {}
+        );
 
+      const summaryRows = Object.values(warehouseMonthTotals).map((item) => ({
+        'Row Type': 'Revenue Summary',
+        'Warehouse Name': item.warehouseName,
+        'Client Name': '',
+        Month: formatMonthLabel(item.month),
+        Date: '',
+        Direction: '',
+        Commodity: '',
+        'Qty (MT)': '',
+        'Gate Pass': '',
+        Status: '',
+        'Rent (₹)': Math.round(item.amount * 100) / 100,
+        'Owner Share (₹)': Math.round(item.amount * 0.6 * 100) / 100,
+        'Platform Share (₹)': Math.round(item.amount * 0.4 * 100) / 100,
+      }));
+
+      const transactionRows = warehouseTransactions
+        .filter((period) => selectedMonth === 'ALL' || period.month === selectedMonth)
+        .map((period) => ({
+          'Row Type': 'Ledger Period',
+          'Warehouse Name': period.warehouseName || '',
+          'Client Name': period.clientName || '',
+          Month: formatMonthLabel(period.month),
+          Date: `${period.periodStart} to ${period.periodEnd}`,
+          Direction: 'Storage',
+          Commodity: period.commodityName || '',
+          'Qty (MT)': typeof period.quantityMT === 'number' ? period.quantityMT.toFixed(2) : '',
+          'Gate Pass': '',
+          Status: period.status || '',
+          'Rent (₹)': typeof period.rentTotal === 'number' ? period.rentTotal.toFixed(2) : '',
+          'Owner Share (₹)': '',
+          'Platform Share (₹)': '',
+        }));
+
+      const rows = [...summaryRows, ...transactionRows];
       if (rows.length === 0) {
-        toast.error('No revenue data available to export');
+        toast.error('No revenue or transaction data available to export');
         return;
       }
 
-      const header = Object.keys(rows[0]);
+      const header = [
+        'Row Type',
+        'Warehouse Name',
+        'Client Name',
+        'Month',
+        'Date',
+        'Direction',
+        'Commodity',
+        'Qty (MT)',
+        'Gate Pass',
+        'Status',
+        'Rent (₹)',
+        'Owner Share (₹)',
+        'Platform Share (₹)',
+      ];
+
       const csvLines = [header.join(',')];
       for (const row of rows) {
         const line = header.map((key) => {
@@ -246,7 +338,7 @@ const rows = warehouseRevenue.flatMap((item: any) => {
             </div>
             <Button
               onClick={exportToCSV}
-              disabled={revenueRows.length === 0}
+              disabled={revenueRows.length === 0 && warehouseTransactions.length === 0}
               className="font-bold bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
@@ -288,6 +380,7 @@ const rows = warehouseRevenue.flatMap((item: any) => {
           </Table>
         </CardContent>
       </Card>
+
     </div>
   );
 }

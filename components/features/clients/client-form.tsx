@@ -138,6 +138,15 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
+          <label className="text-sm font-medium">Mobile Number</label>
+          <Input 
+            required 
+            value={formData.mobile} 
+            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })} 
+            placeholder="+91 98765 43210"
+          />
+        </div>
+        <div className="space-y-2">
           <label className="text-sm font-medium">PAN Card Number</label>
           <Input 
             required 

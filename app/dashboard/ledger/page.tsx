@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getClients } from '@/app/actions/client-actions';
 import { LedgerCalculator } from '@/components/features/ledger';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +23,17 @@ export default function LedgerDashboard() {
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedTab, setSelectedTab] = useState<'clients' | 'warehouse'>('clients');
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const [warehouseLoading, setWarehouseLoading] = useState(false);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
+  const [warehouseReport, setWarehouseReport] = useState<any | null>(null);
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>('all');
 
   useEffect(() => {
     loadClients();
+    loadWarehouses();
   }, []);
 
   const loadClients = async () => {
@@ -35,9 +43,185 @@ export default function LedgerDashboard() {
     setLoading(false);
   };
 
+  const loadWarehouses = async () => {
+    try {
+      const response = await fetch('/api/warehouses');
+      const result = await response.json();
+      if (result.success) {
+        setWarehouses(result.warehouses || []);
+      }
+    } catch (error) {
+      console.error('Failed to load warehouses', error);
+    }
+  };
+
+  const fetchWarehouseReport = async (warehouseId: string) => {
+    if (!warehouseId) {
+      setWarehouseReport(null);
+      setWarehouseError(null);
+      return;
+    }
+
+    setWarehouseLoading(true);
+    setWarehouseError(null);
+
+    try {
+      const response = await fetch(`/api/reports/ledger/warehouse?warehouseId=${encodeURIComponent(warehouseId)}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Unable to load warehouse ledger');
+      }
+      setWarehouseReport(result.data);
+    setSelectedMonthKey('all');
+    } catch (error: any) {
+      console.error('Failed to load warehouse ledger report', error);
+      setWarehouseError(error?.message || 'Failed to load warehouse ledger report');
+      setWarehouseReport(null);
+    } finally {
+      setWarehouseLoading(false);
+    }
+  };
+
   const handleDrillDown = (client: any) => {
     setSelectedClient(client);
   };
+
+  const availableMonthKeys = useMemo(() => {
+    if (!warehouseReport?.transactionRecords?.length) return [];
+    const keys = new Set<string>();
+    warehouseReport.transactionRecords.forEach((tx: any) => {
+      const date = new Date(tx.date);
+      if (!Number.isNaN(date.getTime())) {
+        keys.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+      }
+    });
+    return Array.from(keys).sort();
+  }, [warehouseReport]);
+
+  const formatMonthLabel = (monthKey: string) => {
+    const [year, month] = monthKey.split('-');
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+  };
+
+  const filteredTransactionRecords = useMemo(() => {
+    if (!warehouseReport?.transactionRecords?.length) return [];
+    if (selectedMonthKey === 'all') return warehouseReport.transactionRecords;
+    return warehouseReport.transactionRecords.filter((tx: any) => {
+      const date = new Date(tx.date);
+      if (Number.isNaN(date.getTime())) return false;
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === selectedMonthKey;
+    });
+  }, [warehouseReport, selectedMonthKey]);
+
+  const filteredClientSummaries = useMemo(() => {
+    if (selectedMonthKey === 'all' || !warehouseReport?.transactionRecords?.length) {
+      return warehouseReport?.clientSummaries || [];
+    }
+    const map = new Map<string, any>();
+    filteredTransactionRecords.forEach((tx: any) => {
+      const clientKey = `${tx.clientName || 'Unknown Client'}|${tx.commodityName || 'Unknown Commodity'}`;
+      if (!map.has(clientKey)) {
+        map.set(clientKey, {
+          clientName: tx.clientName || 'Unknown Client',
+          commodityName: tx.commodityName || 'Unknown Commodity',
+          inwardMT: 0,
+          outwardMT: 0,
+          balanceMT: 0,
+          transactionCount: 0,
+        });
+      }
+      const summary = map.get(clientKey);
+      const inwardMT = tx.direction === 'INWARD' ? Number(tx.mt || 0) : 0;
+      const outwardMT = tx.direction === 'OUTWARD' ? Number(tx.mt || 0) : 0;
+      summary.inwardMT += inwardMT;
+      summary.outwardMT += outwardMT;
+      summary.balanceMT += inwardMT - outwardMT;
+      summary.transactionCount += 1;
+    });
+    return Array.from(map.values()).sort((a, b) => a.clientName.localeCompare(b.clientName) || a.commodityName.localeCompare(b.commodityName));
+  }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
+
+  const filteredCommoditySummaries = useMemo(() => {
+    if (selectedMonthKey === 'all' || !warehouseReport?.transactionRecords?.length) {
+      return warehouseReport?.commoditySummaries || [];
+    }
+    const map = new Map<string, any>();
+    filteredTransactionRecords.forEach((tx: any) => {
+      const commodityName = tx.commodityName || 'Unknown Commodity';
+      if (!map.has(commodityName)) {
+        map.set(commodityName, {
+          commodityName,
+          inwardMT: 0,
+          outwardMT: 0,
+          balanceMT: 0,
+          clientIds: new Set<string>(),
+        });
+      }
+      const summary = map.get(commodityName);
+      const inwardMT = tx.direction === 'INWARD' ? Number(tx.mt || 0) : 0;
+      const outwardMT = tx.direction === 'OUTWARD' ? Number(tx.mt || 0) : 0;
+      summary.inwardMT += inwardMT;
+      summary.outwardMT += outwardMT;
+      summary.balanceMT += inwardMT - outwardMT;
+      summary.clientIds.add(tx.clientName || 'Unknown Client');
+    });
+    return Array.from(map.values()).map((summary) => ({
+      commodityName: summary.commodityName,
+      inwardMT: summary.inwardMT,
+      outwardMT: summary.outwardMT,
+      balanceMT: summary.balanceMT,
+      clientCount: summary.clientIds.size,
+    })).sort((a, b) => b.balanceMT - a.balanceMT || a.commodityName.localeCompare(b.commodityName));
+  }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
+
+  const filteredClientLedgerSummaries = useMemo(() => {
+    if (selectedMonthKey === 'all' || !warehouseReport?.transactionRecords?.length) {
+      return warehouseReport?.clientLedgerSummaries || [];
+    }
+    const visibleKeys = new Set<string>();
+    filteredTransactionRecords.forEach((tx: any) => {
+      visibleKeys.add(`${tx.clientName || 'Unknown Client'}|${tx.commodityName || 'Unknown Commodity'}`);
+    });
+    return (warehouseReport?.clientLedgerSummaries || []).filter((item: any) =>
+      visibleKeys.has(`${item.clientName || 'Unknown Client'}|${item.commodityName || 'Unknown Commodity'}`)
+    );
+  }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
+
+  const filteredSummary = useMemo(() => {
+    if (!warehouseReport?.transactionRecords?.length) {
+      return {
+        totalClients: 0,
+        totalCommodities: 0,
+        totalInwardMT: 0,
+        totalOutwardMT: 0,
+        netMT: 0,
+      };
+    }
+    const rows = selectedMonthKey === 'all' ? warehouseReport.transactionRecords : filteredTransactionRecords;
+    const clientIds = new Set<string>();
+    const commodityIds = new Set<string>();
+    let totalInwardMT = 0;
+    let totalOutwardMT = 0;
+
+    rows.forEach((tx: any) => {
+      clientIds.add(tx.clientName || 'Unknown Client');
+      commodityIds.add(tx.commodityName || 'Unknown Commodity');
+      if (tx.direction === 'INWARD') {
+        totalInwardMT += Number(tx.mt || 0);
+      } else if (tx.direction === 'OUTWARD') {
+        totalOutwardMT += Number(tx.mt || 0);
+      }
+    });
+
+    return {
+      totalClients: clientIds.size,
+      totalCommodities: commodityIds.size,
+      totalInwardMT: Number(totalInwardMT.toFixed(2)),
+      totalOutwardMT: Number(totalOutwardMT.toFixed(2)),
+      netMT: Number((totalInwardMT - totalOutwardMT).toFixed(2)),
+    };
+  }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
 
   const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -72,43 +256,318 @@ export default function LedgerDashboard() {
 
       </div>
 
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl border shadow-sm">
-        <Search className="h-5 w-5 text-slate-400" />
-        <Input 
-          placeholder="Search by client name or type..." 
-          className="max-w-md border-none focus-visible:ring-0 shadow-none text-lg"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border shadow-sm">
+        <div className="flex flex-wrap gap-2" suppressHydrationWarning>
+          <button
+            type="button"
+            onClick={() => setSelectedTab('clients')}
+            className={`px-4 py-2 rounded-full font-semibold transition ${
+              selectedTab === 'clients'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Client Ledger
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedTab('warehouse')}
+            className={`px-4 py-2 rounded-full font-semibold transition ${
+              selectedTab === 'warehouse'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Warehouse Ledger Report
+          </button>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          [1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-xl" />)
+        {selectedTab === 'clients' ? (
+          <div className="flex items-center gap-4">
+            <Search className="h-5 w-5 text-slate-400" />
+            <Input 
+              placeholder="Search by client name or type..." 
+              className="max-w-md border-none focus-visible:ring-0 shadow-none text-lg"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         ) : (
-          filteredClients.map((client, index) => (
-            <Card 
-              key={`${client._id || client.id || index}-${client.name}-${index}`} 
-              className="group hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-sm"
-              onClick={() => handleDrillDown(client)}
-            >
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                    <Landmark className="h-6 w-6 text-indigo-600 group-hover:text-white" />
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900">{client.name}</h3>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.type}</Badge>
-                  <p className="text-xs text-slate-400 font-medium">{client.mobile}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">Select Warehouse</label>
+              <select
+                value={selectedWarehouseId}
+                onChange={(e) => {
+                  const warehouseId = e.target.value;
+                  setSelectedWarehouseId(warehouseId);
+                  fetchWarehouseReport(warehouseId);
+                }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">Choose warehouse</option>
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id || warehouse._id?.toString()} value={warehouse.id || warehouse._id?.toString()}>
+                    {warehouse.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">Select Month</label>
+              <select
+                value={selectedMonthKey}
+                onChange={(e) => setSelectedMonthKey(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+                disabled={!availableMonthKeys.length}
+              >
+                <option value="all">All months</option>
+                {availableMonthKeys.map((monthKey) => (
+                  <option key={monthKey} value={monthKey}>
+                    {formatMonthLabel(monthKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end justify-end">
+              <button
+                type="button"
+                disabled={!selectedWarehouseId || warehouseLoading || !warehouseReport}
+                onClick={() => {
+                  if (!warehouseReport) return;
+                  const lines: string[] = [];
+                  lines.push('Warehouse Ledger Report');
+                  lines.push(`Warehouse Name,${warehouseReport.warehouseName}`);
+                  lines.push(`Generated At,${new Date().toISOString()}`);
+                  lines.push(`Total Clients,${filteredSummary.totalClients}`);
+                  lines.push(`Total Commodities,${selectedMonthKey === 'all' ? warehouseReport.totalCommodities : filteredCommoditySummaries.length}`);
+                  lines.push(`Total Inward (MT),${filteredSummary.totalInwardMT}`);
+                  lines.push(`Total Outward (MT),${filteredSummary.totalOutwardMT}`);
+                  lines.push(`Net Balance (MT),${filteredSummary.netMT}`);
+                  lines.push('');
+                  lines.push('Transaction Date,Client,Commodity,Direction,MT,Source,Transaction ID');
+
+                  (filteredTransactionRecords || []).forEach((tx: any) => {
+                    lines.push([
+                      tx.date || '',
+                      tx.clientName || '',
+                      tx.commodityName || '',
+                      tx.direction || '',
+                      Number(tx.mt || 0).toFixed(2),
+                      tx.source || 'ledger',
+                      tx._id || '',
+                    ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+                  });
+
+                  lines.push('');
+                  lines.push('Client,Commodity,Inward MT,Outward MT,Balance MT,Total Rent (₹),Current Inventory (MT),Transaction Count');
+                  (selectedMonthKey === 'all' ? warehouseReport.clientLedgerSummaries : filteredClientSummaries || []).forEach((row: any) => {
+                    lines.push([
+                      row.clientName,
+                      row.commodityName,
+                      Number(row.inwardMT || 0).toFixed(2),
+                      Number(row.outwardMT || 0).toFixed(2),
+                      Number(row.balanceMT || 0).toFixed(2),
+                      Number(row.totalRent || 0).toFixed(2),
+                      Number(row.currentInventory || 0).toFixed(2),
+                      row.transactionCount || 0,
+                    ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+                  });
+
+                  lines.push('');
+                  lines.push('Commodity,Inward MT,Outward MT,Net MT,Client Count');
+                  (selectedMonthKey === 'all' ? warehouseReport.commoditySummaries : filteredCommoditySummaries).forEach((commodity: any) => {
+                    lines.push(
+                      `${commodity.commodityName},${commodity.inwardMT.toFixed(2)},${commodity.outwardMT.toFixed(2)},${commodity.balanceMT.toFixed(2)},${commodity.clientCount}`
+                    );
+                  });
+
+                  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement('a');
+                  anchor.href = url;
+                  const monthSuffix = selectedMonthKey === 'all' ? 'all-months' : selectedMonthKey;
+                  anchor.download = `warehouse-ledger-${warehouseReport.warehouseName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${monthSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Download Full Ledger CSV
+              </button>
+            </div>
+          </div>
         )}
       </div>
+
+      {selectedTab === 'warehouse' ? (
+        <div className="space-y-6">
+          {warehouseError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+              {warehouseError}
+            </div>
+          )}
+          {warehouseLoading && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-600">
+              Loading warehouse ledger report...
+            </div>
+          )}
+          {!warehouseLoading && selectedWarehouseId && warehouseReport ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Warehouse</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{warehouseReport.warehouseName}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Clients with inventory</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{filteredSummary.totalClients}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-sm text-slate-500">Net balance (MT)</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{filteredSummary.netMT.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Client Commodity Ledger</h2>
+                  <p className="text-sm text-slate-600 mt-1">Combined totals for each client and commodity in the selected warehouse.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Client</th>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Commodity</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Inward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Outward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Balance (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Transactions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedMonthKey === 'all' ? warehouseReport.clientSummaries : filteredClientSummaries).map((row: any) => (
+                        <tr key={`${row.clientName}-${row.commodityName}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-slate-900">{row.clientName}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.commodityName}</td>
+                          <td className="px-4 py-3 text-right text-green-700">{row.inwardMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-red-700">{row.outwardMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{row.balanceMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{row.transactionCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Client Ledger Details</h2>
+                  <p className="text-sm text-slate-600 mt-1">Rent, inventory and transaction detail summary for each client and commodity in this warehouse.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Client</th>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Commodity</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Total Rent (₹)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Current Inventory (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Inward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Outward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Balance (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Transactions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredClientLedgerSummaries.map((item: any) => (
+                        <tr key={`${item.clientName}-${item.commodityName}-detail`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-slate-900">{item.clientName}</td>
+                          <td className="px-4 py-3 text-slate-700">{item.commodityName}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(item.totalRent || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(item.currentInventory || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-green-700">{Number(item.inwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-red-700">{Number(item.outwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(item.balanceMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{item.transactionCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Commodity Summary</h2>
+                  <p className="text-sm text-slate-600 mt-1">Total movement and client count by commodity for the selected warehouse.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-700">Commodity</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Inward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Outward (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Net (MT)</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-700">Clients</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCommoditySummaries.map((commodity: any) => (
+                        <tr key={commodity.commodityName} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-slate-900">{commodity.commodityName}</td>
+                          <td className="px-4 py-3 text-right text-green-700">{commodity.inwardMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-red-700">{commodity.outwardMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{commodity.balanceMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{commodity.clientCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {!warehouseLoading && !selectedWarehouseId && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-600">
+              Please select a warehouse to view the ledger report.
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {selectedTab === 'clients' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {loading ? (
+            [1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-xl" />)
+          ) : (
+            filteredClients.map((client, index) => (
+              <Card 
+                key={`${client._id || client.id || index}-${client.name}-${index}`} 
+                className="group hover:border-indigo-500 cursor-pointer transition-all duration-200 shadow-sm"
+                onClick={() => handleDrillDown(client)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                      <Landmark className="h-6 w-6 text-indigo-600 group-hover:text-white" />
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">{client.name}</h3>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.type}</Badge>
+                    <p className="text-xs text-slate-400 font-medium">{client.mobile}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

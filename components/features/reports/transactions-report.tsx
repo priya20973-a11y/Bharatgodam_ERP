@@ -40,6 +40,7 @@ interface TransactionRecord {
   warehouseName: string;
   warehouseId: string;
   quantityMT: number;
+  rentTotal?: number;
   bagsCount?: number;
   gatePass?: string;
   stackNo?: string;

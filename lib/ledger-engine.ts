@@ -12,6 +12,8 @@ export interface Transaction {
   clientName: string;
   commodityName: string;
   gatePass: string;
+  warehouseId?: string;
+  warehouseName?: string;
 }
 
 export interface Payment {
@@ -82,6 +84,12 @@ export interface LedgerEntry {
   createdAt: Date;
 }
 
+export interface WarehouseBreakdown {
+  warehouseId: string;
+  warehouseName: string;
+  ledgerSummary: LedgerSummary;
+}
+
 export interface LedgerSummary {
   clientName: string;
   ledgerSteps: LedgerStep[];
@@ -93,6 +101,7 @@ export interface LedgerSummary {
   calculationDate: string; // Today's date when calculation was run
   invoiceSummaries?: InvoiceAdjustmentSummary[];
   invoiceOutstandingTotal?: number;
+  warehouseBreakdowns?: WarehouseBreakdown[];
 }
 
 export interface AggregatedLedgerSummary extends LedgerSummary {
@@ -213,29 +222,41 @@ export function calculateLedger(
 
     // Calculate rent from previous date to current date
     if (i > 0) {
-      const daysDiff = calculateDaysDifference(previousDate, currentDate);
-      // Calculate rent for each commodity
-      let totalRentAmount = 0;
-      for (const [commodity, qty] of inventory) {
-        const commodityRate = getRate(commodity);
-        totalRentAmount += qty * commodityRate * daysDiff;
+      // Split the interval between previousDate and currentDate into month-aligned buckets
+      let cursor = new Date(previousDate);
+      cursor.setHours(0, 0, 0, 0);
+      const normalizedEnd = new Date(currentDate);
+      normalizedEnd.setHours(0, 0, 0, 0);
+
+      while (cursor < normalizedEnd) {
+        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
+        const bucketDays = calculateDaysDifference(cursor, bucketEnd);
+
+        // Calculate rent for this bucket
+        let bucketRent = 0;
+        for (const [commodity, qty] of inventory) {
+          const commodityRate = getRate(commodity);
+          bucketRent += qty * commodityRate * bucketDays;
+        }
+        const rentAmount = roundCurrency(bucketRent);
+        const totalQuantity = Array.from(inventory.values()).reduce((sum, q) => sum + q, 0);
+
+        ledgerSteps.push({
+          stepNo,
+          startDate: formatDateToString(cursor),
+          endDate: formatDateToString(bucketEnd),
+          daysDifference: bucketDays,
+          quantityMT: totalQuantity,
+          commodity: sortedTransactions[i - 1].commodityName,
+          inventoryBalances: Object.fromEntries(inventory),
+          ratePerDayPerMT: getRate(sortedTransactions[i - 1].commodityName),
+          rentAmount,
+        });
+
+        stepNo++;
+        cursor = bucketEnd;
       }
-      const rentAmount = roundCurrency(totalRentAmount);
-      const totalQuantity = Array.from(inventory.values()).reduce((sum, qty) => sum + qty, 0);
-
-      ledgerSteps.push({
-        stepNo,
-        startDate: formatDateToString(sortedTransactions[i - 1].date),
-        endDate: formatDateToString(currentTxn.date),
-        daysDifference: daysDiff,
-        quantityMT: totalQuantity,
-        commodity: sortedTransactions[i - 1].commodityName,
-        inventoryBalances: Object.fromEntries(inventory),
-        ratePerDayPerMT: getRate(sortedTransactions[i - 1].commodityName), // Keep for compatibility, but not used in calculation
-        rentAmount,
-      });
-
-      stepNo++;
     }
 
     // Update inventory after transaction
@@ -267,25 +288,40 @@ export function calculateLedger(
     const daysDiff = calculateDaysDifference(lastTxnDate, asOfDate);
     const totalQuantity = Array.from(inventory.values()).reduce((sum, qty) => sum + qty, 0);
     if (daysDiff > 0 && totalQuantity > 0) {
-      // Calculate rent for each commodity
-      let totalRentAmount = 0;
-      for (const [commodity, qty] of inventory) {
-        const commodityRate = getRate(commodity);
-        totalRentAmount += qty * commodityRate * daysDiff;
-      }
-      const rentAmount = roundCurrency(totalRentAmount);
+      // Split final period into month-aligned buckets to ensure each calendar month shows carried-forward rent
+      let cursor = new Date(lastTxnDate);
+      cursor.setHours(0, 0, 0, 0);
+      const normalizedEnd = new Date(asOfDate);
+      normalizedEnd.setHours(0, 0, 0, 0);
 
-      ledgerSteps.push({
-        stepNo,
-        startDate: formatDateToString(sortedTransactions[sortedTransactions.length - 1].date),
-        endDate: formatDateToString(asOfDate),
-        daysDifference: daysDiff,
-        quantityMT: totalQuantity,
-        commodity: sortedTransactions[sortedTransactions.length - 1].commodityName,
-        inventoryBalances: Object.fromEntries(inventory),
-        ratePerDayPerMT: getRate(sortedTransactions[sortedTransactions.length - 1].commodityName),
-        rentAmount,
-      });
+      while (cursor < normalizedEnd) {
+        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
+        const bucketDays = calculateDaysDifference(cursor, bucketEnd);
+
+        let bucketRent = 0;
+        for (const [commodity, qty] of inventory) {
+          const commodityRate = getRate(commodity);
+          bucketRent += qty * commodityRate * bucketDays;
+        }
+
+        const rentAmount = roundCurrency(bucketRent);
+
+        ledgerSteps.push({
+          stepNo,
+          startDate: formatDateToString(cursor),
+          endDate: formatDateToString(bucketEnd),
+          daysDifference: bucketDays,
+          quantityMT: totalQuantity,
+          commodity: sortedTransactions[sortedTransactions.length - 1].commodityName,
+          inventoryBalances: Object.fromEntries(inventory),
+          ratePerDayPerMT: getRate(sortedTransactions[sortedTransactions.length - 1].commodityName),
+          rentAmount,
+        });
+
+        stepNo++;
+        cursor = bucketEnd;
+      }
     }
   }
 

@@ -127,16 +127,17 @@ export async function POST(request: NextRequest) {
     }
 
     const ownershipFields = appendOwnershipForMongo({}, session);
-    const deleteFilter: any = {
-      invoiceId: parsed.invoiceId,
-      $or: [
-        ownershipFields,
-        { userId: { $exists: false } },
-        { userEmail: { $exists: false } },
-      ],
+    const invoiceMasterId = invoiceMaster?._id?.toString?.();
+    const deleteQuery: any = {
+      ...ownershipFields,
+      $or: [{ invoiceId: parsed.invoiceId }],
     };
 
-    await db.collection('invoice_adjustments').deleteMany(deleteFilter);
+    if (invoiceMasterId) {
+      deleteQuery.$or.push({ masterId: invoiceMasterId });
+    }
+
+    await db.collection('invoice_adjustments').deleteMany(deleteQuery);
 
     if (normalizedCharges.length > 0) {
       const insertResult = await db.collection('invoice_adjustments').insertMany(

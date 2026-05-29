@@ -350,6 +350,25 @@ export async function GET(request: Request) {
       .sort({ date: -1, createdAt: -1 })
       .toArray();
 
+    const transactionIds = transactions
+      .map((t: any) => t._id?.toString())
+      .filter((id: string | undefined): id is string => typeof id === 'string');
+
+    const rentEntries = transactionIds.length > 0
+      ? await db.collection('ledger_time_state')
+        .find({ 'affectedTransaction.transactionId': { $in: transactionIds } })
+        .project({ 'affectedTransaction.transactionId': 1, rentCalculated: 1 })
+        .toArray()
+      : [];
+
+    const rentByTransactionId = new Map<string, number>();
+    rentEntries.forEach((entry: any) => {
+      const transactionId = entry?.affectedTransaction?.transactionId;
+      if (!transactionId) return;
+      const rentValue = Number(entry.rentCalculated || 0);
+      rentByTransactionId.set(transactionId, (rentByTransactionId.get(transactionId) || 0) + rentValue);
+    });
+
     return NextResponse.json({
       success: true,
       count: transactions.length,
@@ -364,8 +383,10 @@ export async function GET(request: Request) {
         date: t.date,
         gatePass: t.gatePass,
         warehouseId: t.warehouseId,
+        warehouseName: t.warehouseName || '',
         status: t.status,
         createdAt: t.createdAt,
+        rentTotal: Math.round((rentByTransactionId.get(t._id?.toString() || '') || 0) * 100) / 100,
       }))
     });
 

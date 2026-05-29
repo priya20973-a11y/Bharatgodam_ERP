@@ -29,7 +29,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     paymentQuery.accountId = accountId;
   }
 
-  const [bookings, transactionDocs, paymentsDocs, invoiceMasters, commoditiesResult] = await Promise.all([
+  const [bookings, transactionDocs, paymentsDocs, invoiceMasters, commoditiesResult, warehousesResult] = await Promise.all([
     db.collection('bookings')
       .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
       .sort({ date: 1 })
@@ -46,6 +46,9 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
       .toArray(),
     db.collection('commodities')
+      .find({ ...tenantFilter })
+      .toArray(),
+    db.collection('warehouses')
       .find({ ...tenantFilter })
       .toArray(),
   ]);
@@ -102,6 +105,13 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     }
   });
 
+  const warehouseNameById = new Map<string, string>();
+  warehousesResult.forEach((warehouse: any) => {
+    if (warehouse?._id) {
+      warehouseNameById.set(warehouse._id.toString(), warehouse.name || 'Unknown Warehouse');
+    }
+  });
+
   const normalizeTransactionKey = (txn: Transaction & { clientId?: string; warehouseId?: string }) => {
     const clientKey = (txn.clientId || txn.clientName || '').toString().trim().toUpperCase();
     const commodityKey = (txn.commodityName || '').toString().trim().toUpperCase();
@@ -137,6 +147,9 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       clientName: txn.clientName,
       commodityName: txn.commodityName,
       warehouseId: txn.warehouseId?.toString?.() || undefined,
+      warehouseName: txn.warehouseId?.toString?.()
+        ? warehouseNameById.get(txn.warehouseId.toString()) || 'Unknown Warehouse'
+        : 'Unknown Warehouse',
       gatePass: txn.gatePass,
     })
   );
@@ -151,6 +164,9 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       clientName: txn.clientName || bookings[0]?.clientName || accountId,
       commodityName: txn.commodityName,
       warehouseId: txn.warehouseId || undefined,
+      warehouseName: txn.warehouseId
+        ? warehouseNameById.get(txn.warehouseId.toString()) || 'Unknown Warehouse'
+        : 'Unknown Warehouse',
       gatePass: txn.gatePass || '',
     })
   );
@@ -162,6 +178,40 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     date: pay.paymentDate || pay.date,
     amount: pay.amount,
     clientName: pay.clientName || bookings[0]?.clientName || accountId,
+  }));
+
+  const warehouseGroups = new Map<string, {
+    warehouseId: string;
+    warehouseName: string;
+    transactions: Transaction[];
+  }>();
+
+  transactionData.forEach((txn) => {
+    const warehouseId = txn.warehouseId?.toString?.() || 'unknown';
+    const warehouseName = warehouseId === 'unknown'
+      ? 'Unknown Warehouse'
+      : warehouseNameById.get(warehouseId) || 'Unknown Warehouse';
+
+    const group = warehouseGroups.get(warehouseId) || {
+      warehouseId,
+      warehouseName,
+      transactions: [],
+    };
+
+    group.transactions.push(txn);
+    warehouseGroups.set(warehouseId, group);
+  });
+
+  const warehouseBreakdowns = Array.from(warehouseGroups.values()).map((group) => ({
+    warehouseId: group.warehouseId,
+    warehouseName: group.warehouseName,
+    ledgerSummary: calculateLedger(
+      group.transactions,
+      [],
+      bookings[0]?.clientName || accountId,
+      0,
+      commodityRates
+    ),
   }));
 
   const adjustmentsByInvoiceId = new Map<string, any[]>();
@@ -187,12 +237,14 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   });
 
   const normalizeAdjustmentItems = (items: any[]) =>
-    (items || []).map((item) => ({
-      id: item._id?.toString(),
-      name: item.name || item.note || 'Additional Charge',
-      amount: Number(item.amount ?? item.additionalCharges ?? 0),
-      note: item.note || '',
-    }));
+    (items || [])
+      .map((item) => ({
+        id: item._id?.toString(),
+        name: item.name || item.note || 'Additional Charge',
+        amount: Number(item.amount ?? item.additionalCharges ?? 0),
+        note: item.note || '',
+      }))
+      .filter((item) => item.amount > 0);
 
   const invoiceSummaries = invoiceMasters.map((invoice: any) => {
     const clientId = invoice.clientId?.toString?.() || invoice.clientId;
@@ -253,6 +305,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   return {
     ...ledgerSummary,
     transactions: transactionData,
+    warehouseBreakdowns,
     matchedRecords,
     recordCount: matchedRecords.length,
     isAggregated: matchedRecords.length > 1,
