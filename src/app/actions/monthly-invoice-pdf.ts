@@ -17,8 +17,33 @@ interface MonthlyInvoice {
     status: string;
     commodityName: string;
   }>;
+  transactions?: Array<{
+    direction?: string;
+    date?: string;
+    commodityName?: string;
+    startDate?: string;
+    endDate?: string;
+    quantityMT?: number;
+    bags?: number | string;
+    gatePass?: string;
+    status?: string;
+    daysTotal?: number;
+    rentTotal?: number;
+  }>;
   warehouseId?: string;
   warehouseName?: string;
+  companyLogo?: string;
+  companyName?: string;
+  companyAddress?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  invoiceDate?: string;
+  clientAddress?: string;
+  clientPhone?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  bankBranch?: string;
   totalRent: number;
   previousBalance?: number;
   additionalCharges?: number;
@@ -84,7 +109,11 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promi
   const newBalance = invoice.newBalance !== undefined ? invoice.newBalance : roundCurrency(totalAmount + previousBalance + additionalCharges - currentPayments);
   const grandTotal = roundCurrency(totalAmount + previousBalance + additionalCharges);
 
-  const periods = invoice.periods || [];
+  const rows = (Array.isArray(invoice.transactions) && invoice.transactions.length
+    ? invoice.transactions
+    : Array.isArray(invoice.periods)
+      ? invoice.periods
+      : []) as any[];
 
   const html = `
 <!DOCTYPE html>
@@ -104,147 +133,171 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promi
             margin: 0;
             padding: 0;
             background-color: white;
-            color: #333;
+            color: #1f2937;
         }
         body {
             font-family: 'Arial', sans-serif;
+            line-height: 1.45;
         }
         .invoice-container {
             width: 100%;
             min-height: 100%;
-            margin: 0;
+            margin: 0 auto;
             background: white;
-            border-radius: 0;
-            box-shadow: none;
             overflow: visible;
         }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        .logo {
-            position: absolute;
-            top: 20px;
-            left: 30px;
-            font-size: 2em;
-            font-weight: bold;
-            color: white;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 2.5em;
-            font-weight: 300;
-        }
-        .header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-        .invoice-details {
-            padding: 30px;
-            border-bottom: 1px solid #eee;
-        }
-        .detail-row {
+        .top-section {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 15px;
+            align-items: flex-start;
+            gap: 24px;
+            padding: 24px 30px 16px;
         }
-        .detail-label {
-            font-weight: bold;
-            color: #666;
+        .company-block {
+            max-width: 52%;
         }
-        .detail-value {
-            color: #333;
+        .company-logo {
+            max-width: 120px;
+            margin-bottom: 16px;
         }
-        .periods-section {
-            padding: 30px;
+        .company-name {
+            color: #0d6f2a;
+            font-size: 1.9em;
+            font-weight: 700;
+            margin: 0;
         }
-        .section-title {
-            font-size: 1.5em;
-            color: #333;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
+        .company-meta {
+            font-size: 0.95em;
+            color: #4b5563;
+            margin-top: 8px;
         }
-        .periods-table {
+        .invoice-meta {
+            text-align: right;
+            min-width: 220px;
+        }
+        .invoice-title {
+            color: #0d6f2a;
+            font-size: 1.9em;
+            font-weight: 700;
+            margin: 0 0 6px;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 0.95em;
+            color: #1f2937;
+        }
+        .invoice-meta span {
+            display: block;
+            font-weight: 600;
+        }
+        .bill-to {
+            padding: 22px 30px;
+            border-top: 2px solid #e5e7eb;
+            border-bottom: 2px solid #e5e7eb;
+            margin: 0 30px 24px;
+        }
+        .bill-to h2 {
+            margin: 0 0 10px;
+            font-size: 1.2em;
+            color: #111827;
+        }
+        .bill-to p {
+            margin: 3px 0;
+            font-size: 0.95em;
+            color: #4b5563;
+        }
+        .invoice-table-container {
+            padding: 0 30px 24px;
+        }
+        .invoice-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 12px;
         }
-        .periods-table th,
-        .periods-table td {
-            padding: 12px;
+        .invoice-table th,
+        .invoice-table td {
+            padding: 12px 14px;
+            border: 1px solid #d1d5db;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            font-size: 0.95em;
         }
-        .periods-table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #333;
+        .invoice-table th {
+            background: #f3f8f2;
+            color: #0d6f2a;
+            font-weight: 700;
         }
-        .periods-table tr:hover {
-            background-color: #f8f9fa;
+        .invoice-table tbody tr:nth-child(even) {
+            background: #f9fafb;
         }
-        .total-section {
-            background: #f8f9fa;
-            padding: 30px;
-            border-top: 2px solid #667eea;
-            display: flex;
-            gap: 30px;
-            flex-wrap: wrap;
-            align-items: flex-start;
-            overflow: hidden;
+        .invoice-table tbody tr:hover {
+            background: #eef5ea;
         }
-        .amount-block {
-            flex: 1 1 360px;
-            min-width: 280px;
+        .text-right {
+            text-align: right;
         }
-        .total-row {
+        .totals-section {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            font-size: 1.2em;
-            margin-bottom: 10px;
+            gap: 24px;
+            align-items: flex-end;
+            padding: 0 30px 32px;
+            flex-wrap: wrap;
         }
-        .grand-total {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #667eea;
-            border-top: 2px solid #ddd;
-            padding-top: 15px;
-            margin-top: 15px;
+        .bank-details {
+            flex: 1 1 320px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px 20px;
+            font-size: 0.95em;
+            color: #374151;
+        }
+        .bank-details h3 {
+            margin: 0 0 10px;
+            font-size: 1em;
+            letter-spacing: 0.01em;
+            color: #0d6f2a;
+        }
+        .bank-details p {
+            margin: 6px 0;
+        }
+        .summary-box {
+            min-width: 280px;
+            max-width: 360px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+            color: #111827;
+        }
+        .summary-row strong {
+            color: #0d6f2a;
+        }
+        .summary-total {
+            margin-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #0d6f2a;
         }
         .footer {
-            background: #333;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            font-size: 0.9em;
+            padding: 20px 30px 28px;
+            font-size: 0.85em;
+            color: #6b7280;
         }
         .footer p {
-            margin: 5px 0;
+            margin: 6px 0;
         }
         .note {
-            display: block;
-            width: 100%;
-            padding: 10px 0 0 0;
-            font-size: 10px;
-            color: #000000;
-            text-align: center;
-            margin-top: 14px;
-            font-weight: 400;
-        }
-        .amount {
-            font-weight: bold;
-            color: #28a745;
-        }
-        .currency {
-            font-size: 0.9em;
+            padding: 0 30px 10px;
+            font-size: 0.82em;
+            color: #4b5563;
         }
         @media print {
+            body {
                 background: white;
             }
             .invoice-container {
@@ -255,117 +308,94 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promi
 </head>
 <body>
     <div class="invoice-container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo">POSSIBLE WAREHOUSING LLP</div>
-            <h1>WAREHOUSE STORAGE INVOICE</h1>
-            <p>Monthly Billing Statement</p>
-        </div>
-
-        <!-- Invoice Details -->
-        <div class="invoice-details">
-            <div class="detail-row">
-                <span class="detail-label">Bill To:</span>
-                <span class="detail-value">${invoice.clientName}</span>
+        <div class="top-section">
+            <div class="company-block">
+                ${invoice.companyLogo ? `<img src="${invoice.companyLogo}" alt="Logo" class="company-logo" />` : ''}
+                <h1 class="company-name">${invoice.companyName || 'Company Name'}</h1>
+                <div class="company-meta">
+                    ${invoice.companyAddress ? `<p>${invoice.companyAddress}</p>` : ''}
+                    ${invoice.companyEmail ? `<p>Email: ${invoice.companyEmail}</p>` : ''}
+                    ${invoice.companyPhone ? `<p>Phone: ${invoice.companyPhone}</p>` : ''}
+                </div>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">PAN:</span>
-                <span class="detail-value">${invoice.panNumber || '---'}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">GSTIN:</span>
-                <span class="detail-value">${invoice.gstNumber || '---'}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Invoice Period:</span>
-                <span class="detail-value">${invoice.month} ${invoice.year}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Warehouse:</span>
-                <span class="detail-value">${invoice.warehouseName || 'General'}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Invoice Number:</span>
-                <span class="detail-value">${getInvoiceNumber(invoice)}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Generated Date:</span>
-                <span class="detail-value">${new Date().toLocaleDateString()}</span>
+            <div class="invoice-meta">
+                <p class="invoice-title">MONTHLY INVOICE</p>
+                <p><strong>Invoice Number:</strong> ${getInvoiceNumber(invoice)}</p>
+                <p><strong>Month:</strong> ${invoice.month} ${invoice.year}</p>
+                <p><strong>Date:</strong> ${invoice.invoiceDate || new Date().toISOString().split('T')[0]}</p>
             </div>
         </div>
 
-        <!-- Storage Period Details -->
-        <div class="periods-section">
-            <h2 class="section-title">Storage Period Details</h2>
-            <table class="periods-table">
+        <div class="bill-to">
+            <h2>Bill To</h2>
+            <p><strong>${invoice.clientName}</strong></p>
+            ${invoice.clientAddress ? `<p>${invoice.clientAddress}</p>` : ''}
+            ${invoice.clientPhone ? `<p>Phone: ${invoice.clientPhone}</p>` : ''}
+            <p><strong>PAN:</strong> ${invoice.panNumber || 'NA'}</p>
+            <p><strong>GST:</strong> ${invoice.gstNumber || 'NA'}</p>
+        </div>
+
+        <div class="invoice-table-container">
+            <table class="invoice-table">
                 <thead>
                     <tr>
+                        <th>Date</th>
+                        <th>Direction</th>
                         <th>Commodity</th>
-                        <th>From Date</th>
-                        <th>To Date</th>
+                        <th>No. of Bags</th>
                         <th>Qty (MT)</th>
-                        <th>Days</th>
-                        <th>Rent (₹)</th>
-                        <th>Status</th>
+                        <th class="text-right">Rent (₹)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${periods.map((period) => `
+                    ${rows.map((row) => {
+                      const dateRange = row.startDate
+                        ? `${row.startDate} to ${row.endDate || row.startDate}`
+                        : row.date || '---';
+                      const bagsValue = row.bags !== undefined && row.bags !== ''
+                        ? typeof row.bags === 'number' ? row.bags.toLocaleString('en-IN') : row.bags
+                        : '---';
+                      const qtyValue = Number(row.quantityMT || 0).toFixed(3);
+                      const rentValue = Number(row.rentTotal || 0);
+                      return `
                         <tr>
-                            <td>${period.commodityName || 'Unknown'}</td>
-                            <td>${period.startDate || '---'}</td>
-                            <td>${period.endDate || '---'}</td>
-                            <td>${Number(period.quantityMT || 0).toFixed(2)}</td>
-                            <td>${Number(period.daysTotal || 0)}</td>
-                            <td class="amount">₹${Number(period.rentTotal || 0).toLocaleString('en-IN')}</td>
-                            <td>${period.status || 'UNKNOWN'}</td>
+                            <td>${dateRange}</td>
+                            <td>${row.direction || 'INWARD'}</td>
+                            <td>${row.commodityName || 'Unknown'}</td>
+                            <td>${bagsValue}</td>
+                            <td>${qtyValue}</td>
+                            <td class="text-right">₹${rentValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         </div>
 
-        <!-- Total Section -->
-        <div class="total-section">
-            <div class="amount-block">
-                <div class="total-row">
-                    <span>Total Monthly Rent (All Commodities):</span>
-                    <span class="amount">₹${totalAmount.toLocaleString('en-IN')}</span>
+        <div class="totals-section">
+            <div class="bank-details">
+                <h3>BANK DETAILS</h3>
+                ${invoice.bankName ? `<p><strong>Bank Name :</strong> ${invoice.bankName}</p>` : ''}
+                ${invoice.bankAccountNumber ? `<p><strong>A/c. No. :</strong> ${invoice.bankAccountNumber}</p>` : ''}
+                ${invoice.ifscCode ? `<p><strong>IFSC Code :</strong> ${invoice.ifscCode}</p>` : ''}
+                ${invoice.bankBranch ? `<p><strong>Branch :</strong> ${invoice.bankBranch}</p>` : ''}
+            </div>
+            <div class="summary-box">
+                <div class="summary-row">
+                    <span>Monthly Rent</span>
+                    <strong>₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </div>
-                ${additionalCharges > 0 ? `
-                <div class="total-row">
-                    <span>Additional Charges:</span>
-                    <span class="amount">₹${additionalCharges.toLocaleString('en-IN')}</span>
-                </div>
-                ` : ''}
-                ${previousBalance > 0 ? `
-                <div class="total-row">
-                    <span>Previous Balance:</span>
-                    <span class="amount">₹${previousBalance.toLocaleString('en-IN')}</span>
-                </div>
-                ` : ''}
-                ${currentPayments > 0 ? `
-                <div class="total-row">
-                    <span>Payments Received:</span>
-                    <span class="amount">-₹${currentPayments.toLocaleString('en-IN')}</span>
-                </div>
-                ` : ''}
-                <div class="total-row grand-total">
-                    <span>Total Amount Due:</span>
-                    <span class="amount">₹${newBalance.toLocaleString('en-IN')}</span>
+                <div class="summary-total">
+                    <span>Total Monthly Charges</span>
+                    <span>₹${newBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
             </div>
         </div>
-        <div class="note">This is system generated invoice</div>
 
-        <!-- Footer -->
+        <div class="note">This invoice is generated automatically from monthly storage transactions and reflects the billing month of ${invoice.month} ${invoice.year}.</div>
         <div class="footer">
-            <p><strong>POSSIBLE WAREHOUSING LLP</strong></p>
-            <p>123 Warehouse Complex, Industrial Area, Mumbai - 400088</p>
-            <p>Email: info@possiblewarehousing.com | Phone: +91-22-XXXX-XXXX</p>
-            <p>GSTIN: 24AAWFP7490F1ZN</p>
-            <p>Generated on ${new Date().toLocaleString()}</p>
-            <p>Thank you for your business!</p>
+            <p>${invoice.companyName || 'Company Name'}</p>
+            ${invoice.companyAddress ? `<p>${invoice.companyAddress}</p>` : ''}
+            ${invoice.companyEmail || invoice.companyPhone ? `<p>${invoice.companyEmail ? `Email: ${invoice.companyEmail}` : ''}${invoice.companyEmail && invoice.companyPhone ? ' | ' : ''}${invoice.companyPhone ? `Phone: ${invoice.companyPhone}` : ''}</p>` : ''}
         </div>
     </div>
 </body>

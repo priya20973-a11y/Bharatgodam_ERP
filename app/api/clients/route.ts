@@ -5,6 +5,10 @@ import { getDb } from '@/lib/mongodb';
 import { appendOwnershipForMongo, getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -106,9 +110,28 @@ export async function POST(request: Request) {
     }
 
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
+    const nameValue = String(name).trim();
+    const normalizedName = nameValue.toUpperCase();
+
+    const existingClient = await db.collection('clients').findOne({
+      ...tenantFilter,
+      $or: [
+        { nameKey: normalizedName },
+        { name: { $regex: new RegExp(`^${escapeRegExp(nameValue)}$`, 'i') } }
+      ]
+    });
+
+    if (existingClient) {
+      return NextResponse.json(
+        { success: false, message: 'Client name already exists for your account' },
+        { status: 400 }
+      );
+    }
 
     const client = appendOwnershipForMongo({
-      name,
+      name: nameValue,
+      nameKey: normalizedName,
       type,
       address,
       mobile,

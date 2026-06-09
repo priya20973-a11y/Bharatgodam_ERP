@@ -12,7 +12,7 @@ export interface ICommodity extends Document {
 
 const CommoditySchema: Schema = new Schema(
   {
-    name: { type: String, required: true, unique: true, uppercase: true },
+    name: { type: String, required: true, uppercase: true },
     ratePerMtPerDay: { type: Number, required: true, min: 0 },
     ratePerMtMonth: { type: Number, min: 0 },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
@@ -20,6 +20,8 @@ const CommoditySchema: Schema = new Schema(
   },
   { timestamps: true }
 );
+
+CommoditySchema.index({ userId: 1, name: 1 }, { unique: true });
 
 const Commodity: Model<ICommodity> =
   mongoose.models.Commodity || mongoose.model<ICommodity>('Commodity', CommoditySchema);

@@ -17,6 +17,10 @@ export async function GET(
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
     const tenantFilter = getTenantFilterForMongo(session);
+    const activeRecordFilter = {
+      deletedAt: { $exists: false },
+      status: { $nin: ['DELETED', 'CANCELLED'] },
+    };
 
     const url = new URL(req.url);
     const clientId = url.pathname.split('/').pop() || '';
@@ -37,11 +41,11 @@ export async function GET(
 
     const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
       db.collection('bookings')
-        .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
+        .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
-        .find({ accountId, ...tenantFilter })
+        .find({ accountId, ...tenantFilter, ...activeRecordFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('payments')

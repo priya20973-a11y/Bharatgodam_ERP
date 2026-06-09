@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Upload, CheckCircle, AlertCircle, Loader2, File } from 'lucide-react';
+import { Download, Upload, CheckCircle, AlertCircle, Loader2, File as FileIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface BulkUploadResponse {
@@ -11,8 +11,9 @@ interface BulkUploadResponse {
   totalRows: number;
   successCount: number;
   errorCount: number;
-  errors: Array<{ row: number; error: string }>;
+  errors?: Array<{ row: number; error: string }>;
   warnings?: string[];
+  error?: string;
 }
 
 export function BulkTransactionUpload() {
@@ -66,7 +67,24 @@ export function BulkTransactionUpload() {
         body: formData,
       });
 
-      const data: BulkUploadResponse = await response.json();
+      const data = (await response.json()) as BulkUploadResponse | { error: string };
+
+      if (!response.ok || 'error' in data) {
+        const errorMessage = 'error' in data ? data.error : 'Upload failed';
+        const errorResult: BulkUploadResponse = {
+          success: false,
+          totalRows: 0,
+          successCount: 0,
+          errorCount: 1,
+          errors: [{ row: 0, error: errorMessage }],
+          error: errorMessage,
+        };
+        setResult(errorResult);
+        toast.error(errorMessage);
+        setShowDetails(true);
+        return;
+      }
+
       setResult(data);
 
       if (data.success) {
@@ -158,7 +176,7 @@ export function BulkTransactionUpload() {
             </div>
             {selectedFile && (
               <div className="flex items-center gap-2 text-sm text-slate-600">
-                <File className="h-4 w-4" />
+                <FileIcon className="h-4 w-4" />
                 {selectedFile.name}
               </div>
             )}
@@ -233,7 +251,7 @@ export function BulkTransactionUpload() {
             </div>
 
             {/* Error Details */}
-            {result.errors.length > 0 && (
+            {(result.errors?.length ?? 0) > 0 && (
               <div className="space-y-2">
                 <button
                   onClick={() => setShowDetails(!showDetails)}
@@ -244,14 +262,14 @@ export function BulkTransactionUpload() {
                 {showDetails && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 max-h-64 overflow-y-auto">
                     <div className="space-y-2">
-                      {result.errors.map((error, idx) => (
+                      {result.errors?.map((error, idx) => (
                         <div key={idx} className="text-sm text-red-800">
                           <strong>Row {error.row}:</strong> {error.error}
                         </div>
                       ))}
-                      {result.errorCount > result.errors.length && (
+                      {result.errorCount > (result.errors?.length ?? 0) && (
                         <div className="text-sm text-red-800 italic">
-                          ... and {result.errorCount - result.errors.length} more errors
+                          ... and {result.errorCount - (result.errors?.length ?? 0)} more errors
                         </div>
                       )}
                     </div>

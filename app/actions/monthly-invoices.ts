@@ -20,6 +20,16 @@ export interface MonthlyInvoiceData {
     rentTotal: number;
     status: string;
     commodityName?: string;
+    rate?: number;
+    direction?: string;
+    gatePass?: string;
+  }>;
+  transactions?: Array<{
+    date: string;
+    direction: 'INWARD' | 'OUTWARD';
+    commodityName: string;
+    quantityMT: number;
+    gatePass?: string;
   }>;
   warehouseId?: string;
   warehouseName?: string;

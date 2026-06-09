@@ -21,7 +21,7 @@ export async function getMasterData() {
   const [clients, commodities, warehouses] = await Promise.all([
     db.collection('clients').find({ status: 'ACTIVE' }).toArray(),
     db.collection('commodities').find({}).toArray(),
-    db.collection('warehouses').find({ ...tenantFilter, status: 'ACTIVE' }).toArray(),
+    db.collection('warehouses').find({ ...tenantFilter, status: { $in: ['ACTIVE', 'FULL'] } }).toArray(),
   ]);
 
   return {

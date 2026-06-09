@@ -287,11 +287,14 @@ export default async function TransactionsReportWrapper() {
       ...legacyRecords,
     ];
 
+    const isAdminUser = isAdmin(session);
+
     const combinedTransactions = (isAdmin(session)
       ? baseCombinedRecords.filter(isValidTransactionRecord)
       : baseCombinedRecords
     ).map((t: any) => ({
       _id: t._id?.toString(),
+      sourceType: t.sourceType || 'transactions',
       direction: t.direction || t.type || 'INWARD',
       date: t.direction === 'OUTWARD' ? (t.actualOutwardDate || t.inwardDate || t.date || t.createdAt) : (t.inwardDate || t.date || t.createdAt),
       clientName: t.clientName || t.client?.name || '',
@@ -310,7 +313,7 @@ export default async function TransactionsReportWrapper() {
       createdAt: t.createdAt || t.updatedAt || t.date,
     }));
 
-    return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} />;
+    return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} isAdmin={isAdminUser} />;
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return (

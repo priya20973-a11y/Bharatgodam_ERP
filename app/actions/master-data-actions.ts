@@ -13,6 +13,7 @@ export async function getMasterData() {
     db.collection('clients').find({ status: 'ACTIVE', ...tenantFilter }).toArray(),
     db.collection('commodities').find({ ...tenantFilter }).toArray(),
     db.collection('warehouses').find({ status: 'ACTIVE', ...tenantFilter }).toArray(),
+    db.collection('warehouse').find({ status:{$in:['ACTIVE','FULL']},...tenantFilter}).toArray(),
   ]);
 
   return {

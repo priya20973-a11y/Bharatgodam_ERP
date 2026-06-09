@@ -281,14 +281,14 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                   <SelectContent>
                     {warehouses && warehouses.length > 0 ? (
                       warehouses
-                        .filter(w => w && w._id && w.name && w.status === 'ACTIVE')
+                        .filter(w => w && w._id && w.name && (w.status === 'ACTIVE' || w.status === 'FULL'))
                         .map(w => {
                           const availableCapacity = typeof w.totalCapacity === 'number' && typeof w.occupiedCapacity === 'number'
-                            ? w.totalCapacity - w.occupiedCapacity
+                            ? (w.status === 'FULL' ? 0 : w.totalCapacity - w.occupiedCapacity)
                             : undefined;
 
                           return (
-                            <SelectItem key={w._id.toString()} value={w._id.toString()} disabled={w.status === 'FULL'}>
+                            <SelectItem key={w._id.toString()} value={w._id.toString()}>
                               {w.name}
                               {availableCapacity !== undefined ? ` (${availableCapacity} MT left)` : ''}
                             </SelectItem>

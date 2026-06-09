@@ -3,9 +3,133 @@ import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
-import { createStockEntry } from '@/app/actions/stock-ledger-actions';
-import { getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownership';
+import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-ledger-actions';
+import { getTenantFilterForMongo, appendOwnershipForMongo, isAdmin } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
+
+function extractInvoiceMonth(dateString: string) {
+  if (!dateString) return '';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 7);
+}
+
+async function findLinkedStockEntries(db: any, transactionId: string, transaction: any) {
+  const query: any = {
+    $or: [{ remarks: `Synced from transaction ${transactionId}` }],
+  };
+
+  if (transaction?.gatePass) {
+    query.$or.push({ gatePass: transaction.gatePass });
+  }
+
+  return db.collection('stock_entries').find(query).toArray();
+}
+
+async function deleteStockEntriesAndLedger(db: any, stockEntries: any[]) {
+  if (!stockEntries.length) return;
+
+  const stockEntryIds = stockEntries.map((entry) => entry._id).filter(Boolean);
+
+  if (stockEntryIds.length > 0) {
+    await db.collection('ledger_entries').deleteMany({ stockEntryId: { $in: stockEntryIds } });
+    await db.collection('stock_entries').deleteMany({ _id: { $in: stockEntryIds } });
+  }
+
+  for (const entry of stockEntries) {
+    if (entry.direction === 'INWARD' && entry.warehouseId && entry.quantityMT) {
+      await db.collection('warehouses').updateOne(
+        { _id: entry.warehouseId },
+        { $inc: { occupiedCapacity: -Number(entry.quantityMT) } }
+      );
+    }
+  }
+}
+
+async function deleteInvoicesForMonths(db: any, clientId: string, warehouseId: string | null | undefined, invoiceMonths: Set<string>) {
+  if (!clientId || !invoiceMonths.size) return;
+
+  const query: any = {
+    clientId: new ObjectId(clientId),
+    invoiceMonth: { $in: Array.from(invoiceMonths) },
+  };
+
+  if (warehouseId) {
+    try {
+      query.warehouseId = new ObjectId(warehouseId);
+    } catch {
+      query.warehouseId = warehouseId;
+    }
+  }
+
+  const masters = await db.collection('invoice_master').find(query).project({ _id: 1 }).toArray();
+  const masterIds = masters.map((master: any) => master._id).filter(Boolean);
+
+  await db.collection('invoice_master').deleteMany(query);
+
+  if (masterIds.length > 0) {
+    await db.collection('invoice_line_items').deleteMany({ invoiceMasterId: { $in: masterIds } });
+  }
+}
+
+async function removeTransactionStockAndLedger(db: any, transaction: any) {
+  const stockEntries = await findLinkedStockEntries(db, transaction._id.toString(), transaction);
+  await deleteStockEntriesAndLedger(db, stockEntries);
+}
+
+async function syncTransactionStockEntry(db: any, transaction: any, updates: any) {
+  const stockEntries = await findLinkedStockEntries(db, transaction._id.toString(), transaction);
+  const oldStockEntries = stockEntries.map((entry: any) => ({ ...entry }));
+
+  // Remove old linked stock / ledger records before re-sync.
+  await deleteStockEntriesAndLedger(db, stockEntries);
+
+  const warehouseId = transaction.warehouseId;
+  const commodityId = transaction.commodityId;
+  const date = updates.date || transaction.date;
+  const quantityMT = updates.quantityMT ?? transaction.quantityMT;
+  const direction = transaction.direction;
+  const gatePass = updates.gatePass || transaction.gatePass;
+
+  if (warehouseId && commodityId && direction && quantityMT > 0) {
+    try {
+      await createStockEntry({
+        clientId: transaction.clientId,
+        warehouseId: warehouseId,
+        commodityId: commodityId,
+        direction,
+        quantityMT,
+        inwardDate: date,
+        actualOutwardDate: direction === 'OUTWARD' ? date : undefined,
+        ratePerMTPerDay: transaction.ratePerMTPerDay || 10,
+        gatePass,
+        remarks: `Synced from transaction ${transaction._id.toString()}`,
+      });
+    } catch (error) {
+      // restore old stock entries if re-sync fails
+      for (const oldEntry of oldStockEntries) {
+        try {
+          await createStockEntry({
+            clientId: oldEntry.clientId.toString(),
+            warehouseId: oldEntry.warehouseId.toString(),
+            commodityId: oldEntry.commodityId.toString(),
+            direction: oldEntry.direction,
+            quantityMT: oldEntry.quantityMT,
+            inwardDate: oldEntry.inwardDate,
+            actualOutwardDate: oldEntry.actualOutwardDate,
+            ratePerMTPerDay: oldEntry.ratePerMTPerDay,
+            gatePass: oldEntry.gatePass,
+            remarks: oldEntry.remarks || `Synced from transaction ${transaction._id.toString()}`,
+          });
+        } catch (restoreError) {
+          console.error('Failed to restore old stock entry after sync failure:', restoreError);
+        }
+      }
+
+      throw error;
+    }
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -172,6 +296,12 @@ export async function POST(request: Request) {
     }
 
     // Create transaction record ONLY with valid master references
+    const ratePerMTPerDay =
+      commodityFromMaster.ratePerMtPerDay ??
+      (commodityFromMaster.ratePerMtMonth
+        ? commodityFromMaster.ratePerMtMonth / 30
+        : 10);
+
     const transaction = appendOwnershipForMongo({
       accountId: accountId,
       direction: direction,
@@ -183,6 +313,8 @@ export async function POST(request: Request) {
       clientId: clientId,
       clientName: clientFromMaster.name,
       warehouseId: warehouseId || null,
+      ratePerMTPerDay,
+      rate: ratePerMTPerDay,
       createdAt: new Date(),
       updatedAt: new Date(),
       status: 'COMPLETED',
@@ -292,6 +424,238 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !isAdmin(session)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { transactionId, date, quantityMT } = body;
+
+    if (!transactionId || !date || quantityMT === undefined) {
+      return NextResponse.json({ success: false, message: 'transactionId, date and quantityMT are required' }, { status: 400 });
+    }
+
+    if (!ObjectId.isValid(transactionId)) {
+      return NextResponse.json({ success: false, message: 'Invalid transactionId' }, { status: 400 });
+    }
+
+    const parsedQuantity = Number(quantityMT);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      return NextResponse.json({ success: false, message: 'quantityMT must be a positive number' }, { status: 400 });
+    }
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return NextResponse.json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const transaction = await db.collection('transactions').findOne({ _id: new ObjectId(transactionId) });
+    if (!transaction) {
+      return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
+    }
+
+    if (transaction.direction !== transaction.type && transaction.direction) {
+      // If older records stored direction differently, still allow
+    }
+
+    await db.collection('transactions').updateOne(
+      { _id: new ObjectId(transactionId) },
+      {
+        $set: {
+          date,
+          quantityMT: parsedQuantity,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    try {
+      await syncTransactionStockEntry(db, transaction, { date, quantityMT: parsedQuantity });
+    } catch (syncError) {
+      console.error('Failed to resync stock entry after transaction update:', syncError);
+      // Continue, but keep transaction updated. Don't fail the entire request on sync failure.
+    }
+
+    try {
+      const accountId = transaction.accountId || transaction.clientId;
+      const allTransactions = await db.collection('transactions')
+        .find({ accountId: accountId })
+        .sort({ date: 1 })
+        .toArray();
+
+      const txnsForLedger = allTransactions.map((txn: any) => ({
+        _id: txn._id?.toString() || '',
+        date: txn.date,
+        direction: txn.direction,
+        mt: txn.quantityMT,
+        clientName: txn.clientName || '',
+        commodityName: txn.commodityName || 'Unknown',
+        gatePass: txn.gatePass || '',
+      }));
+
+      const timeStateLedger = generateTimeStateLedger(txnsForLedger, transaction.clientName || 'Unknown');
+      await db.collection('ledger_time_state').deleteMany({ accountId });
+
+      if (timeStateLedger.timeStatePeriods.length > 0) {
+        const entriesToInsert = timeStateLedger.timeStatePeriods.map((period) => ({
+          accountId,
+          periodStartDate: period.periodStartDate,
+          periodEndDate: period.periodEndDate,
+          quantityMT: period.quantityMT,
+          status: period.status,
+          reasonForChange: period.reasonForChange,
+          affectedTransaction: period.transaction
+            ? {
+                transactionId: period.transaction.id,
+                direction: period.transaction.direction,
+                quantity: period.transaction.quantity,
+                date: period.transaction.date,
+              }
+            : undefined,
+          ratePerDayPerMT: period.ratePerDayPerMT,
+          rentCalculated: period.rentCalculated,
+          historicalRecord: new Date(period.periodEndDate) < new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        await db.collection('ledger_time_state').insertMany(entriesToInsert);
+      }
+    } catch (ledgerError) {
+      console.error('Error updating TIME-STATE ledger after transaction edit:', ledgerError);
+    }
+
+    try {
+      const invoiceMonths = new Set<string>([
+        extractInvoiceMonth(transaction.date),
+        extractInvoiceMonth(date),
+      ].filter(Boolean));
+
+      await deleteInvoicesForMonths(db, transaction.clientId, transaction.warehouseId, invoiceMonths);
+
+      // Regenerate invoices for affected months
+      for (const month of invoiceMonths) {
+        try {
+          await generateMonthlyInvoices(month, undefined, { clientId: transaction.clientId, warehouseId: transaction.warehouseId });
+        } catch (regenerateError) {
+          console.error(`Error regenerating invoices for month ${month}:`, regenerateError);
+        }
+      }
+    } catch (invoiceError) {
+      console.error('Error clearing affected invoices after transaction edit:', invoiceError);
+    }
+
+    return NextResponse.json({ success: true, message: 'Transaction updated successfully' });
+  } catch (error) {
+    console.error('Error updating transaction:', error);
+    return NextResponse.json({ success: false, message: 'Failed to update transaction' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !isAdmin(session)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { transactionId } = body;
+
+    if (!transactionId || !ObjectId.isValid(transactionId)) {
+      return NextResponse.json({ success: false, message: 'Valid transactionId is required' }, { status: 400 });
+    }
+
+    const db = await getDb();
+    const transaction = await db.collection('transactions').findOne({ _id: new ObjectId(transactionId) });
+    if (!transaction) {
+      return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
+    }
+
+    try {
+      await removeTransactionStockAndLedger(db, transaction);
+    } catch (cleanupError) {
+      console.error('Error cleaning up linked stock/ledger entries:', cleanupError);
+    }
+
+    try {
+      const invoiceMonths = new Set<string>([extractInvoiceMonth(transaction.date)].filter(Boolean));
+      await deleteInvoicesForMonths(db, transaction.clientId, transaction.warehouseId, invoiceMonths);
+
+      // Regenerate invoices for affected months
+      for (const month of invoiceMonths) {
+        try {
+          await generateMonthlyInvoices(month, undefined, { clientId: transaction.clientId, warehouseId: transaction.warehouseId });
+        } catch (regenerateError) {
+          console.error(`Error regenerating invoices for month ${month}:`, regenerateError);
+        }
+      }
+    } catch (invoiceError) {
+      console.error('Error clearing affected invoices after transaction delete:', invoiceError);
+    }
+
+    await db.collection('transactions').deleteOne({ _id: new ObjectId(transactionId) });
+
+    try {
+      const accountId = transaction.accountId || transaction.clientId;
+      const remainingTransactions = await db.collection('transactions')
+        .find({ accountId })
+        .sort({ date: 1 })
+        .toArray();
+
+      const txnsForLedger = remainingTransactions.map((txn: any) => ({
+        _id: txn._id?.toString() || '',
+        date: txn.date,
+        direction: txn.direction,
+        mt: txn.quantityMT,
+        clientName: txn.clientName || '',
+        commodityName: txn.commodityName || 'Unknown',
+        gatePass: txn.gatePass || '',
+      }));
+
+      const timeStateLedger = generateTimeStateLedger(txnsForLedger, transaction.clientName || 'Unknown');
+      await db.collection('ledger_time_state').deleteMany({ accountId });
+
+      if (timeStateLedger.timeStatePeriods.length > 0) {
+        const entriesToInsert = timeStateLedger.timeStatePeriods.map((period) => ({
+          accountId,
+          periodStartDate: period.periodStartDate,
+          periodEndDate: period.periodEndDate,
+          quantityMT: period.quantityMT,
+          status: period.status,
+          reasonForChange: period.reasonForChange,
+          affectedTransaction: period.transaction
+            ? {
+                transactionId: period.transaction.id,
+                direction: period.transaction.direction,
+                quantity: period.transaction.quantity,
+                date: period.transaction.date,
+              }
+            : undefined,
+          ratePerDayPerMT: period.ratePerDayPerMT,
+          rentCalculated: period.rentCalculated,
+          historicalRecord: new Date(period.periodEndDate) < new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        await db.collection('ledger_time_state').insertMany(entriesToInsert);
+      }
+    } catch (ledgerError) {
+      console.error('Error regenerating TIME-STATE ledger after transaction delete:', ledgerError);
+    }
+
+    return NextResponse.json({ success: true, message: 'Transaction deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting transaction:', error);
+    return NextResponse.json({ success: false, message: 'Failed to delete transaction' }, { status: 500 });
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -325,6 +689,8 @@ export async function GET(request: Request) {
     if (clientId) query.clientId = clientId;
     if (accountId) query.accountId = accountId;
     if (direction) query.direction = direction.toUpperCase();
+    query.deletedAt = { $exists: false };
+    query.status = { $nin: ['DELETED', 'CANCELLED'] };
 
     if (warehouseId) {
       const requestedWarehouseIds: Array<string | ObjectId> = [warehouseId];

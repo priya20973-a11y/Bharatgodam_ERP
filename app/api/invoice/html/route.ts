@@ -21,11 +21,18 @@ export async function GET(request: NextRequest) {
         'warehouseId'
       ) || undefined;
 
+    const invoiceMode =
+      request.nextUrl.searchParams.get('mode') ||
+      undefined;
+
     const monthlyInvoice =
       await resolveMonthlyInvoiceFromId(
         id,
         warehouseId,
-        tenantFilter
+        tenantFilter,
+        invoiceMode === 'transactions'
+          ? 'transactions'
+          : undefined
       );
 
     if (!monthlyInvoice) {
@@ -50,6 +57,21 @@ export async function GET(request: NextRequest) {
       additionalChargeItemsCount:
         monthlyInvoice.additionalChargeItems?.length ?? 0,
     });
+    // Debug counts for transactions vs periods to troubleshoot old-format rendering
+    try {
+      console.log('[invoice/html] payload rows', {
+        invoiceId: id,
+        transactionsCount: Array.isArray(monthlyInvoice.transactions)
+          ? monthlyInvoice.transactions.length
+          : 0,
+        periodsCount: Array.isArray(monthlyInvoice.periods)
+          ? monthlyInvoice.periods.length
+          : 0,
+        sampleTransaction: monthlyInvoice.transactions?.slice?.(0, 2) || [],
+      });
+    } catch (e) {
+      console.error('[invoice/html] payload debug failed', e);
+    }
 
     const printableHtml = html.replace(
       '<body>',

@@ -39,6 +39,10 @@ export async function GET(req: Request) {
 
     const db = await getDb();
     const tenantFilter = getTenantFilterForMongo(await requireSession());
+    const activeRecordFilter = {
+      deletedAt: { $exists: false },
+      status: { $nin: ['DELETED', 'CANCELLED'] },
+    };
 
     const warehouseFilter: any = {};
     if (ObjectId.isValid(warehouseId)) {
@@ -50,11 +54,11 @@ export async function GET(req: Request) {
     const [warehouseDoc, bookings, transactions, commodities] = await Promise.all([
       db.collection('warehouses').findOne({ _id: ObjectId.isValid(warehouseId) ? new ObjectId(warehouseId) : warehouseId, ...tenantFilter }),
       db.collection('bookings')
-        .find({ warehouseId: warehouseFilter, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
+        .find({ warehouseId: warehouseFilter, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('transactions')
-        .find({ warehouseId: warehouseFilter, ...tenantFilter })
+        .find({ warehouseId: warehouseFilter, ...tenantFilter, ...activeRecordFilter })
         .sort({ date: 1 })
         .toArray(),
       db.collection('commodities')

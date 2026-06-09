@@ -9,7 +9,7 @@ import { getDb } from '@/lib/mongodb';
 export async function getWarehouses() {
   await connectToDatabase();
   const session = await requireSession();
-  const warehouses = await Warehouse.find({ status: 'ACTIVE', ...getTenantFilter(session) }).sort({ name: 1 });
+  const warehouses = await Warehouse.find({ status: { $in: ['ACTIVE', 'FULL'] }, ...getTenantFilter(session) }).sort({ name: 1 });
   
   const db = await getDb();
   const userIds = warehouses.map(w => w.userId).filter((id): id is any => !!id);

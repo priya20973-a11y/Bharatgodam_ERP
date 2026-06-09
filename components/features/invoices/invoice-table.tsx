@@ -11,7 +11,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [updatingPaymentId, setUpdatingPaymentId] = useState<string | null>(null);
   const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
-  const [paymentSuccessCount, setPaymentSuccessCount] = useState<Record<string, number>>({});
+  const [paymentInputs, setPaymentInputs] = useState<Record<string, string>>({});
   const [isClient, setIsClient] = useState(false);
 
   // useTransition for optimistic updates
@@ -66,28 +66,22 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
     }
   };
 
-  // Handle cumulative payment updates with Enter key trigger and useOptimistic
+  // Handle cumulative payment updates with explicit input state and optimistic updates
   const handlePaymentUpdate = (id: string, additionalPayment: number) => {
-    // Clear any existing error for this invoice
     setPaymentErrors(prev => ({ ...prev, [id]: '' }));
 
-    // Get the invoice to validate against total amount
     const invoice = invoices.find(inv => inv.id === id);
     if (!invoice) return;
 
     const totalAmount = invoice.totalAmount ?? invoice.amount ?? 0;
     const currentPaidAmount = invoice.paidAmount ?? 0;
 
-    // Client-side validation: Additional payment cannot be negative
-    if (additionalPayment < 0) {
-      setPaymentErrors(prev => ({ ...prev, [id]: 'Payment amount cannot be negative' }));
+    if (additionalPayment <= 0) {
+      setPaymentErrors(prev => ({ ...prev, [id]: 'Enter a positive payment amount' }));
       return;
     }
 
-    // Calculate new total paid amount
     const newTotalPaid = currentPaidAmount + additionalPayment;
-
-    // Client-side validation: New total paid cannot exceed total amount
     if (newTotalPaid > totalAmount) {
       const remainingBalance = totalAmount - currentPaidAmount;
       setPaymentErrors(prev => ({
@@ -97,10 +91,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
       return;
     }
 
-    // Calculate new pending amount
     const newPendingAmount = Math.max(0, totalAmount - newTotalPaid);
-
-    // Determine new status based on new amounts
     let newStatus = 'UNPAID';
     if (newTotalPaid === 0) {
       newStatus = 'UNPAID';
@@ -110,9 +101,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
       newStatus = 'PARTIALLY_PAID';
     }
 
-    // Wrap optimistic update and server action in startTransition
     startTransition(async () => {
-      // Optimistic update using useOptimistic
       updateOptimisticInvoices({
         id,
         paidAmount: newTotalPaid,
@@ -124,7 +113,6 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
       try {
         const result = await updateInvoicePayment(id, additionalPayment);
         if (result.success) {
-          // Update the actual state with server response
           setInvoices(prev => prev.map(inv =>
             inv.id === id
               ? {
@@ -135,16 +123,13 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
                 }
               : inv
           ));
-          // Increment success count to clear the input field
-          setPaymentSuccessCount(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+          setPaymentInputs(prev => ({ ...prev, [id]: '' }));
           toast.success(`Payment of ₹${additionalPayment.toFixed(2)} added successfully`);
         } else {
-          // Error handling - useOptimistic will automatically rollback
           setPaymentErrors(prev => ({ ...prev, [id]: result.message || 'Update failed' }));
           toast.error(result.message || 'Failed to update payment');
         }
       } catch (error) {
-        // Error handling - useOptimistic will automatically rollback
         setPaymentErrors(prev => ({ ...prev, [id]: 'Network error occurred' }));
         toast.error('Network error occurred');
       } finally {
@@ -163,6 +148,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
               <th className="px-6 py-4 font-semibold">Customer & Cargo</th>
               <th className="px-6 py-4 font-semibold">Total Amount</th>
               <th className="px-6 py-4 font-semibold">Paid Amount</th>
+              <th className="px-6 py-4 font-semibold">Add Payment</th>
               <th className="px-6 py-4 font-semibold">Pending Amount</th>
               <th className="px-6 py-4 font-semibold">Payment Status</th>
               <th className="px-6 py-4 font-semibold text-right">Actions</th>
@@ -170,7 +156,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
           </thead>
           <tbody className="divide-y divide-slate-100">
             {optimisticInvoices.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-500">No invoices found.</td></tr>
+              <tr><td colSpan={8} className="px-6 py-8 text-center text-slate-500">No invoices found.</td></tr>
             ) : null}
             
             {optimisticInvoices.map((inv) => (
@@ -187,43 +173,45 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
                 <td className="px-6 py-4 font-medium text-emerald-700">
                   {formatCurrency(inv.totalAmount ?? inv.amount ?? 0)}
                 </td>
+                <td className="px-6 py-4 font-medium text-slate-800">
+                  {formatCurrency(inv.paidAmount ?? 0)}
+                </td>
 
-                {/* Paid Amount Input Field - Clears after successful payment */}
+                {/* Add Payment Input Field with explicit button */}
                 <td className="px-6 py-4">
-                  <div className="relative">
+                  <div className="flex flex-col gap-2">
                     <input
-                      key={`payment-input-${inv.id}-${paymentSuccessCount[inv.id] || 0}`}
+                      value={paymentInputs[inv.id] || ''}
+                      onChange={(e) => setPaymentInputs(prev => ({ ...prev, [inv.id]: e.target.value }))}
                       type="number"
-                      defaultValue=""
-                      placeholder="Enter payment"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const value = parseFloat(e.currentTarget.value) || 0;
-                          if (value > 0) {
-                            handlePaymentUpdate(inv.id, value);
-                          }
-                        }
-                      }}
+                      placeholder="₹0"
                       disabled={updatingPaymentId === inv.id || isPending}
-                      className={`w-24 px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 ${
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 ${
                         paymentErrors[inv.id] ? 'border-red-300 focus:ring-red-500' : 'border-slate-300'
                       }`}
                       min="0"
                       step="1"
                     />
-                    {(updatingPaymentId === inv.id || isPending) && (
-                      <Loader2 className="w-4 h-4 text-slate-400 animate-spin absolute right-2 top-2.5" />
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = parseFloat(paymentInputs[inv.id] || '') || 0;
+                        handlePaymentUpdate(inv.id, value);
+                      }}
+                      disabled={updatingPaymentId === inv.id || isPending}
+                      className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      Add Payment
+                    </button>
                     {paymentErrors[inv.id] && (
-                      <div className="absolute top-full mt-1 left-0 text-xs text-red-600 flex items-center">
-                        <AlertCircle className="w-3 h-3 mr-1" />
+                      <div className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
                         {paymentErrors[inv.id]}
                       </div>
                     )}
                   </div>
                 </td>
 
-                {/* NEW: Pending Amount (Auto-calculated, Read-only) */}
                 <td className="px-6 py-4 font-medium text-orange-700">
                   {formatCurrency(inv.pendingAmount ?? (inv.totalAmount ?? inv.amount ?? 0) - (inv.paidAmount ?? 0))}
                 </td>

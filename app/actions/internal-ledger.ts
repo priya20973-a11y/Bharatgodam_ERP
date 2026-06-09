@@ -14,6 +14,10 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   const db = await getDb();
 
   const clientObjectId = ObjectId.isValid(accountId) ? new ObjectId(accountId) : null;
+  const activeRecordFilter = {
+    deletedAt: { $exists: false },
+    status: { $nin: ['DELETED', 'CANCELLED'] },
+  };
   const paymentQuery: any = { ...tenantFilter };
   if (clientObjectId) {
     const clientExists = await db.collection('clients').findOne({ _id: clientObjectId, ...tenantFilter });
@@ -31,11 +35,11 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   const [bookings, transactionDocs, paymentsDocs, invoiceMasters, commoditiesResult, warehousesResult] = await Promise.all([
     db.collection('bookings')
-      .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter })
+      .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
       .sort({ date: 1 })
       .toArray(),
     db.collection('transactions')
-      .find({ accountId, ...tenantFilter })
+      .find({ accountId, ...tenantFilter, ...activeRecordFilter })
       .sort({ date: 1 })
       .toArray(),
     db.collection('payments')

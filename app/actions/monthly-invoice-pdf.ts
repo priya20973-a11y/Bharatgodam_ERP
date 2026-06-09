@@ -43,12 +43,24 @@ function formatAmount(value: number): string {
   return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatQty(value: number): string {
+  return value.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+
 function formatInvoiceDate(dateString: string): string {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) {
     return dateString;
   }
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatInvoiceRowDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+  return date.toLocaleDateString('en-IN');
 }
 
 function formatBillingMonth(month: string | number | undefined): string {
@@ -145,7 +157,9 @@ function getTotalMonthlyCharges(invoice: MonthlyInvoiceData): number {
 
 export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): Promise<string> {
   const companyName = invoice.companyName || 'AGRI CROP CARE';
-  const companyAddress = invoice.companyAddress || 'Agri crop care Warehouse, Vraj 3, Patidad road, Gundala, Gondal';
+  const companyAddress =
+    invoice.companyAddress ||
+    'Agri crop care Warehouse, Vraj 3, Patidad road, Gundala, Gondal';
   const contactEmail = invoice.companyEmail || 'agricropwl@outlook.com';
   const contactPhone = invoice.companyPhone || '+91 9913305200';
   const logoSrc = await getLogoDataUri(invoice.companyLogo || undefined);
@@ -153,10 +167,14 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const invoiceDate = formatInvoiceDate(invoice.invoiceDate);
   const adjustmentTotal = invoice.additionalCharges !== undefined
     ? Number(invoice.additionalCharges)
-    : (invoice.additionalChargeItems || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    : (invoice.additionalChargeItems || []).reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
   const totalMonthlyCharges = Number(invoice.totalRent || 0) + adjustmentTotal;
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
+
   const adjustmentRows = (invoice.additionalChargeItems || [])
     .map(
       (item) => `
@@ -168,372 +186,397 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
     )
     .join('');
 
-  const showAdjustmentSection =
-    (invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) || adjustmentTotal > 0;
-  const additionalChargesTable = showAdjustmentSection
+  const hasAdditionalCharges =
+    (invoice.additionalChargeItems && invoice.additionalChargeItems.length > 0) ||
+    adjustmentTotal > 0;
+
+  const adjustmentBody = adjustmentRows || `
+        <tr>
+          <td>Additional Charges</td>
+          <td class="amount">₹${formatAmount(adjustmentTotal)}</td>
+        </tr>
+      `;
+
+  const additionalChargesTable = hasAdditionalCharges
     ? `
-    <div class="table-wrapper" style="margin-top: 20px;">
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th class="amount">Charge (₹)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${adjustmentRows || `
-            <tr>
-              <td>Additional Charges</td>
-              <td class="amount">₹${formatAmount(adjustmentTotal)}</td>
-            </tr>
-          `}
-        </tbody>
-      </table>
-    </div>
-  `
+        <div class="table-wrapper" style="margin-top: 20px;">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="amount">Charge (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${adjustmentBody}
+            </tbody>
+          </table>
+        </div>
+      `
     : '';
 
-  const monthlyRentChargesSection = showAdjustmentSection ? `
-    <div class="summary-row" style="margin: 18px 0 8px;">
-      <div class="summary-box">
-        <div class="summary-item">
-          <span>Monthly Rent Charges</span>
-          <span>₹${formatAmount(invoice.totalRent)}</span>
+  const monthlyRentChargesSection = hasAdditionalCharges
+    ? `
+        <div class="summary-row" style="margin: 18px 0 8px;">
+          <div class="summary-box">
+            <div class="summary-item">
+              <span>Monthly Rent Charges</span>
+              <span>₹${formatAmount(invoice.totalRent)}</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  ` : '';
-
-  const totalAdditionalChargesSection = showAdjustmentSection ? `
-    <div class="summary-row" style="margin: 8px 0 20px;">
-      <div class="summary-box">
-        <div class="summary-item">
-          <span>Total Additional Charges</span>
-          <span>₹${formatAmount(adjustmentTotal)}</span>
-        </div>
-      </div>
-    </div>
-  ` : '';
-
-  const periodsList = invoice.periods
-    .map(
-      (p) => `
-        <tr>
-          <td>${p.commodityName || 'Unknown'}</td>
-          <td>${p.startDate}</td>
-          <td>${p.endDate}</td>
-          <td style="text-align: right;">${formatAmount(p.quantityMT)}</td>
-          <td style="text-align: right;">${p.daysTotal}</td>
-          <td style="text-align: right;">₹${formatAmount(p.rentTotal)}</td>
-          <td>${p.status}</td>
-        </tr>
       `
-    )
+    : '';
+
+  const totalAdditionalChargesSection = hasAdditionalCharges
+    ? `
+        <div class="summary-row" style="margin: 8px 0 20px;">
+          <div class="summary-box">
+            <div class="summary-item">
+              <span>Total Additional Charges</span>
+              <span>₹${formatAmount(adjustmentTotal)}</span>
+            </div>
+          </div>
+        </div>
+      `
+    : '';
+
+  const invoiceRows = ((invoice.transactions?.length
+    ? invoice.transactions
+    : invoice.periods || []) as any[]).map((p) => ({
+    date: p.date || p.startDate || '',
+    direction: p.direction || 'INWARD',
+    commodityName: p.commodityName || 'Unknown',
+    startDate: p.startDate || '',
+    endDate: p.endDate || '',
+    quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
+    bags: p.bags !== undefined
+      ? p.bags
+      : p.bagCount ?? p.bagsCount ?? '',
+    rentTotal: Number(p.rentTotal || 0),
+    daysTotal: Number(p.daysTotal ?? p.daysOccupied ?? 0),
+    ratePerMTPerDay: Number(p.rate || p.ratePerMTPerDay || 0),
+    gatePass: p.gatePass || p.gatepass || '-',
+    status: p.status || '',
+  }));
+
+  const invoiceRowsList = invoiceRows
+    .map((row) => {
+      const dateRange = row.startDate && row.endDate
+        ? `${row.startDate} to ${row.endDate}`
+        : row.date || `${row.startDate || ''}`;
+      const bagsValue = row.bags !== undefined && row.bags !== ''
+        ? (typeof row.bags === 'number' ? row.bags.toLocaleString('en-IN') : row.bags)
+        : '-';
+      const daysValue = row.daysTotal !== undefined && row.daysTotal !== null
+        ? row.daysTotal
+        : '-';
+      const rateValue = row.ratePerMTPerDay
+        ? `₹${formatAmount(row.ratePerMTPerDay)}`
+        : '-';
+      const commodityLabel = row.commodityName || 'Unknown';
+      return `
+        <tr>
+          <td>${dateRange}</td>
+          <td>${row.direction}</td>
+          <td>${commodityLabel}</td>
+          <td style="text-align: right;">${bagsValue}</td>
+          <td style="text-align: right;">${formatQty(row.quantityMT)}</td>
+          <td style="text-align: right;">${daysValue}</td>
+          <td style="text-align: right;">${rateValue}</td>
+          <td style="text-align: right;">₹${formatAmount(row.rentTotal)}</td>
+        </tr>
+      `;
+    })
     .join('');
+
+  const bankBranchRow = invoice.bankBranch
+    ? `<p>Branch : ${invoice.bankBranch}</p>`
+    : '';
 
   return `
     <!DOCTYPE html>
     <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Monthly Invoice - ${invoice.clientName}</title>
-      <style>
-        * {
-          box-sizing: border-box;
-          font-family: 'Arial', sans-serif;
-        }
-        body {
-          margin: 0;
-          padding: 20px;
-          background: white;
-          color: #111827;
-        }
-        .invoice-container {
-          width: 100%;
-          max-width: none;
-          margin: 0;
-          background: white;
-          border-radius: 0;
-          overflow: visible;
-          box-shadow: none;
-        }
-        .invoice-body {
-          padding: 32px 40px;
-        }
-        .header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 20px;
-        }
-        .logo-block {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          max-width: 320px;
-        }
-        .logo-image {
-          width: 150px;
-          object-fit: contain;
-        }
-        .company-name {
-          font-size: 18px;
-          font-weight: 800;
-          color: #0f6f2c;
-          margin-bottom: 8px;
-        }
-        .company-details {
-          font-size: 12px;
-          color: #475569;
-          line-height: 1.6;
-        }
-        .invoice-meta {
-          text-align: right;
-          min-width: 180px;
-          font-size: 12px;
-          color: #475569;
-        }
-        .invoice-meta-title {
-          color: #0f6f2c;
-          font-size: 16px;
-          font-weight: 700;
-          text-transform: uppercase;
-          margin-bottom: 16px;
-        }
-        .invoice-meta p {
-          margin: 4px 0;
-        }
-        .separator {
-          height: 2px;
-          background: #0f6f2c;
-          margin: 26px 0;
-          border: none;
-        }
-        .bill-section {
-          padding: 0 0 0 0;
-        }
-        .bill-title {
-          font-size: 18px;
-          font-weight: 800;
-          margin-bottom: 12px;
-        }
-        .bill-name {
-          font-size: 14px;
-          font-weight: 700;
-          color: #111827;
-          margin-bottom: 12px;
-        }
-        .bill-detail {
-          font-size: 12px;
-          color: #475569;
-          margin: 0 0 4px;
-        }
-        .commodity-info {
-          font-size: 12px;
-          color: #475569;
-          margin: 18px 0 18px;
-        }
-        .table-wrapper {
-          overflow-x: auto;
-        }
-        .items-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 12px;
-          color: #475569;
-        }
-        .items-table th,
-        .items-table td {
-          padding: 12px 10px;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        .items-table th {
-          text-align: left;
-          font-weight: 700;
-          color: #111827;
-          background: #f8fafc;
-        }
-        .items-table th.amount {
-          text-align: right;
-        }
-        .items-table td {
-          vertical-align: middle;
-        }
-        .items-table td.amount,
-        .items-table td.days,
-        .items-table td.qty {
-          text-align: right;
-        }
-        .summary-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 24px;
-          margin-top: 18px;
-          flex-wrap: wrap;
-        }
-        .summary-box {
-          min-width: 240px;
-          max-width: 320px;
-        }
-        .bank-details {
-          flex: 1 1 320px;
-          min-width: 260px;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 18px;
-          background: #f8fafc;
-        }
-        .bank-details strong {
-          display: block;
-          margin-bottom: 10px;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: #0f6f2c;
-        }
-        .bank-details p {
-          margin: 4px 0;
-          color: #475569;
-          font-size: 12px;
-          line-height: 1.6;
-        }
-        .summary-item {
-          display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-          color: #475569;
-          margin-bottom: 10px;
-        }
-        .summary-item.total {
-          font-weight: 800;
-          color: #0f6f2c;
-          font-size: 14px;
-          margin-top: 8px;
-          border-top: 1px solid #e2e8f0;
-          padding-top: 10px;
-        }
-        .bank-details {
-          width: 320px;
-          font-size: 12px;
-          color: #111827;
-          line-height: 1.6;
-        }
-        .bank-details strong {
-          display: block;
-          margin-bottom: 10px;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .bank-details p {
-          margin: 4px 0;
-        }
-        .note {
-          display: block;
-          width: 100%;
-          padding: 10px 0 0 0;
-          font-size: 10px;
-          color: #000000;
-          text-align: center;
-          margin: 14px auto 0;
-          font-weight: 400;
-        }
-      </style>
-    </head>
-    <body>
-      <!-- invoice-html-version: 2 | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
-      <div class="invoice-container">
-        <div class="invoice-body">
-          <div class="header-row">
-            <div class="logo-block">
-              ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : `<div class="company-name">${companyName}</div>`}
-              <div>
-                <div class="company-name">${companyName}</div>
-                <div class="company-details">
-                  ${companyAddress}<br />
-                  Email: ${contactEmail}<br />
-                  Phone: ${contactPhone}
-                </div>
-              </div>
-            </div>
-            <div class="invoice-meta">
-              <div class="invoice-meta-title">Monthly Invoice</div>
-              <p><strong>Invoice Number:</strong> ${await getInvoiceNumber(invoice)}</p>
-              <p><strong>Month:</strong> ${invoice.month} ${invoice.year}</p>
-              <p><strong>Date:</strong> ${invoiceDate}</p>
-            </div>
-          </div>
-          <hr class="separator" />
-
-          <div class="bill-section">
-            <div class="bill-title">Bill To</div>
-            <div class="bill-name">${invoice.clientName}</div>
-            ${panNumber ? `<div class="bill-detail"><strong>PAN:</strong> ${panNumber}</div>` : ''}
-            ${gstNumber ? `<div class="bill-detail"><strong>GST:</strong> ${gstNumber}</div>` : ''}
-          </div>
-
-          <div class="table-wrapper">
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Commodity</th>
-                  <th>From Date</th>
-                  <th>To Date</th>
-                  <th class="qty">Qty (MT)</th>
-                  <th class="days">Days</th>
-                  <th class="amount">Rent (₹)</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${periodsList}
-              </tbody>
-            </table>
-          </div>
-
-          ${monthlyRentChargesSection}
-          ${additionalChargesTable}
-          ${totalAdditionalChargesSection}
-
-          <div class="summary-row">
-            <div class="bank-details">
-              <strong>Bank Details</strong>
-              <p>Bank Name : ${invoice.bankName || 'ICICI BANK GONDAL'}</p>
-              <p>A/c. No. : ${invoice.bankAccountNumber || '048605008597'}</p>
-              <p>IFSC Code : ${invoice.ifscCode || 'ICIC0000486'}</p>
-              ${invoice.bankBranch ? `<p>Branch : ${invoice.bankBranch}</p>` : ''}
-            </div>
-            <div class="summary-box">
-              <div class="summary-item">
-                <span>Monthly Rent</span>
-                <span>₹${formatAmount(invoice.totalRent)}</span>
-              </div>
-              ${adjustmentTotal > 0 ? `
-                <div class="summary-item">
-                  <span>Additional Charges</span>
-                  <span>₹${formatAmount(adjustmentTotal)}</span>
-                </div>
-              ` : ''}
-              <div class="summary-item total">
-                <span>Total Monthly Charges</span>
-                <span>₹${formatAmount(totalMonthlyCharges)}</span>
-              </div>
-            </div>
-          </div>
-          <div class="note">This is system generated invoice</div>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Monthly Invoice - ${invoice.clientName}</title>
+        <style>
+          * {
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+          }
+          body {
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: #111827;
+          }
+          .invoice-container {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            background: white;
+            border-radius: 0;
+            overflow: visible;
+            box-shadow: none;
+          }
+          .invoice-body {
+            padding: 32px 40px;
+          }
+          .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+          }
+          .logo-block {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 320px;
+          }
+          .logo-image {
+            width: 150px;
+            object-fit: contain;
+          }
+          .company-name {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f6f2c;
+            margin-bottom: 8px;
+          }
+          .company-details {
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.6;
+          }
+          .invoice-meta {
+            text-align: right;
+            min-width: 180px;
+            font-size: 12px;
+            color: #475569;
+          }
+          .invoice-meta-title {
+            color: #0f6f2c;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+          }
+          .invoice-meta p {
+            margin: 4px 0;
+          }
+          .separator {
+            height: 2px;
+            background: #0f6f2c;
+            margin: 26px 0;
+            border: none;
+          }
+          .bill-section {
+            padding: 0 0 0 0;
+          }
+          .bill-title {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 12px;
+          }
+          .bill-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 12px;
+          }
+          .bill-detail {
+            font-size: 12px;
+            color: #475569;
+            margin: 0 0 4px;
+          }
+          .table-wrapper {
+            overflow-x: auto;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            color: #475569;
+          }
+          .items-table th,
+          .items-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .items-table th {
+            text-align: left;
+            font-weight: 700;
+            color: #111827;
+            background: #f8fafc;
+          }
+          .items-table th.amount {
+            text-align: right;
+          }
+          .items-table td {
+            vertical-align: middle;
+          }
+          .items-table td.amount,
+          .items-table td.days,
+          .items-table td.qty {
+            text-align: right;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 24px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+          }
+          .summary-box {
+            min-width: 240px;
+            max-width: 320px;
+          }
+          .bank-details {
+            flex: 1 1 320px;
+            min-width: 260px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px;
+            background: #f8fafc;
+          }
+          .bank-details strong {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0f6f2c;
+          }
+          .bank-details p {
+            margin: 4px 0;
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.6;
+          }
+          .summary-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 10px;
+          }
+          .summary-item.total {
+            font-weight: 800;
+            color: #0f6f2c;
+            font-size: 14px;
+            margin-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+          }
+          .note {
+            display: block;
+            width: 100%;
+            padding: 10px 0 0 0;
+            font-size: 10px;
+            color: #000000;
+            text-align: center;
+            margin: 14px auto 0;
+            font-weight: 400;
+          }
+        </style>
+      </head>
+      <body>
+        <div
+          style="padding:12px;background:#f8fafc;color:#0f172a;font-size:13px;text-align:center;"
+        >
+          Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.
         </div>
-      </div>
-    </body>
+        <!-- invoice-html-version: 2 | transactions:${invoice.transactions?.length || 0} | periods:${invoice.periods?.length || 0} | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
+        <div class="invoice-container">
+          <div class="invoice-body">
+            <div class="header-row">
+              <div class="logo-block">
+                ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : `<div class="company-name">${companyName}</div>`}
+                <div>
+                  <div class="company-name">${companyName}</div>
+                  <div class="company-details">
+                    ${companyAddress}<br />
+                    Email: ${contactEmail}<br />
+                    Phone: ${contactPhone}
+                  </div>
+                </div>
+              </div>
+              <div class="invoice-meta">
+                <div class="invoice-meta-title">Monthly Invoice</div>
+                <p><strong>Invoice Number:</strong> ${await getInvoiceNumber(invoice)}</p>
+                <p><strong>Month:</strong> ${invoice.month} ${invoice.year}</p>
+                <p><strong>Date:</strong> ${invoiceDate}</p>
+              </div>
+            </div>
+            <hr class="separator" />
+
+            <div class="bill-section">
+              <div class="bill-title">Bill To</div>
+              <div class="bill-name">${invoice.clientName}</div>
+              ${panNumber ? `<div class="bill-detail"><strong>PAN:</strong> ${panNumber}</div>` : ''}
+              ${gstNumber ? `<div class="bill-detail"><strong>GST:</strong> ${gstNumber}</div>` : ''}
+            </div>
+
+            <div class="table-wrapper">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Direction</th>
+                    <th>Commodity</th>
+                    <th class="qty">No. of Bags</th>
+                    <th class="qty">Qty (MT)</th>
+                    <th class="qty">Days</th>
+                    <th class="amount">Rate (₹)</th>
+                    <th class="amount">Rent (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${invoiceRowsList}
+                </tbody>
+              </table>
+            </div>
+
+            ${monthlyRentChargesSection}
+            ${additionalChargesTable}
+            ${totalAdditionalChargesSection}
+
+            <div class="summary-row">
+              <div class="bank-details">
+                <strong>Bank Details</strong>
+                <p>Bank Name : ${invoice.bankName || 'ICICI BANK GONDAL'}</p>
+                <p>A/c. No. : ${invoice.bankAccountNumber || '048605008597'}</p>
+                <p>IFSC Code : ${invoice.ifscCode || 'ICIC0000486'}</p>
+                ${bankBranchRow}
+              </div>
+              <div class="summary-box">
+                <div class="summary-item">
+                  <span>Monthly Rent</span>
+                  <span>₹${formatAmount(invoice.totalRent)}</span>
+                </div>
+                ${hasAdditionalCharges ? `
+                  <div class="summary-item">
+                    <span>Additional Charges</span>
+                    <span>₹${formatAmount(adjustmentTotal)}</span>
+                  </div>
+                ` : ''}
+                <div class="summary-item total">
+                  <span>Total Monthly Charges</span>
+                  <span>₹${formatAmount(totalMonthlyCharges)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="note">This is system generated invoice</div>
+          </div>
+        </div>
+      </body>
     </html>
   `;
 }
-
-/**
- * Generate invoice PDF using server-side rendering
- * Returns buffer that can be sent to client for download
- */
 export async function generateMonthlyInvoicePDF(invoice: MonthlyInvoiceData): Promise<Buffer> {
   throw new Error(
     'PDF generation is disabled for this deployment. Use generateMonthlyInvoiceHTML to render invoice previews instead.'

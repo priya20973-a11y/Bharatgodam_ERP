@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     const activeWarehouses = await warehouseCollection.find({
       ...tenantFilter,
-      status: 'ACTIVE'
+      status: { $in: ['ACTIVE', 'FULL'] }
     }).toArray();
     let warehouse = null;
 
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
 
     const totalCapacity = warehouse.totalCapacity || 5000;
     const usedCapacity = commodityBreakdown.reduce((sum, item) => sum + item.totalWeight, 0);
-    const availableCapacity = Math.max(0, totalCapacity - usedCapacity);
+    const availableCapacity = warehouse.status === 'FULL' ? 0 : Math.max(0, totalCapacity - usedCapacity);
 
     const warehouseStats = {
       total_capacity: totalCapacity,

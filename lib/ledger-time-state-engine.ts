@@ -46,42 +46,50 @@ const RATE_PER_DAY_PER_MT = 10;
  * Parse ISO date string to Date object
  */
 function parseDate(dateStr: string): Date {
-  const date = new Date(dateStr.split('T')[0]);
-  date.setHours(0, 0, 0, 0);
-  return date;
+  const normalized = String(dateStr || '').trim().split('T')[0];
+  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalized);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    return new Date(Date.UTC(year, month, day));
+  }
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 /**
- * Format a date as YYYY-MM-DD using local time
+ * Format a date as YYYY-MM-DD using UTC values
  */
 function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
 /**
- * Get the first day of month for a given date
+ * Get the first day of month for a given date in UTC
  */
 function getFirstDayOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 /**
- * Get the last day of month for a given date
+ * Get the last day of month for a given date in UTC
  */
 function getLastDayOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 }
 
 /**
- * Get end of day (23:59:59)
+ * Get end of day (23:59:59 UTC)
  */
 function getEndOfDay(date: Date): Date {
-  const endDate = new Date(date);
-  endDate.setHours(23, 59, 59, 999);
-  return endDate;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 }
 
 /**

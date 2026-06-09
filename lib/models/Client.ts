@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IClient extends Document {
   name: string;
+  nameKey: string;
   address: string;
   clientType: 'FARMER' | 'FPO' | 'COMPANY';
   mobile: string;
@@ -18,6 +19,7 @@ export interface IClient extends Document {
 const ClientSchema: Schema = new Schema(
   {
     name: { type: String, required: true },
+    nameKey: { type: String, required: true, uppercase: true },
     address: { type: String, required: true },
     clientType: {
       type: String,
@@ -33,6 +35,18 @@ const ClientSchema: Schema = new Schema(
     userEmail: { type: String, required: false },
   },
   { timestamps: true }
+);
+
+ClientSchema.index({ userId: 1, nameKey: 1 }, { unique: true });
+ClientSchema.index(
+  { userEmail: 1, nameKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      userEmail: { $exists: true, $ne: null },
+      nameKey: { $exists: true, $ne: null }
+    }
+  }
 );
 
 const Client: Model<IClient> =

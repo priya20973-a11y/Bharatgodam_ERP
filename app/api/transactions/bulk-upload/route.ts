@@ -76,7 +76,7 @@ interface ProcessResult {
 }
 
 async function parseCSV(text: string): Promise<BulkTransactionRow[]> {
-  const lines = text.trim().split('\n');
+  const lines = text.trim().replace(/\r/g, '').split('\n');
   if (lines.length < 2) {
     throw new Error('CSV file must contain header and at least one data row');
   }
@@ -142,9 +142,23 @@ async function parseCSV(text: string): Promise<BulkTransactionRow[]> {
 
 function parseDate(dateStr: string): Date | null {
   if (!dateStr) return null;
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const normalized = dateStr.trim();
+  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalized);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return null;
+  const date = new Date(Date.UTC(year, month, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function formatDateToISO(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,10 +169,17 @@ export async function POST(request: NextRequest) {
     const tenantFilter = getTenantFilterForMongo(session) || {};
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file');
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!file || !(file instanceof Blob)) {
+      return NextResponse.json({
+        success: false,
+        totalRows: 0,
+        successCount: 0,
+        errorCount: 1,
+        errors: [{ row: 0, error: 'No file provided' }],
+        error: 'No file provided',
+      }, { status: 400 });
     }
 
     const fileText = await file.text();
@@ -167,7 +188,14 @@ export async function POST(request: NextRequest) {
     console.log(`[Bulk Upload] Parsed ${rows.length} rows from CSV`);
 
     if (rows.length === 0) {
-      return NextResponse.json({ error: 'No data rows found in CSV' }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        totalRows: 0,
+        successCount: 0,
+        errorCount: 1,
+        errors: [{ row: 0, error: 'No data rows found in CSV' }],
+        error: 'No data rows found in CSV',
+      }, { status: 400 });
     }
 
     // Get all clients, commodities, and warehouses for mapping
@@ -270,7 +298,7 @@ export async function POST(request: NextRequest) {
         const warehouseIdStr = warehouseId.toString();
 
         // Create unique key for this row to prevent duplicates within the same upload
-        const transactionKey = `${row.type}|${clientIdStr}|${commodityIdStr}|${warehouseIdStr}|${row.quantityMT}|${transactionDate.toISOString().split('T')[0]}`;
+        const transactionKey = `${row.type}|${clientIdStr}|${commodityIdStr}|${warehouseIdStr}|${row.quantityMT}|${formatDateToISO(transactionDate)}`;
         
         if (processedTransactions.has(transactionKey)) {
           console.log(`[Bulk Upload] Row ${rowNum}: Duplicate within upload - skipping`);
@@ -287,7 +315,7 @@ export async function POST(request: NextRequest) {
           warehouseId: warehouseIdStr,
           direction: row.type,
           quantityMT: row.quantityMT,
-          date: transactionDate.toISOString().split('T')[0],
+          date: formatDateToISO(transactionDate),
           ...(tenantFilter || {})
         });
 
@@ -332,7 +360,7 @@ export async function POST(request: NextRequest) {
             clientName,
             commodityName,
             warehouseName,
-            date: transactionDate.toISOString().split('T')[0],
+            date: formatDateToISO(transactionDate),
             accountId: clientIdStr,
             userId: session.user?.id ? new mongoose.Types.ObjectId(session.user.id) : undefined,
             userEmail: session.user?.email,
@@ -347,7 +375,7 @@ export async function POST(request: NextRequest) {
             commodityId: commodityIdStr,
             warehouseId: warehouseIdStr,
             quantityMT: row.quantityMT,
-            date: transactionDate.toISOString().split('T')[0],
+            date: formatDateToISO(transactionDate),
             source: 'BULK_UPLOAD',
             ...tenantFilter,
           });
@@ -373,7 +401,7 @@ export async function POST(request: NextRequest) {
             direction: 'INWARD',
             quantityMT: row.quantityMT,
             bagsCount: row.bagsCount,
-            inwardDate: transactionDate.toISOString().split('T')[0],
+            inwardDate: formatDateToISO(transactionDate),
             ratePerMTPerDay,
             gatePass: row.gatePass,
             remarks: `Bulk upload INWARD row ${rowNum}`,
@@ -414,7 +442,7 @@ export async function POST(request: NextRequest) {
             clientName,
             commodityName,
             warehouseName,
-            date: transactionDate.toISOString().split('T')[0],
+            date: formatDateToISO(transactionDate),
             accountId: clientIdStr,
             userId: session.user?.id ? new mongoose.Types.ObjectId(session.user.id) : undefined,
             userEmail: session.user?.email,
@@ -429,7 +457,7 @@ export async function POST(request: NextRequest) {
             commodityId: commodityIdStr,
             warehouseId: warehouseIdStr,
             quantityMT: row.quantityMT,
-            date: transactionDate.toISOString().split('T')[0],
+            date: formatDateToISO(transactionDate),
             source: 'BULK_UPLOAD',
             ...tenantFilter,
           });
@@ -455,8 +483,8 @@ export async function POST(request: NextRequest) {
             direction: 'OUTWARD',
             quantityMT: row.quantityMT,
             bagsCount: row.bagsCount,
-            inwardDate: transactionDate.toISOString().split('T')[0],
-            actualOutwardDate: transactionDate.toISOString().split('T')[0],
+            inwardDate: formatDateToISO(transactionDate),
+            actualOutwardDate: formatDateToISO(transactionDate),
             ratePerMTPerDay,
             gatePass: row.gatePass,
             remarks: `Bulk upload OUTWARD row ${rowNum}`,
@@ -467,14 +495,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const transactionMonth = transactionDate.toISOString().split('T')[0].slice(0, 7);
+        const transactionMonth = formatDateToISO(transactionDate).slice(0, 7);
         invoiceMonths.add(transactionMonth);
 
         if (row.type === 'OUTWARD') {
-          const previousMonthDate = new Date(transactionDate);
+          const previousMonthDate = new Date(transactionDate.getTime());
           previousMonthDate.setUTCDate(1);
           previousMonthDate.setUTCMonth(previousMonthDate.getUTCMonth() - 1);
-          invoiceMonths.add(previousMonthDate.toISOString().split('T')[0].slice(0, 7));
+          invoiceMonths.add(formatDateToISO(previousMonthDate).slice(0, 7));
         }
 
         successCount++;
@@ -515,6 +543,13 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to process bulk upload';
     console.error('[Bulk Upload] Fatal error:', error);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({
+      success: false,
+      totalRows: 0,
+      successCount: 0,
+      errorCount: 1,
+      errors: [{ row: 0, error: message }],
+      error: message,
+    }, { status: 400 });
   }
 }

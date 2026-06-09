@@ -118,14 +118,24 @@ const DEFAULT_RATE_PER_DAY_PER_MT = 10;
  */
 function parseDate(dateStr: string | Date): Date {
   if (dateStr instanceof Date) {
-    const d = new Date(dateStr);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    return new Date(Date.UTC(dateStr.getUTCFullYear(), dateStr.getUTCMonth(), dateStr.getUTCDate()));
   }
   if (typeof dateStr !== 'string') {
     return new Date();
   }
-  return new Date(dateStr.split('T')[0]);
+  const normalized = dateStr.trim().split('T')[0];
+  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalized);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    return new Date(Date.UTC(year, month, day));
+  }
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 /**
@@ -133,9 +143,9 @@ function parseDate(dateStr: string | Date): Date {
  */
 function formatDateToString(date: string | Date): string {
   if (date instanceof Date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
   if (typeof date === 'string') {
@@ -223,13 +233,11 @@ export function calculateLedger(
     // Calculate rent from previous date to current date
     if (i > 0) {
       // Split the interval between previousDate and currentDate into month-aligned buckets
-      let cursor = new Date(previousDate);
-      cursor.setHours(0, 0, 0, 0);
-      const normalizedEnd = new Date(currentDate);
-      normalizedEnd.setHours(0, 0, 0, 0);
+      let cursor = new Date(Date.UTC(previousDate.getUTCFullYear(), previousDate.getUTCMonth(), previousDate.getUTCDate()));
+      const normalizedEnd = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate()));
 
       while (cursor < normalizedEnd) {
-        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const nextMonth = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 
@@ -282,20 +290,18 @@ export function calculateLedger(
   // Final period: from last transaction to today's as-of date
   if (sortedTransactions.length > 0) {
     const lastTxnDate = parseDate(sortedTransactions[sortedTransactions.length - 1].date);
-    const asOfDate = new Date();
-    asOfDate.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const asOfDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     const daysDiff = calculateDaysDifference(lastTxnDate, asOfDate);
     const totalQuantity = Array.from(inventory.values()).reduce((sum, qty) => sum + qty, 0);
     if (daysDiff > 0 && totalQuantity > 0) {
       // Split final period into month-aligned buckets to ensure each calendar month shows carried-forward rent
-      let cursor = new Date(lastTxnDate);
-      cursor.setHours(0, 0, 0, 0);
-      const normalizedEnd = new Date(asOfDate);
-      normalizedEnd.setHours(0, 0, 0, 0);
+      let cursor = new Date(Date.UTC(lastTxnDate.getUTCFullYear(), lastTxnDate.getUTCMonth(), lastTxnDate.getUTCDate()));
+      const normalizedEnd = new Date(Date.UTC(asOfDate.getUTCFullYear(), asOfDate.getUTCMonth(), asOfDate.getUTCDate()));
 
       while (cursor < normalizedEnd) {
-        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const nextMonth = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 

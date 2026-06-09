@@ -26,8 +26,35 @@ async function createCollections() {
   await db.collection('ledger_entries').createIndex({ stockEntryId: 1 });
   await db.collection('ledger_entries').createIndex({ clientId: 1, warehouseId: 1, commodityId: 1, periodStartDate: 1 });
   await db.collection('invoice_master').createIndex({ clientId: 1, warehouseId: 1, invoiceMonth: 1 });
-  await db.collection('clients').createIndex({ name: 1 }, { unique: true });
-  await db.collection('commodities').createIndex({ name: 1 }, { unique: true });
+
+  const clientIndexes = await db.collection('clients').indexes();
+  const hasGlobalClientNameIndex = clientIndexes.some((idx) => idx.name === 'name_1');
+  if (hasGlobalClientNameIndex) {
+    await db.collection('clients').dropIndex('name_1');
+    console.log('Dropped old global client name index');
+  }
+  await db.collection('clients').createIndex(
+    { userId: 1, nameKey: 1 },
+    { unique: true, partialFilterExpression: { userId: { $exists: true, $ne: null }, nameKey: { $exists: true, $ne: null } } }
+  );
+  await db.collection('clients').createIndex(
+    { userEmail: 1, nameKey: 1 },
+    {
+      unique: true,
+      partialFilterExpression: {
+        userEmail: { $exists: true, $ne: null },
+        nameKey: { $exists: true, $ne: null }
+      }
+    }
+  );
+
+  const commodityIndexExists = await db.collection('commodities').indexes();
+  const hasGlobalNameIndex = commodityIndexExists.some((idx) => idx.name === 'name_1');
+  if (hasGlobalNameIndex) {
+    await db.collection('commodities').dropIndex('name_1');
+    console.log('Dropped old global commodity name index');
+  }
+  await db.collection('commodities').createIndex({ userId: 1, name: 1 }, { unique: true });
   await db.collection('warehouses').createIndex({ name: 1 }, { unique: true });
 
   console.log('Indexes created');

@@ -31,6 +31,7 @@ import { toast } from 'react-hot-toast';
 
 interface TransactionRecord {
   _id: string;
+  sourceType?: string;
   direction: 'INWARD' | 'OUTWARD';
   date: string;
   clientName: string;
@@ -51,10 +52,11 @@ interface TransactionRecord {
 
 interface TransactionsReportProps {
   transactions: TransactionRecord[];
+  isAdmin?: boolean;
   isLoading?: boolean;
 }
 
-export default function TransactionsReport({ transactions, isLoading = false }: TransactionsReportProps) {
+export default function TransactionsReport({ transactions, isAdmin = false, isLoading = false }: TransactionsReportProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     stackNo: false,
@@ -64,6 +66,7 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
   const [globalFilter, setGlobalFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [monthFilter, setMonthFilter] = useState('ALL');
   const [clientOptions, setClientOptions] = useState<{ label: string; value: string }[]>([]);
   const [warehouseOptions, setWarehouseOptions] = useState<{ label: string; value: string }[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
@@ -72,6 +75,87 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
     pageIndex: 0,
     pageSize: 20,
   });
+  const [liveTransactions, setLiveTransactions] = useState<TransactionRecord[]>(transactions);
+
+  useEffect(() => {
+    setLiveTransactions(transactions);
+  }, [transactions]);
+
+  const handleDeleteTransaction = async (transaction: TransactionRecord) => {
+    if (!window.confirm(`Delete transaction on ${transaction.date} for ${transaction.clientName}? This will remove linked stock, ledger, and invoice entries.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ transactionId: transaction._id }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to delete transaction');
+      }
+
+      setLiveTransactions((current) => current.filter((item) => item._id !== transaction._id));
+      toast.success('Transaction deleted successfully');
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error(`Delete failed: ${String(error)}`);
+    }
+  };
+
+  const handleEditTransaction = async (transaction: TransactionRecord) => {
+    const newDate = window.prompt('Enter new transaction date (YYYY-MM-DD)', transaction.date);
+    if (!newDate) return;
+    const parsedDate = new Date(newDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      toast.error('Invalid date entered');
+      return;
+    }
+
+    const newQuantity = window.prompt('Enter new quantity (MT)', transaction.quantityMT.toString());
+    if (!newQuantity) return;
+    const quantityValue = Number(newQuantity);
+    if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
+      toast.error('Quantity must be a positive number');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactionId: transaction._id,
+          date: newDate,
+          quantityMT: quantityValue,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to edit transaction');
+      }
+
+      setLiveTransactions((current) =>
+        current.map((item) =>
+          item._id === transaction._id
+            ? { ...item, date: newDate, quantityMT: quantityValue }
+            : item
+        )
+      );
+      toast.success('Transaction updated successfully');
+    } catch (error) {
+      console.error('Edit failed:', error);
+      toast.error(`Edit failed: ${String(error)}`);
+    }
+  };
 
   useEffect(() => {
     const loadMasters = async () => {
@@ -103,8 +187,15 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
     loadMasters();
   }, []);
 
+  const extractTransactionMonth = (dateValue?: string) => {
+    if (!dateValue) return '';
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 7);
+  };
+
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((item) => {
+    return liveTransactions.filter((item) => {
       const matchesClient =
         clientFilter === 'ALL' ||
         item.clientId === clientFilter ||
@@ -113,9 +204,22 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
         warehouseFilter === 'ALL' ||
         item.warehouseId === warehouseFilter ||
         item.warehouseName === warehouseFilter;
-      return matchesClient && matchesWarehouse;
+      const itemMonth = extractTransactionMonth(item.date);
+      const matchesMonth = monthFilter === 'ALL' || itemMonth === monthFilter;
+      return matchesClient && matchesWarehouse && matchesMonth;
     });
-  }, [transactions, clientFilter, warehouseFilter]);
+  }, [liveTransactions, clientFilter, warehouseFilter, monthFilter]);
+
+  const monthDropdownOptions = useMemo(() => {
+    const uniqueMonths = Array.from(
+      new Set(liveTransactions.map((item) => extractTransactionMonth(item.date)).filter(Boolean))
+    );
+    const sortedMonths = uniqueMonths.sort((a, b) => b.localeCompare(a));
+    return [{ label: 'All Months', value: 'ALL' }, ...sortedMonths.map((month) => ({
+      label: new Date(`${month}-01`).toLocaleString('en-IN', { month: 'short', year: 'numeric' }),
+      value: month,
+    }))];
+  }, [transactions]);
 
   const clientDropdownOptions = useMemo(() => {
     const hasAll = clientOptions.some((option) => option.value === 'ALL');
@@ -232,7 +336,36 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
         return new Date(createdAt as string).toLocaleDateString('en-IN');
       },
     },
-  ], []);
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const transaction = row.original as TransactionRecord;
+        if (!isAdmin) {
+          return null;
+        }
+
+        return (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditTransaction(transaction)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleDeleteTransaction(transaction)}
+            >
+              Delete
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [isAdmin, handleEditTransaction, handleDeleteTransaction]);
 
   const table = useReactTable({
     data: filteredTransactions,
@@ -315,7 +448,7 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
 
       {/* Search */}
       <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Client</label>
             <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoadingClients}>
@@ -342,6 +475,22 @@ export default function TransactionsReport({ transactions, isLoading = false }: 
                 {warehouseDropdownOptions.map((warehouse) => (
                   <SelectItem key={warehouse.value} value={warehouse.value} className="font-medium">
                     {warehouse.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
+              <SelectTrigger className="font-semibold text-slate-700 w-full">
+                <SelectValue placeholder="All Months" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthDropdownOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value} className="font-medium">
+                    {month.label}
                   </SelectItem>
                 ))}
               </SelectContent>

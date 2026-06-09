@@ -3,6 +3,7 @@
 import { getDb } from '@/lib/mongodb';
 import { getTenantFilterForMongo, appendOwnership, requireSession } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
+import { buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
 import type { IDetailedBooking, IClient, IInvoiceMaster, IInvoiceLineItem, IWarehouse } from '@/types/schemas';
 
 export interface ReportFilter {
@@ -950,11 +951,39 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
   }
 }
 
+export async function getClientTransactionInvoice(clientId: string, month: string, warehouseId?: string) {
+  try {
+    const session = await requireSession();
+    const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
+
+    if (!clientId || !month) {
+      return { success: false, message: 'Client ID and month are required' };
+    }
+
+    const invoiceId = warehouseId && warehouseId !== '' && warehouseId !== 'ALL'
+      ? `${clientId}-${month}-${warehouseId}`
+      : `${clientId}-${month}`;
+
+    const invoice = await buildMonthlyInvoiceFromTransactions(
+      db,
+      invoiceId,
+      warehouseId,
+      tenantFilter
+    );
+
+    return { success: true, data: invoice };
+  } catch (error: any) {
+    console.error('[getClientTransactionInvoice] Error:', error);
+    return { success: false, message: error.message || 'Failed to fetch transaction invoice' };
+  }
+}
+
 export async function getWarehouseOptions() {
   try {
     const session = await requireSession();
     const db = await getDb();
-    const warehouses = await db.collection('warehouses').find({ status: 'ACTIVE', ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
+    const warehouses = await db.collection('warehouses').find({ status: { $in: ['ACTIVE', 'FULL'] }, ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
     return warehouses.map(w => ({
       label: w.name,

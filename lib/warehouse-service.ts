@@ -38,7 +38,7 @@ export async function getAllWarehouses(): Promise<WarehouseMaster[]> {
 export async function getWarehouseOptions() {
   const warehouses = await getAllWarehouses();
   return warehouses
-    .filter(w => w.status === 'ACTIVE')
+    .filter(w => w.status === 'ACTIVE' || w.status === 'FULL') // Only include ACTIVE and FULL warehouses in dropdowns
     .map(w => ({
       label: w.name,
       value: w._id.toString()

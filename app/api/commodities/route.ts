@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { appendOwnershipForMongo } from '@/lib/ownership';
+import { ObjectId } from 'mongodb';
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+}
 
 export async function GET() {
   try {
@@ -47,15 +53,38 @@ export async function POST(request: Request) {
     }
 
     const db = await getDb();
+    const nameValue = String(name).trim();
+    const normalizedName = nameValue.toUpperCase();
+    const userId = session.user.id;
+    let ownerId: ObjectId | string = userId;
 
-    const commodity = {
-      name,
-      rate: Number(rate),
-      rateUnit,
-      userId: (session.user as any).id,
-      userEmail: session.user.email,
-      createdAt: new Date(),
-    };
+    try {
+      ownerId = new ObjectId(String(userId));
+    } catch {
+      ownerId = userId;
+    }
+
+    const existingCommodity = await db.collection('commodities').findOne({
+      userId: ownerId,
+      name: { $regex: new RegExp(`^${escapeRegExp(nameValue)}$`, 'i') },
+    });
+
+    if (existingCommodity) {
+      return NextResponse.json(
+        { success: false, message: 'Commodity name already exists for your account' },
+        { status: 400 }
+      );
+    }
+
+    const commodity = appendOwnershipForMongo(
+      {
+        name: normalizedName,
+        rate: Number(rate),
+        rateUnit,
+        createdAt: new Date(),
+      },
+      session
+    );
 
     const result = await db.collection('commodities').insertOne(commodity);
 

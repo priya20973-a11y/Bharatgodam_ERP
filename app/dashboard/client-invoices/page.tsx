@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
-import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, recordPayment } from '@/app/actions/reports';
+import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, getClientTransactionInvoice, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 import { toast } from 'react-hot-toast';
 
@@ -77,6 +77,7 @@ export default function ClientInvoicesPage() {
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const invoiceMode = 'ledger';
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -189,7 +190,7 @@ export default function ClientInvoicesPage() {
 
     // Load invoices only when client, warehouse and month are selected
     if (selectedMonth && selectedWarehouse && selectedWarehouse !== 'ALL') {
-      await loadInvoices(clientId, selectedWarehouse, selectedMonth);
+      await loadInvoices(clientId, selectedWarehouse, selectedMonth, invoiceMode);
     }
   };
 
@@ -197,7 +198,7 @@ export default function ClientInvoicesPage() {
   const handleWarehouseChange = async (warehouseId: string) => {
     setSelectedWarehouse(warehouseId);
     if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
-      await loadInvoices(selectedClient, warehouseId, selectedMonth);
+      await loadInvoices(selectedClient, warehouseId, selectedMonth, invoiceMode);
     }
   };
 
@@ -210,14 +211,49 @@ export default function ClientInvoicesPage() {
       selectedWarehouse &&
       selectedWarehouse !== 'ALL'
     ) {
-      await loadInvoices(selectedClient, selectedWarehouse, month);
+      await loadInvoices(selectedClient, selectedWarehouse, month, invoiceMode);
     }
   };
 
+  useEffect(() => {
+    if (
+      selectedClient &&
+      selectedClient !== 'ALL' &&
+      selectedWarehouse &&
+      selectedWarehouse !== 'ALL' &&
+      selectedMonth
+    ) {
+      loadInvoices(selectedClient, selectedWarehouse, selectedMonth, invoiceMode);
+    }
+  }, [invoiceMode]);
+
   // Load invoices with client, warehouse and month filter
-  const loadInvoices = async (clientId: string, warehouseId: string, month: string) => {
+  const loadInvoices = async (
+    clientId: string,
+    warehouseId: string,
+    month: string,
+    mode: 'ledger' | 'transaction' = invoiceMode
+  ) => {
     setLoading(true);
+    setInvoices([]);
+
     try {
+      if (mode === 'transaction') {
+        const result = await getClientTransactionInvoice(
+          clientId,
+          month,
+          warehouseId || undefined
+        );
+
+        if (result.success && result.data) {
+          setInvoices([result.data]);
+        } else {
+          setInvoices([]);
+        }
+
+        return;
+      }
+
       const result = await getClientMonthlyLedger(clientId, month, warehouseId || undefined);
       if (result.success && result.data) {
         const clientResult = await getClientOptions();
@@ -228,7 +264,9 @@ export default function ClientInvoicesPage() {
         const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
           const invoiceWarehouseId = invoice.warehouseId || warehouseId || undefined;
           const invoiceWarehouseName = invoice.warehouseName || warehouse?.label || '';
-          const invoiceIdValue = invoiceWarehouseId ? `${clientId}-${invoice.month}-${invoiceWarehouseId}` : `${clientId}-${invoice.month}`;
+          const invoiceIdValue = invoiceWarehouseId
+            ? `${clientId}-${invoice.month}-${invoiceWarehouseId}`
+            : `${clientId}-${invoice.month}`;
           const additionalChargeItems = (invoice.additionalChargeItems || []).map((item: any, idx: number) => ({
             id: item.id ? String(item.id) : getAdditionalChargeItemRowId(invoiceIdValue, item, idx),
             name: item.name,
@@ -247,7 +285,7 @@ export default function ClientInvoicesPage() {
               daysTotal: Number(period.days ?? 0),
               rentTotal: Number(period.rent ?? 0),
               status: period.status || 'COMPLETED',
-              commodityName: period.commodity || '',
+              commodityName: period.commodityName || period.commodity || '',
             })),
             warehouseId: invoiceWarehouseId,
             warehouseName: invoiceWarehouseName,
@@ -306,7 +344,8 @@ export default function ClientInvoicesPage() {
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}`;
+    const modeQuery = invoiceMode === 'transaction' || invoice.invoiceId?.startsWith('txn-') ? '&mode=transactions' : '';
+    const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
   };
 
@@ -1144,7 +1183,6 @@ export default function ClientInvoicesPage() {
                           <th className="px-4 py-2 text-center font-semibold text-slate-700">Qty (MT)</th>
                           <th className="px-4 py-2 text-center font-semibold text-slate-700">Days</th>
                           <th className="px-4 py-2 text-right font-semibold text-slate-700">Rent (₹)</th>
-                          <th className="px-4 py-2 text-center font-semibold text-slate-700">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -1156,19 +1194,6 @@ export default function ClientInvoicesPage() {
                             <td className="px-4 py-2 text-center font-medium">{Number(period.quantityMT || 0).toFixed(2)}</td>
                             <td className="px-4 py-2 text-center">{period.daysTotal ?? 0}</td>
                             <td className="px-4 py-2 text-right font-semibold">₹{Number(period.rentTotal || 0).toLocaleString('en-IN')}</td>
-                            <td className="px-4 py-2 text-center">
-                              <span
-                                className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                                  period.status === 'ACTIVE'
-                                    ? 'bg-green-100 text-green-800'
-                                    : period.status === 'PARTIAL_REMOVAL'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {period.status}
-                              </span>
-                            </td>
                           </tr>
                         ))}
                       </tbody>

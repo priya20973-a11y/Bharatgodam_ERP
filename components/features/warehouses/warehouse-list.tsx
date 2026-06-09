@@ -42,7 +42,7 @@ export default function WarehouseList({ warehouses, onEdit }: WarehouseListProps
             </TableRow>
           ) : (
             warehouses.filter(w => w && w._id && w.name && typeof w.totalCapacity === 'number' && typeof w.occupiedCapacity === 'number').map((w) => {
-              const availableCapacity = w.totalCapacity - w.occupiedCapacity;
+              const availableCapacity = w.status==='FULL' ? 0 : (w.totalCapacity - w.occupiedCapacity);
               return (
                 <TableRow key={w._id.toString()}>
                   <TableCell className="font-medium">{w.name}</TableCell>
@@ -52,7 +52,7 @@ export default function WarehouseList({ warehouses, onEdit }: WarehouseListProps
                   <TableCell className="text-right">{availableCapacity.toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant={w.status === 'ACTIVE' ? 'success' : w.status === 'FULL' ? 'destructive' : 'secondary'}>
-                      {w.status}
+                      {w.status === 'FULL' ? 'Full': w.status === 'ACTIVE' ? 'Active' : w.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-slate-600">{w.addedBy || 'Unknown'}</TableCell>

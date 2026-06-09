@@ -80,16 +80,35 @@ export async function createClient(data: {
   await connectToDatabase();
   try {
     const session = await requireSession();
-    const client = await Client.create(appendOwnership(data, session));
+    const nameValue = data.name.trim();
+    const nameKey = nameValue.toUpperCase();
+
+    const existingClient = await Client.findOne({
+      ...getTenantFilter(session),
+      $or: [
+        { nameKey },
+        { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+      ]
+    });
+
+    if (existingClient) {
+      return { success: false, error: 'Client name already exists for your account' };
+    }
+
+    const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey }, session));
     revalidatePath('/dashboard/clients');
     return { success: true, data: JSON.parse(JSON.stringify(client)) };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error && /duplicate key/i.test(error.message)
+      ? 'Client name already exists for your account'
+      : error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
   }
 }
 
 export async function updateClient(id: string, data: Partial<{
   name: string;
+  nameKey?: string;
   address: string;
   clientType: string;
   mobile: string;
@@ -101,6 +120,11 @@ export async function updateClient(id: string, data: Partial<{
   await connectToDatabase();
   try {
     const session = await requireSession();
+    if (data.name) {
+      data.name = data.name.trim();
+      data.nameKey = data.name.toUpperCase();
+    }
+
     const client = await Client.findOneAndUpdate(
       { _id: id, ...getTenantFilter(session) },
       data,
@@ -109,6 +133,9 @@ export async function updateClient(id: string, data: Partial<{
     revalidatePath('/dashboard/clients');
     return { success: true, data: JSON.parse(JSON.stringify(client)) };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error && /duplicate key/i.test(error.message)
+      ? 'Client name already exists for your account'
+      : error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
   }
 }

@@ -274,7 +274,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                 </SelectTrigger>
                 <SelectContent>
                   {warehouses && warehouses.length > 0 ? (
-                    warehouses.filter(w => w && w._id && w.name && w.status === 'ACTIVE').map(w => (
+                    warehouses.filter(w => w && w._id && w.name && (w.status === 'ACTIVE' || w.status === 'FULL')).map(w => (
                       <SelectItem key={w._id.toString()} value={w._id.toString()}>
                         {w.name}
                       </SelectItem>
