@@ -70,7 +70,7 @@ export function BulkTransactionUpload() {
       const data = (await response.json()) as BulkUploadResponse | { error: string };
 
       if (!response.ok || 'error' in data) {
-        const errorMessage = 'error' in data ? data.error : 'Upload failed';
+        const errorMessage = typeof data.error === 'string' && data.error ? data.error : 'Upload failed';
         const errorResult: BulkUploadResponse = {
           success: false,
           totalRows: 0,

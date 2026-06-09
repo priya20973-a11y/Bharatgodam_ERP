@@ -77,7 +77,7 @@ export default function ClientInvoicesPage() {
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
-  const invoiceMode = 'ledger';
+  const [invoiceMode, setInvoiceMode] = useState<'ledger' | 'transaction'>('ledger');
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

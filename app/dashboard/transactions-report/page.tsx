@@ -1,6 +1,8 @@
 import React from 'react';
 import TransactionsReportWrapper from '@/components/features/reports/transactions-report-wrapper';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Transactions Report | Warehouse Management',
   description: 'View all inward and outward transactions in tabular format with CSV export',
