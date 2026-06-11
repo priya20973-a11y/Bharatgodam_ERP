@@ -741,13 +741,14 @@ export async function getTransactionsForInvoiceMonth(
       }
     }
 
+    const directionValues = ['INWARD', 'OUTWARD', 'inward', 'outward'];
     const query: any = {
       clientId: {
         $in: clientIdValues.filter(
           (value) => value !== undefined && value !== null
         ),
       },
-      direction: { $in: ['INWARD', 'OUTWARD'] },
+      direction: { $in: directionValues },
       $or: [
         { date: { $lte: monthEndStr } },
         { inwardDate: { $lte: monthEndStr } },
