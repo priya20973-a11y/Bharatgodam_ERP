@@ -1,10 +1,21 @@
 import mongoose from 'mongoose';
 
 const MONGODB_URL = process.env.MONGODB_URL || process.env.MONGODB_URI;
-const MONGODB_DB = process.env.MONGODB_DB || 'wms_production';
+const MONGODB_DB =
+  process.env.MONGODB_DB ||
+  extractDatabaseNameFromUri(MONGODB_URL) ||
+  'wms_production';
 
 if (!MONGODB_URL) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URL" or "MONGODB_URI"');
+}
+
+function extractDatabaseNameFromUri(uri?: string): string | undefined {
+  if (!uri) return undefined;
+  const match = uri.match(/^[^:]+:\/\/[^/]+\/([^?]+)/);
+  if (!match || !match[1]) return undefined;
+  const dbName = match[1].trim();
+  return dbName || undefined;
 }
 
 const mongoUrl = MONGODB_URL as string;

@@ -138,6 +138,10 @@ export default function InvoiceReportPage() {
     }
   };
 
+  const isTransactionInvoiceId = (id: string) => {
+    return /^[a-fA-F0-9]{24}-\d{4}-\d{2}(?:-[a-fA-F0-9]{24})?$/.test(id);
+  };
+
   const openInvoicePreview = () => {
     if (!invoiceData.master) {
       toast.error('No invoice data to preview');
@@ -152,7 +156,7 @@ export default function InvoiceReportPage() {
 
     const isTransactionInvoice =
       invoiceData.master.invoiceType === 'transaction' ||
-      invoiceId.includes('-');
+      isTransactionInvoiceId(invoiceId);
 
     const modeQuery = isTransactionInvoice ? '&mode=transactions' : '';
     const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${modeQuery}`;

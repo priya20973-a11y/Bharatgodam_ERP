@@ -341,10 +341,17 @@ export default function ClientInvoicesPage() {
     }
   };
 
+  const isTransactionInvoiceId = (id: string) => {
+    return /^[a-fA-F0-9]{24}-\d{4}-\d{2}(?:-[a-fA-F0-9]{24})?$/.test(id);
+  };
+
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    const modeQuery = invoiceMode === 'transaction' || invoice.invoiceId?.startsWith('txn-') ? '&mode=transactions' : '';
+    const isTransactionInvoice =
+      invoiceMode === 'transaction' ||
+      isTransactionInvoiceId(invoice.invoiceId || invoice.bookingId);
+    const modeQuery = isTransactionInvoice ? '&mode=transactions' : '';
     const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
   };

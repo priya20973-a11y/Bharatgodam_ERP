@@ -227,6 +227,22 @@ function looksLikeTransactionInvoiceIdentifier(id: string | undefined): boolean 
   );
 }
 
+function buildTransactionInvoiceIdentifierFromMaster(master: any): string | null {
+  if (!master?.clientId || !master?.invoiceMonth) return null;
+  const clientId = master.clientId.toString?.()
+    ? master.clientId.toString()
+    : String(master.clientId);
+  const warehouseId = master.warehouseId
+    ? master.warehouseId.toString?.()
+      ? master.warehouseId.toString()
+      : String(master.warehouseId)
+    : undefined;
+
+  return warehouseId
+    ? `${clientId}-${master.invoiceMonth}-${warehouseId}`
+    : `${clientId}-${master.invoiceMonth}`;
+}
+
 export async function buildMonthlyInvoiceFromTransactions(
   db: any,
   id: string,
@@ -1141,7 +1157,7 @@ export async function resolveMonthlyInvoiceFromId(
   if (shouldBuildTransactionInvoice) {
     const invoiceIdentifier =
       invoiceMaster?.invoiceType === 'transaction'
-        ? invoiceMaster.invoiceId || id
+        ? buildTransactionInvoiceIdentifierFromMaster(invoiceMaster) || id
         : id;
 
     return await buildMonthlyInvoiceFromTransactions(
