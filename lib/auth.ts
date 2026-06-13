@@ -98,3 +98,11 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+
+if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_URL) {
+  throw new Error('Invalid/Missing environment variable: "NEXTAUTH_URL" in production');
+}
+
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('Invalid/Missing environment variable: "NEXTAUTH_SECRET"');
+}

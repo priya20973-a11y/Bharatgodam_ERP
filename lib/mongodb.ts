@@ -1,14 +1,14 @@
 import { MongoClient, ServerApiVersion, Db } from 'mongodb';
 
-if (!process.env.MONGODB_URL) {
-  throw new Error('Invalid/Missing environment variable: "MONGODB_URL"');
+const uri = process.env.MONGODB_URL || process.env.MONGODB_URI;
+const dbName = process.env.MONGODB_DB;
+
+if (!uri) {
+  throw new Error('Invalid/Missing environment variable: "MONGODB_URL" or "MONGODB_URI"');
 }
-if (!process.env.MONGODB_DB) {
+if (!dbName) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_DB"');
 }
-
-const uri = process.env.MONGODB_URL;
-const dbName = process.env.MONGODB_DB;
 
 const options = {
   serverApi: {

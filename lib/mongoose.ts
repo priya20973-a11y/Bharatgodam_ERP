@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
 
-if (!process.env.MONGODB_URL) {
-  throw new Error('Invalid/Missing environment variable: "MONGODB_URL"');
+const MONGODB_URL = process.env.MONGODB_URL || process.env.MONGODB_URI;
+const MONGODB_DB = process.env.MONGODB_DB || 'wms_production';
+
+if (!MONGODB_URL) {
+  throw new Error('Invalid/Missing environment variable: "MONGODB_URL" or "MONGODB_URI"');
 }
 
-const MONGODB_URL = process.env.MONGODB_URL;
-const MONGODB_DB = process.env.MONGODB_DB || 'wms_production';
+const mongoUrl = MONGODB_URL as string;
 
 let cached = (global as any).mongoose;
 
@@ -24,7 +26,7 @@ async function connectToDatabase() {
       dbName: MONGODB_DB,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URL, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(mongoUrl, opts).then((mongoose) => {
       return mongoose;
     });
   }

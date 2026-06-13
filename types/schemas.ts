@@ -258,6 +258,7 @@ export interface IInvoiceMaster {
   invoiceMonth: string; // YYYY-MM format
   totalAmount: number;
   status: 'DRAFT' | 'FINAL' | 'PAID' | 'OVERDUE';
+  invoiceType?: 'STANDARD_STORAGE' | 'FINAL_WITHDRAWAL' | 'transaction';
   generatedAt: Date;
   dueDate: string; // ISO date string
   paidAmount?: number;

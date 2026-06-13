@@ -28,7 +28,8 @@ npm install
 Create a `.env.local` file at the repository root:
 
 ```env
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/wms_db?retryWrites=true&w=majority
+MONGODB_URL=mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/wms_db?retryWrites=true&w=majority
+# MONGODB_URI is also accepted as an alias in the app
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<secure-random-value>
 NODE_ENV=development

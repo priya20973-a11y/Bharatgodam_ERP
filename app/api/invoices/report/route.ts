@@ -35,11 +35,11 @@ export async function GET(request: Request) {
       ...tenantFilter,
     });
 
-    let lineItems = master
+    let lineItems: any[] = master
       ? await db.collection('invoice_line_items').find({ invoiceMasterId: master._id }).toArray()
       : [];
 
-    let responseMaster = master
+    let responseMaster: any = master
       ? {
           ...master,
           totalAmount: master.totalAmount,
