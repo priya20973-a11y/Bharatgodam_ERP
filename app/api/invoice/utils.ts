@@ -1123,9 +1123,14 @@ export async function resolveMonthlyInvoiceFromId(
     );
 
   if (invoiceMaster?.invoiceType === 'transaction' || isTransactionMode) {
+    const invoiceIdentifier =
+      invoiceMaster?.invoiceType === 'transaction'
+        ? invoiceMaster.invoiceId || id
+        : id;
+
     return await buildMonthlyInvoiceFromTransactions(
       db,
-      id,
+      invoiceIdentifier,
       warehouseId,
       tenantFilter
     );

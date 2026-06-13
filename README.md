@@ -34,6 +34,8 @@ NEXTAUTH_SECRET=<secure-random-value>
 NODE_ENV=development
 ```
 
+For production, copy `.env.production.example` to `.env.production` and fill in the real values.
+
 ### Run locally
 
 ```bash

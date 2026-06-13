@@ -144,13 +144,18 @@ export default function InvoiceReportPage() {
       return;
     }
 
-    const invoiceId = String(invoiceData.master._id || '');
+    const invoiceId = String(invoiceData.master.invoiceId || invoiceData.master._id || '');
     if (!invoiceId) {
       toast.error('Invoice ID not found');
       return;
     }
 
-    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}`;
+    const isTransactionInvoice =
+      invoiceData.master.invoiceType === 'transaction' ||
+      invoiceId.includes('-');
+
+    const modeQuery = isTransactionInvoice ? '&mode=transactions' : '';
+    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
   };
 
@@ -317,7 +322,7 @@ export default function InvoiceReportPage() {
                   <TableBody>
                     {invoiceData.lineItems.map((item, index) => (
                       <TableRow key={item._id?.toString() || index}>
-                        <TableCell>{item.commodityId.toString()}</TableCell>
+                        <TableCell>{item.commodityName || item.commodityId?.toString?.() || 'Unknown'}</TableCell>
                         <TableCell>{item.periodStart} to {item.periodEnd}</TableCell>
                         <TableCell>{item.daysOccupied}</TableCell>
                         <TableCell>{item.averageQuantityMT}</TableCell>

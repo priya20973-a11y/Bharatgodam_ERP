@@ -65,7 +65,7 @@ export default function TransactionWiseInvoicePage() {
     }
 
     const previewId = `${selectedClientId}-${year}-${month}-${selectedWarehouseId}`;
-    const url = `/api/invoice/html?id=${encodeURIComponent(previewId)}`;
+    const url = `/api/invoice/html?id=${encodeURIComponent(previewId)}&mode=transactions`;
     window.open(url, '_blank', 'noopener');
   };
 
