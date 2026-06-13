@@ -216,6 +216,17 @@ export async function findInvoiceMasterByIdentifier(
   return invoiceMaster;
 }
 
+function looksLikeTransactionInvoiceIdentifier(id: string | undefined): boolean {
+  if (!id?.trim()) return false;
+  const parts = id.split('-');
+  return (
+    parts.length >= 3 &&
+    ObjectId.isValid(parts[0]) &&
+    /^\d{4}$/.test(parts[1]) &&
+    /^\d{2}$/.test(parts[2])
+  );
+}
+
 export async function buildMonthlyInvoiceFromTransactions(
   db: any,
   id: string,
@@ -1122,7 +1133,12 @@ export async function resolveMonthlyInvoiceFromId(
       isTransactionMode ? 'transactions' : undefined
     );
 
-  if (invoiceMaster?.invoiceType === 'transaction' || isTransactionMode) {
+  const shouldBuildTransactionInvoice =
+    invoiceMaster?.invoiceType === 'transaction' ||
+    isTransactionMode ||
+    (!invoiceMaster && looksLikeTransactionInvoiceIdentifier(id));
+
+  if (shouldBuildTransactionInvoice) {
     const invoiceIdentifier =
       invoiceMaster?.invoiceType === 'transaction'
         ? invoiceMaster.invoiceId || id

@@ -1,13 +1,24 @@
 import { MongoClient, ServerApiVersion, Db } from 'mongodb';
 
 const uri = process.env.MONGODB_URL || process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB;
+const dbName = process.env.MONGODB_DB || extractDatabaseNameFromUri(uri);
 
 if (!uri) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URL" or "MONGODB_URI"');
 }
 if (!dbName) {
-  throw new Error('Invalid/Missing environment variable: "MONGODB_DB"');
+  throw new Error(
+    'Invalid/Missing environment variable: "MONGODB_DB". ' +
+      'If your MongoDB URI includes the database name, ensure the URI contains it as the path component or set MONGODB_DB explicitly.'
+  );
+}
+
+function extractDatabaseNameFromUri(uri?: string): string | undefined {
+  if (!uri) return undefined;
+  const match = uri.match(/^[^:]+:\/\/[^/]+\/([^?]+)/);
+  if (!match || !match[1]) return undefined;
+  const dbName = match[1].trim();
+  return dbName || undefined;
 }
 
 const options = {

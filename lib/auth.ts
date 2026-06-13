@@ -3,6 +3,15 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { getDb } from '@/lib/mongodb';
 import bcrypt from 'bcryptjs';
 
+const nextAuthUrl =
+  process.env.NEXTAUTH_URL ||
+  (process.env.VERCEL_URL ? getNextAuthUrlFromVercel() : undefined);
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+
+if (!process.env.NEXTAUTH_URL && nextAuthUrl) {
+  process.env.NEXTAUTH_URL = nextAuthUrl;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -96,13 +105,19 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/', // Specify your custom login page route
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSecret,
 };
 
-if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_URL) {
+if (process.env.NODE_ENV === 'production' && !nextAuthUrl) {
   throw new Error('Invalid/Missing environment variable: "NEXTAUTH_URL" in production');
 }
 
-if (!process.env.NEXTAUTH_SECRET) {
+if (!nextAuthSecret) {
   throw new Error('Invalid/Missing environment variable: "NEXTAUTH_SECRET"');
+}
+
+function getNextAuthUrlFromVercel() {
+  const vercelUrl = process.env.VERCEL_URL;
+  if (!vercelUrl) return undefined;
+  return vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`;
 }
