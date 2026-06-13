@@ -1149,23 +1149,49 @@ export async function resolveMonthlyInvoiceFromId(
       isTransactionMode ? 'transactions' : undefined
     );
 
-  const shouldBuildTransactionInvoice =
-    invoiceMaster?.invoiceType === 'transaction' ||
-    isTransactionMode ||
-    (!invoiceMaster && looksLikeTransactionInvoiceIdentifier(id));
-
-  if (shouldBuildTransactionInvoice) {
-    const invoiceIdentifier =
-      invoiceMaster?.invoiceType === 'transaction'
-        ? buildTransactionInvoiceIdentifierFromMaster(invoiceMaster) || id
-        : id;
-
+  async function tryBuildTransactionInvoice(invoiceIdentifier: string) {
     return await buildMonthlyInvoiceFromTransactions(
       db,
       invoiceIdentifier,
       warehouseId,
       tenantFilter
     );
+  }
+
+  async function tryBuildLedgerInvoice() {
+    return await buildMonthlyInvoiceFromLedger(
+      db,
+      id,
+      warehouseId,
+      tenantFilter
+    );
+  }
+
+  if (isTransactionMode) {
+    const transactionInvoice = await tryBuildTransactionInvoice(id);
+    if (transactionInvoice) {
+      return transactionInvoice;
+    }
+    return await tryBuildLedgerInvoice();
+  }
+
+  if (invoiceMaster?.invoiceType === 'transaction') {
+    const invoiceIdentifier =
+      buildTransactionInvoiceIdentifierFromMaster(invoiceMaster) || id;
+    const transactionInvoice = await tryBuildTransactionInvoice(
+      invoiceIdentifier
+    );
+    if (transactionInvoice) {
+      return transactionInvoice;
+    }
+    return await tryBuildLedgerInvoice();
+  }
+
+  if (!invoiceMaster && looksLikeTransactionInvoiceIdentifier(id)) {
+    const transactionInvoice = await tryBuildTransactionInvoice(id);
+    if (transactionInvoice) {
+      return transactionInvoice;
+    }
   }
 
   const adjustments = await findInvoiceAdjustments(
