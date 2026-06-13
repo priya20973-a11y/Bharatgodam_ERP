@@ -60,9 +60,19 @@ export async function createStockEntry(data: {
     const commodity = await db.collection('commodities').findOne({ _id: new ObjectId(data.commodityId) });
     if (!commodity) return { success: false, message: 'Commodity not found' };
 
-    // For outward, check if stock exists
+    const currentOccupancy = Number(warehouse.occupiedCapacity ?? 0);
+    const totalCapacity = Number(warehouse.totalCapacity ?? 0);
+
     if (data.direction === 'OUTWARD') {
-      const currentStock = await getCurrentStock(data.clientId, data.warehouseId, data.commodityId, session.user!.id);
+      if (!data.actualOutwardDate) {
+        return { success: false, message: 'Actual outward date is required for withdrawals' };
+      }
+
+      if (currentOccupancy - data.quantityMT < 0) {
+        return { success: false, message: 'Warehouse stock cannot become negative' };
+      }
+
+      const currentStock = await getCurrentStock(data.clientId, data.warehouseId, data.commodityId);
       if (currentStock < data.quantityMT) {
         return { success: false, message: 'Insufficient stock for outward' };
       }
@@ -75,7 +85,7 @@ export async function createStockEntry(data: {
       direction: data.direction,
       quantityMT: data.quantityMT,
       bagsCount: data.bagsCount,
-      inwardDate: data.inwardDate,
+      inwardDate: data.direction === 'OUTWARD' ? (data.actualOutwardDate || data.inwardDate) : data.inwardDate,
       actualOutwardDate: data.actualOutwardDate,
       ratePerMTPerDay: data.ratePerMTPerDay,
       gatePass: data.gatePass,
@@ -90,11 +100,23 @@ export async function createStockEntry(data: {
     // Update ledger
     await updateLedgerForStockEntry({ ...stockEntry, _id: result.insertedId });
 
-    // Update warehouse capacity for inward
-    if (data.direction === 'INWARD') {
+    // Update warehouse capacity
+    if (data.direction === 'INWARD' || data.direction === 'OUTWARD') {
+      const capacityDelta = data.direction === 'INWARD' ? data.quantityMT : -data.quantityMT;
+      const updatedStatus = data.direction === 'OUTWARD'
+        ? currentOccupancy + capacityDelta < totalCapacity
+          ? 'ACTIVE'
+          : warehouse.status
+        : currentOccupancy + capacityDelta >= totalCapacity
+          ? 'FULL'
+          : warehouse.status;
+
       await db.collection('warehouses').updateOne(
         { _id: new ObjectId(data.warehouseId) },
-        { $inc: { occupiedCapacity: data.quantityMT } }
+        {
+          $inc: { occupiedCapacity: capacityDelta },
+          $set: { status: updatedStatus },
+        }
       );
     }
 
@@ -110,11 +132,20 @@ export async function createStockEntry(data: {
  */
 export async function getCurrentStock(clientId: string, warehouseId: string, commodityId: string, userId?: string): Promise<number> {
   const db = await getDb();
+  let userMatch: any = undefined;
+  if (userId) {
+    try {
+      userMatch = new ObjectId(userId);
+    } catch {
+      userMatch = userId;
+    }
+  }
+
   const ownershipMatch: any = {
     clientId: new ObjectId(clientId),
     warehouseId: new ObjectId(warehouseId),
     commodityId: new ObjectId(commodityId),
-    ...(userId ? { userId: new ObjectId(userId) } : {}),
+    ...(userMatch ? { userId: userMatch } : {}),
   };
 
   const inwardResult = await db.collection('stock_entries').aggregate([
@@ -188,7 +219,6 @@ async function processOutwardLedgerUpdate(outwardEntry: IStockEntry): Promise<vo
     warehouseId: outwardEntry.warehouseId,
     commodityId: outwardEntry.commodityId,
     status: 'ACTIVE',
-    ...(outwardEntry.userId ? { userId: outwardEntry.userId } : {}),
   };
 
   const activeEntries = await db.collection('ledger_entries').find(query).sort({ periodStartDate: 1 }).toArray();
