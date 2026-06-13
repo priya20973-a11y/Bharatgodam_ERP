@@ -166,7 +166,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         });
 
         if (res.success) {
-          toast.success('Stock withdrawal recorded');
+          toast.success('Outward Transaction Recorded');
           
           reset({
             clientId: '',
