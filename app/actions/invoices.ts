@@ -136,6 +136,7 @@ export async function fetchInvoiceMasters() {
     const commodities = (inv.items || []).map((item: any) => item.commodityName).filter(Boolean);
     return {
       id: inv._id.toString(),
+      invoiceId: inv.invoiceId || inv._id.toString(),
       clientId: inv.clientId?.toString() || '',
       warehouseId: inv.warehouseId?.toString() || '',
       warehouseName: warehouseMap.get(inv.warehouseId?.toString()) || 'Unknown Warehouse',

@@ -17,18 +17,29 @@ interface InvoicePDFExporterProps {
 export default function InvoicePDFExporter({ invoiceData }: InvoicePDFExporterProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const isTransactionInvoiceId = (id: string) => {
+    return /^[a-fA-F0-9]{24}-\d{4}-\d{2}(?:-[a-fA-F0-9]{24})?$/.test(id);
+  };
+
   const handleGenerateAndDownload = () => {
     try {
       setIsGenerating(true);
 
-      const invoiceId = invoiceData?.metadata?.invoiceNo;
+      const invoiceId =
+        invoiceData?.metadata?.invoiceId ||
+        invoiceData?.metadata?.invoiceNo ||
+        (invoiceData as any)?.metadata?.invoiceNumber;
 
       if (!invoiceId) {
         throw new Error('Invoice ID not found');
       }
 
+      const modeQuery = isTransactionInvoiceId(invoiceId)
+        ? '&mode=transactions'
+        : '';
+
       // Open HTML invoice in new tab
-      window.open(`/api/invoice/html?id=${invoiceId}`, '_blank');
+      window.open(`/api/invoice/html?id=${encodeURIComponent(invoiceId)}${modeQuery}`, '_blank');
 
       toast.success('Invoice opened! Press Ctrl+P to download as PDF.');
     } catch (error) {

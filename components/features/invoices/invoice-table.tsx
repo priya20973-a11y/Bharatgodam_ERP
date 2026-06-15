@@ -32,9 +32,16 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
     setInvoices(initialInvoices);
   }, [initialInvoices]);
 
+  const isTransactionInvoiceId = (id: string) => {
+    return /^[a-fA-F0-9]{24}-\d{4}-\d{2}(?:-[a-fA-F0-9]{24})?$/.test(id);
+  };
+
   // Handle invoice export via HTML print preview
-  const handleExportPDF = (invoiceId: string) => {
-    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}`;
+  const handleExportPDF = (invoice: any) => {
+    const invoiceId = invoice.invoiceId || invoice.id;
+    const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
+    const modeQuery = isTransactionInvoiceId(invoiceId) ? '&mode=transactions' : '';
+    const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
     toast.success('Invoice preview opened in a new tab');
   };
@@ -162,7 +169,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
             {optimisticInvoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4 font-medium text-slate-900">
-                  #{inv.id.substring(0, 8).toUpperCase()}
+                  #{(inv.invoiceId || inv.id).toString().substring(0, 8).toUpperCase()}
                 </td>
                 <td className="px-6 py-4">
                   <div className="font-semibold text-slate-800">{inv.customerName || 'N/A'}</div>
@@ -244,7 +251,7 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
                   {/* HTML Preview Action */}
                   {isClient && (
                     <button
-                      onClick={() => handleExportPDF(inv.id)}
+                      onClick={() => handleExportPDF(inv)}
                       className="inline-flex items-center justify-center px-4 py-2 border border-slate-300 shadow-sm text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 transition-colors"
                     >
                       <FileDown className="w-4 h-4 mr-2 text-indigo-500" />
