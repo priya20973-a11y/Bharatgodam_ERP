@@ -777,9 +777,13 @@ export async function getTransactionsForInvoiceMonth(
       },
       direction: { $in: directionValues },
       $or: [
+        { date: { $lte: monthEnd } },
         { date: { $lte: monthEndStr } },
+        { inwardDate: { $lte: monthEnd } },
         { inwardDate: { $lte: monthEndStr } },
+        { outwardDate: { $lte: monthEnd } },
         { outwardDate: { $lte: monthEndStr } },
+        { actualOutwardDate: { $lte: monthEnd } },
         { actualOutwardDate: { $lte: monthEndStr } },
       ],
       ...tenantFilter,
