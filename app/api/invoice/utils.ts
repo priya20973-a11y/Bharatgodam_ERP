@@ -899,13 +899,37 @@ export async function getTransactionsForInvoiceMonth(
 /**
  * Convert transactions to billing rows based on storage period until month end
  */
+function normalizeTransactionDateValue(value: any): string {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
+  }
+
+  if (typeof value === 'string') {
+    const rawValue = value.trim();
+    if (!rawValue) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+      return rawValue;
+    }
+    if (rawValue.includes('T')) {
+      return rawValue.split('T')[0];
+    }
+    const parsed = new Date(rawValue);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+    return '';
+  }
+
+  return '';
+}
+
 function resolveTransactionDateString(txn: any): string {
   const direction = (txn.direction || 'INWARD').toUpperCase();
   const rawDate =
     direction === 'OUTWARD'
       ? txn.actualOutwardDate || txn.outwardDate || txn.date || txn.inwardDate
       : txn.inwardDate || txn.date || txn.outwardDate || txn.actualOutwardDate;
-  return rawDate ? rawDate.toString().split('T')[0] : '';
+  return normalizeTransactionDateValue(rawDate);
 }
 
 function parseUTCDate(dateString: string): Date | null {
