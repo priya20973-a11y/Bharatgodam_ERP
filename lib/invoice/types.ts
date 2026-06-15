@@ -27,7 +27,9 @@ export interface CustomerInfo {
 }
 
 export interface InvoiceMetadata {
+  invoiceId?: string;
   invoiceNo: string;
+  invoiceNumber?: string;
   invoiceDate: string; // Format: DD/MM/YYYY
   gstin?: string;
 }
