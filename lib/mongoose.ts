@@ -35,6 +35,9 @@ async function connectToDatabase() {
     const opts = {
       bufferCommands: false,
       dbName: MONGODB_DB,
+      retryWrites: true,
+      w: 'majority',
+      readPreference: 'primary',
     };
 
     cached.promise = mongoose.connect(mongoUrl, opts).then((mongoose) => {

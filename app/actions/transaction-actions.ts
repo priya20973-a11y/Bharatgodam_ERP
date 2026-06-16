@@ -15,7 +15,7 @@ import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
 
 async function createTransactionSession() {
-  await connectToDatabase();
+  const dbConnection = await connectToDatabase();
   if (!mongoose.connection.db) {
     throw new Error('Database connection not established');
   }
@@ -24,13 +24,60 @@ async function createTransactionSession() {
   const serverInfo = await admin.command({ hello: 1 }).catch(() => admin.command({ isMaster: 1 }));
   const supportsTransactions = Boolean(serverInfo.setName || serverInfo.msg === 'isdbgrid');
 
+  console.log('[createTransactionSession] serverInfo', {
+    serverInfo: {
+      setName: serverInfo?.setName,
+      msg: serverInfo?.msg,
+      isWritablePrimary: serverInfo?.isWritablePrimary,
+      ok: serverInfo?.ok,
+    },
+    supportsTransactions,
+  });
+
   if (!supportsTransactions) {
+    console.log('[createTransactionSession] transactions not supported, proceeding without session');
     return null;
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  return session;
+  let session: mongoose.ClientSession | null = null;
+  try {
+    session = await mongoose.connection.startSession({ causalConsistency: false });
+    await session.startTransaction({
+      readConcern: { level: 'snapshot' },
+      writeConcern: { w: 'majority' },
+      readPreference: 'primary',
+    });
+    console.log('[createTransactionSession] mongoose transaction session started', {
+      transactionOptions: {
+        readConcern: 'snapshot',
+        writeConcern: 'majority',
+        readPreference: 'primary',
+      },
+    });
+    return session;
+  } catch (error: unknown) {
+    const unsupportedTransaction = isTransactionError(error);
+    console.error('[createTransactionSession] failed to start transaction, falling back to no transaction', {
+      unsupportedTransaction,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    if (session) {
+      try {
+        await session.endSession();
+      } catch (closeError) {
+        console.error('[createTransactionSession] failed to end session after transaction failure', closeError);
+      }
+    }
+    return null;
+  }
+}
+
+function isTransactionError(error: unknown) {
+  if (!(error instanceof Error) || typeof error.message !== 'string') return false;
+  return error.message.includes('Only servers in a sharded cluster can start a new transaction at the active transaction number')
+    || error.message.includes('Transaction numbers are only allowed on a replica set or mongos')
+    || error.message.includes('Cannot start transaction on transaction pinned cursor');
 }
 
 function parseIsoDate(value: any): Date | null {
@@ -92,10 +139,10 @@ function getDailyRateForEntry(entry: any, commodityRateMap: Map<string, number>)
 /**
  * Calculates current stock balance for Client + Commodity + Warehouse
  */
-export async function getStockBalance(clientId: string, commodityId: string, warehouseId: string) {
+export async function getStockBalance(clientId: string, commodityId: string, warehouseId: string, session?: mongoose.ClientSession) {
   await connectToDatabase();
 
-  const inwardResult = await Inward.aggregate([
+  const inwardAgg = Inward.aggregate([
     {
       $match: {
         clientId: new mongoose.Types.ObjectId(clientId),
@@ -106,7 +153,7 @@ export async function getStockBalance(clientId: string, commodityId: string, war
     { $group: { _id: null, total: { $sum: '$quantityMT' } } },
   ]);
 
-  const outwardResult = await Outward.aggregate([
+  const outwardAgg = Outward.aggregate([
     {
       $match: {
         clientId: new mongoose.Types.ObjectId(clientId),
@@ -116,6 +163,9 @@ export async function getStockBalance(clientId: string, commodityId: string, war
     },
     { $group: { _id: null, total: { $sum: '$quantityMT' } } },
   ]);
+
+  const inwardResult = session ? await inwardAgg.session(session).exec() : await inwardAgg.exec();
+  const outwardResult = session ? await outwardAgg.session(session).exec() : await outwardAgg.exec();
 
   const totalInwardValue = inwardResult[0]?.total || 0;
   const totalOutwardValue = outwardResult[0]?.total || 0;
@@ -310,6 +360,10 @@ export async function processOutward(data: {
   const authSession = await requireSession();
   const session = await createTransactionSession();
 
+  console.log('[processOutward] transaction session created', {
+    hasSession: Boolean(session),
+  });
+
   try {
     const outwardDate = data.date ? new Date(data.date) : new Date();
 
@@ -328,7 +382,7 @@ export async function processOutward(data: {
       role: authSession?.user?.role,
     });
 
-    const currentBalance = await getStockBalance(data.clientId, data.commodityId, data.warehouseId);
+    const currentBalance = await getStockBalance(data.clientId, data.commodityId, data.warehouseId, session || undefined);
     console.log('[processOutward] currentBalance', { currentBalance });
     if (data.quantityMT > currentBalance) {
       throw new Error(`Insufficient stock. Available: ${currentBalance} MT`);
@@ -337,13 +391,43 @@ export async function processOutward(data: {
     const clientQuery = Client.findById(data.clientId);
     const commodityQuery = Commodity.findById(data.commodityId);
     const warehouseQuery = Warehouse.findById(data.warehouseId);
-    const [client, commodity, warehouse] = session
-      ? await Promise.all([clientQuery.session(session), commodityQuery.session(session), warehouseQuery.session(session)])
-      : await Promise.all([clientQuery, commodityQuery, warehouseQuery]);
 
-    if (!client) throw new Error('Client not found');
-    if (!commodity) throw new Error('Commodity not found');
-    if (!warehouse) throw new Error('Warehouse not found');
+    let client = null;
+    let commodity = null;
+    let warehouse = null;
+
+    if (session) {
+      console.log('[processOutward] loading client/commodity/warehouse under transaction session');
+      client = await clientQuery.session(session).exec();
+      console.log('[processOutward] loaded client under session', { clientId: data.clientId });
+      commodity = await commodityQuery.session(session).exec();
+      console.log('[processOutward] loaded commodity under session', { commodityId: data.commodityId });
+      warehouse = await warehouseQuery.session(session).exec();
+      console.log('[processOutward] loaded warehouse under session', { warehouseId: data.warehouseId });
+    } else {
+      client = await clientQuery.exec();
+      commodity = await commodityQuery.exec();
+      warehouse = await warehouseQuery.exec();
+    }
+
+    console.log('[processOutward] loaded references', {
+      client: client ? { id: client._id?.toString(), name: client.name } : null,
+      commodity: commodity ? { id: commodity._id?.toString(), name: commodity.name } : null,
+      warehouse: warehouse ? { id: warehouse._id?.toString(), name: warehouse.name, occupiedCapacity: warehouse.occupiedCapacity, totalCapacity: warehouse.totalCapacity, status: warehouse.status } : null,
+    });
+
+    if (!client) {
+      console.error('[processOutward] client not found');
+      throw new Error('Client not found');
+    }
+    if (!commodity) {
+      console.error('[processOutward] commodity not found');
+      throw new Error('Commodity not found');
+    }
+    if (!warehouse) {
+      console.error('[processOutward] warehouse not found');
+      throw new Error('Warehouse not found');
+    }
 
     const outwardPayload = appendOwnershipForMongo({
       ...data,
@@ -353,6 +437,17 @@ export async function processOutward(data: {
     const [newOutward] = session
       ? await Outward.create([outwardPayload], { session })
       : await Outward.create([outwardPayload]);
+
+    console.log('[processOutward] created outward record', {
+      outwardId: newOutward._id?.toString(),
+      outwardPayload: {
+        clientId: newOutward.clientId,
+        commodityId: newOutward.commodityId,
+        warehouseId: newOutward.warehouseId,
+        quantityMT: newOutward.quantityMT,
+        date: newOutward.date,
+      },
+    });
 
     const outwardTransaction = appendOwnershipForMongo({
       accountId: data.clientId,
@@ -387,6 +482,10 @@ export async function processOutward(data: {
       occupiedCapacity: warehouse.occupiedCapacity,
     });
 
+    if (!warehouse) {
+      throw new Error('Warehouse not found');
+    }
+
     if (warehouse.occupiedCapacity - data.quantityMT < 0) {
       throw new Error('Warehouse stock cannot become negative');
     }
@@ -396,8 +495,10 @@ export async function processOutward(data: {
     }
     if (session) {
       await warehouse.save({ session });
+      console.log('[processOutward] warehouse saved within session');
     } else {
       await warehouse.save();
+      console.log('[processOutward] warehouse saved outside session');
     }
 
     const db = mongoose.connection.db;
@@ -410,6 +511,14 @@ export async function processOutward(data: {
     console.log('[processOutward] Inserted transaction record', {
       transactionId: transactionResult.insertedId?.toString?.(),
       sourceId: newOutward._id?.toString(),
+      acknowledged: transactionResult.acknowledged,
+    });
+
+    console.log('[processOutward] updating ledger entries', {
+      clientId: data.clientId,
+      commodityId: data.commodityId,
+      warehouseId: data.warehouseId,
+      outwardDate: outwardDate.toISOString().split('T')[0],
     });
 
     // Update ledger entries for this client/commodity/warehouse combination
@@ -436,6 +545,7 @@ export async function processOutward(data: {
 
     if (session) {
       await session.commitTransaction();
+      console.log('[processOutward] transaction committed');
     }
     revalidatePath('/dashboard/outward');
     revalidatePath('/dashboard/warehouses');
@@ -444,13 +554,28 @@ export async function processOutward(data: {
 
     return { success: true, data: JSON.parse(JSON.stringify(newOutward)) };
   } catch (error: unknown) {
+    console.error('[processOutward] caught error', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      hasSession: Boolean(session),
+    });
     if (session) {
-      await session.abortTransaction();
+      try {
+        await session.abortTransaction();
+        console.log('[processOutward] transaction aborted');
+      } catch (abortError) {
+        console.error('[processOutward] failed to abort transaction', abortError);
+      }
     }
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     if (session) {
-      session.endSession();
+      try {
+        session.endSession();
+        console.log('[processOutward] session ended');
+      } catch (endError) {
+        console.error('[processOutward] failed to end session', endError);
+      }
     }
   }
 }
