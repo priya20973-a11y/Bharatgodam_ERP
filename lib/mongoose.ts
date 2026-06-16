@@ -32,12 +32,12 @@ async function connectToDatabase() {
   }
 
   if (!cached.promise) {
-    const opts = {
+    const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
       dbName: MONGODB_DB,
       retryWrites: true,
       w: 'majority',
-      readPreference: 'primary',
+      readPreference: 'primary' as any,
     };
 
     cached.promise = mongoose.connect(mongoUrl, opts).then((mongoose) => {
