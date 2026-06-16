@@ -151,6 +151,15 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
     if (submittingRef.current) return;
     submittingRef.current = true;
 
+    console.log('[OutwardForm] onSubmit payload', {
+      clientId: data.clientId,
+      commodityId: data.commodityId,
+      warehouseId: data.warehouseId,
+      quantityMT: data.quantityMT,
+      date: data.date,
+      gatePass: data.gatePass,
+    });
+
     startTransition(async () => {
       try {
         const res = await processOutward({
@@ -164,6 +173,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           gatePass: data.gatePass,
           date: data.date,
         });
+
+        console.log('[OutwardForm] processOutward response', res);
 
         if (res.success) {
           toast.success('Outward Transaction Recorded');
@@ -184,6 +195,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           onSuccess?.();
           setTimeout(() => { submittingRef.current = false; }, 1000);
         } else {
+          console.error('Outward form server response error:', res.error);
           toast.error(res.error || 'Failed to process outward');
           submittingRef.current = false;
         }

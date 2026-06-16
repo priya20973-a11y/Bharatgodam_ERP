@@ -313,7 +313,23 @@ export async function processOutward(data: {
   try {
     const outwardDate = data.date ? new Date(data.date) : new Date();
 
+    console.log('[processOutward] payload', {
+      clientId: data.clientId,
+      commodityId: data.commodityId,
+      warehouseId: data.warehouseId,
+      quantityMT: data.quantityMT,
+      date: outwardDate.toISOString(),
+      gatePass: data.gatePass,
+    });
+
+    console.log('[processOutward] authSession', {
+      userId: authSession?.user?.id,
+      email: authSession?.user?.email,
+      role: authSession?.user?.role,
+    });
+
     const currentBalance = await getStockBalance(data.clientId, data.commodityId, data.warehouseId);
+    console.log('[processOutward] currentBalance', { currentBalance });
     if (data.quantityMT > currentBalance) {
       throw new Error(`Insufficient stock. Available: ${currentBalance} MT`);
     }
@@ -360,6 +376,17 @@ export async function processOutward(data: {
       updatedAt: new Date(),
     }, authSession);
 
+    console.log('[processOutward] Starting outward transaction', {
+      userId: authSession?.user?.id,
+      clientId: data.clientId,
+      commodityId: data.commodityId,
+      warehouseId: data.warehouseId,
+      quantityMT: data.quantityMT,
+      outwardId: newOutward._id?.toString(),
+      currentBalance,
+      occupiedCapacity: warehouse.occupiedCapacity,
+    });
+
     if (warehouse.occupiedCapacity - data.quantityMT < 0) {
       throw new Error('Warehouse stock cannot become negative');
     }
@@ -376,14 +403,18 @@ export async function processOutward(data: {
     const db = mongoose.connection.db;
     if (!db) throw new Error('Database connection not established');
 
-    await db.collection('transactions').insertOne(
+    const transactionResult = await db.collection('transactions').insertOne(
       outwardTransaction,
       session ? { session } : undefined
     );
+    console.log('[processOutward] Inserted transaction record', {
+      transactionId: transactionResult.insertedId?.toString?.(),
+      sourceId: newOutward._id?.toString(),
+    });
 
     // Update ledger entries for this client/commodity/warehouse combination
     // Find active ledger entries and update their end date to reflect actual stock withdrawal
-    await db.collection('ledger_entries').updateMany(
+    const ledgerUpdateResult = await db.collection('ledger_entries').updateMany(
       {
         clientId: new mongoose.Types.ObjectId(data.clientId),
         commodityId: new mongoose.Types.ObjectId(data.commodityId),
@@ -398,6 +429,10 @@ export async function processOutward(data: {
       },
       session ? { session } : undefined
     );
+    console.log('[processOutward] Ledger update result', {
+      matchedCount: ledgerUpdateResult.matchedCount,
+      modifiedCount: ledgerUpdateResult.modifiedCount,
+    });
 
     if (session) {
       await session.commitTransaction();
