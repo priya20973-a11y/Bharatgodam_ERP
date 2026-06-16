@@ -1,3 +1,7 @@
+
+
+
+
 'use client';
 
 import { activateUserAction, deactivateUserAction, deleteUserAction, resetUserPasswordAction, updateUserProfileAction, type User } from '@/app/actions/user-actions';
@@ -135,6 +139,25 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
     } catch (error) {
       console.error('Error updating profile:', error);
       alert('Failed to update profile.');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (!window.confirm(`Are you sure you want to delete this user (${email})?`)) {
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('email', email);
+      await deleteUserAction(formData);
+      startTransition(() => {
+        router.refresh();
+      });
+      alert('User deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert(error.message || 'Failed to delete user');
     }
   };
 
@@ -294,19 +317,16 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                               🔑 Reset Password
                             </Button>
 
-                            <form action={deleteUserAction}>
-                              <input type="hidden" name="userId" value={user._id.toString()} />
-                              <input type="hidden" name="email" value={user.email} />
-                              <Button
-                                type="submit"
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </form>
+                            <Button
+                               type="button"
+                               onClick={() => handleDeleteUser(user._id.toString(), user.email)}
+                               variant="outline"
+                               size="sm"
+                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                             >
+                               <Trash2 className="h-4 w-4 mr-1" />
+                               Delete
+                             </Button>
                           </>
                         )}
                       </div>

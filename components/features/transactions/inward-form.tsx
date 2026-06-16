@@ -214,7 +214,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label htmlFor={clientIdId} className="text-sm font-semibold text-slate-700">Client Name</label>
+            <label htmlFor={clientIdId} className="text-sm font-semibold text-slate-700">Client Name *</label>
             <Controller
               name="clientId"
               control={control}
@@ -237,7 +237,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
           </div>
 
           <div className="space-y-2">
-            <label htmlFor={commodityIdId} className="text-sm font-semibold text-slate-700">Commodity</label>
+            <label htmlFor={commodityIdId} className="text-sm font-semibold text-slate-700">Commodity *</label>
             <Controller
               name="commodityId"
               control={control}
@@ -269,7 +269,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label htmlFor={warehouseIdId} className="text-sm font-semibold text-slate-700">Warehouse Name</label>
+            <label htmlFor={warehouseIdId} className="text-sm font-semibold text-slate-700">Warehouse Name *</label>
             <Controller
               name="warehouseId"
               control={control}
@@ -306,7 +306,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor={weightId} className="text-sm font-semibold text-slate-700">Weight (MT)</label>
+              <label htmlFor={weightId} className="text-sm font-semibold text-slate-700">Weight (MT) *</label>
               <Controller
                 name="quantityMT"
                 control={control}
@@ -382,7 +382,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <label htmlFor={inwardDateId} className="text-sm font-semibold text-slate-700">Inward Date</label>
+                <label htmlFor={inwardDateId} className="text-sm font-semibold text-slate-700">Inward Date *</label>
                 <Input 
                     id={inwardDateId}
                     {...register('inwardDate')}

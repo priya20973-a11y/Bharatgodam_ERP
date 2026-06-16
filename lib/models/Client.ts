@@ -43,6 +43,7 @@ ClientSchema.index(
   {
     unique: true,
     partialFilterExpression: {
+      $or: [{ userId: { $exists: false } }, { userId: null }],
       userEmail: { $exists: true, $ne: null },
       nameKey: { $exists: true, $ne: null }
     }

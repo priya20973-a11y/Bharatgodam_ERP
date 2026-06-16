@@ -84,7 +84,7 @@ export default function TransactionWiseInvoicePage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Client *</label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select client" />
@@ -100,7 +100,7 @@ export default function TransactionWiseInvoicePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse *</label>
                 <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select warehouse" />
@@ -116,7 +116,7 @@ export default function TransactionWiseInvoicePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month *</label>
                 <input
                   type="month"
                   value={invoiceMonth}

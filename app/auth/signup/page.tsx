@@ -45,6 +45,12 @@ export default function SignupPage() {
       newErrors.email = 'Please enter a valid email address';
     }
 
+    // Phone format
+    const phoneRegex = /^[0-9]{10}$/;
+    if (formData.phoneNumber && !phoneRegex.test(formData.phoneNumber.trim())) {
+      newErrors.phoneNumber = 'Phone number must be exactly 10 digits';
+    }
+
     // Password match
     if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
@@ -151,7 +157,7 @@ export default function SignupPage() {
           <div className="space-y-4">
             {/* Full Name */}
             <div>
-              <label htmlFor="fullName" className="sr-only">Full Name</label>
+              <label htmlFor="fullName" className="sr-only">Full Name *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <User className="h-5 w-5 text-gray-400" />
@@ -172,7 +178,7 @@ export default function SignupPage() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="sr-only">Email</label>
+              <label htmlFor="email" className="sr-only">Email *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Mail className="h-5 w-5 text-gray-400" />
@@ -193,7 +199,7 @@ export default function SignupPage() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="sr-only">Password</label>
+              <label htmlFor="password" className="sr-only">Password *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Lock className="h-5 w-5 text-gray-400" />
@@ -215,7 +221,7 @@ export default function SignupPage() {
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="sr-only">Confirm Password *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Lock className="h-5 w-5 text-gray-400" />
@@ -236,7 +242,7 @@ export default function SignupPage() {
 
             {/* Company / WSP Name */}
             <div>
-              <label htmlFor="companyName" className="sr-only">Company / WSP Name</label>
+              <label htmlFor="companyName" className="sr-only">Company / WSP Name *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Building className="h-5 w-5 text-gray-400" />
@@ -257,7 +263,7 @@ export default function SignupPage() {
 
             {/* Phone Number */}
             <div>
-              <label htmlFor="phoneNumber" className="sr-only">Phone Number</label>
+              <label htmlFor="phoneNumber" className="sr-only">Phone Number *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Phone className="h-5 w-5 text-gray-400" />
@@ -267,10 +273,13 @@ export default function SignupPage() {
                   name="phoneNumber"
                   type="tel"
                   required
+                  inputMode="numeric"
+                  pattern="[0-9]{10}"
+                  maxLength={10}
                   value={formData.phoneNumber}
                   onChange={handleInputChange}
                   className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Phone Number"
+                  placeholder="10 digit phone number"
                 />
               </div>
               {errors.phoneNumber && <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>}
@@ -297,7 +306,7 @@ export default function SignupPage() {
 
             {/* Location */}
             <div>
-              <label htmlFor="warehouseLocation" className="sr-only">Location</label>
+              <label htmlFor="warehouseLocation" className="sr-only">Location *</label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <MapPin className="h-5 w-5 text-gray-400" />

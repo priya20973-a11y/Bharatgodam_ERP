@@ -49,7 +49,7 @@ export default function CommoditiesDashboard({ initialData }: { initialData: any
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Commodity Name</label>
+            <label className="text-sm font-medium">Commodity Name *</label>
             <Input 
               required 
               value={formData.name} 
@@ -58,7 +58,7 @@ export default function CommoditiesDashboard({ initialData }: { initialData: any
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Rate (₹/MT/Day)</label>
+            <label className="text-sm font-medium">Rate (₹/MT/Day) *</label>
             <Input 
               required 
               type="number" 

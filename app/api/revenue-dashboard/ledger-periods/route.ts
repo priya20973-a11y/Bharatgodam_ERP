@@ -48,9 +48,86 @@ export async function GET(request: Request) {
       ledgerQuery.clientId = { $in: [clientObjectId, clientId] };
     }
 
+    let warehouseMatchIds: Array<string | ObjectId> = [];
     if (warehouseId) {
-      const warehouseObjectId = ObjectId.isValid(warehouseId) ? new ObjectId(warehouseId) : warehouseId;
-      ledgerQuery.warehouseId = { $in: [warehouseObjectId, warehouseId] };
+      warehouseMatchIds = [warehouseId];
+      if (ObjectId.isValid(warehouseId)) {
+        warehouseMatchIds.push(new ObjectId(warehouseId));
+      }
+
+      const warehouseQuery: any = {
+        _id: { $in: warehouseMatchIds }
+      };
+      if (!isAdmin(session)) {
+        warehouseQuery.$or = tenantFilter.$or ? tenantFilter.$or : [];
+      }
+
+      const selectedWarehouse = await db.collection('warehouses').findOne(warehouseQuery);
+      if (!selectedWarehouse) {
+        return NextResponse.json({ success: true, periods: [] });
+      }
+
+      const inwardQuery: any = {
+        warehouseId: { $in: warehouseMatchIds },
+      };
+      const matchingInwards = await db
+        .collection('inwards')
+        .find(inwardQuery, { projection: { _id: 1 } })
+        .toArray();
+      const matchingInwardIds = matchingInwards.flatMap((inward: any) => {
+        const ids: any[] = [];
+        if (inward._id != null) {
+          ids.push(inward._id);
+          ids.push(inward._id.toString());
+        }
+        return ids;
+      });
+
+      const warehouseIdClause = { warehouseId: { $in: warehouseMatchIds } };
+      ledgerQuery.$or = [warehouseIdClause];
+      if (matchingInwardIds.length > 0) {
+        ledgerQuery.$or.push({ inwardId: { $in: matchingInwardIds } });
+      }
+    } else if (Object.keys(tenantFilter).length > 0) {
+      const ownedWarehouseIds = await db
+        .collection('warehouses')
+        .find(tenantFilter, { projection: { _id: 1 } })
+        .toArray();
+
+      const ownedWarehouseKeys = ownedWarehouseIds.flatMap((warehouse: any) => {
+        const ids: any[] = [];
+        if (warehouse._id != null) {
+          ids.push(warehouse._id);
+          ids.push(warehouse._id.toString());
+        }
+        return ids;
+      });
+
+      const ownedInwards = ownedWarehouseKeys.length > 0
+        ? await db.collection('inwards')
+            .find({ warehouseId: { $in: ownedWarehouseKeys } }, { projection: { _id: 1 } })
+            .toArray()
+        : [];
+      const ownedInwardIds = ownedInwards.flatMap((inward: any) => {
+        const ids: any[] = [];
+        if (inward._id != null) {
+          ids.push(inward._id);
+          ids.push(inward._id.toString());
+        }
+        return ids;
+      });
+
+      const warehouseClauses: any[] = [];
+      if (ownedWarehouseKeys.length > 0) {
+        warehouseClauses.push({ warehouseId: { $in: ownedWarehouseKeys } });
+      }
+      if (ownedInwardIds.length > 0) {
+        warehouseClauses.push({ inwardId: { $in: ownedInwardIds } });
+      }
+
+      if (warehouseClauses.length > 0) {
+        ledgerQuery.$or = warehouseClauses;
+      }
     }
 
     // Fetch ledger entries
@@ -60,25 +137,138 @@ export async function GET(request: Request) {
         { $match: ledgerQuery },
         {
           $lookup: {
+            from: 'inwards',
+            let: { inwardId: '$inwardId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: ['$_id', '$$inwardId'] },
+                      {
+                        $eq: [
+                          '$_id',
+                          {
+                            $convert: {
+                              input: '$$inwardId',
+                              to: 'objectId',
+                              onError: null,
+                              onNull: null,
+                            },
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            as: 'inward',
+          },
+        },
+        {
+          $unwind: { path: '$inward', preserveNullAndEmptyArrays: true },
+        },
+        {
+          $addFields: {
+            resolvedWarehouseId: {
+              $ifNull: ['$warehouseId', '$inward.warehouseId'],
+            },
+            resolvedCommodityId: {
+              $ifNull: ['$commodityId', '$inward.commodityId'],
+            },
+          },
+        },
+        {
+          $lookup: {
             from: 'commodities',
-            localField: 'commodityId',
-            foreignField: '_id',
+            let: { commodityId: '$resolvedCommodityId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: ['$_id', '$$commodityId'] },
+                      {
+                        $eq: [
+                          '$_id',
+                          {
+                            $convert: {
+                              input: '$$commodityId',
+                              to: 'objectId',
+                              onError: null,
+                              onNull: null,
+                            },
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
             as: 'commodity',
           },
         },
         {
           $lookup: {
             from: 'clients',
-            localField: 'clientId',
-            foreignField: '_id',
+            let: { clientId: '$clientId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: ['$_id', '$$clientId'] },
+                      {
+                        $eq: [
+                          '$_id',
+                          {
+                            $convert: {
+                              input: '$$clientId',
+                              to: 'objectId',
+                              onError: null,
+                              onNull: null,
+                            },
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
             as: 'client',
           },
         },
         {
           $lookup: {
             from: 'warehouses',
-            localField: 'warehouseId',
-            foreignField: '_id',
+            let: { warehouseId: '$resolvedWarehouseId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: ['$_id', '$$warehouseId'] },
+                      {
+                        $eq: [
+                          '$_id',
+                          {
+                            $convert: {
+                              input: '$$warehouseId',
+                              to: 'objectId',
+                              onError: null,
+                              onNull: null,
+                            },
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
             as: 'warehouse',
           },
         },

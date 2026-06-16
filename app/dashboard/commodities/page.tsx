@@ -3,6 +3,8 @@ import { Toaster } from 'react-hot-toast';
 import { fetchCommodities } from '@/app/actions/commodities';
 import CommoditiesDashboard from '@/components/features/commodities/commodities-dashboard';
 import { Loader2, Boxes } from 'lucide-react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const metadata = {
   title: 'Commodity Master Directory | Logistics ERP',
@@ -20,8 +22,11 @@ function TableSkeletonLoader() {
 
 // Data Execution Wrapper Module
 async function DirectoryContainer() {
+  const session = await getServerSession(authOptions);
+  const role = session?.user?.role?.toString().toUpperCase();
+  const isAdminUser = role === 'ADMIN' || role === 'WSP';
   const payload = await fetchCommodities();
-  return <CommoditiesDashboard initialData={payload} />;
+  return <CommoditiesDashboard initialData={payload} isAdminUser={isAdminUser} />;
 }
 
 export default function CommoditiesMasterPage() {

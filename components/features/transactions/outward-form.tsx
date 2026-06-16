@@ -216,7 +216,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label htmlFor={clientIdId} className="text-sm font-semibold text-slate-700">Client Name</label>
+          <label htmlFor={clientIdId} className="text-sm font-semibold text-slate-700">Client Name *</label>
           <Controller
             name="clientId"
             control={control}
@@ -243,7 +243,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         </div>
 
         <div className="space-y-2">
-          <label htmlFor={commodityIdId} className="text-sm font-semibold text-slate-700">Commodity</label>
+          <label htmlFor={commodityIdId} className="text-sm font-semibold text-slate-700">Commodity *</label>
           <Controller
             name="commodityId"
             control={control}
@@ -275,7 +275,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="space-y-2">
-          <label htmlFor={warehouseIdId} className="text-sm font-semibold text-slate-700">Warehouse</label>
+          <label htmlFor={warehouseIdId} className="text-sm font-semibold text-slate-700">Warehouse *</label>
           <Controller
             name="warehouseId"
             control={control}
@@ -303,7 +303,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         <div className="space-y-2">
           <label htmlFor={quantityId} className="text-sm font-semibold text-slate-700 flex justify-between items-center">
-            Quantity (MT)
+            Quantity (MT) *
             <div className="flex items-center gap-2">
               {checkingStock && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
               {currentStock !== null && (
@@ -354,7 +354,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         </div>
 
         <div className="space-y-2">
-          <label htmlFor={dateId} className="text-sm font-semibold text-slate-700">Withdrawal Date</label>
+          <label htmlFor={dateId} className="text-sm font-semibold text-slate-700">Withdrawal Date *</label>
           <Input 
             id={dateId}
             {...register('date')}

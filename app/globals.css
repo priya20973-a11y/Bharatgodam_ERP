@@ -78,3 +78,15 @@ body {
 .border-blue-200 {
   border-color: #ffd09f !important;
 }
+
+.no-scrollbar {
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

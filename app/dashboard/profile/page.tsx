@@ -107,6 +107,14 @@ export default function ProfilePage() {
     setMessage(null);
     setError(null);
 
+    const phoneNumber = profileForm.phoneNumber?.trim() ?? '';
+    const phoneRegex = /^[0-9]{10}$/;
+    if (phoneNumber && !phoneRegex.test(phoneNumber)) {
+      setError('Phone number must be exactly 10 digits.');
+      setSavingProfile(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/auth/profile', {
         method: 'PATCH',
@@ -283,9 +291,13 @@ export default function ProfilePage() {
               <span className="text-sm font-medium text-slate-700">Phone Number</span>
               <input
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
+                maxLength={10}
                 value={profileForm.phoneNumber}
                 onChange={(event) => setProfileForm({ ...profileForm, phoneNumber: event.target.value })}
                 className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="10 digit phone number"
               />
             </label>
 

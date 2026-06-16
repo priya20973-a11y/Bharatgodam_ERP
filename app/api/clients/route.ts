@@ -9,6 +9,40 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
 }
 
+const mobileRegex = /^[0-9]{10}$/;
+const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
+const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/i;
+const aadhaarRegex = /^[0-9]{12}$/;
+
+const isNAValue = (value: string) => value.trim().toUpperCase() === 'NA';
+const normalizeAadhaarValue = (value: string) => value.replace(/\s+/g, '');
+const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null;
+
+function validateClientPayload(payload: {
+  mobile: string;
+  panNumber: string;
+  aadharNumber: string;
+  gstNumber: string;
+}) {
+  const mobile = payload.mobile.trim();
+  if (!mobile) return 'Mobile number is required';
+  if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+
+  const pan = payload.panNumber.trim();
+  if (!pan) return 'PAN number is required';
+  if (!isNAValue(pan) && !panRegex.test(pan)) return 'PAN number must be valid or NA';
+
+  const aadhar = payload.aadharNumber.trim();
+  if (!aadhar) return 'Aadhaar number is required';
+  if (!isNAValue(aadhar) && !aadhaarRegex.test(normalizeAadhaarValue(aadhar))) return 'Aadhaar number must be 12 digits or NA';
+
+  const gst = payload.gstNumber.trim();
+  if (!gst) return 'GSTIN is required';
+  if (!isNAValue(gst) && !gstRegex.test(gst)) return 'GSTIN must be valid or NA';
+
+  return null;
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -109,16 +143,43 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const payloadError = validateClientPayload({ mobile, panNumber, aadharNumber, gstNumber });
+    if (payloadError) {
+      return NextResponse.json({ success: false, message: payloadError }, { status: 400 });
+    }
+
     const db = await getDb();
-    const tenantFilter = getTenantFilterForMongo(session);
+    const email = normalizeEmail(session.user.email);
+    let userIdFilter: any = String(session.user.id);
+    try {
+      userIdFilter = new ObjectId(String(session.user.id));
+    } catch {
+      // preserve string id for legacy / non-ObjectId stores
+    }
+
+    const ownerFilter: any = {
+      $or: [
+        { userId: userIdFilter },
+        ...(email
+          ? [{ $and: [
+              { $or: [{ userId: { $exists: false } }, { userId: null }] },
+              { userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, 'i') } }
+            ] }]
+          : [])
+      ]
+    };
     const nameValue = String(name).trim();
     const normalizedName = nameValue.toUpperCase();
 
     const existingClient = await db.collection('clients').findOne({
-      ...tenantFilter,
-      $or: [
-        { nameKey: normalizedName },
-        { name: { $regex: new RegExp(`^${escapeRegExp(nameValue)}$`, 'i') } }
+      $and: [
+        ownerFilter,
+        {
+          $or: [
+            { nameKey: normalizedName },
+            { name: { $regex: new RegExp(`^${escapeRegExp(nameValue)}$`, 'i') } }
+          ]
+        }
       ]
     });
 

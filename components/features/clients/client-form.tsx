@@ -1,7 +1,5 @@
 'use client';
 
-'use client';
-
 import { useEffect, useState } from 'react';
 import { createClient, updateClient } from '@/app/actions/client-actions';
 import { Button } from '@/components/ui/button';
@@ -28,6 +26,7 @@ interface ClientFormState {
 
 export default function ClientForm({ client, availableCommodities, onSuccess }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<ClientFormState>({
     name: client?.name || '',
     address: client?.address || '',
@@ -38,6 +37,51 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
     gstNumber: client?.gstNumber || '',
     commodityIds: client?.commodityIds || [],
   });
+
+  const isNAValue = (value: string) => value.trim().toUpperCase() === 'NA';
+  const normalizeAadhaar = (value: string) => value.replace(/\s+/g, '');
+
+  const validateForm = () => {
+    const validationErrors: Record<string, string> = {};
+    const mobile = formData.mobile.trim();
+    const pan = formData.panNumber.trim();
+    const aadhar = formData.aadharNumber.trim();
+    const gst = formData.gstNumber.trim();
+
+    if (!mobile) {
+      validationErrors.mobile = 'Mobile number is required';
+    } else if (!isNAValue(mobile) && !/^[0-9]{10}$/.test(mobile)) {
+      validationErrors.mobile = 'Enter exactly 10 digits or NA if not available';
+    }
+
+    if (!pan) {
+      validationErrors.panNumber = 'PAN number is required';
+    } else if (!isNAValue(pan) && !/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(pan)) {
+      validationErrors.panNumber = 'Enter valid PAN (e.g. ABCDE1234F) or NA if not available';
+    }
+
+    if (!aadhar) {
+      validationErrors.aadharNumber = 'Aadhaar number is required';
+    } else if (!isNAValue(aadhar) && !/^[0-9]{12}$/.test(normalizeAadhaar(aadhar))) {
+      validationErrors.aadharNumber = 'Enter 12-digit Aadhaar or NA if not available';
+    }
+
+    if (!gst) {
+      validationErrors.gstNumber = 'GSTIN is required';
+    } else if (!isNAValue(gst) && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/i.test(gst)) {
+      validationErrors.gstNumber = 'Enter valid GSTIN or NA if not available';
+    }
+
+    setErrors(validationErrors);
+    return validationErrors;
+  };
+
+  const handleFieldChange = (field: keyof ClientFormState, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
 
   useEffect(() => {
     setFormData({
@@ -55,6 +99,12 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -102,7 +152,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       <h3 className="font-semibold text-lg">{client ? 'Edit Client' : 'Register New Client'}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Business/Owner Name</label>
+          <label className="text-sm font-medium">Business/Owner Name *</label>
           <Input 
             required 
             value={formData.name} 
@@ -128,7 +178,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Address</label>
+        <label className="text-sm font-medium">Address *</label>
         <Input 
           required 
           value={formData.address} 
@@ -138,42 +188,50 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Mobile Number</label>
+          <label className="text-sm font-medium">Mobile Number *</label>
           <Input 
             required 
             value={formData.mobile} 
-            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })} 
-            placeholder="+91 98765 43210"
+            onChange={(e) => handleFieldChange('mobile', e.target.value)} 
+            placeholder="9876543210 or NA"
           />
+          <p className="text-xs text-slate-500">Enter exactly 10 digits or NA if not available.</p>
+          {errors.mobile && <p className="mt-1 text-sm text-red-600">{errors.mobile}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">PAN Card Number</label>
+          <label className="text-sm font-medium">PAN Card Number *</label>
           <Input 
             required 
             value={formData.panNumber} 
-            onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })} 
-            placeholder="ABCDE1234F"
+            onChange={(e) => handleFieldChange('panNumber', e.target.value)} 
+            placeholder="ABCDE1234F or NA"
           />
+          <p className="text-xs text-slate-500">Enter valid PAN or NA if not available.</p>
+          {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Aadhaar Number</label>
+          <label className="text-sm font-medium">Aadhaar Number *</label>
           <Input 
             required 
             value={formData.aadharNumber} 
-            onChange={(e) => setFormData({ ...formData, aadharNumber: e.target.value })} 
-            placeholder="1234 5678 9012"
+            onChange={(e) => handleFieldChange('aadharNumber', e.target.value)} 
+            placeholder="1234 5678 9012 or NA"
           />
+          <p className="text-xs text-slate-500">Enter 12 digits or NA if not available.</p>
+          {errors.aadharNumber && <p className="mt-1 text-sm text-red-600">{errors.aadharNumber}</p>}
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">GSTIN</label>
+          <label className="text-sm font-medium">GSTIN *</label>
           <Input 
             required 
             value={formData.gstNumber} 
-            onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })} 
-            placeholder="22AAAAA0000A1Z5"
+            onChange={(e) => handleFieldChange('gstNumber', e.target.value)} 
+            placeholder="22AAAAA0000A1Z5 or NA"
           />
+          <p className="text-xs text-slate-500">Enter valid GSTIN or NA if not available.</p>
+          {errors.gstNumber && <p className="mt-1 text-sm text-red-600">{errors.gstNumber}</p>}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Allowed Commodities</label>

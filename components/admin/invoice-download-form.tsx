@@ -35,8 +35,9 @@ export default function InvoiceDownloadForm({ warehouses }: InvoiceDownloadFormP
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-slate-700">Warehouse</label>
+          <label className="block text-sm font-medium text-slate-700">Warehouse *</label>
           <select
+            required
             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             value={warehouseId}
             onChange={(event) => setWarehouseId(event.target.value)}
@@ -51,8 +52,9 @@ export default function InvoiceDownloadForm({ warehouses }: InvoiceDownloadFormP
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700">Invoice Month</label>
+          <label className="block text-sm font-medium text-slate-700">Invoice Month *</label>
           <input
+            required
             type="month"
             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             value={month}

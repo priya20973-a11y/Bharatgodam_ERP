@@ -73,7 +73,7 @@ export default function LoginForm() {
             {/* Email Field */}
             <div>
               <label htmlFor="email-address" className="sr-only">
-                Email address
+                Email address *
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -97,7 +97,7 @@ export default function LoginForm() {
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="sr-only">
-                Password
+                Password *
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">

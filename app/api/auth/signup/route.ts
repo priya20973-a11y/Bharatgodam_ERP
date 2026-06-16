@@ -53,6 +53,14 @@ export async function POST(req: Request) {
       );
     }
 
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phoneNumber.toString().trim())) {
+      return NextResponse.json(
+        { message: 'Phone number must be exactly 10 digits.' },
+        { status: 400 }
+      );
+    }
+
     const db = await getDb();
     const usersCollection = db.collection('users');
     const signupRequestsCollection = db.collection('signup_requests');

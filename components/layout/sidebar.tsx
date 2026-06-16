@@ -53,7 +53,7 @@ export default function Sidebar({ session }: SidebarProps) {
 
       {/* Sidebar Container */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform sidebar-background text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 h-full transform sidebar-background text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -72,7 +72,7 @@ export default function Sidebar({ session }: SidebarProps) {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 space-y-1 px-4 py-8">
+          <nav className="flex-1 space-y-1 px-4 py-8 overflow-y-auto no-scrollbar">
             {allNavItems.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;

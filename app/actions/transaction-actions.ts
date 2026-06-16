@@ -275,7 +275,7 @@ export async function processInward(data: {
     const ratePerMTPerDay =
       commodity.ratePerMtPerDay ??
       (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
-    const ledgerEntry = {
+    const ledgerEntry = appendOwnershipForMongo({
       clientId: new mongoose.Types.ObjectId(data.clientId),
       warehouseId: new mongoose.Types.ObjectId(data.warehouseId),
       commodityId: new mongoose.Types.ObjectId(data.commodityId),
@@ -287,7 +287,7 @@ export async function processInward(data: {
       rentCalculated: totalAmount,
       version: 1,
       createdAt: new Date(),
-    };
+    }, authSession);
 
     await db.collection('ledger_entries').insertOne(
       ledgerEntry,
@@ -636,14 +636,101 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         : {};
 
     const ledgerQuery: any = {};
+    let warehouseScopedFilter: any = {};
+    let warehouseOwnedByTenant = false;
+
     if (warehouseObjectId) {
-      const filters = [{ warehouseId: warehouseObjectId }];
-      if (Object.keys(ownershipFilter).length > 0) {
-        filters.push(ownershipFilter);
+      const warehouseMatchIds: Array<string | mongoose.Types.ObjectId> = [warehouseObjectId];
+      if (warehouseId) {
+        warehouseMatchIds.push(warehouseId);
       }
-      ledgerQuery.$and = filters;
+
+      const warehouseQuery: any = {
+        _id: { $in: warehouseMatchIds }
+      };
+      if (!isAdminUser && session) {
+        warehouseQuery.$or = tenantFilter.$or ? tenantFilter.$or : [];
+      }
+
+      const selectedWarehouse = await db.collection('warehouses').findOne(warehouseQuery);
+      if (!selectedWarehouse) {
+        return {
+          summary: { totalRevenue: 0, ownerEarnings: 0, platformCommissions: 0 },
+          warehouseRevenue: [],
+        };
+      }
+
+      warehouseOwnedByTenant = !isAdminUser;
+      warehouseScopedFilter = {};
+
+      const inwardQuery: any = {
+        warehouseId: { $in: warehouseMatchIds },
+      };
+      const matchingInwards = await db
+        .collection('inwards')
+        .find(inwardQuery, { projection: { _id: 1 } })
+        .toArray();
+      const matchingInwardIds = matchingInwards.flatMap((inward: any) => {
+        const ids: any[] = [];
+        if (inward._id != null) {
+          ids.push(inward._id);
+          ids.push(inward._id.toString());
+        }
+        return ids;
+      });
+
+      const warehouseClause = { warehouseId: { $in: warehouseMatchIds } };
+      const orClauses: any[] = [warehouseClause];
+      if (matchingInwardIds.length > 0) {
+        orClauses.push({ inwardId: { $in: matchingInwardIds } });
+      }
+
+      const accessClause = { $or: orClauses };
+      if (Object.keys(ownershipFilter).length > 0 && isAdminUser) {
+        ledgerQuery.$and = [accessClause, ownershipFilter];
+      } else {
+        Object.assign(ledgerQuery, accessClause);
+      }
     } else if (Object.keys(ownershipFilter).length > 0) {
-      Object.assign(ledgerQuery, ownershipFilter);
+      const ownedWarehouses = await db.collection('warehouses')
+        .find(ownershipFilter, { projection: { _id: 1 } })
+        .toArray();
+      const ownedWarehouseIds = ownedWarehouses.flatMap((warehouse: any) => {
+        const ids: any[] = [];
+        if (warehouse._id != null) {
+          ids.push(warehouse._id);
+          ids.push(warehouse._id.toString());
+        }
+        return ids;
+      });
+
+      const ownedInwards = ownedWarehouseIds.length > 0
+        ? await db.collection('inwards')
+            .find({ warehouseId: { $in: ownedWarehouseIds } }, { projection: { _id: 1 } })
+            .toArray()
+        : [];
+      const ownedInwardIds = ownedInwards.flatMap((inward: any) => {
+        const ids: any[] = [];
+        if (inward._id != null) {
+          ids.push(inward._id);
+          ids.push(inward._id.toString());
+        }
+        return ids;
+      });
+
+      const warehouseClauses: any[] = [];
+      if (ownedWarehouseIds.length > 0) {
+        warehouseClauses.push({ warehouseId: { $in: ownedWarehouseIds } });
+      }
+      if (ownedInwardIds.length > 0) {
+        warehouseClauses.push({ inwardId: { $in: ownedInwardIds } });
+      }
+
+      if (warehouseClauses.length > 0) {
+        ledgerQuery.$or = warehouseClauses;
+      } else {
+        Object.assign(ledgerQuery, ownershipFilter);
+      }
     }
 
     // Get all ledger entries

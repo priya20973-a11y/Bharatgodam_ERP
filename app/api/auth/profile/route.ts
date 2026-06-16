@@ -56,7 +56,17 @@ export async function PATCH(req: Request) {
     const updates: Record<string, unknown> = {};
     if (fullName !== undefined) updates.fullName = fullName;
     if (companyName !== undefined) updates.companyName = companyName;
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
+    if (phoneNumber !== undefined) {
+      const phoneRegex = /^[0-9]{10}$/;
+      const trimmedPhone = phoneNumber.toString().trim();
+      if (trimmedPhone && !phoneRegex.test(trimmedPhone)) {
+        return NextResponse.json(
+          { message: 'Phone number must be exactly 10 digits.' },
+          { status: 400 }
+        );
+      }
+      updates.phoneNumber = phoneNumber;
+    }
     if (address !== undefined) updates.address = address || null;
     if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
     if (gstNumber !== undefined) updates.gstNumber = gstNumber || null;

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Package, TrendingUp, AlertTriangle, BarChart3, Building2, Loader2 } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Package, TrendingUp, AlertTriangle, Building2, Loader2, Scale, RefreshCw, ChevronDown } from 'lucide-react';
 import { formatWeight } from '@/lib/utils';
 
 interface CommodityData {
@@ -33,7 +33,7 @@ interface InventoryResponse {
   warehouses: WarehouseOption[];
 }
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4'];
 
 export default function WarehouseInventory() {
   const [data, setData] = useState<InventoryResponse | null>(null);
@@ -84,40 +84,57 @@ export default function WarehouseInventory() {
   };
 
   const getCapacityStatus = (percentage: number) => {
-    if (percentage >= 90) return { color: 'text-red-600', bg: 'bg-red-50', icon: AlertTriangle };
-    if (percentage >= 75) return { color: 'text-amber-600', bg: 'bg-amber-50', icon: TrendingUp };
-    return { color: 'text-green-600', bg: 'bg-green-50', icon: Package };
+    if (percentage >= 90) {
+      return {
+        color: 'text-rose-600',
+        bg: 'bg-rose-50/50',
+        accent: 'bg-rose-500',
+        icon: AlertTriangle,
+        status: 'Critical'
+      };
+    }
+    if (percentage >= 75) {
+      return {
+        color: 'text-amber-600',
+        bg: 'bg-amber-50/50',
+        accent: 'bg-amber-500',
+        icon: TrendingUp,
+        status: 'High'
+      };
+    }
+    return {
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50/50',
+      accent: 'bg-emerald-500',
+      icon: Package,
+      status: 'Optimal'
+    };
   };
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="animate-pulse">
-          <div className="h-6 bg-slate-200 rounded w-1/3 mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-slate-200 rounded w-full"></div>
-            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 text-indigo-500 animate-spin" />
+        <p className="text-slate-400 text-xs mt-2 font-medium">Fetching inventory analytics...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center gap-3 text-red-600">
-          <AlertTriangle className="h-5 w-5" />
-          <span className="font-medium">Error loading inventory data</span>
+      <div className="text-center p-4">
+        <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
+          <AlertTriangle className="h-6 w-6 text-rose-500" />
+          <h4 className="font-bold text-slate-800 text-sm mt-2">Error loading inventory</h4>
+          <p className="text-slate-500 text-xs mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchInventoryData(selectedWarehouse)}
+            className="mt-3 flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition active:scale-95 shadow-sm"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span>Try Again</span>
+          </button>
         </div>
-        <p className="text-slate-600 mt-2">{error}</p>
-        <button
-          onClick={() => fetchInventoryData(selectedWarehouse)}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          Try Again
-        </button>
       </div>
     );
   }
@@ -130,7 +147,6 @@ export default function WarehouseInventory() {
   const utilizationPercentage = warehouse_stats.utilization_percentage;
   const capacityStatus = getCapacityStatus(utilizationPercentage);
 
-  // Prepare data for the pie chart
   const chartData = commodities.map((commodity, index) => ({
     name: commodity.commodityName,
     value: commodity.totalWeight,
@@ -138,20 +154,23 @@ export default function WarehouseInventory() {
   }));
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900">Warehouse Inventory</h2>
-            <p className="text-slate-600 mt-1">Commodity breakdown and capacity management</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-slate-500" />
+    <div className="space-y-5">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-indigo-500" />
+            Warehouse Inventory
+          </h2>
+          <p className="text-xs text-slate-500">Commodity capacity & share tracking</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative flex items-center">
             <select
               value={selectedWarehouse}
               onChange={(e) => handleWarehouseChange(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="appearance-none pl-3 pr-8 py-1.5 border border-slate-205 rounded-xl bg-white text-slate-750 text-xs font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer hover:bg-slate-50/50"
             >
               {warehouses.map((warehouse) => (
                 <option key={warehouse.warehouse_id} value={warehouse.warehouse_id}>
@@ -159,172 +178,136 @@ export default function WarehouseInventory() {
                 </option>
               ))}
             </select>
+            <ChevronDown className="absolute right-2.5 pointer-events-none h-3.5 w-3.5 text-slate-400" />
           </div>
-        </div>
-        <button
-          onClick={() => fetchInventoryData(selectedWarehouse)}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-        >
-          <BarChart3 className="h-4 w-4" />
-          Refresh
-        </button>
-      </div>
 
-      {/* Capacity Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Total Capacity</p>
-              <p className="text-2xl font-semibold text-slate-900 mt-1">
-                {formatWeight(warehouse_stats.total_capacity)}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                {warehouse_stats.warehouse_name}
-              </p>
-            </div>
-            <Package className="h-8 w-8 text-slate-400" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Used Capacity</p>
-              <p className="text-2xl font-semibold text-slate-900 mt-1">
-                {formatWeight(warehouse_stats.used_capacity)}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                {utilizationPercentage}% utilized
-              </p>
-            </div>
-            <capacityStatus.icon className={`h-8 w-8 ${capacityStatus.color}`} />
-          </div>
-        </div>
-
-        <div className={`rounded-xl border border-slate-200 p-6 shadow-sm ${capacityStatus.bg}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Available Capacity</p>
-              <p className={`text-2xl font-semibold mt-1 ${capacityStatus.color}`}>
-                {formatWeight(availableCapacity)}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                Ready for new bookings
-              </p>
-            </div>
-            <Package className={`h-8 w-8 ${capacityStatus.color}`} />
-          </div>
+          <button
+            onClick={() => fetchInventoryData(selectedWarehouse)}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-slate-650 text-xs font-semibold rounded-xl hover:bg-slate-50 transition shadow-sm group"
+          >
+            <RefreshCw className={`h-3 w-3 text-slate-400 transition-transform duration-500 group-hover:rotate-180 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
 
-      {/* Capacity Visualization */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Capacity Utilization</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Progress Bar */}
-          <div>
-            <div className="flex justify-between text-sm text-slate-600 mb-2">
-              <span>Used Capacity</span>
-              <span>{utilizationPercentage}%</span>
+      {/* Main Grid: Info/Progress vs Donut Chart */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center">
+        {/* Left: Utilization Metrics & Cards (3 columns) */}
+        <div className="md:col-span-3 space-y-4">
+          {/* Progress fill rate */}
+          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/80">
+            <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1.5">
+              <span>Capacity Fill Rate</span>
+              <span className={capacityStatus.color}>{utilizationPercentage}% Utilized</span>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-3">
+            <div className="w-full bg-slate-200/60 rounded-full h-3 overflow-hidden shadow-inner">
               <div
-                className={`h-3 rounded-full transition-all duration-300 ${
-                  utilizationPercentage >= 90 ? 'bg-red-500' :
-                  utilizationPercentage >= 75 ? 'bg-amber-500' :
-                  'bg-green-500'
-                }`}
+                className={`h-full rounded-full transition-all duration-500 ease-out ${utilizationPercentage >= 90 ? 'bg-gradient-to-r from-red-500 to-rose-600' :
+                    utilizationPercentage >= 75 ? 'bg-gradient-to-r from-amber-400 to-orange-500' :
+                      'bg-gradient-to-r from-teal-400 to-emerald-500'
+                  }`}
                 style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
               ></div>
             </div>
-            <div className="flex justify-between text-xs text-slate-500 mt-2">
+            <div className="flex justify-between text-3xs text-slate-400 mt-1 font-semibold">
               <span>0 MT</span>
               <span>{formatWeight(warehouse_stats.total_capacity)}</span>
             </div>
           </div>
 
-          {/* Pie Chart */}
-          <div className="h-64 flex items-center justify-center">
-            {mounted ? (
+          {/* Quick Metrics Row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
+              <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Total</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{formatWeight(warehouse_stats.total_capacity)}</p>
+            </div>
+            <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
+              <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Used</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{formatWeight(warehouse_stats.used_capacity)}</p>
+            </div>
+            <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
+              <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Available</p>
+              <p className={`text-sm font-black mt-0.5 ${capacityStatus.color}`}>{formatWeight(availableCapacity)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Small Donut Chart (2 columns) */}
+        <div className="md:col-span-2 flex justify-center relative">
+          {mounted ? (
+            <div className="relative w-full h-48 max-w-[200px] flex items-center justify-center">
+              {/* Donut Center Label Overlay */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-2xs font-bold uppercase tracking-widest text-slate-400">Used</p>
+                <p className="text-3xl font-black text-slate-800 tracking-tighter mt-0.5">
+                  {utilizationPercentage}%
+                </p>
+              </div>
+
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={62}
+                    outerRadius={78}
                     paddingAngle={2}
                     dataKey="value"
                   >
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} className="focus:outline-none" />
                     ))}
                   </Pie>
                   <Tooltip
                     formatter={(value) => [typeof value === 'number' ? formatWeight(value) : '0 MT', 'Weight']}
-                    labelStyle={{ color: '#374151' }}
                     contentStyle={{
                       backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px'
+                      border: '1px solid #f1f5f9',
+                      borderRadius: '12px',
+                      fontSize: '10px',
+                      boxShadow: '0 2px 4px rgb(0 0 0 / 0.05)'
                     }}
                   />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="h-40 w-40 rounded-full border-8 border-slate-100 border-t-indigo-200 animate-spin" />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="h-32 w-32 rounded-full border-4 border-slate-100 border-t-indigo-500 animate-spin" />
+          )}
         </div>
       </div>
 
-      {/* Commodity Breakdown */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900">Commodity Breakdown</h3>
-          <p className="text-slate-600 text-sm mt-1">Current inventory by commodity type</p>
-        </div>
+      {/* Commodity Breakdown Rows */}
+      {commodities.length > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <p className="text-3xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">Stored Commodity Shares</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {commodities.map((commodity, index) => {
+              const sharePercentage = usedCapacity > 0 ? (commodity.totalWeight / usedCapacity) * 100 : 0;
+              const color = COLORS[index % COLORS.length];
 
-        {commodities.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            <Package className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-600">No commodities currently stored</p>
-            <p className="text-slate-500 text-sm mt-1">Warehouse is empty and ready for new bookings</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-200">
-            {commodities.map((commodity, index) => (
-              <div key={commodity.commodityName} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    ></div>
-                    <div>
-                      <h4 className="font-medium text-slate-900">{commodity.commodityName}</h4>
-                      <p className="text-sm text-slate-600">
-                        {commodity.bookingCount} booking{commodity.bookingCount !== 1 ? 's' : ''}
-                      </p>
-                    </div>
+              return (
+                <div key={commodity.commodityName} className="flex items-center justify-between p-2 bg-slate-50/50 hover:bg-slate-50 rounded-xl border border-slate-100/50 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-xs font-bold text-slate-700 truncate">{commodity.commodityName}</span>
+                    <span className="text-3xs text-slate-400 font-semibold">({commodity.bookingCount} bookings)</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-slate-900">
-                      {formatWeight(commodity.totalWeight)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {((commodity.totalWeight / warehouse_stats.used_capacity) * 100).toFixed(1)}% of total
-                    </p>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs font-black text-slate-800">{formatWeight(commodity.totalWeight)}</span>
+                    <span className="text-3xs font-bold text-slate-400 bg-white border border-slate-100 px-1 py-0.5 rounded">
+                      {sharePercentage.toFixed(0)}%
+                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

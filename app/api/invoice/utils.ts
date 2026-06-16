@@ -945,7 +945,7 @@ function parseUTCDate(dateString: string): Date | null {
 function buildOpeningBalanceRows(
   transactions: any[],
   monthStartStr: string,
-  monthEndStr: string,
+  billingEndDateStr: string,
   monthDays: number
 ) {
   if (!transactions.length || monthDays <= 0) return [];
@@ -1015,7 +1015,7 @@ function buildOpeningBalanceRows(
     .map((balance) => ({
       date: monthStartStr,
       startDate: monthStartStr,
-      endDate: monthEndStr,
+      endDate: billingEndDateStr,
       commodityName: balance.commodityName,
       quantityMT: balance.quantityMT,
       quantity: balance.quantityMT,
@@ -1045,9 +1045,19 @@ export function transformTransactionsToBillingRows(
     const monthStartDate = new Date(`${monthStartDateStr}T00:00:00Z`);
     const monthEnd = new Date(Date.UTC(year, month, 0));
     const monthEndStr = monthEnd.toISOString().split('T')[0];
+
+    const today = new Date();
+    const todayMonthKey = `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, '0')}`;
+    const todayStr = today.toISOString().split('T')[0];
+    const billingEndDateStr =
+      invoiceMonth === todayMonthKey ? todayStr : monthEndStr;
+    const billingEndDate = new Date(`${billingEndDateStr}T00:00:00Z`);
+
     const monthDays = calculateStorageDays(
       monthStartDateStr,
-      monthEndStr,
+      billingEndDateStr,
       'ACTIVE'
     );
 
@@ -1075,13 +1085,13 @@ export function transformTransactionsToBillingRows(
     const currentMonthTransactions = preparedTransactions.filter(
       (txn) =>
         txn._transactionDate >= monthStartDate &&
-        txn._transactionDate <= monthEnd
+        txn._transactionDate <= billingEndDate
     );
 
     const openingBalanceRows = buildOpeningBalanceRows(
       priorTransactions,
       monthStartDateStr,
-      monthEndStr,
+      billingEndDateStr,
       monthDays
     );
 
@@ -1111,7 +1121,7 @@ export function transformTransactionsToBillingRows(
 
         const startDate =
           txnDateStr > monthStartDateStr ? txnDateStr : monthStartDateStr;
-        const endDate = monthEndStr;
+        const endDate = billingEndDateStr;
         const days = calculateStorageDays(startDate, endDate, 'ACTIVE');
         const rentTotal = Number(quantityMT * ratePerDay * days || 0);
 

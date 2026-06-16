@@ -45,7 +45,7 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
     <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-slate-50">
       <h3 className="font-semibold text-lg">{warehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</h3>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Warehouse Name</label>
+        <label className="text-sm font-medium">Warehouse Name *</label>
         <Input 
           required 
           value={formData.name} 
@@ -54,7 +54,7 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Address</label>
+        <label className="text-sm font-medium">Address *</label>
         <Input 
           required 
           value={formData.address} 
@@ -63,7 +63,7 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Total Capacity (MT)</label>
+        <label className="text-sm font-medium">Total Capacity (MT) *</label>
         <Input 
           required 
           type="number" 

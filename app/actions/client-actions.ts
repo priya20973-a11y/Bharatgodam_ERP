@@ -7,6 +7,48 @@ import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 
+const mobileRegex = /^[0-9]{10}$/;
+const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
+const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/i;
+const aadhaarRegex = /^[0-9]{12}$/;
+
+const isNAValue = (value?: string) => value?.trim().toUpperCase() === 'NA';
+const normalizeAadhaarValue = (value: string) => value.replace(/\s+/g, '');
+const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null;
+
+function validateClientData(data: {
+  mobile?: string;
+  panNumber?: string;
+  aadharNumber?: string;
+  gstNumber?: string;
+}) {
+  if (data.mobile !== undefined) {
+    const mobile = data.mobile.trim();
+    if (!mobile) return 'Mobile number is required';
+    if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+  }
+
+  if (data.panNumber !== undefined) {
+    const pan = data.panNumber.trim();
+    if (!pan) return 'PAN number is required';
+    if (!isNAValue(pan) && !panRegex.test(pan)) return 'PAN number must be valid or NA';
+  }
+
+  if (data.aadharNumber !== undefined) {
+    const aadhar = data.aadharNumber.trim();
+    if (!aadhar) return 'Aadhaar number is required';
+    if (!isNAValue(aadhar) && !aadhaarRegex.test(normalizeAadhaarValue(aadhar))) return 'Aadhaar number must be 12 digits or NA';
+  }
+
+  if (data.gstNumber !== undefined) {
+    const gst = data.gstNumber.trim();
+    if (!gst) return 'GSTIN is required';
+    if (!isNAValue(gst) && !gstRegex.test(gst)) return 'GSTIN must be valid or NA';
+  }
+
+  return null;
+}
+
 type LegacyClient = {
   _id: string;
   clientName?: string;
@@ -79,15 +121,37 @@ export async function createClient(data: {
 }) {
   await connectToDatabase();
   try {
+    const validationError = validateClientData(data);
+    if (validationError) {
+      return { success: false, error: validationError };
+    }
+
     const session = await requireSession();
     const nameValue = data.name.trim();
     const nameKey = nameValue.toUpperCase();
 
-    const existingClient = await Client.findOne({
-      ...getTenantFilter(session),
+    const email = normalizeEmail(session.user.email);
+    const ownerFilter: any = {
       $or: [
-        { nameKey },
-        { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+        { userId: session.user.id },
+        ...(email
+          ? [{ $and: [
+              { $or: [{ userId: { $exists: false } }, { userId: null }] },
+              { userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+            ] }]
+          : [])
+      ]
+    };
+
+    const existingClient = await Client.findOne({
+      $and: [
+        ownerFilter,
+        {
+          $or: [
+            { nameKey },
+            { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+          ]
+        }
       ]
     });
 
@@ -119,10 +183,46 @@ export async function updateClient(id: string, data: Partial<{
 }>) {
   await connectToDatabase();
   try {
+    const validationError = validateClientData(data);
+    if (validationError) {
+      return { success: false, error: validationError };
+    }
+
     const session = await requireSession();
     if (data.name) {
-      data.name = data.name.trim();
-      data.nameKey = data.name.toUpperCase();
+      const nameValue = data.name.trim();
+      const nameKey = nameValue.toUpperCase();
+      data.name = nameValue;
+      data.nameKey = nameKey;
+
+      const email = normalizeEmail(session.user.email);
+      const ownerFilter: any = {
+        $or: [
+          { userId: session.user.id },
+          ...(email
+            ? [{ $and: [
+                { $or: [{ userId: { $exists: false } }, { userId: null }] },
+                { userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+              ] }]
+            : [])
+        ]
+      };
+      const existingClient = await Client.findOne({
+        _id: { $ne: id },
+        $and: [
+          ownerFilter,
+          {
+            $or: [
+              { nameKey },
+              { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+            ]
+          }
+        ]
+      });
+
+      if (existingClient) {
+        return { success: false, error: 'Client name already exists for your account' };
+      }
     }
 
     const client = await Client.findOneAndUpdate(
