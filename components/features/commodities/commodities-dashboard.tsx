@@ -8,7 +8,7 @@ import { Plus, Edit, Trash2, Package } from 'lucide-react';
 import { addCommodity, updateCommodity, deleteCommodity } from '@/app/actions/commodities';
 import { toast, Toaster } from 'react-hot-toast';
 
-export default function CommoditiesDashboard({ initialData }: { initialData: any[] }) {
+export default function CommoditiesDashboard({ initialData, isAdminUser }: { initialData: any[]; isAdminUser?: boolean }) {
   const [items, setItems] = useState(initialData);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
