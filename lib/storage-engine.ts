@@ -20,16 +20,41 @@ export function calculateStorageDays(
   const from = typeof fromDate === 'string' ? new Date(fromDate) : fromDate;
   const to = typeof toDate === 'string' ? new Date(toDate) : toDate;
 
-  // Edge case: same day
+  // Edge case: same day in milliseconds
   if (from.getTime() === to.getTime()) {
     return 1;
   }
 
-  if (status === 'ACTIVE') {
-    return Math.max(1, differenceInDays(to, from) + 1);
+  let days = status === 'ACTIVE'
+    ? Math.max(1, differenceInDays(to, from) + 1)
+    : Math.max(0, differenceInDays(to, from));
+
+  // If calculated days is 0, check if it's a month-end same-day transaction
+  if (days === 0) {
+    const isSameUTCDay =
+      from.getUTCFullYear() === to.getUTCFullYear() &&
+      from.getUTCMonth() === to.getUTCMonth() &&
+      from.getUTCDate() === to.getUTCDate();
+
+    const isSameLocalDay =
+      from.getFullYear() === to.getFullYear() &&
+      from.getMonth() === to.getMonth() &&
+      from.getDate() === to.getDate();
+
+    if (isSameUTCDay || isSameLocalDay) {
+      const year = isSameUTCDay ? from.getUTCFullYear() : from.getFullYear();
+      const month = isSameUTCDay ? from.getUTCMonth() : from.getMonth();
+      const date = isSameUTCDay ? from.getUTCDate() : from.getDate();
+
+      // Check if it is the last day of the month
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      if (date === lastDay) {
+        days = 1;
+      }
+    }
   }
 
-  return Math.max(0, differenceInDays(to, from));
+  return days;
 }
 
 export interface Transaction {

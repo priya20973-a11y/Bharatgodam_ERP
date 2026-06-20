@@ -34,29 +34,27 @@ export async function GET(req: Request) {
     const accountId = url.searchParams.get('accountId');
     const month = url.searchParams.get('month');
 
-    if (invoiceId) {
-      if (ObjectId.isValid(invoiceId)) {
-        filter.invoiceId = { $in: [new ObjectId(invoiceId), invoiceId] };
-      } else {
-        filter.invoiceId = invoiceId;
-      }
-    } else if (accountId) {
-      filter.accountId = accountId;
-    } else {
-      return NextResponse.json(
-        { success: false, message: 'invoiceId or accountId is required' },
-        { status: 400 }
-      );
-    }
+    const invoiceFilter = ObjectId.isValid(invoiceId)
+      ? { invoiceId: { $in: [new ObjectId(invoiceId), invoiceId] } }
+      : { invoiceId };
 
-    if (month && /^\d{4}-\d{2}$/.test(month)) {
+    if (accountId && month && /^\d{4}-\d{2}$/.test(month)) {
       const [year, monthPart] = month.split('-');
       const monthStart = new Date(`${year}-${monthPart}-01T00:00:00.000Z`);
       const monthEnd = new Date(Date.UTC(Number(year), Number(monthPart), 0, 23, 59, 59, 999));
+
       filter.$or = [
-        { paymentDate: { $gte: monthStart, $lte: monthEnd } },
-        { date: { $gte: monthStart, $lte: monthEnd } },
+        invoiceFilter,
+        {
+          accountId,
+          $or: [
+            { paymentDate: { $gte: monthStart, $lte: monthEnd } },
+            { date: { $gte: monthStart, $lte: monthEnd } },
+          ],
+        },
       ];
+    } else {
+      Object.assign(filter, invoiceFilter);
     }
 
     const payments = await db.collection('payments')

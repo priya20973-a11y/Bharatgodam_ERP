@@ -29,6 +29,7 @@ import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { getDropdownDisplayName } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 interface TransactionRecord {
   _id: string;
@@ -58,6 +59,7 @@ interface TransactionsReportProps {
 }
 
 export default function TransactionsReport({ transactions, isAdmin = false, isLoading = false }: TransactionsReportProps) {
+  const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     stackNo: false,
@@ -93,7 +95,10 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ transactionId: transaction._id }),
+        body: JSON.stringify({
+          transactionId: transaction._id,
+          sourceType: transaction.sourceType,
+        }),
       });
 
       const data = await response.json();
@@ -103,6 +108,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
       setLiveTransactions((current) => current.filter((item) => item._id !== transaction._id));
       toast.success('Transaction deleted successfully');
+      router.refresh();
     } catch (error) {
       console.error('Delete failed:', error);
       toast.error(`Delete failed: ${String(error)}`);
@@ -136,6 +142,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
           transactionId: transaction._id,
           date: newDate,
           quantityMT: quantityValue,
+          sourceType: transaction.sourceType,
         }),
       });
 
@@ -152,6 +159,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         )
       );
       toast.success('Transaction updated successfully');
+      router.refresh();
     } catch (error) {
       console.error('Edit failed:', error);
       toast.error(`Edit failed: ${String(error)}`);

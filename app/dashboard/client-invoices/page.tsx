@@ -402,46 +402,33 @@ export default function ClientInvoicesPage() {
       return initialRows;
     }
 
-    const allocationTotals = new Map<string, number>();
-    paymentRecords.forEach((payment) => {
-      const allocations = payment.allocations || [];
-      if (allocations.length > 0) {
-        allocations.forEach((allocation) => {
-          const current = allocationTotals.get(allocation.id) || 0;
-          allocationTotals.set(
-            allocation.id,
-            roundCurrency(current + Number(allocation.amount || 0))
-          );
-        });
-      } else {
-        const current = allocationTotals.get('allCharges') || 0;
-        allocationTotals.set(
-          'allCharges',
-          roundCurrency(current + Number(payment.amount || 0))
-        );
-      }
-    });
+    const totalPaymentsAmount = paymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    return [
+      {
+        id: 'allCharges',
+        name: 'All Charges',
+        charge: getTotalChargeAmount(invoice),
+        paid: '',
+        previousPaid: roundCurrency(totalPaymentsAmount),
+      },
+    ];
+  };
 
-    if (allocationTotals.has('allCharges')) {
+  const buildPaymentAllocationRows = (invoice: MonthlyInvoice, existingRows: PaymentAllocationRow[] = []) => {
+    const hasAllCharges = existingRows.some((row) => row.id === 'allCharges');
+    if (hasAllCharges) {
+      const allChargesRow = existingRows.find((row) => row.id === 'allCharges')!;
       return [
         {
           id: 'allCharges',
           name: 'All Charges',
           charge: getTotalChargeAmount(invoice),
-          paid: '',
-          previousPaid: allocationTotals.get('allCharges') || 0,
+          paid: allChargesRow.paid || '',
+          previousPaid: allChargesRow.previousPaid || 0,
         },
       ];
     }
 
-    return initialRows.map((row) => ({
-      ...row,
-      previousPaid: allocationTotals.get(row.id) ?? row.previousPaid,
-      paid: '',
-    }));
-  };
-
-  const buildPaymentAllocationRows = (invoice: MonthlyInvoice, existingRows: PaymentAllocationRow[] = []) => {
     const initialRows = getInitialPaymentAllocationRows(invoice);
 
     if (!existingRows.length) {
@@ -469,8 +456,9 @@ export default function ClientInvoicesPage() {
         if (!invoice.invoiceId) return;
 
         const existingRows = next[invoice.invoiceId] || [];
+        const hasAllCharges = existingRows.some((row) => row.id === 'allCharges');
         const previousBalanceRowsCount = Number(invoice.previousBalance && Number(invoice.previousBalance) > 0 ? 1 : 0);
-        const expectedRowCount = previousBalanceRowsCount + 1;
+        const expectedRowCount = hasAllCharges ? 1 : (previousBalanceRowsCount + 1);
 
         if (!existingRows.length || existingRows.length !== expectedRowCount) {
           next[invoice.invoiceId] = buildPaymentAllocationRows(invoice, existingRows);
@@ -489,13 +477,17 @@ export default function ClientInvoicesPage() {
     const invoiceResults = await Promise.all(
       invoiceIds.filter(Boolean).map(async (invoiceId) => {
         try {
-          const response = await fetch(`/api/reports/ledger?invoiceId=${encodeURIComponent(invoiceId)}`);
+          const invoice = findInvoiceById(invoiceId);
+          if (!invoice) return null;
+
+          const clientParam = encodeURIComponent(invoice.bookingId);
+          const monthParam = encodeURIComponent(`${invoice.year}-${invoice.month}`);
+          const response = await fetch(
+            `/api/reports/ledger?invoiceId=${encodeURIComponent(invoiceId)}&accountId=${clientParam}&month=${monthParam}`
+          );
           if (!response.ok) return null;
           const result = await response.json();
           if (!result.success || !Array.isArray(result.data)) return null;
-
-          const invoice = findInvoiceById(invoiceId);
-          if (!invoice) return null;
 
           return { invoiceId, rows: buildPaymentAllocationRowsFromSavedPayments(invoice, result.data) };
         } catch (error) {
@@ -510,25 +502,6 @@ export default function ClientInvoicesPage() {
         updatedAllocations[item.invoiceId] = item.rows;
       }
     });
-
-    if (Object.keys(updatedAllocations).length === 0 && selectedClient && selectedMonth && invoiceIds.length === 1) {
-      try {
-        const response = await fetch(
-          `/api/reports/ledger?accountId=${encodeURIComponent(selectedClient)}&month=${encodeURIComponent(selectedMonth)}`
-        );
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && Array.isArray(result.data)) {
-            const invoice = findInvoiceById(invoiceIds[0]);
-            if (invoice) {
-              updatedAllocations[invoiceIds[0]] = buildPaymentAllocationRowsFromSavedPayments(invoice, result.data);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load account payments for invoice allocations:', error);
-      }
-    }
 
     setPaymentAllocations((prev) => ({ ...prev, ...updatedAllocations }));
   };

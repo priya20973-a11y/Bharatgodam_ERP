@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -15,13 +16,75 @@ function extractInvoiceMonth(dateString: string) {
   return parsed.toISOString().slice(0, 7);
 }
 
+async function getTransactionInfo(db: any, transactionId: string, sourceType?: string) {
+  if (!transactionId || !ObjectId.isValid(transactionId)) return null;
+  const objectId = new ObjectId(transactionId);
+  let transaction: any = null;
+  let resolvedSourceType = sourceType ? String(sourceType).toLowerCase() : '';
+
+  // 1. If sourceType is specified, look there first
+  if (resolvedSourceType === 'transactions' || resolvedSourceType === 'transaction') {
+    transaction = await db.collection('transactions').findOne({ _id: objectId });
+  } else if (resolvedSourceType === 'inward') {
+    transaction = await db.collection('inwards').findOne({ _id: objectId });
+  } else if (resolvedSourceType === 'outward') {
+    transaction = await db.collection('outwards').findOne({ _id: objectId });
+  } else if (resolvedSourceType === 'stock_entries' || resolvedSourceType === 'stock_entry') {
+    transaction = await db.collection('stock_entries').findOne({ _id: objectId });
+  }
+
+  // 2. Fallback: search all collections sequentially if not found
+  if (!transaction) {
+    transaction = await db.collection('transactions').findOne({ _id: objectId });
+    if (transaction) resolvedSourceType = 'transactions';
+  }
+  if (!transaction) {
+    transaction = await db.collection('inwards').findOne({ _id: objectId });
+    if (transaction) resolvedSourceType = 'inward';
+  }
+  if (!transaction) {
+    transaction = await db.collection('outwards').findOne({ _id: objectId });
+    if (transaction) resolvedSourceType = 'outward';
+  }
+  if (!transaction) {
+    transaction = await db.collection('stock_entries').findOne({ _id: objectId });
+    if (transaction) resolvedSourceType = 'stock_entries';
+  }
+
+  if (transaction) {
+    // Standardize fields for internal processing
+    transaction.sourceType = resolvedSourceType;
+    transaction.direction = transaction.direction || transaction.type || (resolvedSourceType === 'outward' ? 'OUTWARD' : 'INWARD');
+    transaction.clientId = transaction.clientId || transaction.accountId;
+  }
+
+  return transaction;
+}
+
 async function findLinkedStockEntries(db: any, transactionId: string, transaction: any) {
   const query: any = {
-    $or: [{ remarks: `Synced from transaction ${transactionId}` }],
+    $or: [
+      { remarks: `Synced from transaction ${transactionId}` }
+    ],
   };
+
+  try {
+    if (ObjectId.isValid(transactionId)) {
+      query.$or.push({ _id: new ObjectId(transactionId) });
+    }
+  } catch (err) {}
 
   if (transaction?.gatePass) {
     query.$or.push({ gatePass: transaction.gatePass });
+  }
+
+  if (transaction?.sourceId) {
+    try {
+      if (ObjectId.isValid(transaction.sourceId)) {
+        query.$or.push({ _id: new ObjectId(transaction.sourceId) });
+      }
+      query.$or.push({ remarks: `Synced from transaction ${transaction.sourceId}` });
+    } catch (err) {}
   }
 
   return db.collection('stock_entries').find(query).toArray();
@@ -38,10 +101,14 @@ async function deleteStockEntriesAndLedger(db: any, stockEntries: any[]) {
   }
 
   for (const entry of stockEntries) {
-    if (entry.direction === 'INWARD' && entry.warehouseId && entry.quantityMT) {
+    if (entry.warehouseId && entry.quantityMT) {
       const warehouse = await Warehouse.findById(entry.warehouseId);
       if (warehouse) {
-        const nextOccupied = warehouse.occupiedCapacity - Number(entry.quantityMT);
+        const dir = (entry.direction || '').toUpperCase();
+        // If we delete an INWARD entry, capacity goes DOWN.
+        // If we delete an OUTWARD entry, capacity goes UP.
+        const capacityDelta = dir === 'INWARD' ? -Number(entry.quantityMT) : Number(entry.quantityMT);
+        const nextOccupied = warehouse.occupiedCapacity + capacityDelta;
         warehouse.occupiedCapacity = Math.max(0, nextOccupied);
         warehouse.status = warehouse.occupiedCapacity >= warehouse.totalCapacity ? 'FULL' : 'ACTIVE';
         await warehouse.save();
@@ -436,7 +503,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { transactionId, date, quantityMT } = body;
+    const { transactionId, date, quantityMT, sourceType } = body;
 
     if (!transactionId || !date || quantityMT === undefined) {
       return NextResponse.json({ success: false, message: 'transactionId, date and quantityMT are required' }, { status: 400 });
@@ -457,7 +524,7 @@ export async function PATCH(request: Request) {
     }
 
     const db = await getDb();
-    const transaction = await db.collection('transactions').findOne({ _id: new ObjectId(transactionId) });
+    const transaction = await getTransactionInfo(db, transactionId, sourceType);
     if (!transaction) {
       return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
     }
@@ -466,8 +533,13 @@ export async function PATCH(request: Request) {
       // If older records stored direction differently, still allow
     }
 
-    await db.collection('transactions').updateOne(
-      { _id: new ObjectId(transactionId) },
+    await db.collection('transactions').updateMany(
+      { 
+        $or: [
+          { _id: new ObjectId(transaction._id) },
+          { sourceId: transaction._id.toString() }
+        ]
+      },
       {
         $set: {
           date,
@@ -476,6 +548,61 @@ export async function PATCH(request: Request) {
         },
       }
     );
+
+    // Sync corresponding inward/outward collection documents if they exist
+    try {
+      const srcType = (transaction.sourceType || '').toLowerCase();
+      const objectId = new ObjectId(transaction._id);
+      if (srcType === 'inward') {
+        await db.collection('inwards').updateOne(
+          { _id: objectId },
+          {
+            $set: {
+              date: parsedDate,
+              quantityMT: parsedQuantity,
+              updatedAt: new Date(),
+            }
+          }
+        );
+      } else if (srcType === 'outward') {
+        await db.collection('outwards').updateOne(
+          { _id: objectId },
+          {
+            $set: {
+              date: parsedDate,
+              quantityMT: parsedQuantity,
+              updatedAt: new Date(),
+            }
+          }
+        );
+      }
+
+      if (transaction.sourceId) {
+        const sourceObjectId = new ObjectId(transaction.sourceId);
+        await db.collection('inwards').updateOne(
+          { _id: sourceObjectId },
+          {
+            $set: {
+              date: parsedDate,
+              quantityMT: parsedQuantity,
+              updatedAt: new Date(),
+            }
+          }
+        );
+        await db.collection('outwards').updateOne(
+          { _id: sourceObjectId },
+          {
+            $set: {
+              date: parsedDate,
+              quantityMT: parsedQuantity,
+              updatedAt: new Date(),
+            }
+          }
+        );
+      }
+    } catch (syncDocError) {
+      console.error('Failed to sync linked inward/outward document after transaction edit:', syncDocError);
+    }
 
     try {
       await syncTransactionStockEntry(db, transaction, { date, quantityMT: parsedQuantity });
@@ -553,6 +680,19 @@ export async function PATCH(request: Request) {
       console.error('Error clearing affected invoices after transaction edit:', invoiceError);
     }
 
+    try {
+      revalidatePath('/dashboard/transactions-report');
+      revalidatePath('/dashboard/warehouses');
+      revalidatePath('/dashboard/ledger');
+      revalidatePath('/dashboard/reports');
+      revalidatePath('/dashboard/revenue');
+      revalidatePath('/dashboard');
+      revalidatePath('/dashboard/inward');
+      revalidatePath('/dashboard/outward');
+    } catch (revalError) {
+      console.error('Failed to revalidate paths after transaction edit:', revalError);
+    }
+
     return NextResponse.json({ success: true, message: 'Transaction updated successfully' });
   } catch (error) {
     console.error('Error updating transaction:', error);
@@ -568,14 +708,14 @@ export async function DELETE(request: Request) {
     }
 
     const body = await request.json();
-    const { transactionId } = body;
+    const { transactionId, sourceType } = body;
 
     if (!transactionId || !ObjectId.isValid(transactionId)) {
       return NextResponse.json({ success: false, message: 'Valid transactionId is required' }, { status: 400 });
     }
 
     const db = await getDb();
-    const transaction = await db.collection('transactions').findOne({ _id: new ObjectId(transactionId) });
+    const transaction = await getTransactionInfo(db, transactionId, sourceType);
     if (!transaction) {
       return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
     }
@@ -602,7 +742,31 @@ export async function DELETE(request: Request) {
       console.error('Error clearing affected invoices after transaction delete:', invoiceError);
     }
 
-    await db.collection('transactions').deleteOne({ _id: new ObjectId(transactionId) });
+    // Delete corresponding inward/outward collection documents if they exist
+    try {
+      const srcType = (transaction.sourceType || '').toLowerCase();
+      const objectId = new ObjectId(transaction._id);
+      if (srcType === 'inward') {
+        await db.collection('inwards').deleteOne({ _id: objectId });
+      } else if (srcType === 'outward') {
+        await db.collection('outwards').deleteOne({ _id: objectId });
+      }
+
+      if (transaction.sourceId) {
+        const sourceObjectId = new ObjectId(transaction.sourceId);
+        await db.collection('inwards').deleteOne({ _id: sourceObjectId });
+        await db.collection('outwards').deleteOne({ _id: sourceObjectId });
+      }
+    } catch (syncDocError) {
+      console.error('Failed to delete linked inward/outward document:', syncDocError);
+    }
+
+    await db.collection('transactions').deleteMany({
+      $or: [
+        { _id: new ObjectId(transaction._id) },
+        { sourceId: transaction._id.toString() }
+      ]
+    });
 
     try {
       const accountId = transaction.accountId || transaction.clientId;
@@ -651,6 +815,19 @@ export async function DELETE(request: Request) {
       }
     } catch (ledgerError) {
       console.error('Error regenerating TIME-STATE ledger after transaction delete:', ledgerError);
+    }
+
+    try {
+      revalidatePath('/dashboard/transactions-report');
+      revalidatePath('/dashboard/warehouses');
+      revalidatePath('/dashboard/ledger');
+      revalidatePath('/dashboard/reports');
+      revalidatePath('/dashboard/revenue');
+      revalidatePath('/dashboard');
+      revalidatePath('/dashboard/inward');
+      revalidatePath('/dashboard/outward');
+    } catch (revalError) {
+      console.error('Failed to revalidate paths after transaction delete:', revalError);
     }
 
     return NextResponse.json({ success: true, message: 'Transaction deleted successfully' });
