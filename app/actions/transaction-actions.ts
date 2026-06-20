@@ -19,7 +19,7 @@ async function createTransactionSession() {
   if (!mongoose.connection.db) {
     throw new Error('Database connection not established');
   }
-  
+
   const admin = mongoose.connection.db.admin();
   const serverInfo = await admin.command({ hello: 1 }).catch(() => admin.command({ isMaster: 1 }));
   const supportsTransactions = Boolean(serverInfo.setName || serverInfo.msg === 'isdbgrid');
@@ -210,6 +210,9 @@ export async function processInward(data: {
 
     if (!client) throw new Error('Client not found');
     if (!warehouse) throw new Error('Warehouse not found');
+    if (warehouse.status === 'INACTIVE') {
+      throw new Error('Warehouse is deactivated and cannot be used for new transactions');
+    }
 
     // 2. Create Inward Record
     const inwardPayload = appendOwnershipForMongo({
@@ -270,7 +273,7 @@ export async function processInward(data: {
     const monthlyRate = commodity.ratePerMtPerDay * 30; // Convert daily rate to monthly
     const rent = calculateRent(data.quantityMT, monthlyRate, inwardDate, outwardDate);
     const totalAmount = rent.totalAmount;
-    
+
     // 5. Create Ledger Entry for Invoice Generation
     const ratePerMTPerDay =
       commodity.ratePerMtPerDay ??
@@ -427,6 +430,9 @@ export async function processOutward(data: {
     if (!warehouse) {
       console.error('[processOutward] warehouse not found');
       throw new Error('Warehouse not found');
+    }
+    if (warehouse.status === 'INACTIVE') {
+      throw new Error('Warehouse is deactivated and cannot be used for new transactions');
     }
 
     const outwardPayload = appendOwnershipForMongo({
@@ -706,8 +712,8 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
       const ownedInwards = ownedWarehouseIds.length > 0
         ? await db.collection('inwards')
-            .find({ warehouseId: { $in: ownedWarehouseIds } }, { projection: { _id: 1 } })
-            .toArray()
+          .find({ warehouseId: { $in: ownedWarehouseIds } }, { projection: { _id: 1 } })
+          .toArray()
         : [];
       const ownedInwardIds = ownedInwards.flatMap((inward: any) => {
         const ids: any[] = [];
@@ -817,7 +823,7 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
     // Group by warehouse, then by month
     const warehouseRevenueData = new Map<string, any>();
-    
+
     const entriesByKey = new Map<string, Array<any>>();
     const keyToWarehouseId = new Map<string, string>();
 

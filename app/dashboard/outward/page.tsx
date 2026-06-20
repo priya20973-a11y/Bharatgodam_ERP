@@ -2,6 +2,7 @@ import { getClients } from '@/app/actions/client-actions';
 import { fetchCommodities } from '@/app/actions/commodities';
 import { getWarehouses } from '@/app/actions/warehouse-actions';
 import OutwardForm from '@/components/features/transactions/outward-form';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata = {
   title: 'Outward Transaction | ERP',
@@ -33,6 +34,7 @@ export default async function OutwardPage() {
           warehouses={sanitized.warehouses}
         />
       </div>
+      <Toaster position="top-right" />
     </div>
   );
 }

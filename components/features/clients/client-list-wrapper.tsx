@@ -5,8 +5,8 @@ import ClientList from './client-list';
 import ClientForm from './client-form';
 import { Button } from '@/components/ui/button';
 import { UserPlus2, X } from 'lucide-react';
-import { getClients } from '@/app/actions/client-actions';
-import { Toaster } from 'react-hot-toast';
+import { getClients, deleteClient } from '@/app/actions/client-actions';
+import { toast, Toaster } from 'react-hot-toast';
 
 export default function ClientListWrapper({ initialClients, initialCommodities }: { initialClients: any[]; initialCommodities: any[] }) {
   const [clients, setClients] = useState(initialClients);
@@ -20,12 +20,24 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
     setEditingClient(null);
   };
 
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this client?')) {
+      const res = await deleteClient(id);
+      if (res.success) {
+        toast.success('Client deleted');
+        refreshData();
+      } else {
+        toast.error(res.error || 'Failed to delete client');
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Toaster />
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Business Partners</h2>
-        <Button 
+        <Button
           onClick={() => {
             setEditingClient(null);
             setIsAdding(!isAdding);
@@ -38,16 +50,16 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
 
       {(isAdding || editingClient) && (
         <div className="mb-6">
-          <ClientForm 
-            client={editingClient} 
+          <ClientForm
+            client={editingClient}
             availableCommodities={initialCommodities}
-            onSuccess={refreshData} 
+            onSuccess={refreshData}
           />
         </div>
       )}
 
-      <ClientList 
-        clients={clients} 
+      <ClientList
+        clients={clients}
         commodities={initialCommodities}
         onEdit={(client) => {
           setIsAdding(false);
@@ -62,7 +74,8 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
             gstNumber: client.gstNumber || '',
             commodityIds: client.commodityIds || [],
           });
-        }} 
+        }}
+        onDelete={handleDelete}
       />
     </div>
   );

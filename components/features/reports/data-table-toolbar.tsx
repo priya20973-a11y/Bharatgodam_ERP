@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X } from 'lucide-react';
 import { getCommodityOptions, getClientOptions, getWarehouseOptions } from '@/app/actions/reports';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 interface DataTableToolbarProps {
   filters: {
@@ -27,9 +29,11 @@ export function DataTableToolbar({
   onReset, 
   isPending 
 }: DataTableToolbarProps) {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   
-  const [commodityOptions, setCommodityOptions] = useState<{label: string, value: string}[]>([]);
-  const [clientOptions, setClientOptions] = useState<{label: string, value: string}[]>([]);
+  const [commodityOptions, setCommodityOptions] = useState<{label: string, value: string; wspName?: string}[]>([]);
+  const [clientOptions, setClientOptions] = useState<{label: string, value: string; wspName?: string}[]>([]);
   const [warehouseOptions, setWarehouseOptions] = useState<{label: string, value: string}[]>([]);
   const [isFetchingCommodities, setIsFetchingCommodities] = useState(true);
   const [isFetchingClients, setIsFetchingClients] = useState(true);
@@ -112,7 +116,7 @@ export function DataTableToolbar({
               <SelectItem value="ALL" className="font-medium">All Clients</SelectItem>
               {clientOptions.map((c) => (
                 <SelectItem key={c.value} value={c.value} className="font-medium">
-                  {c.label}
+                  {getDropdownDisplayName(c, clientOptions, isAdmin)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -153,7 +157,7 @@ export function DataTableToolbar({
               <SelectItem value="ALL" className="font-medium">All Commodities</SelectItem>
               {commodityOptions.map((c) => (
                 <SelectItem key={c.value} value={c.value} className="font-medium">
-                  {c.label}
+                  {getDropdownDisplayName(c, commodityOptions, isAdmin)}
                 </SelectItem>
               ))}
             </SelectContent>

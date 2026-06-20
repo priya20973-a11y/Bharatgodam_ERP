@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import toast from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 interface Client {
   _id: string;
@@ -17,6 +19,8 @@ interface Warehouse {
 }
 
 export default function TransactionWiseInvoicePage() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [clients, setClients] = useState<Client[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -92,7 +96,7 @@ export default function TransactionWiseInvoicePage() {
                   <SelectContent>
                     {clients.map(client => (
                       <SelectItem key={client._id} value={client._id}>
-                        {client.name}
+                        {getDropdownDisplayName(client, clients, isAdmin)}
                       </SelectItem>
                     ))}
                   </SelectContent>

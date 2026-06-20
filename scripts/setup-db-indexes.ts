@@ -25,6 +25,7 @@ async function setupIndexes() {
 
     console.log(`Connected to database: ${dbName}. Setting up indexes...`);
 
+    // 1. Bookings indexes
     // Create a compound index for filtering
     // This allows fast matching for warehouseName AND commodityName sequentially
     await bookings.createIndex({ warehouseName: 1, commodityName: 1, date: -1 });
@@ -35,6 +36,23 @@ async function setupIndexes() {
     
     // Default sorting index
     await bookings.createIndex({ date: -1, createdAt: -1 });
+
+    // 2. Commodities indexes migration
+    const commodities = db.collection('commodities');
+    const commodityIndexes = await commodities.indexes();
+    const commodityIndexNames = commodityIndexes.map(idx => idx.name);
+
+    if (commodityIndexNames.includes('name_1')) {
+      console.log('Dropping legacy unique index name_1 on commodities...');
+      await commodities.dropIndex('name_1');
+      console.log('Legacy unique index name_1 dropped successfully.');
+    }
+
+    if (!commodityIndexNames.includes('userId_1_name_1')) {
+      console.log('Creating compound unique index { userId: 1, name: 1 } on commodities...');
+      await commodities.createIndex({ userId: 1, name: 1 }, { unique: true });
+      console.log('Compound unique index created successfully.');
+    }
 
     console.log('✅ Indexes configured successfully.');
 

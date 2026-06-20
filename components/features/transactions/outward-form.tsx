@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'react-hot-toast';
 import { Loader2, ArrowUpFromLine, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 const outwardSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
@@ -38,6 +40,8 @@ interface OutwardFormProps {
 }
 
 export default function OutwardForm({ clients, commodities, warehouses, onSuccess }: OutwardFormProps) {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [isPending, startTransition] = useTransition();
   const submittingRef = useRef(false);
   const [checkingStock, setCheckingStock] = useState(false);
@@ -229,7 +233,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                   {clients && clients.length > 0 ? (
                     clients.filter(c => c && c._id && c.name).map(c => (
                       <SelectItem key={c._id.toString()} value={c._id.toString()}>
-                        {c.name}
+                        {getDropdownDisplayName(c, clients, isAdmin)}
                       </SelectItem>
                     ))
                   ) : (
@@ -256,7 +260,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
                   {allowedCommodities && allowedCommodities.length > 0 ? (
                     allowedCommodities.filter(c => c && c._id && c.name).map(c => (
                       <SelectItem key={c._id.toString()} value={c._id.toString()}>
-                        {c.name}
+                        {getDropdownDisplayName(c, allowedCommodities, isAdmin)}
                       </SelectItem>
                     ))
                   ) : (

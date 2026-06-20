@@ -3,6 +3,8 @@
 import mongoose from 'mongoose';
 import connectToDatabase from '@/lib/mongoose';
 import Client from '@/lib/models/Client';
+import Inward from '@/lib/models/Inward';
+import Outward from '@/lib/models/Outward';
 import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
@@ -71,7 +73,7 @@ export async function getClients() {
     if (!mongoose.connection.db) {
       throw new Error('Database connection not established');
     }
-    
+
     const rawClients = await mongoose.connection.db
       .collection('client_accounts')
       .find({ ...getTenantFilter(session) })
@@ -86,7 +88,7 @@ export async function getClients() {
       mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
       userId: null,
       userEmail: null,
-      addedBy: 'System'
+      wspName: 'System'
     }));
 
     return JSON.parse(JSON.stringify(legacyClients));
@@ -94,17 +96,17 @@ export async function getClients() {
 
   const db = await getDb();
   const userIds = clients.map(client => client.userId).filter((id): id is any => !!id);
-  const users = userIds.length > 0 ? await db.collection('users').find({ _id: { $in: userIds } }).project({ _id: 1, fullName: 1, email: 1 }).toArray() : [];
-  const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email }]));
+  const users = userIds.length > 0 ? await db.collection('users').find({ _id: { $in: userIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray() : [];
+  const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
 
   return JSON.parse(JSON.stringify(clients.map(client => {
     const userId = client.userId?.toString();
     const userInfo = userId ? userMap.get(userId) : null;
-    const addedBy = userInfo?.fullName || userInfo?.email || (client.userId ? 'Unknown' : 'System');
-    
+    const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (client.userId ? 'Unknown' : 'System');
+
     return {
       ...client.toObject?.() || client,
-      addedBy,
+      wspName,
     };
   })));
 }
@@ -135,10 +137,12 @@ export async function createClient(data: {
       $or: [
         { userId: session.user.id },
         ...(email
-          ? [{ $and: [
+          ? [{
+            $and: [
               { $or: [{ userId: { $exists: false } }, { userId: null }] },
               { userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
-            ] }]
+            ]
+          }]
           : [])
       ]
     };
@@ -200,10 +204,12 @@ export async function updateClient(id: string, data: Partial<{
         $or: [
           { userId: session.user.id },
           ...(email
-            ? [{ $and: [
+            ? [{
+              $and: [
                 { $or: [{ userId: { $exists: false } }, { userId: null }] },
                 { userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
-              ] }]
+              ]
+            }]
             : [])
         ]
       };
@@ -237,5 +243,39 @@ export async function updateClient(id: string, data: Partial<{
       ? 'Client name already exists for your account'
       : error instanceof Error ? error.message : String(error);
     return { success: false, error: message };
+  }
+}
+
+export async function deleteClient(id: string) {
+  await connectToDatabase();
+  try {
+    const session = await requireSession();
+
+    // Calculate the client's current stock balance using all inward and outward transactions
+    const inwardAgg = await Inward.aggregate([
+      { $match: { clientId: new mongoose.Types.ObjectId(id) } },
+      { $group: { _id: null, total: { $sum: '$quantityMT' } } }
+    ]);
+    const outwardAgg = await Outward.aggregate([
+      { $match: { clientId: new mongoose.Types.ObjectId(id) } },
+      { $group: { _id: null, total: { $sum: '$quantityMT' } } }
+    ]);
+
+    const totalInward = inwardAgg[0]?.total || 0;
+    const totalOutward = outwardAgg[0]?.total || 0;
+    const remainingStock = Math.round((totalInward - totalOutward) * 10000) / 10000;
+
+    if (remainingStock > 0) {
+      return {
+        success: false,
+        error: 'Client cannot be deleted because stock is still available under this client. Please clear all remaining stock before deleting the client.'
+      };
+    }
+
+    await Client.findOneAndDelete({ _id: id, ...getTenantFilter(session) });
+    revalidatePath('/dashboard/clients');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

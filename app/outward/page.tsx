@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import toast from 'react-hot-toast';
 import { createStockEntry, getCurrentStock, getMasterData } from '@/app/actions/stock-ledger-actions';
 import type { IClient, ICommodity, IWarehouse } from '@/types/schemas';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 export default function OutwardPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -177,7 +179,7 @@ export default function OutwardPage() {
                 <SelectContent>
                   {masterData.clients.map(client => (
                     <SelectItem key={client._id?.toString()} value={client._id?.toString() || ''}>
-                      {client.name} {client.location ? `(${client.location})` : ''}
+                      {getDropdownDisplayName(client, masterData.clients, isAdmin)} {client.location ? `(${client.location})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -209,7 +211,7 @@ export default function OutwardPage() {
                 <SelectContent>
                   {masterData.commodities.map(commodity => (
                     <SelectItem key={commodity._id?.toString()} value={commodity._id?.toString() || ''}>
-                      {commodity.name} ({commodity.category})
+                      {getDropdownDisplayName(commodity, masterData.commodities, isAdmin)} ({commodity.category})
                     </SelectItem>
                   ))}
                 </SelectContent>

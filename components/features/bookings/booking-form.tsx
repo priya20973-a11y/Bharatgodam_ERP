@@ -15,6 +15,8 @@ import { formatCurrency } from '@/lib/utils/currency';
 import { formatWeight } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createDetailedBooking } from '@/app/actions/billing';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 // ── Static fallback list ──────────────────────────────────────────────────────
 // Used when the Commodity Master DB collection is still empty or unreachable.
@@ -72,6 +74,8 @@ export default function BookingForm({ commodities }: BookingFormProps) {
   });
 
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const { clients } = useWarehouse();
   const [direction, setDirection] = useState<'INWARD' | 'OUTWARD'>('INWARD');
   const [stockError, setStockError] = useState<string | null>(null);
@@ -358,7 +362,7 @@ export default function BookingForm({ commodities }: BookingFormProps) {
                       <SelectContent>
                         {clients.map(client => (
                           <SelectItem key={client.id} value={client.name}>
-                            {client.name}
+                            {getDropdownDisplayName(client, clients, isAdmin)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -394,7 +398,7 @@ export default function BookingForm({ commodities }: BookingFormProps) {
                   <option value="">— Select Commodity —</option>
                   {allowedCommodities.map(c => (
                     <option key={c._id} value={c.name}>
-                      {c.name} — ₹{c.baseRate}/{c.unit}
+                      {getDropdownDisplayName(c, allowedCommodities, isAdmin)} — ₹{c.baseRate}/{c.unit}
                     </option>
                   ))}
                 </select>

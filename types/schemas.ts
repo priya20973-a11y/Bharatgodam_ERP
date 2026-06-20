@@ -300,6 +300,8 @@ export interface IClient {
     contactPerson?: string;
   };
   status: 'ACTIVE' | 'INACTIVE';
+  userId?: ObjectId;
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -314,5 +316,7 @@ export interface ICommodity {
   unit: 'MT' | 'KG' | 'TONS';
   ratePerMtPerDay?: number;
   ratePerMtMonth?: number;
+  userId?: ObjectId;
+  userEmail?: string;
   createdAt: Date;
 }

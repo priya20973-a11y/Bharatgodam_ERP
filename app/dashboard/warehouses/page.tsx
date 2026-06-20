@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 export default async function WarehousesPage() {
-  const warehouses = await getWarehouses();
+  const warehouses = await getWarehouses({ includeInactive: true });
 
   return (
     <div className="space-y-6">

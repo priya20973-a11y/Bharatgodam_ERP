@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 interface Client {
   id: string;
@@ -34,6 +36,8 @@ interface MonthlyInvoice {
 }
 
 export default function InvoicesPage() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
@@ -117,7 +121,7 @@ export default function InvoicesPage() {
               <SelectContent>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                    {getDropdownDisplayName(client, clients, isAdmin)}
                   </SelectItem>
                 ))}
               </SelectContent>

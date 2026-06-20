@@ -11,10 +11,12 @@ import toast from 'react-hot-toast';
 import { getMasterData } from '@/app/actions/stock-ledger-actions';
 import { Download, Loader2 } from 'lucide-react';
 import type { IClient, IWarehouse, IInvoiceMaster, IInvoiceLineItem } from '@/types/schemas';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 export default function InvoiceReportPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -202,7 +204,7 @@ export default function InvoiceReportPage() {
                   <option value="">Select client</option>
                   {masterData.clients.map(client => (
                     <option key={client._id?.toString()} value={client._id?.toString() || ''}>
-                      {client.name} {client.location ? `(${client.location})` : ''}
+                      {getDropdownDisplayName(client, masterData.clients, isAdmin)} {client.location ? `(${client.location})` : ''}
                     </option>
                   ))}
                 </select>

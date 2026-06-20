@@ -85,17 +85,33 @@ export async function GET() {
       .toArray();
 
     if (clientDocs.length > 0) {
-      const clients = clientDocs.map((client: any) => ({
-        id: client._id?.toString() || '',
-        name: client.name || client.clientName || 'Unknown',
-        type: client.clientType || client.type || 'FARMER',
-        address: client.address || client.clientLocation || '',
-        mobile: client.mobile || client.contactInfo?.mobile || client.contactInfo?.phone || '',
-        panNumber: client.panNumber || client.panCard || '',
-        aadharNumber: client.aadharNumber || client.adhaarNumber || '',
-        gstNumber: client.gstNumber || client.gst || client.gstin || '',
-        commodityIds: Array.isArray(client.commodityIds) ? client.commodityIds.map((id: any) => id?.toString?.() || id) : [],
-      }));
+      const userIds = clientDocs.map((c: any) => c.userId).filter((id: any): id is any => !!id);
+      const uniqueUserIds = Array.from(new Set(userIds.map((id: any) => id.toString()))).map((id: any) => {
+        try { return new ObjectId(id); } catch { return id; }
+      });
+      const users = uniqueUserIds.length > 0
+        ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+        : [];
+      const userMap = new Map(users.map((u: any) => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
+      const clients = clientDocs.map((client: any) => {
+        const userId = client.userId?.toString();
+        const userInfo = userId ? userMap.get(userId) : null;
+        const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (client.userId ? 'Unknown' : 'System');
+        return {
+          id: client._id?.toString() || '',
+          _id: client._id?.toString() || '',
+          name: client.name || client.clientName || 'Unknown',
+          type: client.clientType || client.type || 'FARMER',
+          address: client.address || client.clientLocation || '',
+          mobile: client.mobile || client.contactInfo?.mobile || client.contactInfo?.phone || '',
+          panNumber: client.panNumber || client.panCard || '',
+          aadharNumber: client.aadharNumber || client.adhaarNumber || '',
+          gstNumber: client.gstNumber || client.gst || client.gstin || '',
+          commodityIds: Array.isArray(client.commodityIds) ? client.commodityIds.map((id: any) => id?.toString?.() || id) : [],
+          wspName
+        };
+      });
 
       return NextResponse.json({
         success: true,
@@ -104,13 +120,30 @@ export async function GET() {
     }
 
     const accountDocs = await db.collection('client_accounts').find({ ...tenantFilter }).sort({ clientName: 1 }).toArray();
-    const clients = accountDocs.map((client: any) => ({
-      id: client._id?.toString() || `legacy-${Date.now()}`,
-      name: client.clientName || client.name || 'Unknown',
-      type: client.clientType || 'FARMER',
-      address: client.clientLocation || client.address || '',
-      mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
-    }));
+    
+    const userIds = accountDocs.map((c: any) => c.userId).filter((id: any): id is any => !!id);
+    const uniqueUserIds = Array.from(new Set(userIds.map((id: any) => id.toString()))).map((id: any) => {
+      try { return new ObjectId(id); } catch { return id; }
+    });
+    const users = uniqueUserIds.length > 0
+      ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+      : [];
+    const userMap = new Map(users.map((u: any) => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
+    const clients = accountDocs.map((client: any) => {
+      const userId = client.userId?.toString();
+      const userInfo = userId ? userMap.get(userId) : null;
+      const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (client.userId ? 'Unknown' : 'System');
+      return {
+        id: client._id?.toString() || `legacy-${Date.now()}`,
+        _id: client._id?.toString() || `legacy-${Date.now()}`,
+        name: client.clientName || client.name || 'Unknown',
+        type: client.clientType || 'FARMER',
+        address: client.clientLocation || client.address || '',
+        mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
+        wspName
+      };
+    });
 
     return NextResponse.json({
       success: true,

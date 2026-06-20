@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { appendOwnershipForMongo, getTenantFilterForMongo, isAdmin, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import type { IStockEntry, ILedgerEntry, IInvoiceMaster, IInvoiceLineItem, IClient, ICommodity, IWarehouse } from '@/types/schemas';
+import Warehouse from '@/lib/models/Warehouse';
 import { ObjectId } from 'mongodb';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
 import { calculateStorageDays } from '@/lib/storage-engine';
@@ -24,11 +25,41 @@ export async function getMasterData() {
     db.collection('warehouses').find({ ...tenantFilter, status: { $in: ['ACTIVE', 'FULL'] } }).toArray(),
   ]);
 
-  return {
-    clients: clients as IClient[],
-    commodities: commodities as ICommodity[],
-    warehouses: warehouses as IWarehouse[],
+  const userIds = [
+    ...clients.map(c => c.userId),
+    ...commodities.map(c => c.userId),
+    ...warehouses.map(w => w.userId)
+  ].filter((id): id is any => !!id);
+
+  const uniqueUserIds = Array.from(new Set(userIds.map(id => id.toString()))).map(id => {
+    try {
+      return new ObjectId(id);
+    } catch {
+      return id;
+    }
+  });
+
+  const users = uniqueUserIds.length > 0
+    ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+    : [];
+
+  const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
+  const mapWspName = (item: any) => {
+    const userId = item.userId?.toString();
+    const userInfo = userId ? userMap.get(userId) : null;
+    const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (item.userId ? 'Unknown' : 'System');
+    return {
+      ...item,
+      wspName
+    };
   };
+
+  return JSON.parse(JSON.stringify({
+    clients: clients.map(mapWspName) as IClient[],
+    commodities: commodities.map(mapWspName) as ICommodity[],
+    warehouses: warehouses.map(mapWspName) as IWarehouse[],
+  }));
 }
 export async function createStockEntry(data: {
   clientId: string;
@@ -56,12 +87,21 @@ export async function createStockEntry(data: {
       ...(!isAdmin(session) ? getTenantFilterForMongo(session) : {}),
     });
     if (!warehouse) return { success: false, message: 'Warehouse not found' };
+    if (warehouse.status === 'INACTIVE') {
+      return { success: false, message: 'Warehouse is deactivated and cannot be used for new transactions' };
+    }
 
     const commodity = await db.collection('commodities').findOne({ _id: new ObjectId(data.commodityId) });
     if (!commodity) return { success: false, message: 'Commodity not found' };
 
     const currentOccupancy = Number(warehouse.occupiedCapacity ?? 0);
     const totalCapacity = Number(warehouse.totalCapacity ?? 0);
+
+    if (data.direction === 'INWARD') {
+      if (currentOccupancy + data.quantityMT > totalCapacity) {
+        return { success: false, message: 'Transaction exceeds warehouse total capacity' };
+      }
+    }
 
     if (data.direction === 'OUTWARD') {
       if (!data.actualOutwardDate) {
@@ -103,21 +143,19 @@ export async function createStockEntry(data: {
     // Update warehouse capacity
     if (data.direction === 'INWARD' || data.direction === 'OUTWARD') {
       const capacityDelta = data.direction === 'INWARD' ? data.quantityMT : -data.quantityMT;
-      const updatedStatus = data.direction === 'OUTWARD'
-        ? currentOccupancy + capacityDelta < totalCapacity
-          ? 'ACTIVE'
-          : warehouse.status
-        : currentOccupancy + capacityDelta >= totalCapacity
-          ? 'FULL'
-          : warehouse.status;
-
-      await db.collection('warehouses').updateOne(
-        { _id: new ObjectId(data.warehouseId) },
-        {
-          $inc: { occupiedCapacity: capacityDelta },
-          $set: { status: updatedStatus },
+      const warehouseDoc = await Warehouse.findById(data.warehouseId);
+      if (warehouseDoc) {
+        const nextOccupied = warehouseDoc.occupiedCapacity + capacityDelta;
+        if (nextOccupied < 0) {
+          return { success: false, message: 'Warehouse stock cannot become negative' };
         }
-      );
+        if (nextOccupied > warehouseDoc.totalCapacity) {
+          return { success: false, message: 'Transaction exceeds warehouse total capacity' };
+        }
+        warehouseDoc.occupiedCapacity = nextOccupied;
+        warehouseDoc.status = warehouseDoc.occupiedCapacity >= warehouseDoc.totalCapacity ? 'FULL' : 'ACTIVE';
+        await warehouseDoc.save();
+      }
     }
 
     return { success: true, stockEntry: { ...stockEntry, _id: result.insertedId } };

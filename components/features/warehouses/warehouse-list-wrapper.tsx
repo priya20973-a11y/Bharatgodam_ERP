@@ -5,19 +5,58 @@ import WarehouseList from './warehouse-list';
 import WarehouseForm from './warehouse-form';
 import { Button } from '@/components/ui/button';
 import { Plus, X } from 'lucide-react';
-import { getWarehouses } from '@/app/actions/warehouse-actions';
-import { Toaster } from 'react-hot-toast';
+import { getWarehouses, toggleWarehouseStatus, deleteWarehouse } from '@/app/actions/warehouse-actions';
+import { Toaster, toast } from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
 
 export default function WarehouseListWrapper({ initialWarehouses }: { initialWarehouses: any[] }) {
   const [warehouses, setWarehouses] = useState(initialWarehouses);
   const [isAdding, setIsAdding] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
+  
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
   const refreshData = async () => {
-    const data = await getWarehouses();
-    setWarehouses(data);
+    try {
+      const data = await getWarehouses({ includeInactive: true });
+      setWarehouses(data);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to refresh warehouses');
+    }
     setIsAdding(false);
     setEditingWarehouse(null);
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    try {
+      const res = await toggleWarehouseStatus(id);
+      if (res.success) {
+        toast.success(`Warehouse status updated successfully.`);
+        await refreshData();
+      } else {
+        toast.error(res.error || 'Failed to update status');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to permanently delete this warehouse? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      const res = await deleteWarehouse(id);
+      if (res.success) {
+        toast.success('Warehouse deleted successfully.');
+        await refreshData();
+      } else {
+        toast.error(res.error || 'Failed to delete warehouse');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong');
+    }
   };
 
   return (
@@ -56,6 +95,9 @@ export default function WarehouseListWrapper({ initialWarehouses }: { initialWar
             totalCapacity: w.totalCapacity
           });
         }} 
+        onToggleStatus={handleToggleStatus}
+        onDelete={handleDelete}
+        isAdmin={isAdmin}
       />
     </div>
   );

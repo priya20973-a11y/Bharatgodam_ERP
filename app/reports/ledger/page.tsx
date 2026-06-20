@@ -10,10 +10,12 @@ import toast from 'react-hot-toast';
 import { getLedgerSummary, getMasterData } from '@/app/actions/stock-ledger-actions';
 import { TimeStateLedgerTable } from '@/components/features/ledger/time-state-ledger-table';
 import type { IClient, ICommodity, IWarehouse } from '@/types/schemas';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 export default function LedgerReportPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function LedgerReportPage() {
                   <SelectContent>
                     {masterData.clients.map(client => (
                       <SelectItem key={client._id?.toString()} value={client._id?.toString() || ''}>
-                        {client.name} {client.location ? `(${client.location})` : ''}
+                        {getDropdownDisplayName(client, masterData.clients, isAdmin)} {client.location ? `(${client.location})` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -137,7 +139,7 @@ export default function LedgerReportPage() {
                   <SelectContent>
                     {masterData.commodities.map(commodity => (
                       <SelectItem key={commodity._id?.toString()} value={commodity._id?.toString() || ''}>
-                        {commodity.name}
+                        {getDropdownDisplayName(commodity, masterData.commodities, isAdmin)}
                       </SelectItem>
                     ))}
                   </SelectContent>

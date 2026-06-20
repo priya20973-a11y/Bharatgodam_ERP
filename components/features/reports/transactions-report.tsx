@@ -28,6 +28,7 @@ import { getClientOptions, getWarehouseOptions } from '@/app/actions/reports';
 import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 interface TransactionRecord {
   _id: string;
@@ -458,7 +459,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
               <SelectContent>
                 {clientDropdownOptions.map((client) => (
                   <SelectItem key={client.value} value={client.value} className="font-medium">
-                    {client.label}
+                    {getDropdownDisplayName(client, clientDropdownOptions, isAdmin)}
                   </SelectItem>
                 ))}
               </SelectContent>

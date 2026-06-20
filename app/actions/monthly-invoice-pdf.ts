@@ -168,9 +168,9 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const adjustmentTotal = invoice.additionalCharges !== undefined
     ? Number(invoice.additionalCharges)
     : (invoice.additionalChargeItems || []).reduce(
-        (sum, item) => sum + Number(item.amount || 0),
-        0
-      );
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
   const totalMonthlyCharges = Number(invoice.totalRent || 0) + adjustmentTotal;
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
@@ -244,21 +244,21 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const invoiceRows = ((invoice.transactions?.length
     ? invoice.transactions
     : invoice.periods || []) as any[]).map((p) => ({
-    date: p.date || p.startDate || '',
-    direction: p.direction || 'INWARD',
-    commodityName: p.commodityName || 'Unknown',
-    startDate: p.startDate || '',
-    endDate: p.endDate || '',
-    quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
-    bags: p.bags !== undefined
-      ? p.bags
-      : p.bagCount ?? p.bagsCount ?? '',
-    rentTotal: Number(p.rentTotal || 0),
-    daysTotal: Number(p.daysTotal ?? p.daysOccupied ?? 0),
-    ratePerMTPerDay: Number(p.rate || p.ratePerMTPerDay || 0),
-    gatePass: p.gatePass || p.gatepass || '-',
-    status: p.status || '',
-  }));
+      date: p.date || p.startDate || '',
+      direction: p.direction || 'INWARD',
+      commodityName: p.commodityName || 'Unknown',
+      startDate: p.startDate || '',
+      endDate: p.endDate || '',
+      quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
+      bags: p.bags !== undefined
+        ? p.bags
+        : p.bagCount ?? p.bagsCount ?? '',
+      rentTotal: Number(p.rentTotal || 0),
+      daysTotal: Number(p.daysTotal ?? p.daysOccupied ?? 0),
+      ratePerMTPerDay: Number(p.rate || p.ratePerMTPerDay || 0),
+      gatePass: p.gatePass || p.gatepass || '-',
+      status: p.status || '',
+    }));
 
   const invoiceRowsList = invoiceRows
     .map((row) => {

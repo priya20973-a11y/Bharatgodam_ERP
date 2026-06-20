@@ -9,6 +9,8 @@ import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } f
 import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, getClientTransactionInvoice, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 import { toast } from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 interface AdditionalChargeItem {
   id?: string;
@@ -71,7 +73,9 @@ const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: Addit
 };
 
 export default function ClientInvoicesPage() {
-  const [clients, setClients] = useState<{ label: string; value: string }[]>([]);
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const [clients, setClients] = useState<{ label: string; value: string; wspName?: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ label: string; value: string }[]>([]);
   const [commodities, setCommodities] = useState<{ label: string; value: string }[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
@@ -348,10 +352,10 @@ export default function ClientInvoicesPage() {
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
     const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
-    const isTransactionInvoice =
-      invoiceMode === 'transaction' ||
-      isTransactionInvoiceId(invoice.invoiceId || invoice.bookingId);
-    const modeQuery = isTransactionInvoice ? '&mode=transactions' : '';
+    // Only use transaction mode when user explicitly selected it.
+    // Do NOT infer mode from ID format — all generated IDs match the
+    // transaction pattern, causing incorrect amounts for ledger invoices.
+    const modeQuery = invoiceMode === 'transaction' ? '&mode=transactions' : '';
     const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
   };
@@ -925,7 +929,7 @@ export default function ClientInvoicesPage() {
                     <SelectContent>
                       {clients.map((client) => (
                         <SelectItem key={client.value} value={client.value}>
-                          {client.label}
+                          {getDropdownDisplayName(client, clients, isAdmin)}
                         </SelectItem>
                       ))}
                     </SelectContent>

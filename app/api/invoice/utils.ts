@@ -422,6 +422,18 @@ export async function buildMonthlyInvoiceFromTransactions(
     0
   );
 
+  const adjustments = await findInvoiceAdjustments(
+    db,
+    id,
+    masterId?.toString()
+  );
+
+  const additionalChargeItems =
+    normalizeAdjustmentItems(adjustments);
+
+  const additionalCharges =
+    sumAdjustmentItems(additionalChargeItems);
+
   return {
     bookingId: clientId,
     invoiceId: invoiceNumber,
@@ -439,9 +451,9 @@ export async function buildMonthlyInvoiceFromTransactions(
     totalRent,
     previousBalance: 0,
     currentPayments: 0,
-    newBalance: totalRent,
-    additionalCharges: 0,
-    additionalChargeItems: [],
+    newBalance: totalRent + additionalCharges,
+    additionalCharges,
+    additionalChargeItems,
     invoiceDate: new Date().toISOString().split('T')[0],
   };
 }
@@ -626,6 +638,7 @@ export async function buildMonthlyInvoiceFromLedger(
       .insertMany(lineItems as any[]);
   }
 
+  // Fetch transactions to show INWARD/OUTWARD rows in the invoice table
   const transactions = await getTransactionsForInvoiceMonth(
     db,
     clientId,
@@ -639,6 +652,8 @@ export async function buildMonthlyInvoiceFromLedger(
     invoiceMonth
   );
 
+  // Use transaction rows for display (shows INWARD/OUTWARD direction),
+  // but use ledger totals for the summary (matches dashboard calculation).
   const invoicePeriods =
     transactionRows.length > 0
       ? transactionRows
@@ -650,6 +665,7 @@ export async function buildMonthlyInvoiceFromLedger(
           rentTotal: Number(item.rent ?? 0),
           status: item.status || 'COMPLETED',
           commodityName: item.commodity || '',
+          rate: Number(item.rate ?? 0),
         }));
 
   const previousBalance = Number(
@@ -659,13 +675,8 @@ export async function buildMonthlyInvoiceFromLedger(
     ledgerInvoice.summary.payments ?? 0
   );
 
-  const totalRent =
-    transactionRows.length > 0
-      ? transactionRows.reduce(
-          (sum: number, row: any) => sum + (row.rentTotal || 0),
-          0
-        )
-      : Number(ledgerInvoice.summary.totalRent ?? 0);
+  // IMPORTANT: Always use ledger totalRent — it matches the dashboard.
+  const totalRent = Number(ledgerInvoice.summary.totalRent ?? 0);
 
   const adjustments = await findInvoiceAdjustments(
     db,
@@ -678,10 +689,7 @@ export async function buildMonthlyInvoiceFromLedger(
   const additionalCharges =
     sumAdjustmentItems(additionalChargeItems);
 
-  const newBalance =
-    transactionRows.length > 0
-      ? totalRent + previousBalance + additionalCharges - currentPayments
-      : Number(ledgerInvoice.summary.outstanding ?? 0);
+  const newBalance = Number(ledgerInvoice.summary.outstanding ?? 0);
 
   return {
     bookingId: clientId,
@@ -692,10 +700,7 @@ export async function buildMonthlyInvoiceFromLedger(
     month,
     year,
     periods: invoicePeriods,
-    transactions:
-      transactionRows.length > 0
-        ? transactionRows
-        : transactions,
+    transactions: invoicePeriods,
     warehouseId: resolvedWarehouseId,
     warehouseName: resolvedWarehouse?.name || '',
     ...companyProfile,
@@ -839,11 +844,20 @@ export async function getTransactionsForInvoiceMonth(
         '';
 
       return {
-        date: (
-          txn.date || txn.inwardDate || txn.outwardDate || ''
-        )
-          .toString()
-          .split('T')[0],
+        date: (() => {
+          const d = txn.date || txn.inwardDate || txn.outwardDate;
+          if (!d) return '';
+          if (d instanceof Date) return d.toISOString().split('T')[0];
+          if (typeof d === 'string') {
+            const raw = d.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            if (raw.includes('T') && !raw.includes(' ')) return raw.split('T')[0];
+            const parsed = new Date(raw);
+            if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+            return raw;
+          }
+          return String(d);
+        })(),
         inwardDate: txn.inwardDate || txn.date || '',
         actualOutwardDate:
           txn.actualOutwardDate || txn.outwardDate || null,
@@ -914,7 +928,7 @@ function normalizeTransactionDateValue(value: any): string {
     if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
       return rawValue;
     }
-    if (rawValue.includes('T')) {
+    if (rawValue.includes('T') && !rawValue.includes(' ')) {
       return rawValue.split('T')[0];
     }
     const parsed = new Date(rawValue);
@@ -1206,14 +1220,25 @@ export async function resolveMonthlyInvoiceFromId(
   }
 
   if (isTransactionMode) {
+    // Prefer ledger — it matches dashboard calculation.
+    // Fall back to transaction-based only if ledger returns nothing.
+    const ledgerInvoice = await tryBuildLedgerInvoice();
+    if (ledgerInvoice) {
+      return ledgerInvoice;
+    }
     const transactionInvoice = await tryBuildTransactionInvoice(id);
     if (transactionInvoice) {
       return transactionInvoice;
     }
-    return await tryBuildLedgerInvoice();
+    return null;
   }
 
   if (invoiceMaster?.invoiceType === 'transaction') {
+    // Prefer ledger — it matches dashboard calculation.
+    const ledgerInvoice = await tryBuildLedgerInvoice();
+    if (ledgerInvoice) {
+      return ledgerInvoice;
+    }
     const invoiceIdentifier =
       buildTransactionInvoiceIdentifierFromMaster(invoiceMaster) || id;
     const transactionInvoice = await tryBuildTransactionInvoice(
@@ -1222,10 +1247,16 @@ export async function resolveMonthlyInvoiceFromId(
     if (transactionInvoice) {
       return transactionInvoice;
     }
-    return await tryBuildLedgerInvoice();
+    return null;
   }
 
   if (!invoiceMaster && looksLikeTransactionInvoiceIdentifier(id)) {
+    // Try ledger first — it matches dashboard calculation.
+    // Only fall back to transaction-based if ledger returns nothing.
+    const ledgerInvoice = await tryBuildLedgerInvoice();
+    if (ledgerInvoice) {
+      return ledgerInvoice;
+    }
     const transactionInvoice = await tryBuildTransactionInvoice(id);
     if (transactionInvoice) {
       return transactionInvoice;
@@ -1353,21 +1384,38 @@ export async function resolveMonthlyInvoiceFromId(
       const currentPayments = Number(
         ledgerInvoice.summary.payments ?? 0
       );
-      const totalRent =
+
+      // Always use ledger totals — they match the dashboard calculation.
+      // Use transaction rows for display so INWARD/OUTWARD entries appear.
+      const totalRent = Number(
+        ledgerInvoice.summary.totalRent ??
+          invoiceMaster.totalAmount ??
+          0
+      );
+      const newBalance = Number(
+        ledgerInvoice.summary.outstanding ??
+          invoiceMaster.totalAmount ??
+          0
+      );
+
+      // Use transaction rows for display (shows INWARD/OUTWARD),
+      // fall back to ledger rows if no transactions found
+      const displayPeriods =
         transactionRows.length > 0
-          ? totalRentFromBilling
-          : Number(
-              ledgerInvoice.summary.totalRent ??
-                invoiceMaster.totalAmount ??
-                0
-            );
-      const newBalance =
-        transactionRows.length > 0
-          ? totalRent + previousBalance + additionalCharges - currentPayments
-          : Number(
-              ledgerInvoice.summary.outstanding ??
-                invoiceMaster.totalAmount ??
-                0
+          ? transactionRows
+          : ledgerInvoice.rows.map(
+              (item: any) => ({
+                startDate: item.fromDate || '',
+                endDate: item.toDate || '',
+                quantityMT: Number(item.qty ?? 0),
+                daysTotal: Number(item.days ?? 0),
+                rentTotal: Number(item.rent ?? 0),
+                status:
+                  item.status || 'COMPLETED',
+                commodityName:
+                  item.commodity || '',
+                rate: Number(item.rate ?? 0),
+              })
             );
 
       return {
@@ -1382,23 +1430,8 @@ export async function resolveMonthlyInvoiceFromId(
         gstNumber: resolveClientGst(client),
         month,
         year,
-        periods:
-          transactionRows.length > 0
-            ? transactionRows
-            : ledgerInvoice.rows.map(
-                (item: any) => ({
-                  startDate: item.fromDate || '',
-                  endDate: item.toDate || '',
-                  quantityMT: Number(item.qty ?? 0),
-                  daysTotal: Number(item.days ?? 0),
-                  rentTotal: Number(item.rent ?? 0),
-                  status:
-                    item.status || 'COMPLETED',
-                  commodityName:
-                    item.commodity || '',
-                })
-              ),
-        transactions: transactionRows,
+        periods: displayPeriods,
+        transactions: displayPeriods,
         warehouseId:
           invoiceMaster.warehouseId?.toString(),
         warehouseName: warehouse.name || '',

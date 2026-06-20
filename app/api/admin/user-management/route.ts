@@ -86,6 +86,10 @@ export async function POST(req: Request) {
       }
 
       await usersCollection.deleteOne({ _id: objectId });
+      if (user.email) {
+        const signupRequestsCollection = db.collection('signup_requests');
+        await signupRequestsCollection.deleteMany({ email: user.email });
+      }
       return NextResponse.json({ message: 'User deleted successfully' });
     } else {
       return NextResponse.json(

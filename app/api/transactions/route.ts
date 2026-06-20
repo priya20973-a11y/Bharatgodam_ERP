@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
 import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-ledger-actions';
 import { getTenantFilterForMongo, appendOwnershipForMongo, isAdmin } from '@/lib/ownership';
+import Warehouse from '@/lib/models/Warehouse';
 import { ObjectId } from 'mongodb';
 
 function extractInvoiceMonth(dateString: string) {
@@ -38,10 +39,13 @@ async function deleteStockEntriesAndLedger(db: any, stockEntries: any[]) {
 
   for (const entry of stockEntries) {
     if (entry.direction === 'INWARD' && entry.warehouseId && entry.quantityMT) {
-      await db.collection('warehouses').updateOne(
-        { _id: entry.warehouseId },
-        { $inc: { occupiedCapacity: -Number(entry.quantityMT) } }
-      );
+      const warehouse = await Warehouse.findById(entry.warehouseId);
+      if (warehouse) {
+        const nextOccupied = warehouse.occupiedCapacity - Number(entry.quantityMT);
+        warehouse.occupiedCapacity = Math.max(0, nextOccupied);
+        warehouse.status = warehouse.occupiedCapacity >= warehouse.totalCapacity ? 'FULL' : 'ACTIVE';
+        await warehouse.save();
+      }
     }
   }
 }
@@ -139,12 +143,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { 
-      type, 
-      clientId, 
-      warehouseId, 
-      commodityId, 
-      quantity, 
+    const {
+      type,
+      clientId,
+      warehouseId,
+      commodityId,
+      quantity,
       date,
       bookingId,      // NEW: account ID from client accounts
       clientName,     // NEW: client name for easier lookup
@@ -162,9 +166,9 @@ export async function POST(request: Request) {
     }
 
     // Validate transaction type (support both formats)
-    const direction = type === 'Inward' || type === 'INWARD' ? 'INWARD' : 
-                     type === 'Outward' || type === 'OUTWARD' ? 'OUTWARD' : null;
-    
+    const direction = type === 'Inward' || type === 'INWARD' ? 'INWARD' :
+      type === 'Outward' || type === 'OUTWARD' ? 'OUTWARD' : null;
+
     if (!direction) {
       return NextResponse.json({
         success: false,
@@ -184,7 +188,7 @@ export async function POST(request: Request) {
     const db = await getDb();
 
     // ENFORCE: All references MUST exist in master tables. No auto-creation or fallbacks.
-    
+
     // Validate client exists in master
     let clientFromMaster;
     try {
@@ -232,7 +236,7 @@ export async function POST(request: Request) {
     } else {
       return NextResponse.json({
         success: false,
-        message: 'Either commodityId or commodityName must be provided'  
+        message: 'Either commodityId or commodityName must be provided'
       }, { status: 400 });
     }
 
@@ -382,11 +386,11 @@ export async function POST(request: Request) {
           reasonForChange: period.reasonForChange,
           affectedTransaction: period.transaction
             ? {
-                transactionId: period.transaction.id,
-                direction: period.transaction.direction,
-                quantity: period.transaction.quantity,
-                date: period.transaction.date,
-              }
+              transactionId: period.transaction.id,
+              direction: period.transaction.direction,
+              quantity: period.transaction.quantity,
+              date: period.transaction.date,
+            }
             : undefined,
           ratePerDayPerMT: period.ratePerDayPerMT,
           rentCalculated: period.rentCalculated,
@@ -510,11 +514,11 @@ export async function PATCH(request: Request) {
           reasonForChange: period.reasonForChange,
           affectedTransaction: period.transaction
             ? {
-                transactionId: period.transaction.id,
-                direction: period.transaction.direction,
-                quantity: period.transaction.quantity,
-                date: period.transaction.date,
-              }
+              transactionId: period.transaction.id,
+              direction: period.transaction.direction,
+              quantity: period.transaction.quantity,
+              date: period.transaction.date,
+            }
             : undefined,
           ratePerDayPerMT: period.ratePerDayPerMT,
           rentCalculated: period.rentCalculated,
@@ -630,11 +634,11 @@ export async function DELETE(request: Request) {
           reasonForChange: period.reasonForChange,
           affectedTransaction: period.transaction
             ? {
-                transactionId: period.transaction.id,
-                direction: period.transaction.direction,
-                quantity: period.transaction.quantity,
-                date: period.transaction.date,
-              }
+              transactionId: period.transaction.id,
+              direction: period.transaction.direction,
+              quantity: period.transaction.quantity,
+              date: period.transaction.date,
+            }
             : undefined,
           ratePerDayPerMT: period.ratePerDayPerMT,
           rentCalculated: period.rentCalculated,

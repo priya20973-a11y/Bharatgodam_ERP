@@ -75,7 +75,10 @@ export async function POST(req: Request) {
     }
 
     // Check if signup request already exists
-    const existingRequest = await signupRequestsCollection.findOne({ email });
+    const existingRequest = await signupRequestsCollection.findOne({
+      email,
+      status: { $in: ['pending', 'PENDING_APPROVAL'] }
+    });
     if (existingRequest) {
       return NextResponse.json(
         { message: 'A signup request with this email is already pending approval.' },

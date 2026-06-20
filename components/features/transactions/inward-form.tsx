@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 import { Loader2, Calculator, Calendar, Info } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { getDropdownDisplayName } from '@/lib/utils';
 
 const inwardSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
@@ -42,6 +44,8 @@ interface InwardFormProps {
 }
 
 export default function InwardForm({ clients, commodities, warehouses, onSuccess }: InwardFormProps) {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [isPending, startTransition] = useTransition();
   const submittingRef = useRef(false);
   const router = useRouter();
@@ -225,7 +229,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                   </SelectTrigger>
                   <SelectContent>
                     {clients && clients.length > 0 ? (
-                      clients.filter(c => c && c._id && c.name).map(c => <SelectItem key={c._id.toString()} value={c._id.toString()}>{c.name}</SelectItem>)
+                      clients.filter(c => c && c._id && c.name).map(c => <SelectItem key={c._id.toString()} value={c._id.toString()}>{getDropdownDisplayName(c, clients, isAdmin)}</SelectItem>)
                     ) : (
                       <SelectItem value="none" disabled>No clients available</SelectItem>
                     )}
@@ -250,7 +254,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
                     {allowedCommodities && allowedCommodities.length > 0 ? (
                       allowedCommodities.filter(c => c && c._id && c.name).map(c => (
                         <SelectItem key={c._id.toString()} value={c._id.toString()}>
-                          {c.name}
+                          {getDropdownDisplayName(c, allowedCommodities, isAdmin)}
                         </SelectItem>
                       ))
                     ) : (

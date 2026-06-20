@@ -4,6 +4,7 @@ import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { ObjectId } from 'mongodb';
 import { calculateInvoiceTotal } from '@/lib/pricing-engine';
 
 // Type definition for booking form values
@@ -99,16 +100,31 @@ export async function fetchCommodityOptions() {
   try {
     const db = await getDb();
     const commodities = await db.collection('commodities')
-      .find({}, { projection: { name: 1 } })
+      .find({}, { projection: { name: 1, userId: 1 } })
       .sort({ name: 1 })
       .toArray();
 
+    const userIds = commodities.map(c => c.userId).filter((id): id is any => !!id);
+    const uniqueUserIds = Array.from(new Set(userIds.map(id => id.toString()))).map(id => {
+      try { return new ObjectId(id); } catch { return id; }
+    });
+    const users = uniqueUserIds.length > 0
+      ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+      : [];
+    const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
     return [
       { label: 'All Commodities', value: 'ALL' },
-      ...commodities.map(c => ({
-        label: c.name,
-        value: c.name
-      }))
+      ...commodities.map(c => {
+        const userId = c.userId?.toString();
+        const userInfo = userId ? userMap.get(userId) : null;
+        const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (c.userId ? 'Unknown' : 'System');
+        return {
+          label: c.name,
+          value: c.name,
+          wspName
+        };
+      })
     ];
   } catch (error) {
     console.error('Error fetching commodities:', error);

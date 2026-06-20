@@ -645,9 +645,27 @@ export async function getClientOptions() {
       return name !== 'abc traders' && name !== 'xyz enterprise' && name !== 'xyz enterprises';
     });
 
+    const userIds = filteredClients.map(c => c.userId).filter((id): id is any => !!id);
+    const uniqueUserIds = Array.from(new Set(userIds.map(id => id.toString()))).map(id => {
+      try { return new ObjectId(id); } catch { return id; }
+    });
+    const users = uniqueUserIds.length > 0
+      ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+      : [];
+    const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
     return [
       { label: 'All Clients', value: 'ALL' },
-      ...filteredClients.map(c => ({ label: c.name, value: c._id?.toString() || '' }))
+      ...filteredClients.map(c => {
+        const userId = c.userId?.toString();
+        const userInfo = userId ? userMap.get(userId) : null;
+        const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (c.userId ? 'Unknown' : 'System');
+        return {
+          label: c.name,
+          value: c._id?.toString() || '',
+          wspName
+        };
+      })
     ];
   } catch (error) {
     console.error('[getClientOptions] Error:', error);
@@ -1001,12 +1019,27 @@ export async function getCommodityOptions() {
     const db = await getDb();
     const items = await db.collection('commodities').find({ ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
+    const userIds = items.map(c => c.userId).filter((id): id is any => !!id);
+    const uniqueUserIds = Array.from(new Set(userIds.map(id => id.toString()))).map(id => {
+      try { return new ObjectId(id); } catch { return id; }
+    });
+    const users = uniqueUserIds.length > 0
+      ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+      : [];
+    const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
     return [
       { label: "All Commodities", value: "ALL" },
-      ...items.map(c => ({
-        label: c.name,
-        value: c.name
-      }))
+      ...items.map(c => {
+        const userId = c.userId?.toString();
+        const userInfo = userId ? userMap.get(userId) : null;
+        const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (c.userId ? 'Unknown' : 'System');
+        return {
+          label: c.name,
+          value: c.name,
+          wspName
+        };
+      })
     ];
   } catch (error) {
     console.error('[getCommodityOptions] Error:', error);
