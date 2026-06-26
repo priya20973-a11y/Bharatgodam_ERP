@@ -14,14 +14,15 @@ export async function fetchCommodities() {
   const items = await Commodity.find({ ...getTenantFilter(session) }).sort({ name: 1 });
   const db = await getDb();
 
-  const userIds = items.map(item => item.userId).filter((id): id is any => !!id);
+  const uniqueUserIds = [...new Set(items.map(item => item.userId?.toString()).filter(Boolean))];
+  const userIds = uniqueUserIds.map(id => new ObjectId(id as string));
   const users = userIds.length > 0 ? await db.collection('users').find({ _id: { $in: userIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray() : [];
   const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
 
   return JSON.parse(JSON.stringify(items.map(item => {
     const userId = item.userId?.toString();
     const userInfo = userId ? userMap.get(userId) : null;
-    const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (item.userId ? 'Unknown' : 'System');
+    const wspName = userInfo?.fullName || userInfo?.companyName || userInfo?.email || (item.userId ? 'Unknown' : 'System');
 
     return {
       _id: item._id,

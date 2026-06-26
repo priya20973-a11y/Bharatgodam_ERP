@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, address, totalCapacity, isActive } = body;
+    const { warehouseId, name, address, totalCapacity, isActive } = body;
 
     if (!name || !address || !totalCapacity) {
       return NextResponse.json({
@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     const db = await getDb();
 
     const warehousePayload = appendOwnershipForMongo({
+      warehouseId,
       name,
       address,
       totalCapacity: Number(totalCapacity),

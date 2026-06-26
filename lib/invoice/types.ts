@@ -36,6 +36,7 @@ export interface InvoiceMetadata {
 
 export interface BankDetails {
   bankName: string;
+  accountName?: string;
   branchName: string;
   accountNumber: string;
   ifscCode: string;

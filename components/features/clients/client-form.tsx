@@ -7,6 +7,45 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry"
+];
+
 interface ClientFormProps {
   client?: any;
   availableCommodities: any[];
@@ -21,6 +60,7 @@ interface ClientFormState {
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  state: string;
   commodityIds: string[];
 }
 
@@ -35,6 +75,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
     panNumber: client?.panNumber || '',
     aadharNumber: client?.aadharNumber || '',
     gstNumber: client?.gstNumber || '',
+    state: client?.state || '',
     commodityIds: client?.commodityIds || [],
   });
 
@@ -72,6 +113,10 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       validationErrors.gstNumber = 'Enter valid GSTIN or NA if not available';
     }
 
+    if (!client && !formData.state) {
+      validationErrors.state = 'State is required';
+    }
+
     setErrors(validationErrors);
     return validationErrors;
   };
@@ -92,6 +137,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       panNumber: client?.panNumber || '',
       aadharNumber: client?.aadharNumber || '',
       gstNumber: client?.gstNumber || '',
+      state: client?.state || '',
       commodityIds: client?.commodityIds || [],
     });
   }, [client]);
@@ -115,6 +161,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
         panNumber: formData.panNumber,
         aadharNumber: formData.aadharNumber,
         gstNumber: formData.gstNumber,
+        state: formData.state,
         commodityIds: formData.commodityIds,
       };
 
@@ -177,14 +224,35 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
           </Select>
         </div>
       </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Address *</label>
-        <Input
-          required
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          placeholder="Location/Village/City"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Address *</label>
+          <Input
+            required
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            placeholder="Location/Village/City"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">
+            State{!client ? ' *' : ''}
+          </label>
+          <Select
+            value={formData.state}
+            onValueChange={(val) => handleFieldChange('state', val)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select State/UT" />
+            </SelectTrigger>
+            <SelectContent>
+              {INDIAN_STATES.map((state) => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -209,6 +277,9 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
           <p className="text-xs text-slate-500">Enter valid PAN or NA if not available.</p>
           {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Aadhaar Number *</label>
           <Input
@@ -220,8 +291,6 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
           <p className="text-xs text-slate-500">Enter 12 digits or NA if not available.</p>
           {errors.aadharNumber && <p className="mt-1 text-sm text-red-600">{errors.aadharNumber}</p>}
         </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">GSTIN *</label>
           <Input
@@ -233,9 +302,11 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
           <p className="text-xs text-slate-500">Enter valid GSTIN or NA if not available.</p>
           {errors.gstNumber && <p className="mt-1 text-sm text-red-600">{errors.gstNumber}</p>}
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Allowed Commodities</label>
-          <div className="rounded-xl border border-slate-300 bg-white p-3 min-h-[120px]">
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Allowed Commodities</label>
+        <div className="rounded-xl border border-slate-300 bg-white p-3 min-h-[120px]">
             {availableCommodities.length === 0 ? (
               <p className="text-sm text-slate-500">No commodities configured yet.</p>
             ) : (
@@ -259,7 +330,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
           </div>
           <p className="text-xs text-slate-500 mt-1">Click to assign or remove commodities for this client.</p>
         </div>
-      </div>
+
       <div className="flex justify-between items-center gap-2 pt-2">
         <p className="text-sm text-slate-500">{formData.commodityIds.length} commodity{formData.commodityIds.length === 1 ? '' : 'ies'} assigned.</p>
         <Button type="submit" disabled={loading}>

@@ -15,8 +15,6 @@ export async function GET() {
       return NextResponse.json({ message: 'User not found.' }, { status: 404 });
     }
 
-    const { password, ...userData } = user;
-
     return NextResponse.json({
       user: {
         id: user._id.toString(),
@@ -26,12 +24,15 @@ export async function GET() {
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
         warehouseLocation: user.warehouseLocation || '',
+        state: user.state || '',
         gstNumber: user.gstNumber || null,
         bankName: user.bankName || null,
+        accountName: user.accountName || null,
         bankAccountNumber: user.bankAccountNumber || null,
         ifscCode: user.ifscCode || null,
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
+        isNewRegistration: !!user.isNewRegistration,
       },
     });
   } catch (error: any) {
@@ -51,7 +52,69 @@ export async function PATCH(req: Request) {
     const session = await requireSession();
     const userId = session.user.id;
     const body = await req.json();
-    const { fullName, companyName, phoneNumber, address, warehouseLocation, gstNumber, bankName, bankAccountNumber, ifscCode, bankBranch, companyLogo } = body;
+    const {
+      fullName,
+      companyName,
+      phoneNumber,
+      address,
+      warehouseLocation,
+      state,
+      gstNumber,
+      bankName,
+      accountName,
+      bankAccountNumber,
+      ifscCode,
+      bankBranch,
+      companyLogo
+    } = body;
+
+    const db = await getDb();
+    const userBeforeUpdate = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    if (!userBeforeUpdate) {
+      return NextResponse.json({ message: 'User not found.' }, { status: 404 });
+    }
+
+    const isNew = !!userBeforeUpdate.isNewRegistration;
+
+    const merged = {
+      state: state !== undefined ? state : userBeforeUpdate.state,
+      bankName: bankName !== undefined ? bankName : userBeforeUpdate.bankName,
+      accountName: accountName !== undefined ? accountName : userBeforeUpdate.accountName,
+      bankAccountNumber: bankAccountNumber !== undefined ? bankAccountNumber : userBeforeUpdate.bankAccountNumber,
+      ifscCode: ifscCode !== undefined ? ifscCode : userBeforeUpdate.ifscCode,
+      bankBranch: bankBranch !== undefined ? bankBranch : userBeforeUpdate.bankBranch,
+      companyLogo: companyLogo !== undefined ? companyLogo : userBeforeUpdate.companyLogo,
+      gstNumber: gstNumber !== undefined ? gstNumber : userBeforeUpdate.gstNumber,
+    };
+
+    const trimmedGst = merged.gstNumber ? merged.gstNumber.toString().trim().toUpperCase() : '';
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    if (isNew) {
+      if (!merged.state || !merged.state.toString().trim()) {
+        return NextResponse.json({ message: 'State is required.' }, { status: 400 });
+      }
+      if (!merged.bankName || !merged.bankName.toString().trim() ||
+          !merged.accountName || !merged.accountName.toString().trim() ||
+          !merged.bankAccountNumber || !merged.bankAccountNumber.toString().trim() ||
+          !merged.ifscCode || !merged.ifscCode.toString().trim() ||
+          !merged.bankBranch || !merged.bankBranch.toString().trim()) {
+        return NextResponse.json({ message: 'All bank details are required.' }, { status: 400 });
+      }
+      if (!merged.companyLogo) {
+        return NextResponse.json({ message: 'Company logo is required.' }, { status: 400 });
+      }
+      if (!trimmedGst) {
+        return NextResponse.json({ message: 'GST Number is required (use NA if not applicable).' }, { status: 400 });
+      }
+      if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+      }
+    } else {
+      if (trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+      }
+    }
 
     const updates: Record<string, unknown> = {};
     if (fullName !== undefined) updates.fullName = fullName;
@@ -69,8 +132,10 @@ export async function PATCH(req: Request) {
     }
     if (address !== undefined) updates.address = address || null;
     if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
-    if (gstNumber !== undefined) updates.gstNumber = gstNumber || null;
+    if (state !== undefined) updates.state = state || '';
+    if (gstNumber !== undefined) updates.gstNumber = trimmedGst || null;
     if (bankName !== undefined) updates.bankName = bankName || null;
+    if (accountName !== undefined) updates.accountName = accountName || null;
     if (bankAccountNumber !== undefined) updates.bankAccountNumber = bankAccountNumber || null;
     if (ifscCode !== undefined) updates.ifscCode = ifscCode || null;
     if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
@@ -85,7 +150,6 @@ export async function PATCH(req: Request) {
 
     updates.updatedAt = new Date();
 
-    const db = await getDb();
     const updateResult = await db.collection('users').updateOne(
       { _id: new ObjectId(userId) },
       { $set: updates }
@@ -100,8 +164,6 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ message: 'User not found.' }, { status: 404 });
     }
 
-    const { password, ...userData } = user;
-
     return NextResponse.json({
       user: {
         id: user._id.toString(),
@@ -111,12 +173,15 @@ export async function PATCH(req: Request) {
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
         warehouseLocation: user.warehouseLocation || '',
+        state: user.state || '',
         gstNumber: user.gstNumber || null,
         bankName: user.bankName || null,
+        accountName: user.accountName || null,
         bankAccountNumber: user.bankAccountNumber || null,
         ifscCode: user.ifscCode || null,
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
+        isNewRegistration: !!user.isNewRegistration,
       },
     });
   } catch (error: any) {

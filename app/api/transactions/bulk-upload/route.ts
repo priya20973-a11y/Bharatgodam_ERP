@@ -9,6 +9,7 @@ import Commodity from '@/lib/models/Commodity';
 import Warehouse from '@/lib/models/Warehouse';
 import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-ledger-actions';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
+import { validateOutwardStock } from '@/app/actions/transaction-actions';
 import mongoose from 'mongoose';
 
 interface BulkTransactionRow {
@@ -199,14 +200,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Get all clients, commodities, and warehouses for mapping
-    const clients = await Client.find({}).lean();
+    const clients = await Client.find(tenantFilter).lean();
     const commodities = await Commodity.find({}).lean();
-    const warehouses = await Warehouse.find({}).lean();
+    const warehouses = await Warehouse.find(tenantFilter).lean();
 
     const clientMap = buildLookupMap(clients);
     const commodityMap = buildLookupMap(commodities);
     const commodityDocMap = new Map<string, any>();
     const warehouseMap = buildLookupMap(warehouses);
+
+    const warehouseCapacityMap = new Map<string, { total: number, occupied: number }>();
+    warehouses.forEach((w: any) => {
+      if (w._id) {
+        warehouseCapacityMap.set(w._id.toString(), {
+          total: Number(w.totalCapacity) || 0,
+          occupied: Number(w.occupiedCapacity) || 0
+        });
+      }
+    });
 
     commodities.forEach((c: any) => {
       if (c._id) {
@@ -271,7 +282,7 @@ export async function POST(request: NextRequest) {
         const warehouseId = findMasterByName(row.warehouseName, warehouseMap, warehouses);
 
         if (!clientId) {
-          errors.push({ row: rowNum, error: `Client '${row.clientName}' not found` });
+          errors.push({ row: rowNum, error: `Client does not exist under this WSP account.` });
           continue;
         }
 
@@ -288,6 +299,16 @@ export async function POST(request: NextRequest) {
         const client = clients.find((item: any) => item._id?.toString() === clientId.toString());
         const commodity = commodities.find((item: any) => item._id?.toString() === commodityId.toString());
         const warehouse = warehouses.find((item: any) => item._id?.toString() === warehouseId.toString());
+
+        // Validate that the commodity is assigned to the selected client
+        if (client) {
+          const assignedCommodities = client.commodityIds || [];
+          const isAssigned = assignedCommodities.some((id: any) => id.toString() === commodityId.toString());
+          if (!isAssigned) {
+            errors.push({ row: rowNum, error: `Commodity '${row.commodityName}' is not assigned to client '${client.name}'. Please assign it first.` });
+            continue;
+          }
+        }
 
         const clientName = client?.name || row.clientName;
         const commodityName = commodity?.name || row.commodityName;
@@ -329,6 +350,18 @@ export async function POST(request: NextRequest) {
 
         // Create transaction based on type
         if (row.type === 'INWARD') {
+          // Check capacity
+          const wData = warehouseCapacityMap.get(warehouseIdStr);
+          if (wData) {
+            const availableCapacity = Math.max(0, wData.total - wData.occupied);
+            if (row.quantityMT > availableCapacity) {
+              errors.push({ row: rowNum, error: `Insufficient warehouse capacity. Available capacity: ${availableCapacity} MT.` });
+              continue;
+            }
+            // Update tracking map
+            wData.occupied += row.quantityMT;
+          }
+
           console.log(`[Bulk Upload] Row ${rowNum}: Creating Inward model...`);
           const inwardRecord = await Inward.create({
             clientId,
@@ -411,6 +444,15 @@ export async function POST(request: NextRequest) {
             throw new Error(`Failed to sync inward stock entry: ${stockResult.message}`);
           }
         } else if (row.type === 'OUTWARD') {
+          console.log(`[Bulk Upload] Row ${rowNum}: Validating Outward stock...`);
+          await validateOutwardStock(
+            clientId.toString(),
+            commodityId.toString(),
+            warehouseId.toString(),
+            transactionDate,
+            row.quantityMT
+          );
+
           console.log(`[Bulk Upload] Row ${rowNum}: Creating Outward model...`);
           const outwardRecord = await Outward.create({
             clientId,

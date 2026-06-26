@@ -3,6 +3,7 @@ import { getDb } from '@/lib/mongodb';
 import { requireSession, getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
+import { findInvoiceMasterByIdentifier, buildMonthlyInvoiceFromLedger, buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
 
 const adjustmentPayloadSchema = z.object({
   invoiceId: z.string().min(1),
@@ -77,21 +78,78 @@ export async function POST(request: NextRequest) {
     const parsed = adjustmentPayloadSchema.parse(payload);
 
     const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
     const invoiceCollection = db.collection('invoices');
-    const invoiceObjectId = ObjectId.isValid(parsed.invoiceId)
-      ? new ObjectId(parsed.invoiceId)
-      : undefined;
 
-    const searchFilters: Array<Record<string, unknown>> = [];
-    if (invoiceObjectId) {
-      searchFilters.push({ _id: invoiceObjectId });
+    // Resolve invoiceMaster and invoiceDoc using robust ID parsing
+    let invoiceMaster = null;
+    let invoiceDoc = null;
+
+    // 1. Try to find in invoice_master using identifier helper
+    invoiceMaster = await findInvoiceMasterByIdentifier(db, parsed.invoiceId, tenantFilter);
+
+    // 2. If not found in invoice_master, parse parts to find in invoices
+    let clientId = '';
+    let invoiceMonth = '';
+    let parsedWarehouseId = '';
+    if (parsed.invoiceId.includes('-')) {
+      const parts = parsed.invoiceId.split('-');
+      if (parts.length >= 3 && ObjectId.isValid(parts[0]) && /^\d{4}$/.test(parts[1]) && /^\d{2}$/.test(parts[2])) {
+        clientId = parts[0];
+        invoiceMonth = `${parts[1]}-${parts[2]}`;
+        parsedWarehouseId = parts.length > 3 ? parts.slice(3).join('-') : '';
+      }
     }
-    searchFilters.push({ invoiceNumber: parsed.invoiceId }, { invoiceId: parsed.invoiceId });
 
-    const invoiceDoc = await invoiceCollection.findOne({ $or: searchFilters });
-    const invoiceMaster =
-      invoiceDoc ??
-      (await db.collection('invoice_master').findOne({ invoiceId: parsed.invoiceId }));
+    if (invoiceMaster) {
+      // Find matching invoiceDoc using fields from master
+      const searchFilters: any[] = [{ invoiceId: invoiceMaster.invoiceId }, { invoiceNumber: invoiceMaster.invoiceId }];
+      if (invoiceMaster._id) {
+        searchFilters.push({ _id: invoiceMaster._id });
+      }
+      invoiceDoc = await invoiceCollection.findOne({ $or: searchFilters });
+    } else if (clientId && invoiceMonth) {
+      const [yearPart, monthPart] = invoiceMonth.split('-');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthName = monthNames[parseInt(monthPart, 10) - 1] || '';
+      const cycleName = invoiceMonth;
+      const yearValue = parseInt(yearPart, 10);
+
+      const invoiceQuery: any = {
+        clientId,
+        $or: [
+          { month: `${monthName} ${yearValue}`, year: yearValue },
+          { cycleName }
+        ]
+      };
+      if (parsedWarehouseId) {
+        try {
+          invoiceQuery.warehouseId = ObjectId.isValid(parsedWarehouseId) ? new ObjectId(parsedWarehouseId) : parsedWarehouseId;
+        } catch {
+          invoiceQuery.warehouseId = parsedWarehouseId;
+        }
+      }
+      invoiceDoc = await invoiceCollection.findOne(invoiceQuery);
+    }
+
+    if (!invoiceMaster && invoiceDoc) {
+      invoiceMaster = invoiceDoc;
+    }
+
+    if (!invoiceMaster && clientId && invoiceMonth) {
+      // Dynamically initialize invoice in invoice_master
+      await buildMonthlyInvoiceFromLedger(db, parsed.invoiceId, parsedWarehouseId, tenantFilter);
+      invoiceMaster = await findInvoiceMasterByIdentifier(db, parsed.invoiceId, tenantFilter);
+
+      if (!invoiceMaster) {
+        await buildMonthlyInvoiceFromTransactions(db, parsed.invoiceId, parsedWarehouseId, tenantFilter);
+        invoiceMaster = await findInvoiceMasterByIdentifier(db, parsed.invoiceId, tenantFilter);
+      }
+    }
+
+    if (!invoiceMaster) {
+      throw new Error('Invoice not found');
+    }
 
     const normalizedCharges = parsed.additionalCharges.map((item) => ({
       description: item.description,
@@ -159,6 +217,82 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const finalInvoiceMaster = await db.collection('invoice_master').findOne({
+      $or: [
+        ...(invoiceMaster?._id ? [{ _id: invoiceMaster._id }] : []),
+        { invoiceId: parsed.invoiceId }
+      ]
+    });
+
+    let totalTaxAmount = 0;
+    let cgstAmount = 0;
+    let sgstAmount = 0;
+    let igstAmount = 0;
+    let taxType = 'IGST';
+
+    if (finalInvoiceMaster) {
+      const TAX_RATES: Record<string, number> = {
+        'Non-GST Supply': 0,
+        'GST 5%': 0.05,
+        'GST 12%': 0.12,
+        'GST 18%': 0.18,
+        'GST 28%': 0.28,
+      };
+
+      const taxGroup = finalInvoiceMaster.taxGroup || 'No Tax';
+      const billingState = finalInvoiceMaster.billingState || '';
+      const warehouseId = finalInvoiceMaster.warehouseId;
+      let whState = '';
+      if (warehouseId) {
+        const warehouseQuery: any = {
+          _id: ObjectId.isValid(warehouseId) ? new ObjectId(warehouseId) : warehouseId
+        };
+        const warehouse = await db.collection('warehouses').findOne(warehouseQuery);
+        if (warehouse) {
+          whState = warehouse.state || '';
+        }
+      }
+
+      taxType = whState && billingState
+        ? (whState.trim().toLowerCase() === billingState.trim().toLowerCase() ? 'CGST_SGST' : 'IGST')
+        : '';
+
+      const rentAmount = Number(finalInvoiceMaster.totalAmount ?? finalInvoiceMaster.totalRent ?? 0);
+      const taxableAmount = rentAmount + chargeTotal;
+      const taxRate = TAX_RATES[taxGroup] || 0;
+      totalTaxAmount = Number((taxableAmount * taxRate).toFixed(2));
+
+      if (totalTaxAmount > 0 && taxType) {
+        if (taxType === 'CGST_SGST') {
+          cgstAmount = Number((totalTaxAmount / 2).toFixed(2));
+          sgstAmount = Number((totalTaxAmount / 2).toFixed(2));
+        } else {
+          igstAmount = totalTaxAmount;
+        }
+      }
+
+      const taxUpdates = {
+        totalTaxAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        taxType,
+        updatedAt: new Date(),
+      };
+
+      await db.collection('invoice_master').updateOne(
+        { _id: finalInvoiceMaster._id },
+        { $set: taxUpdates }
+      );
+
+      if (invoiceDoc) {
+        await db.collection('invoices').updateOne(
+          { _id: invoiceDoc._id },
+          { $set: taxUpdates }
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -168,6 +302,11 @@ export async function POST(request: NextRequest) {
           amount: item.amount,
         })),
         additionalCharges: Number(chargeTotal.toFixed(2)),
+        totalTaxAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        taxType,
       },
     });
   } catch (error) {

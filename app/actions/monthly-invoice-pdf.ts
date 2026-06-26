@@ -4,6 +4,31 @@ import { MonthlyInvoiceData } from './monthly-invoices';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
+function numberToWords(num: number): string {
+  if (num === 0) return 'Zero';
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const formatNumber = (n: number): string => {
+    if (n < 20) return a[n];
+    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+    if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + formatNumber(n % 100) : '');
+    return '';
+  };
+  let words = '';
+  const crores = Math.floor(num / 10000000);
+  num %= 10000000;
+  const lakhs = Math.floor(num / 100000);
+  num %= 100000;
+  const thousands = Math.floor(num / 1000);
+  num %= 1000;
+  const hundreds = Math.floor(num);
+  if (crores > 0) words += formatNumber(crores) + ' Crore ';
+  if (lakhs > 0) words += formatNumber(lakhs) + ' Lakh ';
+  if (thousands > 0) words += formatNumber(thousands) + ' Thousand ';
+  if (hundreds > 0) words += formatNumber(hundreds);
+  return words.trim();
+}
+
 let cachedLogoDataUri: string | null = null;
 
 async function getLogoDataUri(logoUrl?: string): Promise<string> {
@@ -165,22 +190,76 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const logoSrc = await getLogoDataUri(invoice.companyLogo || undefined);
   const logoAlt = `${companyName} Logo`;
   const invoiceDate = formatInvoiceDate(invoice.invoiceDate);
+  const TAX_RATES: Record<string, number> = {
+    'Non-GST Supply': 0,
+    'GST 5%': 0.05,
+    'GST 12%': 0.12,
+    'GST 18%': 0.18,
+    'GST 28%': 0.28,
+  };
+
   const adjustmentTotal = invoice.additionalCharges !== undefined
     ? Number(invoice.additionalCharges)
     : (invoice.additionalChargeItems || []).reduce(
       (sum, item) => sum + Number(item.amount || 0),
       0
     );
-  const totalMonthlyCharges = Number(invoice.totalRent || 0) + adjustmentTotal;
+
+  const taxableAmount = Number(invoice.totalRent || 0) + adjustmentTotal;
+  const totalTaxAmount = Number(invoice.totalTaxAmount || 0);
+  const taxAdjustment = Number(invoice.adjustmentAmount || 0);
+  const finalTotal = taxableAmount + totalTaxAmount + taxAdjustment;
+
+  const taxGroup = invoice.taxGroup || 'No Tax';
+  const taxType = invoice.taxType || 'IGST';
+  const cgstAmount = Number(invoice.cgstAmount || 0);
+  const sgstAmount = Number(invoice.sgstAmount || 0);
+  const igstAmount = Number(invoice.igstAmount || 0);
+
+  let gstRate = 0;
+  const taxGroupMatch = taxGroup.match(/\d+(\.\d+)?/);
+  if (taxGroupMatch) {
+    gstRate = Number(taxGroupMatch[0]);
+  }
+  const halfRate = gstRate / 2;
+
+  const cgstLabel = gstRate > 0 ? `CGST${halfRate} (${halfRate}%)` : 'CGST';
+  const sgstLabel = gstRate > 0 ? `SGST${halfRate} (${halfRate}%)` : 'SGST';
+  const igstLabel = gstRate > 0 ? `IGST${gstRate} (${gstRate}%)` : 'IGST';
+
+  const previousBalance = Number(invoice.previousBalance || 0);
+  const paymentsReceived = Number(invoice.currentPayments || 0);
+  const outstandingBalance = getTotalDue(invoice);
+
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
+  const companyGst = invoice.companyGst || '';
+
+  const db = await getDb();
+  let clientAddress = '';
+  let clientMobile = '';
+  const clientState = invoice.billingState || '';
+
+  if (invoice.bookingId) {
+    try {
+      const client = await db.collection('clients').findOne({
+        _id: (ObjectId.isValid(invoice.bookingId) ? new ObjectId(invoice.bookingId) : invoice.bookingId) as any
+      });
+      if (client) {
+        clientAddress = client.address || '';
+        clientMobile = client.mobile || '';
+      }
+    } catch (err) {
+      console.error('Error fetching client details in HTML generator:', err);
+    }
+  }
 
   const adjustmentRows = (invoice.additionalChargeItems || [])
     .map(
       (item) => `
         <tr>
           <td>${item.name || 'Additional Charge'}</td>
-          <td class="amount">₹${formatAmount(item.amount || 0)}</td>
+          <td class="text-right">₹${formatAmount(Number(item.amount || 0))}</td>
         </tr>
       `
     )
@@ -193,53 +272,9 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const adjustmentBody = adjustmentRows || `
         <tr>
           <td>Additional Charges</td>
-          <td class="amount">₹${formatAmount(adjustmentTotal)}</td>
+          <td class="text-right">₹${formatAmount(adjustmentTotal)}</td>
         </tr>
       `;
-
-  const additionalChargesTable = hasAdditionalCharges
-    ? `
-        <div class="table-wrapper" style="margin-top: 20px;">
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th class="amount">Charge (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${adjustmentBody}
-            </tbody>
-          </table>
-        </div>
-      `
-    : '';
-
-  const monthlyRentChargesSection = hasAdditionalCharges
-    ? `
-        <div class="summary-row" style="margin: 18px 0 8px;">
-          <div class="summary-box">
-            <div class="summary-item">
-              <span>Monthly Rent Charges</span>
-              <span>₹${formatAmount(invoice.totalRent)}</span>
-            </div>
-          </div>
-        </div>
-      `
-    : '';
-
-  const totalAdditionalChargesSection = hasAdditionalCharges
-    ? `
-        <div class="summary-row" style="margin: 8px 0 20px;">
-          <div class="summary-box">
-            <div class="summary-item">
-              <span>Total Additional Charges</span>
-              <span>₹${formatAmount(adjustmentTotal)}</span>
-            </div>
-          </div>
-        </div>
-      `
-    : '';
 
   const invoiceRows = ((invoice.transactions?.length
     ? invoice.transactions
@@ -247,6 +282,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       date: p.date || p.startDate || '',
       direction: p.direction || 'INWARD',
       commodityName: p.commodityName || 'Unknown',
+      warehouseName: p.warehouseName || 'Unknown',
       startDate: p.startDate || '',
       endDate: p.endDate || '',
       quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
@@ -260,7 +296,26 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       status: p.status || '',
     }));
 
-  const invoiceRowsList = invoiceRows
+  let showWarehouseColumn = false;
+  
+  const invoiceRowsWithId = invoiceRows.map((row) => {
+    let customWarehouseId = '';
+    const name = row.warehouseName || '';
+    if (name.includes(' - ')) {
+      customWarehouseId = name.split(' - ')[0].trim();
+    }
+    
+    if (customWarehouseId) {
+      showWarehouseColumn = true;
+    }
+    
+    return {
+      ...row,
+      customWarehouseId
+    };
+  });
+
+  const invoiceRowsList = invoiceRowsWithId
     .map((row) => {
       const dateRange = row.startDate && row.endDate
         ? `${row.startDate} to ${row.endDate}`
@@ -275,24 +330,28 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         ? `₹${formatAmount(row.ratePerMTPerDay)}`
         : '-';
       const commodityLabel = row.commodityName || 'Unknown';
+      const warehouseCell = showWarehouseColumn 
+        ? `<td>${row.customWarehouseId || ''}</td>` 
+        : '';
+        
       return `
         <tr>
           <td>${dateRange}</td>
           <td>${row.direction}</td>
           <td>${commodityLabel}</td>
-          <td style="text-align: right;">${bagsValue}</td>
-          <td style="text-align: right;">${formatQty(row.quantityMT)}</td>
-          <td style="text-align: right;">${daysValue}</td>
-          <td style="text-align: right;">${rateValue}</td>
-          <td style="text-align: right;">₹${formatAmount(row.rentTotal)}</td>
+          ${warehouseCell}
+          <td class="text-right">${bagsValue}</td>
+          <td class="text-right">${formatQty(row.quantityMT)}</td>
+          <td class="text-right">${daysValue}</td>
+          <td class="text-right">${rateValue}</td>
+          <td class="text-right font-medium text-dark">₹${formatAmount(row.rentTotal)}</td>
         </tr>
       `;
     })
     .join('');
 
-  const bankBranchRow = invoice.bankBranch
-    ? `<p>Branch : ${invoice.bankBranch}</p>`
-    : '';
+  const formattedInvoiceNumber = await getInvoiceNumber(invoice);
+  const formattedInvoiceMonth = `${invoice.month} ${invoice.year}`;
 
   return `
     <!DOCTYPE html>
@@ -302,275 +361,669 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Monthly Invoice - ${invoice.clientName}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
           * {
             box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
           }
+
           body {
             margin: 0;
-            padding: 20px;
-            background: white;
-            color: #111827;
+            padding: 0;
+            background-color: #fff;
+            font-family: 'Inter', sans-serif;
+            color: #1F2937;
+            line-height: 1.4;
+            -webkit-font-smoothing: antialiased;
+            font-size: 8px;
           }
+
+          .print-banner {
+            padding: 8px;
+            background: #0F2D52;
+            color: white;
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 20px;
+          }
+
           .invoice-container {
             width: 100%;
-            max-width: none;
-            margin: 0;
+            max-width: 900px;
+            margin: 0 auto;
             background: white;
-            border-radius: 0;
-            overflow: visible;
-            box-shadow: none;
           }
+
           .invoice-body {
-            padding: 32px 40px;
+            padding: 30px;
           }
-          .header-row {
+
+          /* Header Section */
+          .header-container {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             gap: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #D9DDE3;
           }
-          .logo-block {
+
+          .header-left {
             display: flex;
-            flex-direction: column;
-            gap: 16px;
-            max-width: 320px;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
           }
+
           .logo-image {
-            width: 150px;
+            width: 80px;
+            height: 80px;
             object-fit: contain;
           }
+
+          .company-info {
+            flex: 1;
+          }
+
           .company-name {
-            font-size: 18px;
-            font-weight: 800;
-            color: #0f6f2c;
-            margin-bottom: 8px;
-          }
-          .company-details {
-            font-size: 12px;
-            color: #475569;
-            line-height: 1.6;
-          }
-          .invoice-meta {
-            text-align: right;
-            min-width: 180px;
-            font-size: 12px;
-            color: #475569;
-          }
-          .invoice-meta-title {
-            color: #0f6f2c;
             font-size: 16px;
             font-weight: 700;
+            color: #0F2D52;
+            margin-bottom: 4px;
             text-transform: uppercase;
-            margin-bottom: 16px;
           }
-          .invoice-meta p {
-            margin: 4px 0;
+
+          .company-details {
+            font-size: 8px;
+            color: #1F2937;
           }
-          .separator {
-            height: 2px;
-            background: #0f6f2c;
-            margin: 26px 0;
-            border: none;
+
+          .company-details p {
+            margin: 2px 0;
           }
-          .bill-section {
-            padding: 0 0 0 0;
+          
+          .gstin-badge {
+            display: inline-block;
+            font-weight: 600;
+            margin-top: 4px;
           }
-          .bill-title {
-            font-size: 18px;
-            font-weight: 800;
-            margin-bottom: 12px;
+
+          .header-right {
+            text-align: right;
+            min-width: 200px;
           }
-          .bill-name {
-            font-size: 14px;
+
+          .invoice-title {
+            font-size: 26px;
             font-weight: 700;
-            color: #111827;
-            margin-bottom: 12px;
+            color: #0F2D52;
+            margin-bottom: 10px;
+            text-transform: uppercase;
           }
-          .bill-detail {
-            font-size: 12px;
-            color: #475569;
-            margin: 0 0 4px;
+
+          .invoice-details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 10px;
+            font-size: 9px;
+            text-align: right;
           }
-          .table-wrapper {
-            overflow-x: auto;
+
+          .detail-label {
+            color: #1F2937;
+            font-weight: 600;
           }
+
+          .detail-value {
+            color: #1F2937;
+          }
+
+          .highlight-text {
+            font-weight: 700;
+          }
+
+          /* Sections General */
+          .addresses-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+          }
+
+          .bill-to-card, .table-card, .bank-details-card {
+            border: 1px solid #D9DDE3;
+            margin-bottom: 20px;
+            background: #fff;
+          }
+
+          .addresses-grid .bill-to-card {
+            margin-bottom: 0;
+          }
+
+          .card-header, .table-header-bar, .card-header-sub {
+            background: #F5F7FA;
+            color: #0F2D52;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-bottom: 1px solid #D9DDE3;
+            text-transform: uppercase;
+          }
+
+          .bill-to-card .card-body, .bank-details-card .card-body {
+            padding: 8px 10px;
+          }
+
+          .client-name {
+            font-size: 10px;
+            font-weight: 700;
+            color: #0F2D52;
+            margin-bottom: 4px;
+          }
+
+          .client-stacked-address {
+            font-size: 8px;
+            color: #1F2937;
+            line-height: 1.4;
+          }
+
+          .font-mono {
+            font-family: inherit;
+          }
+
+          /* Table */
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
-            color: #475569;
+            font-size: 8px;
+            color: #1F2937;
           }
+
           .items-table th,
           .items-table td {
-            padding: 12px 10px;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            border-bottom: 1px solid #D9DDE3;
+            border-right: 1px solid #D9DDE3;
           }
+
+          .items-table th:last-child,
+          .items-table td:last-child {
+            border-right: none;
+          }
+
           .items-table th {
             text-align: left;
             font-weight: 700;
-            color: #111827;
-            background: #f8fafc;
-          }
-          .items-table th.amount {
-            text-align: right;
-          }
-          .items-table td {
-            vertical-align: middle;
-          }
-          .items-table td.amount,
-          .items-table td.days,
-          .items-table td.qty {
-            text-align: right;
-          }
-          .summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 24px;
-            margin-top: 18px;
-            flex-wrap: wrap;
-          }
-          .summary-box {
-            min-width: 240px;
-            max-width: 320px;
-          }
-          .bank-details {
-            flex: 1 1 320px;
-            min-width: 260px;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 18px;
-            background: #f8fafc;
-          }
-          .bank-details strong {
-            display: block;
-            margin-bottom: 10px;
-            font-size: 13px;
+            color: #0F2D52;
+            background: #F5F7FA;
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #0f6f2c;
           }
-          .bank-details p {
-            margin: 4px 0;
-            color: #475569;
-            font-size: 12px;
-            line-height: 1.6;
+
+          .items-table th.text-right,
+          .items-table td.text-right {
+            text-align: right;
           }
-          .summary-item {
+
+          .items-table tbody tr:last-child td {
+            border-bottom: none;
+          }
+
+          .items-table tbody tr:nth-child(even) {
+            background: #FAFAFA;
+          }
+
+          /* Bottom Grid Layout */
+          .bottom-grid {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 20px;
+          }
+
+          .bottom-left-panel, .bottom-right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .horizontal-divider {
+            border-top: 1px solid #D9DDE3;
+            margin: 12px 0;
+            width: 100%;
+          }
+
+          .info-block {
+            margin-bottom: 12px;
+          }
+
+          .info-block .info-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #0F2D52;
+            margin-bottom: 4px;
+          }
+
+          .info-block .info-value {
+            font-size: 8px;
+            color: #1F2937;
+          }
+
+          .info-block .italic {
+            font-style: italic;
+          }
+
+          /* Bank Details */
+          .bank-info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px 10px;
+            font-size: 8px;
+          }
+
+          .bank-label {
+            color: #1F2937;
+            font-weight: 600;
+          }
+
+          .bank-value {
+            color: #1F2937;
+          }
+
+          /* Invoice Summary */
+          .invoice-summary-card {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .summary-row-item {
             display: flex;
             justify-content: space-between;
-            font-size: 13px;
-            color: #475569;
-            margin-bottom: 10px;
+            font-size: 9px;
+            color: #1F2937;
+            font-weight: 500;
           }
-          .summary-item.total {
-            font-weight: 800;
-            color: #0f6f2c;
-            font-size: 14px;
-            margin-top: 8px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 10px;
+
+          .summary-row-item.separator-top {
+            border-top: 1px solid #D9DDE3;
+            padding-top: 6px;
           }
-          .note {
-            display: block;
-            width: 100%;
-            padding: 10px 0 0 0;
+
+          .summary-row-item.outstanding-row {
+            border-top: 1px solid #D9DDE3;
+            padding-top: 6px;
+            font-weight: 700;
+            color: #1F2937;
             font-size: 10px;
-            color: #000000;
+          }
+
+          .summary-row-item.grand-total-row {
+            border-top: 2px solid #0F2D52;
+            background: #F5F7FA;
+            padding: 8px 10px;
+            margin-top: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #0F2D52;
+          }
+
+          /* GST Breakdown Section */
+          .gst-breakdown-card {
+            border: 1px solid #D9DDE3;
+            margin-bottom: 20px;
+            background: white;
+          }
+
+          .gst-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+            color: #1F2937;
+          }
+
+          .gst-table th,
+          .gst-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #D9DDE3;
+            border-right: 1px solid #D9DDE3;
+          }
+
+          .gst-table th:last-child,
+          .gst-table td:last-child {
+            border-right: none;
+          }
+
+          .gst-table th {
+            text-align: left;
+            font-weight: 700;
+            color: #0F2D52;
+            background: #F5F7FA;
+            font-size: 9px;
+            text-transform: uppercase;
+          }
+
+          .gst-table th.text-center,
+          .gst-table td.text-center {
             text-align: center;
-            margin: 14px auto 0;
-            font-weight: 400;
+          }
+
+          .gst-table th.text-right,
+          .gst-table td.text-right {
+            text-align: right;
+          }
+
+          .gst-table tbody tr:last-child td {
+            border-bottom: none;
+          }
+
+          /* Footer Section */
+          .footer-section {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #D9DDE3;
+          }
+
+          .signature-note {
+            font-size: 8px;
+            color: #1F2937;
+          }
+
+          /* Print Styles */
+          @media print {
+            body {
+              padding: 0 !important;
+              background: white !important;
+            }
+            .print-banner {
+              display: none !important;
+            }
+            .invoice-container {
+              border: none !important;
+              box-shadow: none !important;
+              max-width: 100% !important;
+            }
+            .invoice-body {
+              padding: 0 !important;
+            }
+            .bill-to-card, .table-card, .bottom-grid, .bank-details-card, .invoice-summary-card {
+              page-break-inside: avoid;
+            }
           }
         </style>
       </head>
       <body>
-        <div
-          style="padding:12px;background:#f8fafc;color:#0f172a;font-size:13px;text-align:center;"
-        >
+        <div class="print-banner">
           Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.
         </div>
-        <!-- invoice-html-version: 2 | transactions:${invoice.transactions?.length || 0} | periods:${invoice.periods?.length || 0} | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
+        <!-- invoice-html-version: 3 | transactions:${invoice.transactions?.length || 0} | periods:${invoice.periods?.length || 0} | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
         <div class="invoice-container">
           <div class="invoice-body">
-            <div class="header-row">
-              <div class="logo-block">
-                ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : `<div class="company-name">${companyName}</div>`}
-                <div>
+            
+            <!-- Header Section -->
+            <div class="header-container">
+              <div class="header-left">
+                ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : ''}
+                <div class="company-info">
                   <div class="company-name">${companyName}</div>
                   <div class="company-details">
-                    ${companyAddress}<br />
-                    Email: ${contactEmail}<br />
-                    Phone: ${contactPhone}
+                    <p>📍 ${companyAddress}</p>
+                    <p>📞 ${contactPhone} &nbsp;|&nbsp; ✉️ ${contactEmail}</p>
+                    ${companyGst ? `<p class="gstin-badge">GSTIN: ${companyGst}</p>` : ''}
+                  </div>
+                  ${(invoice as any).warehouses && (invoice as any).warehouses.length > 0 ? `
+                  <div style="margin-top: 10px; font-size: 10px; font-weight: 600; color: #0F2D52;">
+                    Warehouses: 
+                    ${(invoice as any).warehouses.map((w: any) => `${w.warehouseId || 'WH'} - ${w.name}`).join(', ')}
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+              <div class="header-right">
+                <div class="invoice-title">Monthly Invoice</div>
+                <div class="invoice-details-grid">
+                  <div class="detail-label">Invoice Number:</div>
+                  <div class="detail-value highlight-text">${formattedInvoiceNumber}</div>
+                  
+                  <div class="detail-label">Invoice Date:</div>
+                  <div class="detail-value">${invoiceDate}</div>
+                  
+                  <div class="detail-label">Invoice Month:</div>
+                  <div class="detail-value">${formattedInvoiceMonth}</div>
+                  
+                  ${(invoice as any).dueDate ? `
+                    <div class="detail-label">Due Date:</div>
+                    <div class="detail-value">${formatInvoiceDate((invoice as any).dueDate)}</div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Addresses Section -->
+            <div class="addresses-grid">
+              <!-- Bill To Section -->
+              <div class="bill-to-card">
+                <div class="card-header">
+                  Bill To
+                </div>
+                <div class="card-body">
+                  <div class="client-name">${invoice.clientName}</div>
+                  <div class="client-stacked-address">
+                    ${clientAddress ? `<div>${clientAddress.replace(/\n/g, '<br>')}</div>` : ''}
+                    ${clientState ? `<div>${clientState}</div>` : ''}
+                    <div>India</div>
+                    ${gstNumber ? `<div>GSTIN ${gstNumber}</div>` : ''}
+                    ${panNumber ? `<div>PAN ${panNumber}</div>` : ''}
+                    ${clientMobile ? `<div>Mobile ${clientMobile}</div>` : ''}
                   </div>
                 </div>
               </div>
-              <div class="invoice-meta">
-                <div class="invoice-meta-title">Monthly Invoice</div>
-                <p><strong>Invoice Number:</strong> ${await getInvoiceNumber(invoice)}</p>
-                <p><strong>Month:</strong> ${invoice.month} ${invoice.year}</p>
-                <p><strong>Date:</strong> ${invoiceDate}</p>
-              </div>
-            </div>
-            <hr class="separator" />
 
-            <div class="bill-section">
-              <div class="bill-title">Bill To</div>
-              <div class="bill-name">${invoice.clientName}</div>
-              ${panNumber ? `<div class="bill-detail"><strong>PAN:</strong> ${panNumber}</div>` : ''}
-              ${gstNumber ? `<div class="bill-detail"><strong>GST:</strong> ${gstNumber}</div>` : ''}
-            </div>
-
-            <div class="table-wrapper">
-              <table class="items-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Direction</th>
-                    <th>Commodity</th>
-                    <th class="qty">No. of Bags</th>
-                    <th class="qty">Qty (MT)</th>
-                    <th class="qty">Days</th>
-                    <th class="amount">Rate (₹)</th>
-                    <th class="amount">Rent (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${invoiceRowsList}
-                </tbody>
-              </table>
-            </div>
-
-            ${monthlyRentChargesSection}
-            ${additionalChargesTable}
-            ${totalAdditionalChargesSection}
-
-            <div class="summary-row">
-              <div class="bank-details">
-                <strong>Bank Details</strong>
-                <p>Bank Name : ${invoice.bankName || 'ICICI BANK GONDAL'}</p>
-                <p>A/c. No. : ${invoice.bankAccountNumber || '048605008597'}</p>
-                <p>IFSC Code : ${invoice.ifscCode || 'ICIC0000486'}</p>
-                ${bankBranchRow}
-              </div>
-              <div class="summary-box">
-                <div class="summary-item">
-                  <span>Monthly Rent</span>
-                  <span>₹${formatAmount(invoice.totalRent)}</span>
+              <!-- Ship To Section -->
+              <div class="bill-to-card">
+                <div class="card-header">
+                  Ship To
                 </div>
-                ${hasAdditionalCharges ? `
-                  <div class="summary-item">
-                    <span>Additional Charges</span>
-                    <span>₹${formatAmount(adjustmentTotal)}</span>
+                <div class="card-body">
+                  <div class="client-stacked-address">
+                    ${clientAddress ? `<div>${clientAddress.replace(/\n/g, '<br>')}</div>` : ''}
+                    ${clientState ? `<div>${clientState}</div>` : ''}
+                    <div>India</div>
                   </div>
-                ` : ''}
-                <div class="summary-item total">
-                  <span>Total Monthly Charges</span>
-                  <span>₹${formatAmount(totalMonthlyCharges)}</span>
                 </div>
               </div>
             </div>
-            <div class="note">This is system generated invoice</div>
+
+            <!-- Storage Transactions Section -->
+            <div class="table-card">
+              <div class="table-header-bar">
+                STORAGE TRANSACTION ENTRIES
+              </div>
+              <div class="table-wrapper">
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Direction</th>
+                      <th>Commodity</th>
+                      ${showWarehouseColumn ? '<th>Warehouse</th>' : ''}
+                      <th class="text-right">No. of Bags</th>
+                      <th class="text-right">Qty (MT)</th>
+                      <th class="text-right">Days</th>
+                      <th class="text-right">Rate (₹)</th>
+                      <th class="text-right">Rent (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${invoiceRowsList}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Additional Charges Details Section -->
+            ${hasAdditionalCharges ? `
+              <div class="table-card">
+                <div class="table-header-bar">
+                  ADDITIONAL CHARGES DETAILS
+                </div>
+                <div class="table-wrapper">
+                  <table class="items-table">
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th class="text-right">Charge Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${adjustmentBody}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Bottom Section Layout -->
+            <div class="bottom-grid">
+              
+              <!-- Left Panel -->
+              <div class="bottom-left-panel" style="border: 1px solid #D9DDE3; display: flex; flex-direction: column;">
+                <div style="padding: 12px 16px;">
+                  <div class="info-block" style="margin-bottom: 0;">
+                    <div class="info-label" style="font-size: 10px;">Total In Words</div>
+                    <div class="info-value italic" style="margin-top: 6px; font-size: 11px; font-weight: 500;">Indian Rupee ${numberToWords(Math.floor(finalTotal))} Only</div>
+                  </div>
+                </div>
+                
+                <div class="horizontal-divider" style="margin: 0 16px; width: auto;"></div>
+                
+                <div style="padding: 12px 16px;">
+                  <div class="info-block" style="margin-bottom: 0;">
+                    <div class="info-label" style="font-size: 10px;">Notes</div>
+                    <div class="info-value" style="margin-top: 6px; font-size: 11px; font-weight: 500;">Thanks for your business.</div>
+                  </div>
+                </div>
+                
+                <!-- Bank Details -->
+                <div class="bank-details-card" style="margin-bottom: 0; border: none; border-top: 1px solid #D9DDE3;">
+                  <div class="card-header" style="border-bottom: 1px solid #D9DDE3; padding: 8px 16px;">
+                    Bank Details
+                  </div>
+                  <div class="card-body" style="padding: 12px 16px;">
+                    <div class="bank-info-grid">
+                      <div class="bank-label">Bank Name:</div>
+                      <div class="bank-value">${invoice.bankName || 'ICICI BANK GONDAL'}</div>
+                      
+                      ${invoice.accountName ? `
+                      <div class="bank-label">Account Name:</div>
+                      <div class="bank-value">${invoice.accountName}</div>
+                      ` : ''}
+                      
+                      <div class="bank-label">Account No:</div>
+                      <div class="bank-value font-mono highlight-text">${invoice.bankAccountNumber || '048605008597'}</div>
+                      
+                      <div class="bank-label">IFSC Code:</div>
+                      <div class="bank-value font-mono">${invoice.ifscCode || 'ICIC0000486'}</div>
+                      
+                      ${invoice.bankBranch ? `
+                        <div class="bank-label">Branch Name:</div>
+                        <div class="bank-value">${invoice.bankBranch}</div>
+                      ` : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Panel -->
+              <div class="bottom-right-panel">
+                <div style="flex: 1;"></div>
+                <div class="horizontal-divider"></div>
+                
+                <!-- Invoice Summary -->
+                <div class="invoice-summary-card">
+                  <div class="summary-row-item">
+                    <span>Monthly Storage Rent</span>
+                    <span>₹${formatAmount(invoice.totalRent)}</span>
+                  </div>
+                  ${hasAdditionalCharges ? `
+                    <div class="summary-row-item">
+                      <span>Additional Charges</span>
+                      <span>₹${formatAmount(adjustmentTotal)}</span>
+                    </div>
+                  ` : ''}
+                  
+                  <div class="summary-row-item separator-top">
+                    <span>Taxable Amount</span>
+                    <span>₹${formatAmount(taxableAmount)}</span>
+                  </div>
+                  
+                  ${cgstAmount > 0 ? `
+                    <div class="summary-row-item">
+                      <span>${cgstLabel}</span>
+                      <span>₹${formatAmount(cgstAmount)}</span>
+                    </div>
+                  ` : ''}
+                  ${sgstAmount > 0 ? `
+                    <div class="summary-row-item">
+                      <span>${sgstLabel}</span>
+                      <span>₹${formatAmount(sgstAmount)}</span>
+                    </div>
+                  ` : ''}
+                  ${igstAmount > 0 ? `
+                    <div class="summary-row-item">
+                      <span>${igstLabel}</span>
+                      <span>₹${formatAmount(igstAmount)}</span>
+                    </div>
+                  ` : ''}
+                  ${taxAdjustment !== 0 ? `
+                    <div class="summary-row-item">
+                      <span>Adjustment</span>
+                      <span>₹${formatAmount(taxAdjustment)}</span>
+                    </div>
+                  ` : ''}
+                  
+                  <div class="summary-row-item separator-top">
+                    <span>Previous Balance</span>
+                    <span>₹${formatAmount(previousBalance)}</span>
+                  </div>
+                  <div class="summary-row-item">
+                    <span>Payments Received</span>
+                    <span>₹${formatAmount(paymentsReceived)}</span>
+                  </div>
+                  
+                  <div class="summary-row-item outstanding-row">
+                    <span>Outstanding Balance</span>
+                    <span>₹${formatAmount(outstandingBalance)}</span>
+                  </div>
+                  
+                  <div class="summary-row-item grand-total-row">
+                    <span>Grand Total</span>
+                    <span>₹${formatAmount(finalTotal)}</span>
+                  </div>
+                </div>
+
+                <!-- Signature Box -->
+                <div style="margin-top: 12px;">
+                  <div style="border: 1px solid #D9DDE3; height: 90px; position: relative; background: #fff;">
+                    <div style="position: absolute; bottom: 8px; width: 100%; text-align: center; font-size: 9px; color: #1F2937; font-weight: 500;">
+                      Authorized Signature
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+
+            <!-- Footer Section -->
+            <div class="footer-section">
+              <div class="signature-note">
+                This is a computer-generated invoice.
+              </div>
+            </div>
+
           </div>
         </div>
       </body>

@@ -38,7 +38,9 @@ export interface MonthlyInvoiceData {
   companyPhone?: string;
   companyEmail?: string;
   companyLogo?: string;
+  companyGst?: string;
   bankName?: string;
+  accountName?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
   bankBranch?: string;
@@ -53,6 +55,14 @@ export interface MonthlyInvoiceData {
     amount: number;
     note?: string;
   }>;
+  billingState?: string;
+  taxGroup?: string;
+  taxType?: string;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTaxAmount?: number;
+  adjustmentAmount?: number;
   invoiceDate: string;
   invoiceNumber?: string;
 }
@@ -158,6 +168,11 @@ export async function getClientMonthlyInvoicesTimeState(clientName: string) {
         currentPayments: monthlyPayments,
         newBalance: cumulativeBalance,
         invoiceDate: new Date().toISOString().split('T')[0],
+        bankName: account.bankName,
+        accountName: account.accountName,
+        bankAccountNumber: account.bankAccountNumber,
+        ifscCode: account.ifscCode,
+        bankBranch: account.bankBranch,
       });
     }
 

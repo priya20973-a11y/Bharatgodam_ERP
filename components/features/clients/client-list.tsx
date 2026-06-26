@@ -59,7 +59,7 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
                       {c.clientType}
                     </Badge>
                   </TableCell>
-                  <TableCell>{c.address}</TableCell>
+                  <TableCell>{c.address}{c.state ? `, ${c.state}` : ''}</TableCell>
                   <TableCell>{c.mobile}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-slate-600">
                     {commodityNames.length > 0 ? commodityNames.join(', ') : 'Any'}

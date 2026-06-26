@@ -5,6 +5,45 @@ import React, { useState } from 'react';
 import { Mail, Lock, User, Phone, Building, MapPin, FileText, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry"
+];
+
 export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -16,14 +55,17 @@ export default function SignupPage() {
     phoneNumber: '',
     address: '',
     warehouseLocation: '',
+    state: '',
     gstNumber: '',
     bankName: '',
+    accountName: '',
     bankAccountNumber: '',
     ifscCode: '',
     bankBranch: '',
     companyLogo: '',
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [gstNotApplicable, setGstNotApplicable] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -38,6 +80,28 @@ export default function SignupPage() {
     if (!formData.companyName.trim()) newErrors.companyName = 'Company/WSP name is required';
     if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
     if (!formData.warehouseLocation.trim()) newErrors.warehouseLocation = 'Location is required';
+    if (!formData.state) newErrors.state = 'State is required';
+
+    if (!formData.bankName.trim()) newErrors.bankName = 'Bank name is required';
+    if (!formData.accountName.trim()) newErrors.accountName = 'Account Name is required.';
+    if (!formData.bankAccountNumber.trim()) newErrors.bankAccountNumber = 'Bank account number is required';
+    if (!formData.ifscCode.trim()) newErrors.ifscCode = 'IFSC code is required';
+    if (!formData.bankBranch.trim()) newErrors.bankBranch = 'Bank branch is required';
+    if (!formData.companyLogo) newErrors.companyLogo = 'Company logo is required';
+
+    if (gstNotApplicable) {
+      // NA checked, no format validation needed
+    } else {
+      const gstTrimmed = formData.gstNumber.trim().toUpperCase();
+      if (!gstTrimmed) {
+        newErrors.gstNumber = 'GST Number is required';
+      } else {
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!gstRegex.test(gstTrimmed)) {
+          newErrors.gstNumber = 'Invalid GSTIN format';
+        }
+      }
+    }
 
     // Email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -112,6 +176,7 @@ export default function SignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          gstNumber: gstNotApplicable ? 'NA' : formData.gstNumber,
           role: 'WSP',
         }),
       });
@@ -318,16 +383,66 @@ export default function SignupPage() {
                   required
                   value={formData.warehouseLocation}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Location"
+                  className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="Location *"
                 />
               </div>
               {errors.warehouseLocation && <p className="mt-1 text-sm text-red-600">{errors.warehouseLocation}</p>}
             </div>
 
-            {/* GST Number (Optional) */}
+            {/* State */}
             <div>
-              <label htmlFor="gstNumber" className="sr-only">GST Number (Optional)</label>
+              <label htmlFor="state" className="sr-only">State *</label>
+              <div className="relative">
+                <select
+                  id="state"
+                  name="state"
+                  required
+                  value={formData.state}
+                  onChange={(e) => {
+                    const { name, value } = e.target;
+                    setFormData(prev => ({ ...prev, [name]: value }));
+                    if (errors.state) {
+                      setErrors(prev => ({ ...prev, state: '' }));
+                    }
+                  }}
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                >
+                  <option value="" disabled>Select State/UT *</option>
+                  {INDIAN_STATES.map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
+              {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
+            </div>
+
+            {/* GST Number */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="gstNumber" className="sr-only">GST Number *</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="gstNotApplicable"
+                    checked={gstNotApplicable}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setGstNotApplicable(checked);
+                      if (checked) {
+                        setFormData(prev => ({ ...prev, gstNumber: 'NA' }));
+                        setErrors(prev => ({ ...prev, gstNumber: '' }));
+                      } else {
+                        setFormData(prev => ({ ...prev, gstNumber: '' }));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="gstNotApplicable" className="text-sm font-medium text-gray-700 select-none">
+                    Not Applicable (NA)
+                  </label>
+                </div>
+              </div>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <FileText className="h-5 w-5 text-gray-400" />
@@ -336,71 +451,104 @@ export default function SignupPage() {
                   id="gstNumber"
                   name="gstNumber"
                   type="text"
-                  value={formData.gstNumber}
+                  required={!gstNotApplicable}
+                  disabled={gstNotApplicable}
+                  value={gstNotApplicable ? 'NA' : formData.gstNumber}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="GST Number (Optional)"
+                  className={`block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm ${
+                    gstNotApplicable ? 'bg-gray-100 text-gray-500' : 'bg-white'
+                  }`}
+                  placeholder="GST Number *"
                 />
               </div>
+              {errors.gstNumber && <p className="mt-1 text-sm text-red-600">{errors.gstNumber}</p>}
             </div>
 
-            {/* Bank Details (Optional) */}
-            <div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Bank Details (Optional)</p>
+            {/* Bank Details */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-gray-950">Bank Details *</p>
+              <div>
                 <input
                   id="bankName"
                   name="bankName"
                   type="text"
+                  required
                   value={formData.bankName}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Bank Name"
+                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="Bank Name *"
                 />
+                {errors.bankName && <p className="mt-1 text-sm text-red-600">{errors.bankName}</p>}
+              </div>
+              <div>
+                <input
+                  id="accountName"
+                  name="accountName"
+                  type="text"
+                  required
+                  value={formData.accountName}
+                  onChange={handleInputChange}
+                  className="mt-2 block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="Account Name *"
+                />
+                {errors.accountName && <p className="mt-1 text-sm text-red-600">{errors.accountName}</p>}
+              </div>
+              <div>
                 <input
                   id="bankAccountNumber"
                   name="bankAccountNumber"
                   type="text"
+                  required
                   value={formData.bankAccountNumber}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Account Number"
+                  className="mt-2 block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="Account Number *"
                 />
+                {errors.bankAccountNumber && <p className="mt-1 text-sm text-red-600">{errors.bankAccountNumber}</p>}
+              </div>
+              <div>
                 <input
                   id="ifscCode"
                   name="ifscCode"
                   type="text"
+                  required
                   value={formData.ifscCode}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="IFSC Code"
+                  className="mt-2 block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="IFSC Code *"
                 />
+                {errors.ifscCode && <p className="mt-1 text-sm text-red-600">{errors.ifscCode}</p>}
+              </div>
+              <div>
                 <input
                   id="bankBranch"
                   name="bankBranch"
                   type="text"
+                  required
                   value={formData.bankBranch}
                   onChange={handleInputChange}
-                  className="block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
-                  placeholder="Branch / IFSC Branch"
+                  className="mt-2 block w-full rounded-lg border border-gray-300 py-3 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white"
+                  placeholder="Branch / IFSC Branch *"
                 />
+                {errors.bankBranch && <p className="mt-1 text-sm text-red-600">{errors.bankBranch}</p>}
               </div>
             </div>
 
             {/* Company Logo Upload */}
             <div>
-              <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700">
-                Company/WSP Logo (Optional)
+              <label htmlFor="companyLogo" className="block text-sm font-semibold text-gray-950">
+                Company/WSP Logo *
               </label>
               <input
                 id="companyLogo"
                 name="companyLogo"
                 type="file"
                 accept="image/*"
+                required
                 onChange={handleLogoChange}
                 className="mt-2 block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
-              <p className="mt-2 text-xs text-gray-500">Optional logo upload for your WSP account. Max 1MB.</p>
+              <p className="mt-2 text-xs text-gray-500">Logo upload for your WSP account. Max 1MB. (Required) *</p>
               {errors.companyLogo && <p className="mt-1 text-sm text-red-600">{errors.companyLogo}</p>}
               {logoPreview && (
                 <img

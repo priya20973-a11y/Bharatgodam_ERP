@@ -199,7 +199,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           onSuccess?.();
           setTimeout(() => { submittingRef.current = false; }, 1000);
         } else {
-          console.error('Outward form server response error:', res.error);
+          console.warn('Outward form server response error:', res.error);
           toast.error(res.error || 'Failed to process outward');
           submittingRef.current = false;
         }

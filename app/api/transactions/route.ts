@@ -8,12 +8,30 @@ import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-l
 import { getTenantFilterForMongo, appendOwnershipForMongo, isAdmin } from '@/lib/ownership';
 import Warehouse from '@/lib/models/Warehouse';
 import { ObjectId } from 'mongodb';
+import { calculateRent } from '@/lib/pricing-engine';
+import { validateOutwardStock } from '@/app/actions/transaction-actions';
 
 function extractInvoiceMonth(dateString: string) {
   if (!dateString) return '';
   const parsed = new Date(dateString);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toISOString().slice(0, 7);
+}
+
+function normalizeDateToYYYYMMDD(d: any): string {
+  if (!d) return '';
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return '';
+
+  const match = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 async function getTransactionInfo(db: any, transactionId: string, sourceType?: string) {
@@ -53,7 +71,7 @@ async function getTransactionInfo(db: any, transactionId: string, sourceType?: s
 
   if (transaction) {
     // Standardize fields for internal processing
-    transaction.sourceType = resolvedSourceType;
+    transaction.sourceType = transaction.sourceType || resolvedSourceType;
     transaction.direction = transaction.direction || transaction.type || (resolvedSourceType === 'outward' ? 'OUTWARD' : 'INWARD');
     transaction.clientId = transaction.clientId || transaction.accountId;
   }
@@ -146,6 +164,83 @@ async function deleteInvoicesForMonths(db: any, clientId: string, warehouseId: s
 async function removeTransactionStockAndLedger(db: any, transaction: any) {
   const stockEntries = await findLinkedStockEntries(db, transaction._id.toString(), transaction);
   await deleteStockEntriesAndLedger(db, stockEntries);
+
+  // Directly adjust warehouse capacity for processInward/processOutward transactions on delete
+  const isDirectTransaction = !transaction.sourceId && (!transaction.sourceType || (transaction.sourceType !== 'inward' && transaction.sourceType !== 'outward'));
+  if (!isDirectTransaction && transaction.warehouseId && transaction.quantityMT) {
+    try {
+      const warehouse = await Warehouse.findById(transaction.warehouseId);
+      if (warehouse) {
+        const dir = (transaction.direction || '').toUpperCase();
+        const capacityDelta = dir === 'INWARD' ? -Number(transaction.quantityMT) : Number(transaction.quantityMT);
+        const nextOccupied = warehouse.occupiedCapacity + capacityDelta;
+        warehouse.occupiedCapacity = Math.max(0, nextOccupied);
+        warehouse.status = warehouse.occupiedCapacity >= warehouse.totalCapacity ? 'FULL' : 'ACTIVE';
+        await warehouse.save();
+        console.log(`[DELETE] Adjusted warehouse capacity for processInward/Outward transaction deletion: delta=${capacityDelta}, newOccupied=${warehouse.occupiedCapacity}`);
+      }
+    } catch (capError) {
+      console.error('Failed to adjust warehouse capacity on processInward/Outward delete:', capError);
+    }
+  }
+
+  // Directly clean up processInward ledger entries and revenue distributions on delete
+  try {
+    const txnObjectId = new ObjectId(transaction._id);
+    const txnIdStr = transaction._id.toString();
+    const sourceId = transaction.sourceId;
+    const sourceObjectId = sourceId && ObjectId.isValid(sourceId) ? new ObjectId(sourceId) : null;
+
+    const ledgerMatchClauses: any[] = [];
+    ledgerMatchClauses.push({ inwardId: txnObjectId });
+    ledgerMatchClauses.push({ inwardId: txnIdStr });
+    if (sourceObjectId) {
+      ledgerMatchClauses.push({ inwardId: sourceObjectId });
+      ledgerMatchClauses.push({ inwardId: sourceId });
+    }
+
+    const oldDate = transaction.date;
+    const oldQuantity = transaction.quantityMT;
+    if (transaction.clientId && transaction.warehouseId && transaction.commodityId && oldDate != null && oldQuantity != null) {
+      const clientIds: any[] = [transaction.clientId];
+      const warehouseIds: any[] = [transaction.warehouseId];
+      const commodityIds: any[] = [transaction.commodityId];
+      try { clientIds.push(new ObjectId(String(transaction.clientId))); } catch {}
+      try { warehouseIds.push(new ObjectId(String(transaction.warehouseId))); } catch {}
+      try { commodityIds.push(new ObjectId(String(transaction.commodityId))); } catch {}
+
+      const oldDateStr = normalizeDateToYYYYMMDD(oldDate);
+
+      ledgerMatchClauses.push({
+        clientId: { $in: clientIds },
+        warehouseId: { $in: warehouseIds },
+        commodityId: { $in: commodityIds },
+        periodStartDate: oldDateStr,
+        quantityMT: Number(oldQuantity),
+        stockEntryId: { $exists: false },
+      });
+    }
+
+    if (ledgerMatchClauses.length > 0) {
+      const deleteLedgerRes = await db.collection('ledger_entries').deleteMany({ $or: ledgerMatchClauses });
+      console.log(`[DELETE] Direct ledger_entries cleanup: deleted=${deleteLedgerRes.deletedCount}`);
+    }
+
+    const revenueMatchClauses: any[] = [];
+    revenueMatchClauses.push({ inwardId: txnObjectId });
+    revenueMatchClauses.push({ inwardId: txnIdStr });
+    if (sourceObjectId) {
+      revenueMatchClauses.push({ inwardId: sourceObjectId });
+      revenueMatchClauses.push({ inwardId: sourceId });
+    }
+
+    if (revenueMatchClauses.length > 0) {
+      const deleteRevRes = await db.collection('revenuedistributions').deleteMany({ $or: revenueMatchClauses });
+      console.log(`[DELETE] Direct revenuedistributions cleanup: deleted=${deleteRevRes.deletedCount}`);
+    }
+  } catch (err) {
+    console.error('Failed to directly clean up ledger_entries/revenuedistributions on delete:', err);
+  }
 }
 
 async function syncTransactionStockEntry(db: any, transaction: any, updates: any) {
@@ -366,6 +461,23 @@ export async function POST(request: Request) {
       }
     }
 
+    if (direction === 'OUTWARD') {
+      try {
+        await validateOutwardStock(
+          clientId,
+          commodityFromMaster._id.toString(),
+          warehouseId || '',
+          date,
+          qty
+        );
+      } catch (validationError: any) {
+        return NextResponse.json({
+          success: false,
+          message: validationError.message || 'Stock validation failed'
+        }, { status: 400 });
+      }
+    }
+
     // Create transaction record ONLY with valid master references
     const ratePerMTPerDay =
       commodityFromMaster.ratePerMtPerDay ??
@@ -376,7 +488,7 @@ export async function POST(request: Request) {
     const transaction = appendOwnershipForMongo({
       accountId: accountId,
       direction: direction,
-      date: date,
+      date: normalizeDateToYYYYMMDD(date),
       quantityMT: qty,
       commodityName: commodityFromMaster.name,
       commodityId: commodityFromMaster._id.toString(),
@@ -542,7 +654,7 @@ export async function PATCH(request: Request) {
       },
       {
         $set: {
-          date,
+          date: normalizeDateToYYYYMMDD(date),
           quantityMT: parsedQuantity,
           updatedAt: new Date(),
         },
@@ -604,11 +716,155 @@ export async function PATCH(request: Request) {
       console.error('Failed to sync linked inward/outward document after transaction edit:', syncDocError);
     }
 
+    const isDirectTransaction = !transaction.sourceId && (!transaction.sourceType || (transaction.sourceType !== 'inward' && transaction.sourceType !== 'outward'));
+
+    if (isDirectTransaction) {
+      try {
+        await syncTransactionStockEntry(db, transaction, { date, quantityMT: parsedQuantity });
+      } catch (syncError) {
+        console.error('Failed to resync stock entry after transaction update:', syncError);
+        // Continue, but keep transaction updated. Don't fail the entire request on sync failure.
+      }
+    } else {
+      // For processInward/processOutward transactions:
+      // Adjust warehouse capacity only if quantity changed
+      const oldQuantity = Number(transaction.quantityMT || 0);
+      if (parsedQuantity !== oldQuantity && transaction.warehouseId) {
+        try {
+          const warehouse = await Warehouse.findById(transaction.warehouseId);
+          if (warehouse) {
+            const dir = (transaction.direction || '').toUpperCase();
+            const qtyDiff = parsedQuantity - oldQuantity;
+            const capacityDelta = dir === 'INWARD' ? qtyDiff : -qtyDiff;
+            
+            const nextOccupied = warehouse.occupiedCapacity + capacityDelta;
+            warehouse.occupiedCapacity = Math.max(0, nextOccupied);
+            warehouse.status = warehouse.occupiedCapacity >= warehouse.totalCapacity ? 'FULL' : 'ACTIVE';
+            await warehouse.save();
+            console.log(`[PATCH] Adjusted warehouse capacity for processInward/Outward transaction: diff=${qtyDiff}, newOccupied=${warehouse.occupiedCapacity}`);
+          }
+        } catch (capError) {
+          console.error('Failed to adjust warehouse capacity on processInward/Outward edit:', capError);
+        }
+      }
+    }
+
+    // ── Direct ledger_entries sync (covers entries created by processInward) ──
     try {
-      await syncTransactionStockEntry(db, transaction, { date, quantityMT: parsedQuantity });
-    } catch (syncError) {
-      console.error('Failed to resync stock entry after transaction update:', syncError);
-      // Continue, but keep transaction updated. Don't fail the entire request on sync failure.
+      const txnObjectId = new ObjectId(transaction._id);
+      const txnIdStr = transaction._id.toString();
+      const sourceId = transaction.sourceId;
+      const sourceObjectId = sourceId && ObjectId.isValid(sourceId) ? new ObjectId(sourceId) : null;
+
+      // Build a comprehensive query to find ALL ledger entries related to this transaction,
+      // including those created by processInward (which have no stockEntryId).
+      const ledgerMatchClauses: any[] = [];
+
+      // Match by inwardId (ObjectId or string) – covers processInward entries
+      ledgerMatchClauses.push({ inwardId: txnObjectId });
+      ledgerMatchClauses.push({ inwardId: txnIdStr });
+      if (sourceObjectId) {
+        ledgerMatchClauses.push({ inwardId: sourceObjectId });
+        ledgerMatchClauses.push({ inwardId: sourceId });
+      }
+
+      // Match by property signature: same client + warehouse + commodity + old date + old quantity
+      // This is a fallback for legacy records with no inwardId or stockEntryId
+      const oldDate = transaction.date;
+      const oldQuantity = transaction.quantityMT;
+      if (transaction.clientId && transaction.warehouseId && transaction.commodityId && oldDate != null && oldQuantity != null) {
+        const clientIds: any[] = [transaction.clientId];
+        const warehouseIds: any[] = [transaction.warehouseId];
+        const commodityIds: any[] = [transaction.commodityId];
+        try { clientIds.push(new ObjectId(String(transaction.clientId))); } catch {}
+        try { warehouseIds.push(new ObjectId(String(transaction.warehouseId))); } catch {}
+        try { commodityIds.push(new ObjectId(String(transaction.commodityId))); } catch {}
+
+        // Normalize old date for comparison (handle both Date objects and strings)
+        const oldDateStr = normalizeDateToYYYYMMDD(oldDate);
+
+        ledgerMatchClauses.push({
+          clientId: { $in: clientIds },
+          warehouseId: { $in: warehouseIds },
+          commodityId: { $in: commodityIds },
+          periodStartDate: oldDateStr,
+          quantityMT: Number(oldQuantity),
+          stockEntryId: { $exists: false }, // Only match processInward-created entries
+        });
+      }
+
+      // Normalize new date string for storage
+      const newDateStr = normalizeDateToYYYYMMDD(parsedDate);
+
+      // Find the matched ledger entries
+      const matchedLedgerEntries = await db.collection('ledger_entries').find({ $or: ledgerMatchClauses }).toArray();
+
+      // Recalculate rate and rent
+      const commodityId = transaction.commodityId;
+      let ratePerMTPerDay = transaction.ratePerMTPerDay;
+      if (!ratePerMTPerDay && commodityId) {
+        const commodity = await db.collection('commodities').findOne({ _id: new ObjectId(commodityId) });
+        if (commodity) {
+          ratePerMTPerDay = commodity.ratePerMtPerDay ?? (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
+        }
+      }
+      if (!ratePerMTPerDay) {
+        ratePerMTPerDay = 10;
+      }
+
+      let totalRentCalculated = 0;
+
+      for (const entry of matchedLedgerEntries) {
+        const rentEndDate = entry.periodEndDate ? new Date(entry.periodEndDate) : null;
+        let newRentTotal = 0;
+        if (rentEndDate) {
+          const monthlyRate = ratePerMTPerDay * 30;
+          const rent = calculateRent(parsedQuantity, monthlyRate, parsedDate as any, rentEndDate as any);
+          newRentTotal = rent.totalAmount;
+        }
+        totalRentCalculated += newRentTotal;
+
+        await db.collection('ledger_entries').updateOne(
+          { _id: entry._id },
+          {
+            $set: {
+              periodStartDate: newDateStr,
+              quantityMT: parsedQuantity,
+              rentCalculated: newRentTotal,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+      console.log(`[PATCH] Direct ledger_entries sync: matched=${matchedLedgerEntries.length}, recalculated rent=${totalRentCalculated}`);
+
+      // ── Sync/recalculate revenuedistributions ──
+      const revenueMatchClauses: any[] = [];
+      revenueMatchClauses.push({ inwardId: txnObjectId });
+      revenueMatchClauses.push({ inwardId: txnIdStr });
+      if (sourceObjectId) {
+        revenueMatchClauses.push({ inwardId: sourceObjectId });
+        revenueMatchClauses.push({ inwardId: sourceId });
+      }
+
+      if (revenueMatchClauses.length > 0) {
+        const newOwnerShare = Math.round(totalRentCalculated * 0.6 * 100) / 100;
+        const newPlatformShare = Math.round((totalRentCalculated - newOwnerShare) * 100) / 100;
+
+        await db.collection('revenuedistributions').updateMany(
+          { $or: revenueMatchClauses },
+          {
+            $set: {
+              totalAmount: totalRentCalculated,
+              ownerShare: newOwnerShare,
+              platformShare: newPlatformShare,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+    } catch (directLedgerError) {
+      console.error('Failed to directly sync ledger_entries/revenuedistributions after transaction edit:', directLedgerError);
     }
 
     try {
@@ -620,7 +876,7 @@ export async function PATCH(request: Request) {
 
       const txnsForLedger = allTransactions.map((txn: any) => ({
         _id: txn._id?.toString() || '',
-        date: txn.date,
+        date: normalizeDateToYYYYMMDD(txn.date),
         direction: txn.direction,
         mt: txn.quantityMT,
         clientName: txn.clientName || '',
@@ -777,7 +1033,7 @@ export async function DELETE(request: Request) {
 
       const txnsForLedger = remainingTransactions.map((txn: any) => ({
         _id: txn._id?.toString() || '',
-        date: txn.date,
+        date: normalizeDateToYYYYMMDD(txn.date),
         direction: txn.direction,
         mt: txn.quantityMT,
         clientName: txn.clientName || '',
@@ -857,7 +1113,7 @@ export async function GET(request: Request) {
 
     const warehouseDocs = await db.collection('warehouses')
       .find({ ...tenantFilter })
-      .project({ _id: 1 })
+      .project({ _id: 1, name: 1 })
       .toArray();
     const ownedWarehouseIdStrings = warehouseDocs.map((warehouse: any) => warehouse._id.toString());
     const ownedWarehouseObjectIds = warehouseDocs
@@ -916,6 +1172,34 @@ export async function GET(request: Request) {
       rentByTransactionId.set(transactionId, (rentByTransactionId.get(transactionId) || 0) + rentValue);
     });
 
+    const userIds = [...new Set(transactions.map((t: any) => t.userId?.toString()).filter(Boolean))];
+    const uniqueUserIds = userIds.map(id => {
+      try { return new ObjectId(id as string); } catch { return id; }
+    });
+    const users = uniqueUserIds.length > 0
+      ? await db.collection('users').find({ _id: { $in: uniqueUserIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray()
+      : [];
+    const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+
+    const nameCounts = new Map<string, number>();
+    warehouseDocs.forEach((w: any) => {
+      const n = w.name?.toLowerCase() || '';
+      nameCounts.set(n, (nameCounts.get(n) || 0) + 1);
+    });
+
+    const formatWarehouseName = (t: any) => {
+      let wName = t.warehouseName || '';
+      if (isAdmin(session) && t.userId && wName) {
+        const isDuplicate = (nameCounts.get(wName.toLowerCase()) || 0) > 1;
+        if (isDuplicate) {
+          const userInfo = userMap.get(t.userId.toString());
+          const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || 'Unknown';
+          wName = `${wName} (${wspName})`;
+        }
+      }
+      return wName;
+    };
+
     return NextResponse.json({
       success: true,
       count: transactions.length,
@@ -930,7 +1214,7 @@ export async function GET(request: Request) {
         date: t.date,
         gatePass: t.gatePass,
         warehouseId: t.warehouseId,
-        warehouseName: t.warehouseName || '',
+        warehouseName: formatWarehouseName(t),
         status: t.status,
         createdAt: t.createdAt,
         rentTotal: Math.round((rentByTransactionId.get(t._id?.toString() || '') || 0) * 100) / 100,

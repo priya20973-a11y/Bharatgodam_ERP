@@ -9,6 +9,7 @@ export interface IClient extends Document {
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  state?: string;
   commodityIds?: mongoose.Types.ObjectId[];
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
@@ -21,6 +22,7 @@ const ClientSchema: Schema = new Schema(
     name: { type: String, required: true },
     nameKey: { type: String, required: true, uppercase: true },
     address: { type: String, required: true },
+    state: { type: String, required: false },
     clientType: {
       type: String,
       enum: ['FARMER', 'FPO', 'COMPANY'],

@@ -84,6 +84,7 @@ export async function getClients() {
       _id: client._id.toString(),
       name: client.clientName || client.name || 'Unknown',
       address: client.clientLocation || client.address || '',
+      state: client.state || '',
       clientType: client.clientType || 'FARMER',
       mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
       userId: null,
@@ -119,10 +120,15 @@ export async function createClient(data: {
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  state?: string;
   commodityIds?: string[];
 }) {
   await connectToDatabase();
   try {
+    if (!data.state || !data.state.trim()) {
+      return { success: false, error: 'State is required' };
+    }
+
     const validationError = validateClientData(data);
     if (validationError) {
       return { success: false, error: validationError };
@@ -183,6 +189,7 @@ export async function updateClient(id: string, data: Partial<{
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
+  state?: string;
   commodityIds?: string[];
 }>) {
   await connectToDatabase();

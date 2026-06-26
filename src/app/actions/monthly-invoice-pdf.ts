@@ -41,6 +41,7 @@ interface MonthlyInvoice {
   clientAddress?: string;
   clientPhone?: string;
   bankName?: string;
+  companyGst?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
   bankBranch?: string;
@@ -316,6 +317,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoice): Promi
                     ${invoice.companyAddress ? `<p>${invoice.companyAddress}</p>` : ''}
                     ${invoice.companyEmail ? `<p>Email: ${invoice.companyEmail}</p>` : ''}
                     ${invoice.companyPhone ? `<p>Phone: ${invoice.companyPhone}</p>` : ''}
+                    ${invoice.companyGst ? `<p>GSTIN: ${invoice.companyGst}</p>` : ''}
                 </div>
             </div>
             <div class="invoice-meta">

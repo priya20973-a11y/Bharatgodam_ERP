@@ -28,6 +28,14 @@ export interface ClientMonthlyLedgerSummary {
   payments: number;
   additionalCharges?: number;
   outstanding: number;
+  billingState?: string;
+  taxGroup?: string;
+  taxType?: string;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTaxAmount?: number;
+  adjustmentAmount?: number;
 }
 
 export interface ClientMonthLedger {
@@ -62,7 +70,20 @@ function normalizeDate(dateValue: string | Date): Date {
     return new Date(Date.UTC(dateValue.getUTCFullYear(), dateValue.getUTCMonth(), dateValue.getUTCDate()));
   }
 
-  return new Date(`${dateValue.toString().slice(0, 10)}T00:00:00.000Z`);
+  const str = dateValue.toString().trim();
+  // Check if it's already YYYY-MM-DD
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  }
+
+  // If not YYYY-MM-DD, try standard Date parsing
+  const parsed = new Date(str);
+  if (!Number.isNaN(parsed.getTime())) {
+    return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+  }
+
+  return new Date(`${str.slice(0, 10)}T00:00:00.000Z`);
 }
 
 function formatMonthKey(date: Date): string {
@@ -331,8 +352,14 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   const clientName = client?.name || client?.clientName || 'Unknown Client';
 
   const transactionQuery: any = { clientId: clientId, ...(tenantFilter || {}) };
+  let warehouseIdsArray: string[] = [];
   if (warehouseId && warehouseId !== 'ALL') {
-    transactionQuery.warehouseId = warehouseId;
+    warehouseIdsArray = warehouseId.split(',').map(id => id.trim()).filter(Boolean);
+    if (warehouseIdsArray.length === 1) {
+      transactionQuery.warehouseId = warehouseIdsArray[0];
+    } else if (warehouseIdsArray.length > 1) {
+      transactionQuery.warehouseId = { $in: warehouseIdsArray };
+    }
   }
 
   const transactions = await db.collection('transactions').find(transactionQuery, { sort: { date: 1 } }).toArray();
@@ -350,9 +377,26 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
     const key = `${txn.commodityId}-${txn.warehouseId}`;
     if (!txnGroups.has(key)) txnGroups.set(key, { txns: [], warehouseId: txn.warehouseId });
     txnGroups.get(key)?.txns.push({
-      date: txn.date instanceof Date ? txn.date.toISOString().split('T')[0] : 
-            typeof txn.date === 'string' && txn.date.includes('T') ? txn.date.split('T')[0] : 
-            txn.date,
+      date: (() => {
+        if (txn.date instanceof Date) {
+          return txn.date.toISOString().split('T')[0];
+        }
+        if (typeof txn.date === 'string') {
+          const raw = txn.date.trim();
+          const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (match) {
+            return `${match[1]}-${match[2]}-${match[3]}`;
+          }
+          const parsed = new Date(raw);
+          if (!Number.isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear();
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+        }
+        return txn.date;
+      })(),
       type: txn.direction === 'INWARD' ? 'INWARD' : 'OUTWARD',
       qty: txn.quantityMT || 0,
       clientId: txn.clientId,
@@ -395,7 +439,7 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
         status: period.status,
         calculation,
         warehouseId,
-        warehouseName: warehouse?.name || '',
+        warehouseName: warehouse?.warehouseId ? `${warehouse.warehouseId} - ${warehouse.name}` : (warehouse?.name || ''),
       });
     });
   });
@@ -403,14 +447,15 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   const grouped = new Map<string, { month: string; warehouseId?: string; warehouseName?: string; rows: ClientMonthlyLedgerRow[] }>();
   allPeriods.forEach(row => {
     const monthKey = formatMonthKey(normalizeDate(row.fromDate));
-    const warehouseKey = row.warehouseId || 'ALL';
+    // If multiple warehouses are requested, combine them into one invoice for the month
+    const warehouseKey = warehouseIdsArray.length > 1 ? warehouseId : (row.warehouseId || 'ALL');
     const groupKey = `${monthKey}::${warehouseKey}`;
 
     if (!grouped.has(groupKey)) {
       grouped.set(groupKey, {
         month: monthKey,
-        warehouseId: row.warehouseId,
-        warehouseName: row.warehouseName,
+        warehouseId: warehouseIdsArray.length > 1 ? warehouseId : row.warehouseId,
+        warehouseName: warehouseIdsArray.length > 1 ? 'Multiple Warehouses' : row.warehouseName,
         rows: [],
       });
     }
@@ -575,8 +620,21 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
       const invoiceId = group.warehouseId ? `${clientId}-${group.month}-${group.warehouseId}` : `${clientId}-${group.month}`;
       const totalRent = roundCurrency(group.rows.reduce((sum, row) => sum + row.rent, 0));
       const invoiceAdditionalCharges = roundCurrency(adjustmentAmountsByInvoice[invoiceId] || 0);
+
+      const matchingMaster = invoiceMasters.find((inv: any) => {
+        const invWarehouseId = inv.warehouseId?.toString?.();
+        const groupWarehouseId = group.warehouseId?.toString?.();
+        return inv.clientId?.toString() === clientId &&
+               inv.invoiceMonth === group.month &&
+               invWarehouseId === groupWarehouseId;
+      });
+
+      const taxAmount = Number(matchingMaster?.totalTaxAmount || 0);
+      const adjustmentAmount = Number(matchingMaster?.adjustmentAmount || 0);
+      const totalInvoiceCharges = roundCurrency(totalRent + invoiceAdditionalCharges + taxAmount + adjustmentAmount);
+
       totalRentThisMonth = roundCurrency(totalRentThisMonth + totalRent);
-      totalAdjustmentsThisMonth = roundCurrency(totalAdjustmentsThisMonth + invoiceAdditionalCharges);
+      totalAdjustmentsThisMonth = roundCurrency(totalAdjustmentsThisMonth + invoiceAdditionalCharges + taxAmount + adjustmentAmount);
 
       const invoiceSpecificPayments = roundCurrency(paymentsByInvoice[invoiceId] || 0);
       let paymentsForMonth = 0;
@@ -584,7 +642,7 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
         paymentsForMonth = invoiceSpecificPayments;
       } else {
         const remainingMonthPayments = roundCurrency(monthPaymentBalances[monthKey] || 0);
-        const maxPayable = roundCurrency(Math.max(0, previousBalance + totalRent + invoiceAdditionalCharges));
+        const maxPayable = roundCurrency(Math.max(0, previousBalance + totalInvoiceCharges));
         const allocated = Math.min(remainingMonthPayments, maxPayable);
         paymentsForMonth = allocated;
         monthPaymentBalances[monthKey] = roundCurrency(remainingMonthPayments - allocated);
@@ -593,7 +651,7 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
       const invoicePreviousBalance = previousBalance;
       totalPaymentsThisMonth = roundCurrency(totalPaymentsThisMonth + paymentsForMonth);
 
-      const outstanding = roundCurrency(invoicePreviousBalance + totalRent + invoiceAdditionalCharges - paymentsForMonth);
+      const outstanding = roundCurrency(invoicePreviousBalance + totalInvoiceCharges - paymentsForMonth);
 
       monthlyLedgers.push({
         month: group.month,
@@ -607,6 +665,14 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
           payments: paymentsForMonth,
           additionalCharges: invoiceAdditionalCharges,
           outstanding,
+          billingState: matchingMaster?.billingState || '',
+          taxGroup: matchingMaster?.taxGroup || 'No Tax',
+          taxType: matchingMaster?.taxType || '',
+          cgstAmount: Number(matchingMaster?.cgstAmount || 0),
+          sgstAmount: Number(matchingMaster?.sgstAmount || 0),
+          igstAmount: Number(matchingMaster?.igstAmount || 0),
+          totalTaxAmount: Number(matchingMaster?.totalTaxAmount || 0),
+          adjustmentAmount: Number(matchingMaster?.adjustmentAmount || 0),
         },
       });
     });

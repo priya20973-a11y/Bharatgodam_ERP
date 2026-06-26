@@ -14,8 +14,10 @@ export async function POST(req: Request) {
       phoneNumber,
       address,
       warehouseLocation,
+      state,
       gstNumber,
       bankName,
+      accountName,
       bankAccountNumber,
       ifscCode,
       bankBranch,
@@ -24,9 +26,39 @@ export async function POST(req: Request) {
     } = body;
 
     // Validation
-    if (!fullName || !email || !password || !confirmPassword || !companyName || !phoneNumber || !warehouseLocation) {
+    if (!fullName || !email || !password || !confirmPassword || !companyName || !phoneNumber || !warehouseLocation || !state) {
       return NextResponse.json(
         { message: 'All required fields must be filled.' },
+        { status: 400 }
+      );
+    }
+
+    if (!bankName || !accountName || !bankAccountNumber || !ifscCode || !bankBranch) {
+      return NextResponse.json(
+        { message: 'All bank details including Account Name are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (!companyLogo) {
+      return NextResponse.json(
+        { message: 'Company logo is required.' },
+        { status: 400 }
+      );
+    }
+
+    if (!gstNumber) {
+      return NextResponse.json(
+        { message: 'GST Number is required (use NA if not applicable).' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedGst = gstNumber.toString().trim().toUpperCase();
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+      return NextResponse.json(
+        { message: 'Please enter a valid GSTIN format or NA.' },
         { status: 400 }
       );
     }
@@ -99,14 +131,17 @@ export async function POST(req: Request) {
       phoneNumber,
       address: address || null,
       warehouseLocation,
-      gstNumber: gstNumber || null,
-      bankName: bankName || null,
-      bankAccountNumber: bankAccountNumber || null,
-      ifscCode: ifscCode || null,
-      bankBranch: bankBranch || null,
-      companyLogo: companyLogo || null,
+      state: state.trim(),
+      gstNumber: trimmedGst,
+      bankName: bankName.trim(),
+      accountName: accountName.trim(),
+      bankAccountNumber: bankAccountNumber.trim(),
+      ifscCode: ifscCode.trim(),
+      bankBranch: bankBranch.trim(),
+      companyLogo,
       role: normalizedRole,
       status: 'PENDING_APPROVAL',
+      isNewRegistration: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

@@ -4,6 +4,45 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
+const INDIAN_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry"
+];
+
 interface ProfileData {
   id: string;
   fullName: string;
@@ -13,12 +52,15 @@ interface ProfileData {
   phoneNumber?: string;
   address?: string | null;
   warehouseLocation?: string;
+  state?: string;
   gstNumber?: string | null;
   bankName?: string | null;
+  accountName?: string | null;
   bankAccountNumber?: string | null;
   ifscCode?: string | null;
   bankBranch?: string | null;
   companyLogo?: string | null;
+  isNewRegistration?: boolean;
 }
 
 const initialProfileForm = {
@@ -28,8 +70,10 @@ const initialProfileForm = {
   phoneNumber: '',
   address: '',
   warehouseLocation: '',
+  state: '',
   gstNumber: '',
   bankName: '',
+  accountName: '',
   bankAccountNumber: '',
   ifscCode: '',
   bankBranch: '',
@@ -48,6 +92,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [gstNotApplicable, setGstNotApplicable] = useState(false);
   const [passwordForm, setPasswordForm] = useState(initialPasswordForm);
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -85,14 +130,17 @@ export default function ProfilePage() {
         phoneNumber: data.user.phoneNumber || '',
         address: data.user.address || '',
         warehouseLocation: data.user.warehouseLocation || '',
+        state: data.user.state || '',
         gstNumber: data.user.gstNumber || '',
         bankName: data.user.bankName || '',
+        accountName: data.user.accountName || '',
         bankAccountNumber: data.user.bankAccountNumber || '',
         ifscCode: data.user.ifscCode || '',
         bankBranch: data.user.bankBranch || '',
         companyLogo: data.user.companyLogo || '',
       });
       setLogoPreview(data.user.companyLogo || null);
+      setGstNotApplicable(data.user.gstNumber === 'NA');
     } catch (err) {
       setError('Unable to load profile data.');
       console.error(err);
@@ -102,10 +150,19 @@ export default function ProfilePage() {
   }
 
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSavingProfile(true);
-    setMessage(null);
-    setError(null);
+    const isNew = !!profile?.isNewRegistration;
+
+    if (!profileForm.fullName.trim()) {
+      setError('Full name is required.');
+      setSavingProfile(false);
+      return;
+    }
+
+    if (!profileForm.warehouseLocation.trim()) {
+      setError('Location is required.');
+      setSavingProfile(false);
+      return;
+    }
 
     const phoneNumber = profileForm.phoneNumber?.trim() ?? '';
     const phoneRegex = /^[0-9]{10}$/;
@@ -115,13 +172,73 @@ export default function ProfilePage() {
       return;
     }
 
+    const gstTrimmed = profileForm.gstNumber?.trim().toUpperCase() || '';
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    if (isNew) {
+      if (!profileForm.state) {
+        setError('State is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.bankName.trim()) {
+        setError('Bank name is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.accountName.trim()) {
+        setError('Account Name is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.bankAccountNumber.trim()) {
+        setError('Bank account number is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.ifscCode.trim()) {
+        setError('IFSC code is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.bankBranch.trim()) {
+        setError('Bank branch is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!profileForm.companyLogo) {
+        setError('Company logo is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!gstTrimmed) {
+        setError('GST Number is required (use NA if not applicable).');
+        setSavingProfile(false);
+        return;
+      }
+      if (gstTrimmed !== 'NA' && !gstRegex.test(gstTrimmed)) {
+        setError('Invalid GSTIN format (must be 15 characters, or NA).');
+        setSavingProfile(false);
+        return;
+      }
+    } else {
+      if (gstTrimmed && gstTrimmed !== 'NA' && !gstRegex.test(gstTrimmed)) {
+        setError('Invalid GSTIN format (must be 15 characters, or NA).');
+        setSavingProfile(false);
+        return;
+      }
+    }
+
     try {
       const response = await fetch('/api/auth/profile', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(profileForm),
+        body: JSON.stringify({
+          ...profileForm,
+          gstNumber: gstNotApplicable ? 'NA' : profileForm.gstNumber,
+        }),
       });
 
       const data = await response.json();
@@ -131,6 +248,7 @@ export default function ProfilePage() {
       }
 
       setProfile(data.user);
+      setGstNotApplicable(data.user.gstNumber === 'NA');
       setMessage('Profile updated successfully.');
     } catch (err) {
       setError('Unable to update profile.');
@@ -255,7 +373,9 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Company Logo</span>
+              <span className="text-sm font-medium text-slate-700">
+                Company Logo{profile?.isNewRegistration ? ' *' : ''}
+              </span>
               <input
                 type="file"
                 accept="image/*"
@@ -284,7 +404,9 @@ export default function ProfilePage() {
                 }}
                 className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
-              <p className="text-xs text-slate-500">Optional company logo for your account. Max 1MB.</p>
+              <p className="text-xs text-slate-500">
+                {profile?.isNewRegistration ? 'Company logo is required. Max 1MB.' : 'Optional company logo for your account. Max 1MB.'}
+              </p>
             </label>
 
             <label className="space-y-2">
@@ -335,17 +457,59 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">GST Number</span>
-              <input
-                type="text"
-                value={profileForm.gstNumber}
-                onChange={(event) => setProfileForm({ ...profileForm, gstNumber: event.target.value })}
+              <span className="text-sm font-medium text-slate-700">
+                State{profile?.isNewRegistration ? ' *' : ''}
+              </span>
+              <select
+                value={profileForm.state}
+                onChange={(event) => setProfileForm({ ...profileForm, state: event.target.value })}
                 className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
+              >
+                <option value="" disabled>Select State/UT</option>
+                {INDIAN_STATES.map((state) => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
             </label>
 
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">
+                  GST Number{profile?.isNewRegistration ? ' *' : ''}
+                </span>
+                <label className="flex items-center space-x-2 text-sm text-slate-600 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gstNotApplicable}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setGstNotApplicable(checked);
+                      if (checked) {
+                        setProfileForm(prev => ({ ...prev, gstNumber: 'NA' }));
+                      } else {
+                        setProfileForm(prev => ({ ...prev, gstNumber: '' }));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Not Applicable (NA)</span>
+                </label>
+              </div>
+              <input
+                type="text"
+                disabled={gstNotApplicable}
+                value={gstNotApplicable ? 'NA' : profileForm.gstNumber}
+                onChange={(event) => setProfileForm({ ...profileForm, gstNumber: event.target.value })}
+                className={`w-full rounded-md border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 ${
+                  gstNotApplicable ? 'bg-slate-100 text-slate-750' : 'bg-slate-50'
+                }`}
+              />
+            </div>
+
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Bank Name</span>
+              <span className="text-sm font-medium text-slate-700">
+                Bank Name{profile?.isNewRegistration ? ' *' : ''}
+              </span>
               <input
                 type="text"
                 value={profileForm.bankName}
@@ -355,7 +519,21 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Account Number</span>
+              <span className="text-sm font-medium text-slate-700">
+                Account Name{profile?.isNewRegistration ? ' *' : ''}
+              </span>
+              <input
+                type="text"
+                value={profileForm.accountName}
+                onChange={(event) => setProfileForm({ ...profileForm, accountName: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Account Number{profile?.isNewRegistration ? ' *' : ''}
+              </span>
               <input
                 type="text"
                 value={profileForm.bankAccountNumber}
@@ -365,7 +543,9 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">IFSC Code</span>
+              <span className="text-sm font-medium text-slate-700">
+                IFSC Code{profile?.isNewRegistration ? ' *' : ''}
+              </span>
               <input
                 type="text"
                 value={profileForm.ifscCode}
@@ -375,7 +555,9 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Branch</span>
+              <span className="text-sm font-medium text-slate-700">
+                Branch{profile?.isNewRegistration ? ' *' : ''}
+              </span>
               <input
                 type="text"
                 value={profileForm.bankBranch}
@@ -403,8 +585,10 @@ export default function ProfilePage() {
                 phoneNumber: profile?.phoneNumber || '',
                 address: profile?.address || '',
                 warehouseLocation: profile?.warehouseLocation || '',
+                state: profile?.state || '',
                 gstNumber: profile?.gstNumber || '',
                 bankName: profile?.bankName || '',
+                accountName: profile?.accountName || '',
                 bankAccountNumber: profile?.bankAccountNumber || '',
                 ifscCode: profile?.ifscCode || '',
                 bankBranch: profile?.bankBranch || '',
@@ -412,6 +596,7 @@ export default function ProfilePage() {
               });
               setMessage(null);
               setError(null);
+              setGstNotApplicable(profile?.gstNumber === 'NA');
             }}
             className="rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >

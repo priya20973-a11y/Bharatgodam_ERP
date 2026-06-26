@@ -130,6 +130,9 @@ export async function GET(request: Request) {
       }
     }
 
+    // Exclude stale SPLIT entries to avoid double counting
+    ledgerQuery.status = { $ne: 'SPLIT' };
+
     // Fetch ledger entries
     const ledgerEntries = await db
       .collection('ledger_entries')

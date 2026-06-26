@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen } from 'lucide-react';
+import { Download, FileText, Loader2, Calendar, Building2, Package, BookOpen, Info, ChevronDown } from 'lucide-react';
 import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodityOptions, getClientTransactionInvoice, recordPayment } from '@/app/actions/reports';
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 import { toast } from 'react-hot-toast';
@@ -58,6 +58,14 @@ interface MonthlyInvoice {
   outstandingBalance?: number;
   invoiceDate: string;
   invoiceId?: string;
+  billingState?: string;
+  taxGroup?: string;
+  taxType?: string;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTaxAmount?: number;
+  adjustmentAmount?: number;
 }
 
 const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: AdditionalChargeItem, index: number) => {
@@ -72,6 +80,24 @@ const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: Addit
   return `${invoiceId || 'invoice'}-additional-${cleanName}-${amountToken}-${index}-${randomToken}`;
 };
 
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
+  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
+  "Ladakh", "Lakshadweep", "Puducherry"
+];
+
+const TAX_GROUPS = [
+  'Non-GST Supply',
+  'GST 5%',
+  'GST 12%',
+  'GST 18%',
+  'GST 28%',
+];
+
 export default function ClientInvoicesPage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
@@ -79,9 +105,11 @@ export default function ClientInvoicesPage() {
   const [warehouses, setWarehouses] = useState<{ label: string; value: string }[]>([]);
   const [commodities, setCommodities] = useState<{ label: string; value: string }[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
+  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [isWarehouseDropdownOpen, setIsWarehouseDropdownOpen] = useState(false);
   const [invoiceMode, setInvoiceMode] = useState<'ledger' | 'transaction'>('ledger');
+  const [taxSavingStatus, setTaxSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,7 +151,7 @@ export default function ClientInvoicesPage() {
 
   useEffect(() => {
     const loadTransactions = async () => {
-      if ((!selectedClient || selectedClient === 'ALL') && (!selectedWarehouse || selectedWarehouse === 'ALL')) {
+      if ((!selectedClient || selectedClient === 'ALL') && (selectedWarehouses.length === 0 || selectedWarehouses.includes('ALL'))) {
         setTransactions([]);
         return;
       }
@@ -142,8 +170,8 @@ export default function ClientInvoicesPage() {
           filters.clientId = selectedClient;
         }
 
-        if (selectedWarehouse && selectedWarehouse !== 'ALL') {
-          filters.warehouseId = selectedWarehouse;
+        if (selectedWarehouses.length > 0 && !selectedWarehouses.includes('ALL')) {
+          filters.warehouseIds = selectedWarehouses.join(',');
         }
 
         if (selectedMonth) {
@@ -172,7 +200,7 @@ export default function ClientInvoicesPage() {
     };
 
     loadTransactions();
-  }, [selectedClient, selectedWarehouse, selectedMonth, clients, warehouses]);
+  }, [selectedClient, selectedWarehouses, selectedMonth, clients, warehouses]);
 
   const transactionCounts = transactions.reduce(
     (summary, record) => {
@@ -193,16 +221,16 @@ export default function ClientInvoicesPage() {
     }
 
     // Load invoices only when client, warehouse and month are selected
-    if (selectedMonth && selectedWarehouse && selectedWarehouse !== 'ALL') {
-      await loadInvoices(clientId, selectedWarehouse, selectedMonth, invoiceMode);
+    if (selectedMonth && selectedWarehouses.length > 0 && !selectedWarehouses.includes('ALL')) {
+      await loadInvoices(clientId, selectedWarehouses, selectedMonth, invoiceMode);
     }
   };
 
   // Handle warehouse selection
-  const handleWarehouseChange = async (warehouseId: string) => {
-    setSelectedWarehouse(warehouseId);
-    if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
-      await loadInvoices(selectedClient, warehouseId, selectedMonth, invoiceMode);
+  const handleWarehouseChange = async (warehouseIds: string[]) => {
+    setSelectedWarehouses(warehouseIds);
+    if (selectedClient && selectedClient !== 'ALL' && selectedMonth && warehouseIds.length > 0) {
+      await loadInvoices(selectedClient, warehouseIds, selectedMonth, invoiceMode);
     }
   };
 
@@ -212,10 +240,10 @@ export default function ClientInvoicesPage() {
     if (
       selectedClient &&
       selectedClient !== 'ALL' &&
-      selectedWarehouse &&
-      selectedWarehouse !== 'ALL'
+      selectedWarehouses.length > 0 &&
+      !selectedWarehouses.includes('ALL')
     ) {
-      await loadInvoices(selectedClient, selectedWarehouse, month, invoiceMode);
+      await loadInvoices(selectedClient, selectedWarehouses, month, invoiceMode);
     }
   };
 
@@ -223,18 +251,18 @@ export default function ClientInvoicesPage() {
     if (
       selectedClient &&
       selectedClient !== 'ALL' &&
-      selectedWarehouse &&
-      selectedWarehouse !== 'ALL' &&
+      selectedWarehouses.length > 0 &&
+      !selectedWarehouses.includes('ALL') &&
       selectedMonth
     ) {
-      loadInvoices(selectedClient, selectedWarehouse, selectedMonth, invoiceMode);
+      loadInvoices(selectedClient, selectedWarehouses, selectedMonth, invoiceMode);
     }
   }, [invoiceMode]);
 
   // Load invoices with client, warehouse and month filter
   const loadInvoices = async (
     clientId: string,
-    warehouseId: string,
+    warehouseIds: string[],
     month: string,
     mode: 'ledger' | 'transaction' = invoiceMode
   ) => {
@@ -246,7 +274,7 @@ export default function ClientInvoicesPage() {
         const result = await getClientTransactionInvoice(
           clientId,
           month,
-          warehouseId || undefined
+          warehouseIds.length > 0 ? warehouseIds.join(',') : undefined
         );
 
         if (result.success && result.data) {
@@ -258,16 +286,17 @@ export default function ClientInvoicesPage() {
         return;
       }
 
-      const result = await getClientMonthlyLedger(clientId, month, warehouseId || undefined);
+      const result = await getClientMonthlyLedger(clientId, month, warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
       if (result.success && result.data) {
         const clientResult = await getClientOptions();
         const warehouseResult = await getWarehouseOptions();
         const client = clientResult.find((c: any) => c.value === clientId);
-        const warehouse = warehouseResult.find((w: any) => w.value === warehouseId);
+        const selectedWMap = warehouseResult.filter((w: any) => warehouseIds.includes(w.value));
+        const warehouseNames = selectedWMap.map((w: any) => w.label).join(', ');
 
         const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
-          const invoiceWarehouseId = invoice.warehouseId || warehouseId || undefined;
-          const invoiceWarehouseName = invoice.warehouseName || warehouse?.label || '';
+          const invoiceWarehouseId = invoice.warehouseId || (warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
+          const invoiceWarehouseName = invoice.warehouseName || warehouseNames || '';
           const invoiceIdValue = invoiceWarehouseId
             ? `${clientId}-${invoice.month}-${invoiceWarehouseId}`
             : `${clientId}-${invoice.month}`;
@@ -301,6 +330,14 @@ export default function ClientInvoicesPage() {
             outstandingBalance: Number(invoice.summary.outstanding ?? 0),
             invoiceDate: new Date().toISOString().split('T')[0],
             invoiceId: invoiceIdValue,
+            billingState: invoice.summary.billingState || '',
+            taxGroup: invoice.summary.taxGroup || 'No Tax',
+            taxType: invoice.summary.taxType || '',
+            cgstAmount: Number(invoice.summary.cgstAmount || 0),
+            sgstAmount: Number(invoice.summary.sgstAmount || 0),
+            igstAmount: Number(invoice.summary.igstAmount || 0),
+            totalTaxAmount: Number(invoice.summary.totalTaxAmount || 0),
+            adjustmentAmount: Number(invoice.summary.adjustmentAmount || 0),
           };
         });
 
@@ -366,12 +403,12 @@ export default function ClientInvoicesPage() {
     const previousBalanceAmount = roundCurrency(Number(invoice.previousBalance || 0));
     const previousBalanceRows: PaymentAllocationRow[] = previousBalanceAmount > 0
       ? [{
-          id: 'previousBalance',
-          name: 'Previous Balance',
-          charge: previousBalanceAmount,
-          paid: '',
-          previousPaid: 0,
-        }]
+        id: 'previousBalance',
+        name: 'Previous Balance',
+        charge: previousBalanceAmount,
+        paid: '',
+        previousPaid: 0,
+      }]
       : [];
 
     const rentRow: PaymentAllocationRow = {
@@ -533,7 +570,10 @@ export default function ClientInvoicesPage() {
   };
 
   const getTotalMonthlyCharges = (invoice: MonthlyInvoice) => {
-    return Number(invoice.totalRent || 0) + getAdjustmentTotal(invoice);
+    const baseRent = Number(invoice.totalRent || 0);
+    const additionalCharges = getAdjustmentTotal(invoice);
+    const taxAmount = Number(invoice.totalTaxAmount || 0);
+    return roundCurrency(baseRent + additionalCharges + taxAmount);
   };
 
   const getTotalChargeAmount = (invoice: MonthlyInvoice) => {
@@ -653,16 +693,16 @@ export default function ClientInvoicesPage() {
       prev.map((item) =>
         item.invoiceId === invoice.invoiceId
           ? {
-              ...item,
-              additionalChargeItems: [
-                ...(item.additionalChargeItems || []),
-                {
-                  id: `${invoice.invoiceId}-additional-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  name: '',
-                  amount: '',
-                },
-              ],
-            }
+            ...item,
+            additionalChargeItems: [
+              ...(item.additionalChargeItems || []),
+              {
+                id: `${invoice.invoiceId}-additional-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                name: '',
+                amount: '',
+              },
+            ],
+          }
           : item
       )
     );
@@ -729,16 +769,21 @@ export default function ClientInvoicesPage() {
         prev.map((item) =>
           item.invoiceId === invoice.invoiceId
             ? {
-                ...item,
-                additionalCharges: updatedSum,
-                additionalChargeItems: savedItems,
-              }
+              ...item,
+              additionalCharges: updatedSum,
+              additionalChargeItems: savedItems,
+              totalTaxAmount: Number(result.data?.totalTaxAmount ?? item.totalTaxAmount ?? 0),
+              cgstAmount: Number(result.data?.cgstAmount ?? item.cgstAmount ?? 0),
+              sgstAmount: Number(result.data?.sgstAmount ?? item.sgstAmount ?? 0),
+              igstAmount: Number(result.data?.igstAmount ?? item.igstAmount ?? 0),
+              taxType: result.data?.taxType ?? item.taxType ?? '',
+            }
             : item
         )
       );
 
-      if (selectedClient && selectedWarehouse && selectedMonth) {
-        await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
+      if (selectedClient && selectedWarehouses.length > 0 && selectedMonth) {
+        await loadInvoices(selectedClient, selectedWarehouses, selectedMonth);
       }
 
       toast.success('Additional charges saved successfully');
@@ -747,6 +792,64 @@ export default function ClientInvoicesPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to update additional charges');
     } finally {
       setSavingChargeFor(null);
+    }
+  };
+
+  const handleTaxAutoSave = async (
+    invoiceId: string,
+    billingState: string,
+    taxGroup: string
+  ) => {
+    if (!invoiceId) return;
+
+    setTaxSavingStatus((prev) => ({ ...prev, [invoiceId]: 'saving' }));
+    try {
+      const response = await fetch('/api/invoice/tax-adjustments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invoiceId,
+          billingState,
+          taxGroup,
+          adjustment: 0,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to save tax settings');
+      }
+
+      const { data } = result;
+
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.invoiceId === invoiceId
+            ? {
+              ...item,
+              billingState: data.billingState,
+              taxGroup: data.taxGroup,
+              taxType: data.taxType,
+              cgstAmount: Number(data.cgstAmount),
+              sgstAmount: Number(data.sgstAmount),
+              igstAmount: Number(data.igstAmount),
+              totalTaxAmount: Number(data.totalTaxAmount),
+              adjustmentAmount: Number(data.adjustmentAmount),
+            }
+            : item
+        )
+      );
+
+      setTaxSavingStatus((prev) => ({ ...prev, [invoiceId]: 'saved' }));
+      setTimeout(() => {
+        setTaxSavingStatus((prev) => ({ ...prev, [invoiceId]: 'idle' }));
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to auto-save tax details:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save tax details');
+      setTaxSavingStatus((prev) => ({ ...prev, [invoiceId]: 'error' }));
     }
   };
 
@@ -818,8 +921,8 @@ export default function ClientInvoicesPage() {
           ],
         }));
 
-        if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
-          await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
+        if (selectedClient && selectedClient !== 'ALL' && selectedMonth && selectedWarehouses.length > 0) {
+          await loadInvoices(selectedClient, selectedWarehouses, selectedMonth);
         }
       } else {
         toast.error(result.message || 'Failed to record payment');
@@ -857,8 +960,8 @@ export default function ClientInvoicesPage() {
           delete next[invoice.invoiceId || ''];
           return next;
         });
-        if (selectedClient && selectedClient !== 'ALL' && selectedMonth) {
-          await loadInvoices(selectedClient, selectedWarehouse, selectedMonth);
+        if (selectedClient && selectedClient !== 'ALL' && selectedMonth && selectedWarehouses.length > 0) {
+          await loadInvoices(selectedClient, selectedWarehouses, selectedMonth);
         }
       } else {
         toast.error(result.message || 'Failed to reset invoice payments');
@@ -909,20 +1012,41 @@ export default function ClientInvoicesPage() {
                   </Select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Warehouse *</label>
-                  <Select value={selectedWarehouse} onValueChange={handleWarehouseChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a warehouse..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {warehouses.map((warehouse) => (
-                        <SelectItem key={warehouse.value} value={warehouse.value}>
-                          {warehouse.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="relative">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Warehouses *</label>
+                  <div 
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onClick={() => setIsWarehouseDropdownOpen(!isWarehouseDropdownOpen)}
+                  >
+                    <span className={selectedWarehouses.length ? "text-slate-900" : "text-slate-500"}>
+                      {selectedWarehouses.includes('ALL') || selectedWarehouses.length === 0 ? 'All Warehouses' : (selectedWarehouses.length === 1 ? (warehouses.find((w) => w.value === selectedWarehouses[0])?.label || 'Select Warehouse') : `${selectedWarehouses.length} warehouse(s) selected`)}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </div>
+                  {isWarehouseDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsWarehouseDropdownOpen(false)} />
+                      <div className="absolute z-20 w-full mt-1 border rounded-md max-h-60 overflow-y-auto bg-white p-2 text-sm flex flex-col gap-1 shadow-xl">
+                        {warehouses.map((warehouse) => (
+                          <label key={warehouse.value} className="flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                              checked={selectedWarehouses.includes(warehouse.value)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  handleWarehouseChange([...selectedWarehouses, warehouse.value]);
+                                } else {
+                                  handleWarehouseChange(selectedWarehouses.filter(id => id !== warehouse.value));
+                                }
+                              }}
+                            />
+                            <span className="text-slate-700 font-medium">{warehouse.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div>
@@ -1013,7 +1137,7 @@ export default function ClientInvoicesPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">Warehouse</span>
-              <span className="font-medium">{warehouses.find((w) => w.value === selectedWarehouse)?.label || 'Any'}</span>
+              <span className="font-medium">{selectedWarehouses.includes('ALL') ? 'Any' : (selectedWarehouses.length === 1 ? (warehouses.find((w) => w.value === selectedWarehouses[0])?.label || 'Any') : `${selectedWarehouses.length} selected`)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">Invoice Month</span>
@@ -1170,7 +1294,7 @@ export default function ClientInvoicesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {invoice.periods.map((period, idx) => (
+                        {(invoice.periods || []).map((period, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="px-4 py-2 font-medium text-slate-900">{period.commodityName}</td>
                             <td className="px-4 py-2">{period.startDate}</td>
@@ -1298,7 +1422,117 @@ export default function ClientInvoicesPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-4">
+                    {/* Tax & Adjustment Section */}
+                    <div className="space-y-4 border-t border-blue-200 pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            Tax & Adjustment
+                            <span title="Auto-saves on field change or blur.">
+                              <Info className="h-3.5 w-3.5 text-slate-400" />
+                            </span>
+                            {taxSavingStatus[invoice.invoiceId || ''] === 'saving' && (
+                              <span className="inline-flex items-center text-xs font-normal text-slate-500 animate-pulse">
+                                <Loader2 className="h-3 w-3 animate-spin mr-1 text-indigo-600" />
+                                Saving...
+                              </span>
+                            )}
+                            {taxSavingStatus[invoice.invoiceId || ''] === 'saved' && (
+                              <span className="text-xs font-normal text-emerald-600 flex items-center">
+                                ✓ Saved
+                              </span>
+                            )}
+                            {taxSavingStatus[invoice.invoiceId || ''] === 'error' && (
+                              <span className="text-xs font-normal text-rose-600 flex items-center">
+                                ⚠ Save Failed
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500">Configure Billing State, Tax Group, and adjust the total amount manually.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-slate-200">
+                        {/* Billing State */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-medium text-slate-600">Billing State *</label>
+                          <Select
+                            value={invoice.billingState || undefined}
+                            onValueChange={(val) => {
+                              handleTaxAutoSave(
+                                invoice.invoiceId || '',
+                                val,
+                                invoice.taxGroup || 'No Tax'
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="w-full text-sm">
+                              <SelectValue placeholder="Select Billing State..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60 overflow-y-auto">
+                              {INDIAN_STATES.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                  {state}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Tax Group */}
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-medium text-slate-600">Tax Group *</label>
+                          <Select
+                            value={invoice.taxGroup || 'No Tax'}
+                            onValueChange={(val) => {
+                              handleTaxAutoSave(
+                                invoice.invoiceId || '',
+                                invoice.billingState || '',
+                                val
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="w-full text-sm">
+                              <SelectValue placeholder="Select Tax Group..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60 overflow-y-auto">
+                              {TAX_GROUPS.map((group) => (
+                                <SelectItem key={group} value={group}>
+                                  {group}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Tax calculations breakdown display */}
+                      {invoice.taxGroup && invoice.taxGroup !== 'No Tax' && (
+                        <div className="mt-2 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1 bg-slate-100/50 p-2.5 rounded border border-slate-200">
+                          <span className="font-semibold text-slate-700">Tax Breakdown:</span>
+                          {(() => {
+                            const match = (invoice.taxGroup || '').match(/\d+(\.\d+)?/);
+                            const gstRate = match ? Number(match[0]) : 0;
+                            const halfRate = gstRate / 2;
+                            const cgstLabel = gstRate > 0 ? `CGST ${halfRate} (${halfRate}%)` : 'CGST';
+                            const sgstLabel = gstRate > 0 ? `SGST ${halfRate} (${halfRate}%)` : 'SGST';
+                            const igstLabel = gstRate > 0 ? `IGST ${gstRate} (${gstRate}%)` : 'IGST';
+
+                            return invoice.taxType === 'CGST_SGST' ? (
+                              <>
+                                <span>{cgstLabel}: ₹{Number(invoice.cgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span>{sgstLabel}: ₹{Number(invoice.sgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </>
+                            ) : (
+                              <span>{igstLabel}: ₹{Number(invoice.igstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            );
+                          })()}
+                          <span className="ml-auto font-bold text-slate-800">Total Tax: ₹{Number(invoice.totalTaxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4 border-t border-blue-200 pt-4">
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-slate-700">Payment Allocation</p>

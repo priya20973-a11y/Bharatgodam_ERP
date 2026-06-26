@@ -104,6 +104,7 @@ export async function GET() {
           name: client.name || client.clientName || 'Unknown',
           type: client.clientType || client.type || 'FARMER',
           address: client.address || client.clientLocation || '',
+          state: client.state || '',
           mobile: client.mobile || client.contactInfo?.mobile || client.contactInfo?.phone || '',
           panNumber: client.panNumber || client.panCard || '',
           aadharNumber: client.aadharNumber || client.adhaarNumber || '',
@@ -140,6 +141,7 @@ export async function GET() {
         name: client.clientName || client.name || 'Unknown',
         type: client.clientType || 'FARMER',
         address: client.clientLocation || client.address || '',
+        state: client.state || '',
         mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
         wspName
       };
@@ -167,12 +169,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, type, address, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds } = body;
+    const { name, type, address, state, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds } = body;
 
     if (!name || !type || !address || !mobile || !panNumber || !aadharNumber || !gstNumber) {
       return NextResponse.json({
         success: false,
         message: 'Missing required fields: name, type, address, mobile, panNumber, aadharNumber, gstNumber'
+      }, { status: 400 });
+    }
+
+    if (!state || !state.trim()) {
+      return NextResponse.json({
+        success: false,
+        message: 'Missing required field: state'
       }, { status: 400 });
     }
 
@@ -228,6 +237,7 @@ export async function POST(request: Request) {
       nameKey: normalizedName,
       type,
       address,
+      state: state || '',
       mobile,
       panNumber,
       aadharNumber,

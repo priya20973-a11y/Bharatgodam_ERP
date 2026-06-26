@@ -14,6 +14,7 @@ interface WarehouseFormProps {
 export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    warehouseId: warehouse?.warehouseId || '',
     name: warehouse?.name || '',
     address: warehouse?.address || '',
     totalCapacity: warehouse?.totalCapacity || 0,
@@ -44,6 +45,14 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-slate-50">
       <h3 className="font-semibold text-lg">{warehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</h3>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Warehouse ID (Optional)</label>
+        <Input 
+          value={formData.warehouseId} 
+          onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })} 
+          placeholder="e.g. WH-001"
+        />
+      </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">Warehouse Name *</label>
         <Input 

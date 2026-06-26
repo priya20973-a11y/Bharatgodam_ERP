@@ -100,7 +100,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
                       ₹{item.ratePerMtPerDay ? item.ratePerMtPerDay.toFixed(2) : '0.00'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600">{item.addedBy || 'Unknown'}</TableCell>
+                  <TableCell className="text-sm text-slate-600">{item.wspName || 'Unknown'}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="ghost" size="icon" onClick={() => { setEditingId(item._id); setFormData({ name: item.name, ratePerMtPerDay: item.ratePerMtPerDay }); }}>
                       <Edit className="h-4 w-4" />

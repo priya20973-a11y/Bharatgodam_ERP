@@ -132,7 +132,9 @@ async function resolveInvoiceCompanyProfile(
     companyPhone: user.phoneNumber || '',
     companyEmail: user.email || '',
     companyLogo: user.companyLogo || '',
+    companyGst: user.gstNumber || '',
     bankName: user.bankName || '',
+    accountName: user.accountName || '',
     bankAccountNumber: user.bankAccountNumber || '',
     ifscCode: user.ifscCode || '',
     bankBranch: user.bankBranch || '',
@@ -306,12 +308,26 @@ export async function buildMonthlyInvoiceFromTransactions(
   const client = await findClientDocument(db, clientId, tenantFilter);
   if (!client) return null;
 
-  const resolvedWarehouse = resolvedWarehouseId
-    ? await db.collection('warehouses').findOne({
-        _id: new ObjectId(resolvedWarehouseId),
+  const isMultipleWarehouses = resolvedWarehouseId?.includes(',');
+  const warehouseIdsArray = isMultipleWarehouses && resolvedWarehouseId
+    ? resolvedWarehouseId.split(',').map(id => id.trim()).filter(Boolean)
+    : resolvedWarehouseId ? [resolvedWarehouseId] : [];
+
+  let resolvedWarehouse = null;
+  let resolvedWarehouses: any[] = [];
+  
+  if (warehouseIdsArray.length > 0) {
+    try {
+      const wIds = warehouseIdsArray.map(id => new ObjectId(id));
+      resolvedWarehouses = await db.collection('warehouses').find({
+        _id: { $in: wIds },
         ...tenantFilter,
-      })
-    : null;
+      }).toArray();
+      resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+    } catch (e) {
+      console.error('Error fetching warehouses:', e);
+    }
+  }
 
   const companyProfile =
     (await resolveInvoiceCompanyProfile(db, resolvedWarehouse, null)) || {};
@@ -332,7 +348,7 @@ export async function buildMonthlyInvoiceFromTransactions(
     const existingInvoices = await db
       .collection('invoice_master')
       .find({
-        warehouseId: new ObjectId(resolvedWarehouseId),
+        ...(isMultipleWarehouses ? { warehouseIds: { $in: warehouseIdsArray.map(id => new ObjectId(id)) } } : { warehouseId: new ObjectId(resolvedWarehouseId) }),
         invoiceMonth: invoiceMonthString,
         invoiceType: 'transaction',
         invoiceId: { $regex: invoiceIdPattern },
@@ -391,7 +407,11 @@ export async function buildMonthlyInvoiceFromTransactions(
       updatedAt: new Date(),
     };
 
-    invoiceMaster.warehouseId = new ObjectId(resolvedWarehouseId);
+    if (!isMultipleWarehouses) {
+      invoiceMaster.warehouseId = new ObjectId(resolvedWarehouseId);
+    } else {
+      invoiceMaster.warehouseIds = warehouseIdsArray.map(id => new ObjectId(id));
+    }
 
     const masterResult = await db
       .collection('invoice_master')
@@ -446,7 +466,8 @@ export async function buildMonthlyInvoiceFromTransactions(
     periods: transactionRows,
     transactions: transactionRows,
     warehouseId: resolvedWarehouseId,
-    warehouseName: resolvedWarehouse?.name || '',
+    warehouseName: isMultipleWarehouses ? 'Multiple Warehouses' : (resolvedWarehouse?.name || ''),
+    warehouses: resolvedWarehouses,
     ...companyProfile,
     totalRent,
     previousBalance: 0,
@@ -454,6 +475,14 @@ export async function buildMonthlyInvoiceFromTransactions(
     newBalance: totalRent + additionalCharges,
     additionalCharges,
     additionalChargeItems,
+    billingState: existingMaster?.billingState || '',
+    taxGroup: existingMaster?.taxGroup || 'No Tax',
+    taxType: existingMaster?.taxType || '',
+    cgstAmount: Number(existingMaster?.cgstAmount || 0),
+    sgstAmount: Number(existingMaster?.sgstAmount || 0),
+    igstAmount: Number(existingMaster?.igstAmount || 0),
+    totalTaxAmount: Number(existingMaster?.totalTaxAmount || 0),
+    adjustmentAmount: Number(existingMaster?.adjustmentAmount || 0),
     invoiceDate: new Date().toISOString().split('T')[0],
   };
 }
@@ -486,6 +515,12 @@ export async function buildMonthlyInvoiceFromLedger(
     warehouseId ||
     (warehouseParts.length ? warehouseParts.join('-') : undefined);
 
+  const existingMaster = await findInvoiceMasterByIdentifier(
+    db,
+    id,
+    tenantFilter
+  );
+
   const ledgerResult = await getClientMonthlyLedger(
     clientId,
     invoiceMonth,
@@ -507,12 +542,26 @@ export async function buildMonthlyInvoiceFromLedger(
 
   if (!client) return null;
 
-  const resolvedWarehouse = resolvedWarehouseId
-    ? await db.collection('warehouses').findOne({
-        _id: new ObjectId(resolvedWarehouseId),
+  const isMultipleWarehouses = resolvedWarehouseId?.includes(',');
+  const warehouseIdsArray = isMultipleWarehouses && resolvedWarehouseId
+    ? resolvedWarehouseId.split(',').map(id => id.trim()).filter(Boolean)
+    : resolvedWarehouseId ? [resolvedWarehouseId] : [];
+
+  let resolvedWarehouse = null;
+  let resolvedWarehouses: any[] = [];
+  
+  if (warehouseIdsArray.length > 0) {
+    try {
+      const wIds = warehouseIdsArray.map(id => new ObjectId(id));
+      resolvedWarehouses = await db.collection('warehouses').find({
+        _id: { $in: wIds },
         ...tenantFilter,
-      })
-    : null;
+      }).toArray();
+      resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+    } catch (e) {
+      console.error('Error fetching warehouses:', e);
+    }
+  }
 
   const companyProfile =
     (await resolveInvoiceCompanyProfile(
@@ -544,7 +593,7 @@ export async function buildMonthlyInvoiceFromLedger(
     const existingInvoices = await db
       .collection('invoice_master')
       .find({
-        warehouseId: new ObjectId(resolvedWarehouseId),
+        ...(isMultipleWarehouses ? { warehouseIds: { $in: warehouseIdsArray.map(id => new ObjectId(id)) } } : { warehouseId: new ObjectId(resolvedWarehouseId) }),
         invoiceMonth: invoiceMonthString,
         invoiceId: { $regex: invoiceIdPattern },
         ...tenantFilter,
@@ -601,10 +650,12 @@ export async function buildMonthlyInvoiceFromLedger(
     updatedAt: new Date(),
   };
 
-  if (resolvedWarehouseId) {
+  if (resolvedWarehouseId && !isMultipleWarehouses) {
     invoiceMaster.warehouseId = new ObjectId(
       resolvedWarehouseId
     );
+  } else if (isMultipleWarehouses) {
+    invoiceMaster.warehouseIds = warehouseIdsArray.map(id => new ObjectId(id));
   }
 
   let masterId: any = null;
@@ -702,7 +753,8 @@ export async function buildMonthlyInvoiceFromLedger(
     periods: invoicePeriods,
     transactions: invoicePeriods,
     warehouseId: resolvedWarehouseId,
-    warehouseName: resolvedWarehouse?.name || '',
+    warehouseName: isMultipleWarehouses ? 'Multiple Warehouses' : (resolvedWarehouse?.name || ''),
+    warehouses: resolvedWarehouses,
     ...companyProfile,
     totalRent,
     previousBalance,
@@ -710,6 +762,14 @@ export async function buildMonthlyInvoiceFromLedger(
     newBalance,
     additionalCharges,
     additionalChargeItems,
+    billingState: existingMaster?.billingState || '',
+    taxGroup: existingMaster?.taxGroup || 'No Tax',
+    taxType: existingMaster?.taxType || '',
+    cgstAmount: Number(existingMaster?.cgstAmount || 0),
+    sgstAmount: Number(existingMaster?.sgstAmount || 0),
+    igstAmount: Number(existingMaster?.igstAmount || 0),
+    totalTaxAmount: Number(existingMaster?.totalTaxAmount || 0),
+    adjustmentAmount: Number(existingMaster?.adjustmentAmount || 0),
     invoiceDate:
       new Date().toISOString().split('T')[0],
   };
@@ -765,11 +825,14 @@ export async function getTransactionsForInvoiceMonth(
     }
 
     if (warehouseId !== undefined && warehouseId !== null) {
-      if (ObjectId.isValid(warehouseId)) {
-        warehouseIdValues.push(new ObjectId(warehouseId));
-        warehouseIdValues.push(warehouseId.toString());
-      } else {
-        warehouseIdValues.push(warehouseId);
+      const wIds = String(warehouseId).split(',').map(id => id.trim()).filter(Boolean);
+      for (const wId of wIds) {
+        if (ObjectId.isValid(wId)) {
+          warehouseIdValues.push(new ObjectId(wId));
+          warehouseIdValues.push(wId.toString());
+        } else {
+          warehouseIdValues.push(wId);
+        }
       }
     }
 
@@ -832,6 +895,32 @@ export async function getTransactionsForInvoiceMonth(
 
     const commodityMap = new Map<string, any>(
       commodityDocs.map((commodity: any) => [commodity._id.toString(), commodity])
+    );
+
+    const warehouseIdsArray: string[] = Array.from(
+      new Set(
+        transactions
+          .map((txn: any) => txn.warehouseId)
+          .filter((id: any) => id !== undefined && id !== null)
+          .map((id: any) => String(id))
+      )
+    );
+
+    const warehouseDocs = warehouseIdsArray.length
+      ? await db
+          .collection('warehouses')
+          .find({
+            _id: {
+              $in: warehouseIdsArray
+                .filter((id: string) => ObjectId.isValid(id))
+                .map((id: string) => new ObjectId(id)),
+            },
+          })
+          .toArray()
+      : [];
+
+    const warehouseMap = new Map<string, any>(
+      warehouseDocs.map((w: any) => [w._id.toString(), w])
     );
 
     return transactions.map((txn: any) => {
@@ -905,6 +994,13 @@ export async function getTransactionsForInvoiceMonth(
         ),
         commodityId: txn.commodityId,
         warehouseId: txn.warehouseId,
+        warehouseName: (() => {
+          const w = txn.warehouseId && warehouseMap.has(String(txn.warehouseId))
+            ? warehouseMap.get(String(txn.warehouseId))
+            : null;
+          if (w) return w.warehouseId ? `${w.warehouseId} - ${w.name}` : (w.name || 'Unknown');
+          return txn.warehouseName || 'Unknown';
+        })(),
         clientId: txn.clientId,
       } as any;
     });
@@ -968,6 +1064,7 @@ function buildOpeningBalanceRows(
     string,
     {
       commodityName: string;
+      warehouseName: string;
       quantityMT: number;
       bags: number;
       ratePerDay: number;
@@ -995,12 +1092,13 @@ function buildOpeningBalanceRows(
         0
     );
 
-    const commodityKey = `${txn.commodityId || txn.commodityName || 'unknown'}::${txn.commodityName || 'Unknown'}`;
+    const commodityKey = `${txn.commodityId || txn.commodityName || 'unknown'}::${txn.commodityName || 'Unknown'}::${txn.warehouseName || 'Unknown'}`;
     const existing = balanceMap.get(commodityKey);
 
     if (!existing) {
       balanceMap.set(commodityKey, {
         commodityName: txn.commodityName || 'Unknown',
+        warehouseName: txn.warehouseName || 'Unknown',
         quantityMT,
         bags,
         ratePerDay: ratePerDay || 0,
@@ -1031,6 +1129,7 @@ function buildOpeningBalanceRows(
       startDate: monthStartStr,
       endDate: billingEndDateStr,
       commodityName: balance.commodityName,
+      warehouseName: balance.warehouseName,
       quantityMT: balance.quantityMT,
       quantity: balance.quantityMT,
       bags: balance.bags || '',
@@ -1148,6 +1247,7 @@ export function transformTransactionsToBillingRows(
           startDate,
           endDate,
           commodityName: txn.commodityName || 'Unknown',
+          warehouseName: txn.warehouseName || 'Unknown',
           quantityMT,
           quantity: quantityMT,
           bags: bagCountValue,
@@ -1442,6 +1542,14 @@ export async function resolveMonthlyInvoiceFromId(
         newBalance,
         additionalCharges,
         additionalChargeItems,
+        billingState: invoiceMaster.billingState || '',
+        taxGroup: invoiceMaster.taxGroup || 'No Tax',
+        taxType: invoiceMaster.taxType || '',
+        cgstAmount: Number(invoiceMaster.cgstAmount || 0),
+        sgstAmount: Number(invoiceMaster.sgstAmount || 0),
+        igstAmount: Number(invoiceMaster.igstAmount || 0),
+        totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
+        adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
         invoiceDate:
           invoiceMaster.generatedAt
             ?.toISOString()
@@ -1519,6 +1627,14 @@ export async function resolveMonthlyInvoiceFromId(
             ),
       additionalCharges,
       additionalChargeItems,
+      billingState: invoiceMaster.billingState || '',
+      taxGroup: invoiceMaster.taxGroup || 'No Tax',
+      taxType: invoiceMaster.taxType || '',
+      cgstAmount: Number(invoiceMaster.cgstAmount || 0),
+      sgstAmount: Number(invoiceMaster.sgstAmount || 0),
+      igstAmount: Number(invoiceMaster.igstAmount || 0),
+      totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
+      adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
       invoiceDate:
         invoiceMaster.generatedAt
           ?.toISOString()

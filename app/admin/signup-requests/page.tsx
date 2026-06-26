@@ -13,6 +13,7 @@ interface SignupRequest {
   warehouseLocation: string;
   gstNumber?: string;
   bankName?: string;
+  accountName?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
   bankBranch?: string;
@@ -177,6 +178,12 @@ export default function SignupRequestsPage() {
                   <span>{request.bankName}</span>
                 </div>
               )}
+              {request.accountName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">A/C Name:</span>
+                  <span>{request.accountName}</span>
+                </div>
+              )}
               {request.bankAccountNumber && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500">A/C:</span>
@@ -256,6 +263,7 @@ export default function SignupRequestsPage() {
               {selectedRequest.address && <div><strong>Address:</strong> {selectedRequest.address}</div>}
               <div><strong>Location:</strong> {selectedRequest.warehouseLocation}</div>
               {selectedRequest.bankName && <div><strong>Bank Name:</strong> {selectedRequest.bankName}</div>}
+              {selectedRequest.accountName && <div><strong>Account Name:</strong> {selectedRequest.accountName}</div>}
               {selectedRequest.bankAccountNumber && <div><strong>Account Number:</strong> {selectedRequest.bankAccountNumber}</div>}
               {selectedRequest.ifscCode && <div><strong>IFSC Code:</strong> {selectedRequest.ifscCode}</div>}
               {selectedRequest.bankBranch && <div><strong>Branch:</strong> {selectedRequest.bankBranch}</div>}

@@ -137,12 +137,34 @@ export function generateStoragePeriods(
   if (!transactions.length) return [];
 
   // Step 1: Normalize transactions
-  const normalizedTxns = transactions.map(t => ({
-    date: typeof t.date === 'string' && t.date.includes('T') ? t.date.split('T')[0] :
-          t.date instanceof Date ? t.date.toISOString().split('T')[0] :
-          t.date,
-    qty: t.type === 'INWARD' ? t.qty : -t.qty
-  }));
+  const normalizedTxns = transactions.map(t => {
+    let dateStr = '';
+    if (t.date instanceof Date) {
+      dateStr = t.date.toISOString().split('T')[0];
+    } else if (typeof t.date === 'string') {
+      const raw = t.date.trim();
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        dateStr = `${match[1]}-${match[2]}-${match[3]}`;
+      } else {
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) {
+          const y = parsed.getFullYear();
+          const m = String(parsed.getMonth() + 1).padStart(2, '0');
+          const d = String(parsed.getDate()).padStart(2, '0');
+          dateStr = `${y}-${m}-${d}`;
+        } else {
+          dateStr = raw;
+        }
+      }
+    } else {
+      dateStr = String(t.date || '');
+    }
+    return {
+      date: dateStr,
+      qty: t.type === 'INWARD' ? t.qty : -t.qty
+    };
+  });
   console.log('Normalized transactions:', normalizedTxns);
 
   // Step 2: Group by date to get daily net changes (CRITICAL FIX)

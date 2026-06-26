@@ -588,18 +588,33 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
       return JSON.stringify(value);
     };
 
-    const serializedBookings = pagedRecords.map((booking: ReportRow, index) => ({
-      _id: normalizedValue(booking._id),
-      direction: booking.direction,
-      date: normalizedDate(booking.date),
-      clientName: booking.clientName,
-      clientLocation: booking.clientLocation,
-      commodityName: booking.commodityName,
-      warehouseName: booking.warehouseName,
-      location: booking.location,
-      quantityMT: booking.quantityMT,
-      bags: booking.bags,
-      storageDays: booking.storageDays,
+    const { getWarehouseFormatter } = await import('@/lib/warehouse-format');
+    const isAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN';
+    const formatter = await getWarehouseFormatter(db, isAdmin);
+
+    // Fetch warehouse map for formatting since booking might not have userId
+    const wIds = pagedRecords.map((b: any) => { try { return new ObjectId(b.warehouseId); } catch { return null; } }).filter((id): id is ObjectId => id !== null);
+    const pagedWarehouses = wIds.length > 0 ? await db.collection('warehouses').find({ _id: { $in: wIds } }).project({ _id: 1, userId: 1, warehouseId: 1 }).toArray() : [];
+    const warehouseUserIdMap = new Map(pagedWarehouses.map(w => [w._id.toString(), { userId: w.userId?.toString(), warehouseId: w.warehouseId }]));
+
+    const serializedBookings = pagedRecords.map((booking: ReportRow, index) => {
+      const wIdStr = normalizeId((booking as any).warehouseId);
+      const wMapInfo = warehouseUserIdMap.get(wIdStr);
+      const userIdStr = wMapInfo?.userId;
+      const warehouseIdStr = wMapInfo?.warehouseId;
+      
+      return {
+        _id: normalizedValue(booking._id),
+        direction: booking.direction,
+        date: normalizedDate(booking.date),
+        clientName: booking.clientName,
+        clientLocation: booking.clientLocation,
+        commodityName: booking.commodityName,
+        warehouseName: formatter(booking.warehouseName || '', userIdStr, warehouseIdStr),
+        location: booking.location,
+        quantityMT: booking.quantityMT,
+        bags: booking.bags,
+        storageDays: booking.storageDays,
       createdAt: normalizedValue(booking.createdAt),
       lotNo: booking.lotNo,
       gatePass: booking.gatePass,
@@ -614,7 +629,8 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
       warehouseId: normalizeId((booking as any).warehouseId),
       palaBags: booking.palaBags,
       sNo: skip + index + 1,
-    })) as any[];
+      };
+    }) as any[];
 
     const totalPages = Math.ceil(totalCount / limit);
 
@@ -815,6 +831,14 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
       const balanceResult = await getClientBalance(clientId);
       const clientBalance = balanceResult.success ? balanceResult.data : { totalPayments: 0, totalOutstanding: 0, currentBalance: 0 };
 
+      const { getWarehouseFormatter } = await import('@/lib/warehouse-format');
+      const isAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN';
+      const formatter = await getWarehouseFormatter(db, isAdmin);
+
+      const wIds = newInvoices.map((inv: any) => { try { return new ObjectId(inv.warehouseId); } catch { return null; } }).filter((id): id is ObjectId => id !== null);
+      const invoiceWarehouses = wIds.length > 0 ? await db.collection('warehouses').find({ _id: { $in: wIds } }).project({ _id: 1, userId: 1, warehouseId: 1 }).toArray() : [];
+      const invoiceWarehouseUserMap = new Map(invoiceWarehouses.map(w => [w._id.toString(), { userId: w.userId?.toString(), warehouseId: w.warehouseId }]));
+
       const invoices = newInvoices.map((invoice) => {
         const invoiceMonthParts = (invoice.month || '').split(' ');
         const monthLabel = invoiceMonthParts[0] || invoice.month || '';
@@ -856,7 +880,7 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
           month: monthLabel,
           year: yearValue,
           periods,
-          warehouseName: invoice.warehouseName || 'General',
+          warehouseName: formatter(invoice.warehouseName || 'General', invoiceWarehouseUserMap.get(invoice.warehouseId?.toString())?.userId, invoiceWarehouseUserMap.get(invoice.warehouseId?.toString())?.warehouseId),
           totalRent: invoice.totalAmount || 0,
           previousBalance: Math.max(0, previousBalance),
           paymentsReceived,
@@ -898,7 +922,11 @@ export async function getClientInvoicesByClientId(clientId: string, month?: stri
       .find(warehouseQueryWithTenant)
       .toArray() as IWarehouse[];
 
-    const warehouseMap = new Map(warehouses.map(warehouse => [warehouse._id?.toString(), warehouse.name]));
+    const { getWarehouseFormatter } = await import('@/lib/warehouse-format');
+    const isAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN';
+    const formatter = await getWarehouseFormatter(db, isAdmin);
+
+    const warehouseMap = new Map(warehouses.map(warehouse => [warehouse._id?.toString(), formatter(warehouse.name || '', warehouse.userId?.toString(), (warehouse as any).warehouseId)]));
 
     // Get client balance information
     const balanceResult = await getClientBalance(clientId);
@@ -1003,8 +1031,12 @@ export async function getWarehouseOptions() {
     const db = await getDb();
     const warehouses = await db.collection('warehouses').find({ status: { $in: ['ACTIVE', 'FULL'] }, ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
+    const { getWarehouseFormatter } = await import('@/lib/warehouse-format');
+    const isAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN';
+    const formatter = await getWarehouseFormatter(db, isAdmin);
+
     return warehouses.map(w => ({
-      label: w.name,
+      label: formatter(w.name || '', w.userId?.toString(), w.warehouseId),
       value: w._id.toString() // Always return as string
     }));
   } catch (error) {

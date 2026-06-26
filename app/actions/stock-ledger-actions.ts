@@ -45,20 +45,36 @@ export async function getMasterData() {
 
   const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
 
-  const mapWspName = (item: any) => {
+  const warehouseNameCounts = new Map<string, number>();
+  warehouses.forEach(w => {
+    const n = w.name?.toLowerCase() || '';
+    warehouseNameCounts.set(n, (warehouseNameCounts.get(n) || 0) + 1);
+  });
+
+  const mapWspName = (type: string) => (item: any) => {
     const userId = item.userId?.toString();
     const userInfo = userId ? userMap.get(userId) : null;
     const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (item.userId ? 'Unknown' : 'System');
+    
+    let displayName = item.name;
+    if (isAdmin(session) && type === 'warehouse') {
+      const isDuplicate = (warehouseNameCounts.get(item.name?.toLowerCase() || '') || 0) > 1;
+      if (isDuplicate) {
+        displayName = `${item.name} (${wspName})`;
+      }
+    }
+
     return {
       ...item,
+      name: displayName,
       wspName
     };
   };
 
   return JSON.parse(JSON.stringify({
-    clients: clients.map(mapWspName) as IClient[],
-    commodities: commodities.map(mapWspName) as ICommodity[],
-    warehouses: warehouses.map(mapWspName) as IWarehouse[],
+    clients: clients.map(mapWspName('client')) as IClient[],
+    commodities: commodities.map(mapWspName('commodity')) as ICommodity[],
+    warehouses: warehouses.map(mapWspName('warehouse')) as IWarehouse[],
   }));
 }
 export async function createStockEntry(data: {
@@ -341,7 +357,33 @@ async function processOutwardLedgerUpdate(outwardEntry: IStockEntry): Promise<vo
 export async function generateMonthlyInvoices(invoiceMonth: string, userId?: string, tenantFilter?: any): Promise<{ success: boolean; message: string }> {
   try {
     const db = await getDb();
-    const filter: any = tenantFilter || { status: { $in: ['ACTIVE', 'CLOSED'] } };
+    const filter: any = {};
+    if (tenantFilter) {
+      // Support both string and ObjectId formats for clientId and warehouseId
+      for (const [key, value] of Object.entries(tenantFilter)) {
+        if (key === 'clientId' && value) {
+          const ids: any[] = [value];
+          if (typeof value === 'string' && ObjectId.isValid(value)) {
+            ids.push(new ObjectId(value));
+          } else if (value instanceof ObjectId) {
+            ids.push(value.toString());
+          }
+          filter.clientId = { $in: ids };
+        } else if (key === 'warehouseId' && value) {
+          const ids: any[] = [value];
+          if (typeof value === 'string' && ObjectId.isValid(value)) {
+            ids.push(new ObjectId(value));
+          } else if (value instanceof ObjectId) {
+            ids.push(value.toString());
+          }
+          filter.warehouseId = { $in: ids };
+        } else {
+          filter[key] = value;
+        }
+      }
+    } else {
+      filter.status = { $in: ['ACTIVE', 'CLOSED'] };
+    }
     if (userId && !tenantFilter) filter.userId = new ObjectId(userId);
 
     // Get all client-warehouse combinations with active stock
@@ -387,8 +429,8 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
   const monthEndStr = monthEnd.toISOString().split('T')[0];
 
   const ledgerQuery: any = {
-    clientId,
-    warehouseId,
+    clientId: ObjectId.isValid(clientId.toString()) ? new ObjectId(clientId.toString()) : clientId,
+    warehouseId: ObjectId.isValid(warehouseId.toString()) ? new ObjectId(warehouseId.toString()) : warehouseId,
     status: { $in: ['ACTIVE', 'CLOSED'] },
     periodStartDate: { $exists: true, $ne: null, $lte: monthEndStr },
     quantityMT: { $gt: 0 },
@@ -396,9 +438,17 @@ async function generateInvoiceForClientWarehouse(clientId: ObjectId, warehouseId
       { periodEndDate: { $gte: monthStart } },
       { periodEndDate: null },
     ],
-    ...(tenantFilter || {}),
     ...(userId ? { userId: new ObjectId(userId) } : {}),
   };
+
+  // Merge tenantFilter safely, avoiding overriding clientId and warehouseId with raw string formats
+  if (tenantFilter) {
+    for (const [key, value] of Object.entries(tenantFilter)) {
+      if (key !== 'clientId' && key !== 'warehouseId') {
+        ledgerQuery[key] = value;
+      }
+    }
+  }
 
   // Query ledger entries for this client+warehouse during the invoice month
   const ledgerData = await db.collection('ledger_entries').aggregate([

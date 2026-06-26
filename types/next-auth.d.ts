@@ -11,10 +11,13 @@ declare module "next-auth" {
     warehouseLocation?: string;
     gstNumber?: string;
     bankName?: string;
+    accountName?: string;
     bankAccountNumber?: string;
     ifscCode?: string;
     bankBranch?: string;
     companyLogo?: string | null;
+    state?: string;
+    isNewRegistration?: boolean;
   }
 
   interface Session {

@@ -32,6 +32,7 @@ export default function WarehouseList({
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">
+            <TableHead className="font-semibold">Warehouse ID</TableHead>
             <TableHead className="font-semibold">Name</TableHead>
             <TableHead className="font-semibold">Address</TableHead>
             <TableHead className="text-right font-semibold">Total Capacity (MT)</TableHead>
@@ -45,7 +46,7 @@ export default function WarehouseList({
         <TableBody>
           {warehouses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={9} className="h-24 text-center text-slate-500">
                 No warehouses found. Start by adding one.
               </TableCell>
             </TableRow>
@@ -54,6 +55,7 @@ export default function WarehouseList({
               const availableCapacity = w.status === 'FULL' || w.status === 'INACTIVE' ? 0 : (w.totalCapacity - w.occupiedCapacity);
               return (
                 <TableRow key={w._id.toString()} className="hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="text-slate-600">{w.warehouseId || '-'}</TableCell>
                   <TableCell className="font-medium text-slate-900">{w.name}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-slate-600" title={w.address}>{w.address}</TableCell>
                   <TableCell className="text-right text-slate-700">{w.totalCapacity.toLocaleString()}</TableCell>

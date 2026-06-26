@@ -104,6 +104,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceData | n
       },
       bankDetails: {
         bankName: 'State Bank of India',
+        accountName: 'ABC Warehousing Pvt. Ltd.',
         branchName: 'Industrial Area Branch',
         accountNumber: '123456789012',
         ifscCode: 'SBIN0001234',

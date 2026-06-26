@@ -20,9 +20,16 @@ export async function getWarehouses(options?: { includeInactive?: boolean }) {
   const warehouses = await Warehouse.find({ status: { $in: allowedStatuses }, ...getTenantFilter(session) }).sort({ name: 1 });
   
   const db = await getDb();
-  const userIds = warehouses.map(w => w.userId).filter((id): id is any => !!id);
+  const uniqueUserIds = [...new Set(warehouses.map(w => w.userId?.toString()).filter(Boolean))];
+  const userIds = uniqueUserIds.map(id => new mongoose.Types.ObjectId(id as string));
   const users = userIds.length > 0 ? await db.collection('users').find({ _id: { $in: userIds } }).project({ _id: 1, fullName: 1, email: 1, companyName: 1 }).toArray() : [];
   const userMap = new Map(users.map(u => [u._id.toString(), { fullName: u.fullName, email: u.email, companyName: u.companyName }]));
+  
+  const nameCounts = new Map<string, number>();
+  warehouses.forEach(w => {
+    const n = w.name?.toLowerCase() || '';
+    nameCounts.set(n, (nameCounts.get(n) || 0) + 1);
+  });
   
   return JSON.parse(JSON.stringify(warehouses.map(w => {
     const userId = w.userId?.toString();
@@ -30,8 +37,17 @@ export async function getWarehouses(options?: { includeInactive?: boolean }) {
     const wspName = userInfo?.companyName || userInfo?.fullName || userInfo?.email || (w.userId ? 'Unknown' : 'System');
     const addedBy = userInfo?.fullName || userInfo?.email || (w.userId ? 'Unknown' : 'System');
     
+    let displayName = w.name;
+    if (isAdmin(session)) {
+      const isDuplicate = (nameCounts.get(w.name?.toLowerCase() || '') || 0) > 1;
+      if (isDuplicate) {
+        displayName = `${w.name} (${wspName})`;
+      }
+    }
+
     return {
       ...w.toObject?.() || w,
+      name: displayName,
       wspName,
       addedBy,
     };
@@ -39,6 +55,7 @@ export async function getWarehouses(options?: { includeInactive?: boolean }) {
 }
 
 export async function createWarehouse(data: {
+  warehouseId?: string;
   name: string;
   address: string;
   totalCapacity: number;
@@ -46,6 +63,24 @@ export async function createWarehouse(data: {
   await connectToDatabase();
   try {
     const session = await requireSession();
+    
+    const email = session.user.email?.trim().toLowerCase() || null;
+    const ownerFilter: any = {
+      $or: [
+        { userId: session.user.id },
+        ...(email ? [{ userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }] : [])
+      ]
+    };
+    
+    const existingWarehouse = await Warehouse.findOne({
+      ...ownerFilter,
+      name: data.name
+    });
+    
+    if (existingWarehouse) {
+      return { success: false, error: 'Warehouse name already exists for this WSP. Please use a different name.' };
+    }
+
     const warehouse = await Warehouse.create(appendOwnership({
       ...data,
       occupiedCapacity: 0,
@@ -59,6 +94,7 @@ export async function createWarehouse(data: {
 }
 
 export async function updateWarehouse(id: string, data: Partial<{
+  warehouseId: string;
   name: string;
   address: string;
   totalCapacity: number;
@@ -72,6 +108,26 @@ export async function updateWarehouse(id: string, data: Partial<{
     const warehouse = await Warehouse.findOne({ _id: id, ...getTenantFilter(session) });
     if (!warehouse) {
       throw new Error('Warehouse not found');
+    }
+
+    if (data.name) {
+      const email = session.user.email?.trim().toLowerCase() || null;
+      const ownerFilter: any = {
+        $or: [
+          { userId: session.user.id },
+          ...(email ? [{ userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }] : [])
+        ]
+      };
+      
+      const existingWarehouse = await Warehouse.findOne({
+        _id: { $ne: id },
+        ...ownerFilter,
+        name: data.name
+      });
+      
+      if (existingWarehouse) {
+        throw new Error('Warehouse name already exists for this WSP. Please use a different name.');
+      }
     }
 
     const nextTotalCapacity = data.totalCapacity !== undefined ? data.totalCapacity : warehouse.totalCapacity;

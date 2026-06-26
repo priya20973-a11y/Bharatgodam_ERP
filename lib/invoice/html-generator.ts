@@ -293,6 +293,11 @@ export function generateInvoiceHTML(data: InvoiceData): string {
           <div class="bank-label">Bank Name:</div>
           <div>${data.bankDetails.bankName}</div>
         </div>
+        ${data.bankDetails.accountName ? `
+        <div class="bank-detail">
+          <div class="bank-label">Account Name:</div>
+          <div>${data.bankDetails.accountName}</div>
+        </div>` : ''}
         <div class="bank-detail">
           <div class="bank-label">Branch:</div>
           <div>${data.bankDetails.branchName}</div>

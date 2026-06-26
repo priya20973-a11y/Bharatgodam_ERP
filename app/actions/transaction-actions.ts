@@ -174,6 +174,107 @@ export async function getStockBalance(clientId: string, commodityId: string, war
 }
 
 /**
+ * Validates if an outward transaction is valid based on date-wise stock availability.
+ */
+export async function validateOutwardStock(
+  clientId: string,
+  commodityId: string,
+  warehouseId: string,
+  outwardDateStr: string | Date,
+  quantityMT: number,
+  session?: mongoose.ClientSession
+): Promise<void> {
+  await connectToDatabase();
+  
+  // Normalize date properly depending on type, avoiding UTC shifting if it's already a Date
+  let targetDateStr;
+  if (typeof outwardDateStr === 'string') {
+    targetDateStr = outwardDateStr.split('T')[0];
+  } else {
+    // If it's a date, format it properly
+    const y = outwardDateStr.getUTCFullYear();
+    const m = String(outwardDateStr.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(outwardDateStr.getUTCDate()).padStart(2, '0');
+    targetDateStr = `${y}-${m}-${d}`;
+  }
+  
+  const parts = targetDateStr.split('-');
+  const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+  const clientObjectId = new mongoose.Types.ObjectId(clientId);
+  const commodityObjectId = new mongoose.Types.ObjectId(commodityId);
+  const warehouseObjectId = new mongoose.Types.ObjectId(warehouseId);
+
+  const inwardAgg = Inward.aggregate([
+    { $match: { clientId: clientObjectId, commodityId: commodityObjectId, warehouseId: warehouseObjectId } },
+    { $project: { date: 1, quantityMT: 1 } }
+  ]);
+  const outwardAgg = Outward.aggregate([
+    { $match: { clientId: clientObjectId, commodityId: commodityObjectId, warehouseId: warehouseObjectId } },
+    { $project: { date: 1, quantityMT: 1 } }
+  ]);
+
+  const inwards = session ? await inwardAgg.session(session).exec() : await inwardAgg.exec();
+  const outwards = session ? await outwardAgg.session(session).exec() : await outwardAgg.exec();
+
+  const getIsoDateStr = (d: Date) => {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const firstInwardDateStr = inwards.length > 0 
+      ? inwards.map((i: any) => getIsoDateStr(i.date)).sort()[0] 
+      : null;
+
+  if (!firstInwardDateStr || targetDateStr < firstInwardDateStr) {
+      throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is 0 MT.`);
+  }
+
+  let availableStockOnDate = 0;
+  for (const inv of inwards) {
+    if (getIsoDateStr(inv.date) <= targetDateStr) {
+       availableStockOnDate += inv.quantityMT;
+    }
+  }
+  for (const out of outwards) {
+    if (getIsoDateStr(out.date) <= targetDateStr) {
+       availableStockOnDate -= out.quantityMT;
+    }
+  }
+
+  availableStockOnDate = Math.round(availableStockOnDate * 10000) / 10000;
+
+  if (quantityMT > availableStockOnDate) {
+      throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is ${availableStockOnDate} MT.`);
+  }
+
+  // Check historical negative balance
+  const dateBalances = new Map<string, number>();
+  for (const inv of inwards) {
+     const d = getIsoDateStr(inv.date);
+     dateBalances.set(d, (dateBalances.get(d) || 0) + inv.quantityMT);
+  }
+  for (const out of outwards) {
+     const d = getIsoDateStr(out.date);
+     dateBalances.set(d, (dateBalances.get(d) || 0) - out.quantityMT);
+  }
+  dateBalances.set(targetDateStr, (dateBalances.get(targetDateStr) || 0) - quantityMT);
+
+  const sortedDates = Array.from(dateBalances.keys()).sort();
+  let runningBalance = 0;
+  for (const d of sortedDates) {
+     runningBalance += dateBalances.get(d)!;
+     if (runningBalance < -0.0001) {
+         const dParts = d.split('-');
+         const dFormatted = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
+         throw new Error(`Transaction would cause stock to become negative on ${dFormatted}.`);
+     }
+  }
+}
+
+/**
  * Processes Inward entry with Grouped Invoicing and Revenue Distribution
  */
 export async function processInward(data: {
@@ -279,6 +380,7 @@ export async function processInward(data: {
       commodity.ratePerMtPerDay ??
       (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
     const ledgerEntry = appendOwnershipForMongo({
+      inwardId: newInward._id,
       clientId: new mongoose.Types.ObjectId(data.clientId),
       warehouseId: new mongoose.Types.ObjectId(data.warehouseId),
       commodityId: new mongoose.Types.ObjectId(data.commodityId),
@@ -385,11 +487,8 @@ export async function processOutward(data: {
       role: authSession?.user?.role,
     });
 
-    const currentBalance = await getStockBalance(data.clientId, data.commodityId, data.warehouseId, session || undefined);
-    console.log('[processOutward] currentBalance', { currentBalance });
-    if (data.quantityMT > currentBalance) {
-      throw new Error(`Insufficient stock. Available: ${currentBalance} MT`);
-    }
+    await validateOutwardStock(data.clientId, data.commodityId, data.warehouseId, outwardDate, data.quantityMT, session || undefined);
+    console.log('[processOutward] stock validated successfully');
 
     const clientQuery = Client.findById(data.clientId);
     const commodityQuery = Commodity.findById(data.commodityId);
@@ -484,7 +583,6 @@ export async function processOutward(data: {
       warehouseId: data.warehouseId,
       quantityMT: data.quantityMT,
       outwardId: newOutward._id?.toString(),
-      currentBalance,
       occupiedCapacity: warehouse.occupiedCapacity,
     });
 
@@ -738,6 +836,9 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         Object.assign(ledgerQuery, ownershipFilter);
       }
     }
+
+    // Exclude stale SPLIT entries to avoid double counting
+    ledgerQuery.status = { $ne: 'SPLIT' };
 
     // Get all ledger entries
     const allLedgerEntries = await db.collection('ledger_entries').find(ledgerQuery).toArray();

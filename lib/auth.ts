@@ -56,6 +56,8 @@ export const authOptions: NextAuthOptions = {
           bankAccountNumber: user.bankAccountNumber || null,
           ifscCode: user.ifscCode || null,
           bankBranch: user.bankBranch || null,
+          state: user.state || '',
+          isNewRegistration: !!user.isNewRegistration,
         };
       },
     }),
@@ -80,6 +82,8 @@ export const authOptions: NextAuthOptions = {
         token.ifscCode = (user as any).ifscCode || null;
         token.bankBranch = (user as any).bankBranch || null;
         token.companyLogo = (user as any).companyLogo || null;
+        token.state = (user as any).state || '';
+        token.isNewRegistration = (user as any).isNewRegistration || false;
       }
       return token;
     },
@@ -98,6 +102,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).ifscCode = token.ifscCode || null;
         (session.user as any).bankBranch = token.bankBranch || null;
         (session.user as any).companyLogo = token.companyLogo || null;
+        (session.user as any).state = token.state || '';
+        (session.user as any).isNewRegistration = token.isNewRegistration || false;
       }
       return session;
     },

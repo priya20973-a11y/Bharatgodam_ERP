@@ -14,7 +14,16 @@ export async function GET() {
     const db = await getDb();
     const warehouses = await db.collection('warehouses').find({ ...getTenantFilterForMongo(session) }).sort({ name: 1 }).toArray();
 
-    return NextResponse.json(warehouses);
+    const { getWarehouseFormatter } = await import('@/lib/warehouse-format');
+    const isAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN';
+    const formatter = await getWarehouseFormatter(db, isAdmin);
+
+    const formattedWarehouses = warehouses.map(w => ({
+      ...w,
+      name: formatter(w.name || '', w.userId?.toString(), w.warehouseId)
+    }));
+
+    return NextResponse.json(formattedWarehouses);
 
   } catch (error) {
     console.error('Error fetching warehouses:', error);

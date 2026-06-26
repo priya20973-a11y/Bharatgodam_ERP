@@ -46,19 +46,26 @@ const RATE_PER_DAY_PER_MT = 10;
  * Parse ISO date string to Date object
  */
 function parseDate(dateStr: string): Date {
-  const normalized = String(dateStr || '').trim().split('T')[0];
-  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalized);
+  const str = String(dateStr || '').trim();
+  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(str.split('T')[0]);
   if (match) {
     const year = Number(match[1]);
     const month = Number(match[2]) - 1;
     const day = Number(match[3]);
     return new Date(Date.UTC(year, month, day));
   }
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) {
-    return new Date();
+  // Try standard parsing directly (avoid splitting by 'T' if it might contain timezone info like GMT)
+  const date = new Date(str);
+  if (!Number.isNaN(date.getTime())) {
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   }
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  // Fallback split
+  const normalized = str.split('T')[0];
+  const secondDate = new Date(normalized);
+  if (!Number.isNaN(secondDate.getTime())) {
+    return new Date(Date.UTC(secondDate.getUTCFullYear(), secondDate.getUTCMonth(), secondDate.getUTCDate()));
+  }
+  return new Date();
 }
 
 /**
