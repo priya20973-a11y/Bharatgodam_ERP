@@ -207,6 +207,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
         <div class="company-detail"><strong>Web:</strong> ${data.company.website}</div>
         <div class="company-detail"><strong>Phone:</strong> ${data.company.phone}</div>
         <div class="company-detail" style="margin-top: 5px;"><strong>GSTIN:</strong> ${data.company.gstin}</div>
+        ${data.company.pan ? `<div class="company-detail" style="margin-top: 2px;"><strong>PAN:</strong> ${data.company.pan}</div>` : ''}
       </div>
     </div>
 
@@ -228,6 +229,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
         <div class="recipient-label" style="text-align: right;">Bill Details:</div>
         <div class="recipient-value" style="text-align: right;">
           ${data.customer.gstin ? `<strong>GSTIN:</strong> ${data.customer.gstin}<br>` : ''}
+          ${data.customer.pan ? `<strong>PAN:</strong> ${data.customer.pan}<br>` : ''}
         </div>
       </div>
     </div>

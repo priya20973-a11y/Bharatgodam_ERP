@@ -32,6 +32,7 @@ export async function GET() {
         ifscCode: user.ifscCode || null,
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
+        panNumber: user.panNumber || null,
         isNewRegistration: !!user.isNewRegistration,
       },
     });
@@ -65,7 +66,8 @@ export async function PATCH(req: Request) {
       bankAccountNumber,
       ifscCode,
       bankBranch,
-      companyLogo
+      companyLogo,
+      panNumber
     } = body;
 
     const db = await getDb();
@@ -85,10 +87,14 @@ export async function PATCH(req: Request) {
       bankBranch: bankBranch !== undefined ? bankBranch : userBeforeUpdate.bankBranch,
       companyLogo: companyLogo !== undefined ? companyLogo : userBeforeUpdate.companyLogo,
       gstNumber: gstNumber !== undefined ? gstNumber : userBeforeUpdate.gstNumber,
+      panNumber: panNumber !== undefined ? panNumber : userBeforeUpdate.panNumber,
     };
 
     const trimmedGst = merged.gstNumber ? merged.gstNumber.toString().trim().toUpperCase() : '';
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    const trimmedPan = merged.panNumber ? merged.panNumber.toString().trim().toUpperCase() : '';
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
     if (isNew) {
       if (!merged.state || !merged.state.toString().trim()) {
@@ -110,9 +116,18 @@ export async function PATCH(req: Request) {
       if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
         return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
       }
+      if (!trimmedPan) {
+        return NextResponse.json({ message: 'PAN Number is required.' }, { status: 400 });
+      }
+      if (!panRegex.test(trimmedPan)) {
+        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+      }
     } else {
       if (trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
         return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+      }
+      if (trimmedPan && !panRegex.test(trimmedPan)) {
+        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
       }
     }
 
@@ -140,6 +155,7 @@ export async function PATCH(req: Request) {
     if (ifscCode !== undefined) updates.ifscCode = ifscCode || null;
     if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
     if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
+    if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -181,6 +197,7 @@ export async function PATCH(req: Request) {
         ifscCode: user.ifscCode || null,
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
+        panNumber: user.panNumber || null,
         isNewRegistration: !!user.isNewRegistration,
       },
     });

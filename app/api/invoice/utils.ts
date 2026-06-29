@@ -133,6 +133,7 @@ async function resolveInvoiceCompanyProfile(
     companyEmail: user.email || '',
     companyLogo: user.companyLogo || '',
     companyGst: user.gstNumber || '',
+    companyPan: user.panNumber || '',
     bankName: user.bankName || '',
     accountName: user.accountName || '',
     bankAccountNumber: user.bankAccountNumber || '',

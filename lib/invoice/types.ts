@@ -10,6 +10,7 @@ export interface CompanyInfo {
   website: string;
   phone: string;
   gstin: string;
+  pan?: string;
   logo?: string; // Base64 or URL
 }
 
@@ -24,6 +25,7 @@ export interface CustomerInfo {
   pincode?: string;
   contact?: string;
   gstin?: string;
+  pan?: string;
 }
 
 export interface InvoiceMetadata {

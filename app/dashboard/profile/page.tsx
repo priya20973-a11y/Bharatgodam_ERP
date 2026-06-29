@@ -60,6 +60,7 @@ interface ProfileData {
   ifscCode?: string | null;
   bankBranch?: string | null;
   companyLogo?: string | null;
+  panNumber?: string | null;
   isNewRegistration?: boolean;
 }
 
@@ -78,6 +79,7 @@ const initialProfileForm = {
   ifscCode: '',
   bankBranch: '',
   companyLogo: '',
+  panNumber: '',
 };
 
 const initialPasswordForm = {
@@ -138,6 +140,7 @@ export default function ProfilePage() {
         ifscCode: data.user.ifscCode || '',
         bankBranch: data.user.bankBranch || '',
         companyLogo: data.user.companyLogo || '',
+        panNumber: data.user.panNumber || '',
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -174,6 +177,9 @@ export default function ProfilePage() {
 
     const gstTrimmed = profileForm.gstNumber?.trim().toUpperCase() || '';
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    const panTrimmed = profileForm.panNumber?.trim().toUpperCase() || '';
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
     if (isNew) {
       if (!profileForm.state) {
@@ -221,9 +227,24 @@ export default function ProfilePage() {
         setSavingProfile(false);
         return;
       }
+      if (!panTrimmed) {
+        setError('PAN Number is required.');
+        setSavingProfile(false);
+        return;
+      }
+      if (!panRegex.test(panTrimmed)) {
+        setError('Invalid PAN format (must be AAAAA9999A).');
+        setSavingProfile(false);
+        return;
+      }
     } else {
       if (gstTrimmed && gstTrimmed !== 'NA' && !gstRegex.test(gstTrimmed)) {
         setError('Invalid GSTIN format (must be 15 characters, or NA).');
+        setSavingProfile(false);
+        return;
+      }
+      if (panTrimmed && !panRegex.test(panTrimmed)) {
+        setError('Invalid PAN format (must be AAAAA9999A).');
         setSavingProfile(false);
         return;
       }
@@ -508,6 +529,18 @@ export default function ProfilePage() {
 
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">
+                PAN Number{profile?.isNewRegistration ? ' *' : ''}
+              </span>
+              <input
+                type="text"
+                value={profileForm.panNumber}
+                onChange={(event) => setProfileForm({ ...profileForm, panNumber: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 uppercase"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
                 Bank Name{profile?.isNewRegistration ? ' *' : ''}
               </span>
               <input
@@ -593,6 +626,7 @@ export default function ProfilePage() {
                 ifscCode: profile?.ifscCode || '',
                 bankBranch: profile?.bankBranch || '',
                 companyLogo: profile?.companyLogo || '',
+                panNumber: profile?.panNumber || '',
               });
               setMessage(null);
               setError(null);

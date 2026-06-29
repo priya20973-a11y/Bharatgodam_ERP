@@ -63,6 +63,7 @@ export default function SignupPage() {
     ifscCode: '',
     bankBranch: '',
     companyLogo: '',
+    panNumber: '',
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [gstNotApplicable, setGstNotApplicable] = useState(false);
@@ -100,6 +101,16 @@ export default function SignupPage() {
         if (!gstRegex.test(gstTrimmed)) {
           newErrors.gstNumber = 'Invalid GSTIN format';
         }
+      }
+    }
+
+    const panTrimmed = formData.panNumber.trim().toUpperCase();
+    if (!panTrimmed) {
+      newErrors.panNumber = 'PAN Number is required';
+    } else {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panTrimmed)) {
+        newErrors.panNumber = 'Invalid PAN format';
       }
     }
 
@@ -462,6 +473,27 @@ export default function SignupPage() {
                 />
               </div>
               {errors.gstNumber && <p className="mt-1 text-sm text-red-600">{errors.gstNumber}</p>}
+            </div>
+
+            {/* PAN Number */}
+            <div>
+              <label htmlFor="panNumber" className="sr-only">PAN Number *</label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <FileText className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="panNumber"
+                  name="panNumber"
+                  type="text"
+                  required
+                  value={formData.panNumber}
+                  onChange={handleInputChange}
+                  className="block w-full rounded-lg border border-gray-300 py-3 pl-10 pr-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm bg-white uppercase"
+                  placeholder="PAN Number *"
+                />
+              </div>
+              {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
             </div>
 
             {/* Bank Details */}

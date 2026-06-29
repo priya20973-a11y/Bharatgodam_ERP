@@ -22,6 +22,7 @@ export async function POST(req: Request) {
       ifscCode,
       bankBranch,
       companyLogo,
+      panNumber,
       role
     } = body;
 
@@ -54,11 +55,27 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!panNumber) {
+      return NextResponse.json(
+        { message: 'PAN Number is required.' },
+        { status: 400 }
+      );
+    }
+
     const trimmedGst = gstNumber.toString().trim().toUpperCase();
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
       return NextResponse.json(
         { message: 'Please enter a valid GSTIN format or NA.' },
+        { status: 400 }
+      );
+    }
+
+    const trimmedPan = panNumber.toString().trim().toUpperCase();
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(trimmedPan)) {
+      return NextResponse.json(
+        { message: 'Please enter a valid PAN format (AAAAA9999A).' },
         { status: 400 }
       );
     }
@@ -139,6 +156,7 @@ export async function POST(req: Request) {
       ifscCode: ifscCode.trim(),
       bankBranch: bankBranch.trim(),
       companyLogo,
+      panNumber: trimmedPan,
       role: normalizedRole,
       status: 'PENDING_APPROVAL',
       isNewRegistration: true,

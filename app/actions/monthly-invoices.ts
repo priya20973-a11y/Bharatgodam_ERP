@@ -39,6 +39,7 @@ export interface MonthlyInvoiceData {
   companyEmail?: string;
   companyLogo?: string;
   companyGst?: string;
+  companyPan?: string;
   bankName?: string;
   accountName?: string;
   bankAccountNumber?: string;

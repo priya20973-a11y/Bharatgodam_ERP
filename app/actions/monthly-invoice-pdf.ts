@@ -234,6 +234,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
   const companyGst = invoice.companyGst || '';
+  const companyPan = invoice.companyPan || '';
 
   const db = await getDb();
   let clientAddress = '';
@@ -755,9 +756,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         </style>
       </head>
       <body>
-        <div class="print-banner">
-          Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.
-        </div>
+        
         <!-- invoice-html-version: 3 | transactions:${invoice.transactions?.length || 0} | periods:${invoice.periods?.length || 0} | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
         <div class="invoice-container">
           <div class="invoice-body">
@@ -772,6 +771,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     <p>📍 ${companyAddress}</p>
                     <p>📞 ${contactPhone} &nbsp;|&nbsp; ✉️ ${contactEmail}</p>
                     ${companyGst ? `<p class="gstin-badge">GSTIN: ${companyGst}</p>` : ''}
+                    ${companyPan ? `<p class="gstin-badge" style="margin-top: 2px;">PAN: ${companyPan}</p>` : ''}
                   </div>
                   ${(invoice as any).warehouses && (invoice as any).warehouses.length > 0 ? `
                   <div style="margin-top: 10px; font-size: 10px; font-weight: 600; color: #0F2D52;">
