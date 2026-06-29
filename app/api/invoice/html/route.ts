@@ -76,17 +76,8 @@ export async function GET(request: NextRequest) {
     const printableHtml = html.replace(
       '<body>',
       `<body>
-        <div
-          style="
-            padding:12px;
-            background:#f8fafc;
-            color:#0f172a;
-            font-size:13px;
-            text-align:center;
-          "
-        >
-          Press Ctrl+P (or ⌘+P on Mac)
-          to print or save this invoice.
+        <div class="print-banner hide-on-print">
+          Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.
         </div>`
     );
 

@@ -32,6 +32,27 @@ export function generateInvoiceHTML(data: InvoiceData): string {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
+    
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        margin: 10mm 15mm !important;
+      }
+      .hide-on-print {
+        display: none !important;
+      }
+      .container {
+        max-width: none !important;
+        width: 100% !important;
+      }
+    }
+    
     .container { width: 100%; max-width: 9in; margin: 0 auto; padding: 20px; }
     
     /* Header */

@@ -45,6 +45,7 @@ export interface MonthlyInvoiceData {
   bankAccountNumber?: string;
   ifscCode?: string;
   bankBranch?: string;
+  companyTermsAndConditions?: string;
   totalRent: number;
   previousBalance?: number;
   currentPayments?: number;
@@ -66,6 +67,7 @@ export interface MonthlyInvoiceData {
   adjustmentAmount?: number;
   invoiceDate: string;
   invoiceNumber?: string;
+  notes?: string;
 }
 
 /**

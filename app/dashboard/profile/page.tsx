@@ -61,6 +61,7 @@ interface ProfileData {
   bankBranch?: string | null;
   companyLogo?: string | null;
   panNumber?: string | null;
+  termsAndConditions?: string | null;
   isNewRegistration?: boolean;
 }
 
@@ -80,6 +81,7 @@ const initialProfileForm = {
   bankBranch: '',
   companyLogo: '',
   panNumber: '',
+  termsAndConditions: '',
 };
 
 const initialPasswordForm = {
@@ -141,6 +143,7 @@ export default function ProfilePage() {
         bankBranch: data.user.bankBranch || '',
         companyLogo: data.user.companyLogo || '',
         panNumber: data.user.panNumber || '',
+        termsAndConditions: data.user.termsAndConditions || '',
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -407,8 +410,8 @@ export default function ProfilePage() {
                     setError('Please upload a valid image file.');
                     return;
                   }
-                  if (file.size > 1024 * 1024) {
-                    setError('Logo file size must be 1MB or smaller.');
+                  if (file.size > 500 * 1024) {
+                    setError('Logo file size must be 500KB or smaller.');
                     return;
                   }
 
@@ -426,7 +429,7 @@ export default function ProfilePage() {
                 className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
               <p className="text-xs text-slate-500">
-                {profile?.isNewRegistration ? 'Company logo is required. Max 1MB.' : 'Optional company logo for your account. Max 1MB.'}
+                {profile?.isNewRegistration ? 'Company logo is required. Max 500KB.' : 'Optional company logo for your account. Max 500KB.'}
               </p>
             </label>
 
@@ -598,6 +601,18 @@ export default function ProfilePage() {
                 className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
             </label>
+            <label className="space-y-2 lg:col-span-2">
+              <span className="text-sm font-medium text-slate-700">
+                Terms & Conditions
+              </span>
+              <textarea
+                rows={4}
+                value={profileForm.termsAndConditions}
+                onChange={(event) => setProfileForm({ ...profileForm, termsAndConditions: event.target.value })}
+                placeholder="Enter custom terms and conditions for your invoices..."
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
           </div>
 
           <div className="mt-6 flex items-center gap-3">
@@ -627,6 +642,7 @@ export default function ProfilePage() {
                 bankBranch: profile?.bankBranch || '',
                 companyLogo: profile?.companyLogo || '',
                 panNumber: profile?.panNumber || '',
+                termsAndConditions: profile?.termsAndConditions || '',
               });
               setMessage(null);
               setError(null);

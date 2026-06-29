@@ -139,6 +139,7 @@ async function resolveInvoiceCompanyProfile(
     bankAccountNumber: user.bankAccountNumber || '',
     ifscCode: user.ifscCode || '',
     bankBranch: user.bankBranch || '',
+    companyTermsAndConditions: user.termsAndConditions || '',
   };
 }
 
@@ -204,13 +205,18 @@ export async function findInvoiceMasterByIdentifier(
         };
 
         if (warehouseId) {
-          query.warehouseId = new ObjectId(warehouseId);
+          if (warehouseId.includes(',')) {
+            query.warehouseIds = { $in: warehouseId.split(',').map(id => new ObjectId(id.trim())) };
+          } else {
+            query.warehouseId = new ObjectId(warehouseId);
+          }
         }
 
         invoiceMaster = await db
           .collection('invoice_master')
           .findOne(query);
-      } catch {
+      } catch (e) {
+        console.error('Error in findInvoiceMasterByIdentifier:', e);
         invoiceMaster = null;
       }
     }
@@ -484,6 +490,7 @@ export async function buildMonthlyInvoiceFromTransactions(
     igstAmount: Number(existingMaster?.igstAmount || 0),
     totalTaxAmount: Number(existingMaster?.totalTaxAmount || 0),
     adjustmentAmount: Number(existingMaster?.adjustmentAmount || 0),
+    notes: existingMaster?.notes || '',
     invoiceDate: new Date().toISOString().split('T')[0],
   };
 }
@@ -771,6 +778,7 @@ export async function buildMonthlyInvoiceFromLedger(
     igstAmount: Number(existingMaster?.igstAmount || 0),
     totalTaxAmount: Number(existingMaster?.totalTaxAmount || 0),
     adjustmentAmount: Number(existingMaster?.adjustmentAmount || 0),
+    notes: existingMaster?.notes || '',
     invoiceDate:
       new Date().toISOString().split('T')[0],
   };
@@ -1551,6 +1559,7 @@ export async function resolveMonthlyInvoiceFromId(
         igstAmount: Number(invoiceMaster.igstAmount || 0),
         totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
         adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
+        notes: invoiceMaster.notes || '',
         invoiceDate:
           invoiceMaster.generatedAt
             ?.toISOString()
@@ -1636,6 +1645,7 @@ export async function resolveMonthlyInvoiceFromId(
       igstAmount: Number(invoiceMaster.igstAmount || 0),
       totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
       adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
+      notes: invoiceMaster.notes || '',
       invoiceDate:
         invoiceMaster.generatedAt
           ?.toISOString()

@@ -379,6 +379,26 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
             font-size: 8px;
           }
 
+          @page {
+            size: A4;
+            margin: 0;
+          }
+
+          @media print {
+            .print-banner, .hide-on-print {
+              display: none !important;
+            }
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              margin: 10mm 15mm !important;
+            }
+            .invoice-container {
+              box-shadow: none !important;
+              margin: 0 !important;
+            }
+          }
+
           .print-banner {
             padding: 8px;
             background: #0F2D52;
@@ -496,7 +516,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           .bill-to-card, .table-card, .bank-details-card {
             border: 1px solid #D9DDE3;
             margin-bottom: 20px;
-            background: #fff;
+            background: transparent;
           }
 
           .addresses-grid .bill-to-card {
@@ -504,7 +524,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           }
 
           .card-header, .table-header-bar, .card-header-sub {
-            background: #F5F7FA;
+            background: rgba(245, 247, 250, 0.8);
             color: #0F2D52;
             font-size: 10px;
             font-weight: 700;
@@ -558,7 +578,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
             text-align: left;
             font-weight: 700;
             color: #0F2D52;
-            background: #F5F7FA;
+            background: rgba(245, 247, 250, 0.8);
             font-size: 9px;
             text-transform: uppercase;
           }
@@ -573,7 +593,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           }
 
           .items-table tbody tr:nth-child(even) {
-            background: #FAFAFA;
+            background: rgba(250, 250, 250, 0.6);
           }
 
           /* Bottom Grid Layout */
@@ -662,7 +682,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
 
           .summary-row-item.grand-total-row {
             border-top: 2px solid #0F2D52;
-            background: #F5F7FA;
+            background: rgba(245, 247, 250, 0.8);
             padding: 8px 10px;
             margin-top: 6px;
             font-size: 11px;
@@ -674,7 +694,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           .gst-breakdown-card {
             border: 1px solid #D9DDE3;
             margin-bottom: 20px;
-            background: white;
+            background: transparent;
           }
 
           .gst-table {
@@ -700,7 +720,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
             text-align: left;
             font-weight: 700;
             color: #0F2D52;
-            background: #F5F7FA;
+            background: rgba(245, 247, 250, 0.8);
             font-size: 9px;
             text-transform: uppercase;
           }
@@ -758,8 +778,14 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       <body>
         
         <!-- invoice-html-version: 3 | transactions:${invoice.transactions?.length || 0} | periods:${invoice.periods?.length || 0} | adjustmentTotal: ${formatAmount(adjustmentTotal)} | additionalCharges: ${formatAmount(Number(invoice.additionalCharges || 0))} | additionalChargeItemsCount: ${(invoice.additionalChargeItems || []).length} -->
-        <div class="invoice-container">
-          <div class="invoice-body">
+        <div class="invoice-container" style="position: relative; z-index: 1;">
+          ${logoSrc ? `
+          <!-- Watermark -->
+          <div class="watermark" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0.08; filter: grayscale(100%);">
+            <img src="${logoSrc}" style="width: 70%; height: auto; max-height: 70%; object-fit: contain;" alt="Watermark" />
+          </div>
+          ` : ''}
+          <div class="invoice-body" style="position: relative; z-index: 1;">
             
             <!-- Header Section -->
             <div class="header-container">
@@ -902,41 +928,53 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 <div style="padding: 12px 16px;">
                   <div class="info-block" style="margin-bottom: 0;">
                     <div class="info-label" style="font-size: 10px;">Notes</div>
-                    <div class="info-value" style="margin-top: 6px; font-size: 11px; font-weight: 500;">Thanks for your business.</div>
+                    <div class="info-value" style="margin-top: 6px; font-size: 11px; font-weight: 500;">${invoice.notes || 'Thanks for your business.'}</div>
                   </div>
                 </div>
                 
-                <!-- Bank Details -->
-                <div class="bank-details-card" style="margin-bottom: 0; border: none; border-top: 1px solid #D9DDE3;">
-                  <div class="card-header" style="border-bottom: 1px solid #D9DDE3; padding: 8px 16px;">
-                    Bank Details
-                  </div>
-                  <div class="card-body" style="padding: 12px 16px;">
-                    <div class="bank-info-grid">
-                      <div class="bank-label">Bank Name:</div>
-                      <div class="bank-value">${invoice.bankName || 'ICICI BANK GONDAL'}</div>
-                      
-                      ${invoice.accountName ? `
-                      <div class="bank-label">Account Name:</div>
-                      <div class="bank-value">${invoice.accountName}</div>
-                      ` : ''}
-                      
-                      <div class="bank-label">Account No:</div>
-                      <div class="bank-value font-mono highlight-text">${invoice.bankAccountNumber || '048605008597'}</div>
-                      
-                      <div class="bank-label">IFSC Code:</div>
-                      <div class="bank-value font-mono">${invoice.ifscCode || 'ICIC0000486'}</div>
-                      
-                      ${invoice.bankBranch ? `
-                        <div class="bank-label">Branch Name:</div>
-                        <div class="bank-value">${invoice.bankBranch}</div>
-                      ` : ''}
+                <!-- Bottom Split for Bank & Terms -->
+                <div style="display: flex; border-top: 1px solid #D9DDE3;">
+                  <!-- Bank Details -->
+                  <div class="bank-details-card" style="flex: 1; margin-bottom: 0; border: none; border-right: 1px solid #D9DDE3;">
+                    <div class="card-header" style="border-bottom: 1px solid #D9DDE3; padding: 8px 16px;">
+                      Bank Details
+                    </div>
+                    <div class="card-body" style="padding: 12px 16px;">
+                      <div class="bank-info-grid">
+                        <div class="bank-label">Bank Name:</div>
+                        <div class="bank-value">${invoice.bankName || 'ICICI BANK GONDAL'}</div>
+                        
+                        ${invoice.accountName ? `
+                        <div class="bank-label">Account Name:</div>
+                        <div class="bank-value">${invoice.accountName}</div>
+                        ` : ''}
+                        
+                        <div class="bank-label">Account No:</div>
+                        <div class="bank-value font-mono highlight-text">${invoice.bankAccountNumber || '048605008597'}</div>
+                        
+                        <div class="bank-label">IFSC Code:</div>
+                        <div class="bank-value font-mono">${invoice.ifscCode || 'ICIC0000486'}</div>
+                        
+                        ${invoice.bankBranch ? `
+                          <div class="bank-label">Branch Name:</div>
+                          <div class="bank-value">${invoice.bankBranch}</div>
+                        ` : ''}
+                      </div>
                     </div>
                   </div>
+                  
+                  ${invoice.companyTermsAndConditions && invoice.companyTermsAndConditions.trim() !== '' ? `
+                  <!-- Terms & Conditions -->
+                  <div style="flex: 1; display: flex; flex-direction: column;">
+                    <div class="card-header" style="border-bottom: 1px solid #D9DDE3; padding: 8px 16px;">
+                      Terms & Conditions
+                    </div>
+                    <div class="card-body" style="padding: 12px 16px; font-size: 8.5px; line-height: 1.5; color: #1F2937; white-space: pre-wrap;">${invoice.companyTermsAndConditions}</div>
+                  </div>
+                  ` : ''}
                 </div>
               </div>
 
-              <!-- Right Panel -->
               <div class="bottom-right-panel">
                 <div style="flex: 1;"></div>
                 <div class="horizontal-divider"></div>

@@ -66,6 +66,7 @@ interface MonthlyInvoice {
   igstAmount?: number;
   totalTaxAmount?: number;
   adjustmentAmount?: number;
+  notes?: string;
 }
 
 const getAdditionalChargeItemRowId = (invoiceId: string | undefined, item: AdditionalChargeItem, index: number) => {
@@ -798,7 +799,8 @@ export default function ClientInvoicesPage() {
   const handleTaxAutoSave = async (
     invoiceId: string,
     billingState: string,
-    taxGroup: string
+    taxGroup: string,
+    notes?: string
   ) => {
     if (!invoiceId) return;
 
@@ -814,6 +816,7 @@ export default function ClientInvoicesPage() {
           billingState,
           taxGroup,
           adjustment: 0,
+          notes,
         }),
       });
 
@@ -837,6 +840,7 @@ export default function ClientInvoicesPage() {
               igstAmount: Number(data.igstAmount),
               totalTaxAmount: Number(data.totalTaxAmount),
               adjustmentAmount: Number(data.adjustmentAmount),
+              notes: data.notes !== undefined ? data.notes : item.notes,
             }
             : item
         )
@@ -1462,7 +1466,8 @@ export default function ClientInvoicesPage() {
                               handleTaxAutoSave(
                                 invoice.invoiceId || '',
                                 val,
-                                invoice.taxGroup || 'No Tax'
+                                invoice.taxGroup || 'No Tax',
+                                invoice.notes
                               );
                             }}
                           >
@@ -1488,7 +1493,8 @@ export default function ClientInvoicesPage() {
                               handleTaxAutoSave(
                                 invoice.invoiceId || '',
                                 invoice.billingState || '',
-                                val
+                                val,
+                                invoice.notes
                               );
                             }}
                           >
@@ -1530,6 +1536,31 @@ export default function ClientInvoicesPage() {
                           <span className="ml-auto font-bold text-slate-800">Total Tax: ₹{Number(invoice.totalTaxAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       )}
+                    </div>
+
+                    <div className="space-y-4 border-t border-blue-200 pt-4">
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Invoice Notes</p>
+                        <p className="text-xs text-slate-500 mb-2">These notes will be displayed in the invoice footer.</p>
+                        <textarea
+                          rows={3}
+                          value={invoice.notes || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInvoices((prev) => prev.map((item) => item.invoiceId === invoice.invoiceId ? { ...item, notes: val } : item));
+                          }}
+                          onBlur={() => {
+                            handleTaxAutoSave(
+                              invoice.invoiceId || '',
+                              invoice.billingState || '',
+                              invoice.taxGroup || 'No Tax',
+                              invoice.notes
+                            );
+                          }}
+                          placeholder="e.g. Thanks for your business."
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-4 border-t border-blue-200 pt-4">

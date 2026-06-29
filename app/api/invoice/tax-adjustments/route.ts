@@ -10,6 +10,7 @@ const taxAdjustmentSchema = z.object({
   billingState: z.string(),
   taxGroup: z.string().min(1),
   adjustment: z.number().optional(),
+  notes: z.string().optional(),
 });
 
 const INDIAN_STATES = [
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       igstAmount,
       totalTaxAmount,
       adjustmentAmount,
+      ...(parsed.notes !== undefined ? { notes: parsed.notes } : {}),
       updatedAt: new Date(),
     };
 
@@ -201,6 +203,7 @@ export async function POST(request: NextRequest) {
         igstAmount,
         totalTaxAmount,
         adjustmentAmount,
+        notes: parsed.notes,
       }
     });
 

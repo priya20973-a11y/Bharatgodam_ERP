@@ -33,6 +33,7 @@ export async function GET() {
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
         panNumber: user.panNumber || null,
+        termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
       },
     });
@@ -67,7 +68,8 @@ export async function PATCH(req: Request) {
       ifscCode,
       bankBranch,
       companyLogo,
-      panNumber
+      panNumber,
+      termsAndConditions
     } = body;
 
     const db = await getDb();
@@ -88,6 +90,7 @@ export async function PATCH(req: Request) {
       companyLogo: companyLogo !== undefined ? companyLogo : userBeforeUpdate.companyLogo,
       gstNumber: gstNumber !== undefined ? gstNumber : userBeforeUpdate.gstNumber,
       panNumber: panNumber !== undefined ? panNumber : userBeforeUpdate.panNumber,
+      termsAndConditions: termsAndConditions !== undefined ? termsAndConditions : userBeforeUpdate.termsAndConditions,
     };
 
     const trimmedGst = merged.gstNumber ? merged.gstNumber.toString().trim().toUpperCase() : '';
@@ -156,6 +159,7 @@ export async function PATCH(req: Request) {
     if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
     if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
     if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
+    if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -198,6 +202,7 @@ export async function PATCH(req: Request) {
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
         panNumber: user.panNumber || null,
+        termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
       },
     });
