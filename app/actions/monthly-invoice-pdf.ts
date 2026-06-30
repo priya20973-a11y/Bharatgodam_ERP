@@ -206,15 +206,27 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
     );
 
   const taxableAmount = Number(invoice.totalRent || 0) + adjustmentTotal;
-  const totalTaxAmount = Number(invoice.totalTaxAmount || 0);
+  let totalTaxAmount = Number(invoice.totalTaxAmount || 0);
   const taxAdjustment = Number(invoice.adjustmentAmount || 0);
+
+  const companyGst = invoice.companyGst || '';
+  if (companyGst.trim().toUpperCase() === 'NA') {
+    totalTaxAmount = 0;
+  }
+
   const finalTotal = taxableAmount + totalTaxAmount + taxAdjustment;
 
   const taxGroup = invoice.taxGroup || 'No Tax';
   const taxType = invoice.taxType || 'IGST';
-  const cgstAmount = Number(invoice.cgstAmount || 0);
-  const sgstAmount = Number(invoice.sgstAmount || 0);
-  const igstAmount = Number(invoice.igstAmount || 0);
+  let cgstAmount = Number(invoice.cgstAmount || 0);
+  let sgstAmount = Number(invoice.sgstAmount || 0);
+  let igstAmount = Number(invoice.igstAmount || 0);
+
+  if (companyGst.trim().toUpperCase() === 'NA') {
+    cgstAmount = 0;
+    sgstAmount = 0;
+    igstAmount = 0;
+  }
 
   let gstRate = 0;
   const taxGroupMatch = taxGroup.match(/\d+(\.\d+)?/);
@@ -233,7 +245,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
 
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
-  const companyGst = invoice.companyGst || '';
   const companyPan = invoice.companyPan || '';
 
   const db = await getDb();
@@ -992,10 +1003,12 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     </div>
                   ` : ''}
                   
+                  ${totalTaxAmount > 0 ? `
                   <div class="summary-row-item separator-top">
                     <span>Taxable Amount</span>
                     <span>₹${formatAmount(taxableAmount)}</span>
                   </div>
+                  ` : ''}
                   
                   ${cgstAmount > 0 ? `
                     <div class="summary-row-item">
@@ -1022,20 +1035,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     </div>
                   ` : ''}
                   
-                  <div class="summary-row-item separator-top">
-                    <span>Previous Balance</span>
-                    <span>₹${formatAmount(previousBalance)}</span>
-                  </div>
-                  <div class="summary-row-item">
-                    <span>Payments Received</span>
-                    <span>₹${formatAmount(paymentsReceived)}</span>
-                  </div>
-                  
-                  <div class="summary-row-item outstanding-row">
-                    <span>Outstanding Balance</span>
-                    <span>₹${formatAmount(outstandingBalance)}</span>
-                  </div>
-                  
+
                   <div class="summary-row-item grand-total-row">
                     <span>Grand Total</span>
                     <span>₹${formatAmount(finalTotal)}</span>

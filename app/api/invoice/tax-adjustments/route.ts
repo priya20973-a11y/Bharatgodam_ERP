@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     // Determine GST split type based on Warehouse State and Billing State
     const taxType = whState && parsed.billingState
       ? (whState.trim().toLowerCase() === parsed.billingState.trim().toLowerCase() ? 'CGST_SGST' : 'IGST')
-      : '';
+      : 'IGST';
 
     // 2. Fetch or compute the base rent and additional charges
     const rentAmount = Number(invoiceMaster.totalAmount ?? invoiceMaster.totalRent ?? 0);

@@ -1180,7 +1180,7 @@ export function transformTransactionsToBillingRows(
     const monthDays = calculateStorageDays(
       monthStartDateStr,
       billingEndDateStr,
-      'ACTIVE'
+      'COMPLETED'
     );
 
     const preparedTransactions = (transactions || [])
@@ -1244,7 +1244,7 @@ export function transformTransactionsToBillingRows(
         const startDate =
           txnDateStr > monthStartDateStr ? txnDateStr : monthStartDateStr;
         const endDate = billingEndDateStr;
-        const days = calculateStorageDays(startDate, endDate, 'ACTIVE');
+        const days = calculateStorageDays(startDate, endDate, 'COMPLETED');
         const rentTotal = Number(quantityMT * ratePerDay * days || 0);
 
         if (Number.isNaN(days) || days <= 0) {
