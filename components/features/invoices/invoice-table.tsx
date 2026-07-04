@@ -39,7 +39,10 @@ export default function InvoiceTable({ initialInvoices }: { initialInvoices: any
   // Handle invoice export via HTML print preview
   const handleExportPDF = (invoice: any) => {
     const invoiceId = invoice.invoiceId || invoice.id;
-    const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
+    const warehouseQuery =
+      invoice.warehouseId && invoiceId && !invoiceId.endsWith(`-${invoice.warehouseId}`)
+        ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}`
+        : '';
     const modeQuery = isTransactionInvoiceId(invoiceId) ? '&mode=transactions' : '';
     const url = `/api/invoice/html?id=${encodeURIComponent(invoiceId)}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');

@@ -21,7 +21,23 @@ export async function GET(request: NextRequest) {
         'warehouseId'
       ) || undefined;
 
-      const debug = request.nextUrl.searchParams.get('debug') === 'true';
+    const normalizedWarehouseId = (() => {
+      if (!warehouseId || !id) return warehouseId;
+      const parts = id.split('-');
+      if (parts.length >= 4) {
+        const idWarehouseSegment = parts.slice(3).join('-');
+        if (idWarehouseSegment === warehouseId) {
+          console.log(
+            '[invoice/html] ignoring duplicate warehouseId param matching id segment',
+            { id, warehouseId }
+          );
+          return undefined;
+        }
+      }
+      return warehouseId;
+    })();
+
+    const debug = request.nextUrl.searchParams.get('debug') === 'true';
 
     const invoiceMode =
       request.nextUrl.searchParams.get('mode') ||
@@ -30,7 +46,7 @@ export async function GET(request: NextRequest) {
     const monthlyInvoice =
       await resolveMonthlyInvoiceFromId(
         id,
-        warehouseId,
+        normalizedWarehouseId,
         tenantFilter,
         invoiceMode === 'transactions'
           ? 'transactions'
