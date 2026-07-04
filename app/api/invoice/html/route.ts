@@ -41,33 +41,7 @@ export async function GET(request: NextRequest) {
       // Fallback attempts: some clients include warehouse IDs in the invoice identifier
       // while others pass them as a query param. Try both forms and log the results.
       try {
-        if (warehouseId && warehouseId.includes(',')) {
-          const appendedId = `${id}-${warehouseId}`;
-          console.log('[invoice/html] attempting fallback with appended warehouse ids', { appendedId });
-          const fallback = await resolveMonthlyInvoiceFromId(appendedId, undefined, tenantFilter, invoiceMode === 'transactions' ? 'transactions' : undefined);
-          if (fallback) {
-            console.log('[invoice/html] fallback (appendedId) succeeded', { appendedId });
-            // use this invoice
-            const html = await generateMonthlyInvoiceHTML(fallback);
-            const printableHtml = html.replace(
-              '<body>',
-              `<body>
-        <div class="print-banner hide-on-print">
-          Press Ctrl+P (or ⌘+P on Mac) to print or save this invoice.
-        </div>`
-            );
-
-            return new NextResponse(printableHtml, {
-              status: 200,
-              headers: {
-                'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-              },
-            });
-          }
-        }
-
-        // Try resolving without warehouseId param (let resolver parse from id)
+        // Try resolving without warehouseId param (let resolver parse warehouse parts from `id`)
         console.log('[invoice/html] attempting fallback without warehouseId param', { id });
         const fallback2 = await resolveMonthlyInvoiceFromId(id, undefined, tenantFilter, invoiceMode === 'transactions' ? 'transactions' : undefined);
         if (fallback2) {

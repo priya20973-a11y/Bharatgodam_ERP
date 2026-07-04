@@ -205,10 +205,14 @@ export async function findInvoiceMasterByIdentifier(
         };
 
         if (warehouseId) {
-          if (warehouseId.includes(',')) {
-            query.warehouseIds = { $in: warehouseId.split(',').map(id => new ObjectId(id.trim())) };
+          const parts = warehouseId.split(',').map((s) => s.trim()).filter(Boolean);
+          const objectIds = parts.filter((p) => ObjectId.isValid(p)).map((p) => new ObjectId(p));
+          if (objectIds.length === 1) {
+            query.warehouseId = objectIds[0];
+          } else if (objectIds.length > 1) {
+            query.warehouseIds = { $in: objectIds };
           } else {
-            query.warehouseId = new ObjectId(warehouseId);
+            // No valid ObjectId found; avoid adding warehouse filters to prevent BSON errors
           }
         }
 
@@ -325,12 +329,17 @@ export async function buildMonthlyInvoiceFromTransactions(
   
   if (warehouseIdsArray.length > 0) {
     try {
-      const wIds = warehouseIdsArray.map(id => new ObjectId(id));
-      resolvedWarehouses = await db.collection('warehouses').find({
-        _id: { $in: wIds },
-        ...tenantFilter,
-      }).toArray();
-      resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+      const validIds = warehouseIdsArray.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+      if (validIds.length > 0) {
+        resolvedWarehouses = await db.collection('warehouses').find({
+          _id: { $in: validIds },
+          ...tenantFilter,
+        }).toArray();
+        resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+      } else {
+        resolvedWarehouses = [];
+        resolvedWarehouse = null;
+      }
     } catch (e) {
       console.error('Error fetching warehouses:', e);
     }
@@ -560,12 +569,17 @@ export async function buildMonthlyInvoiceFromLedger(
   
   if (warehouseIdsArray.length > 0) {
     try {
-      const wIds = warehouseIdsArray.map(id => new ObjectId(id));
-      resolvedWarehouses = await db.collection('warehouses').find({
-        _id: { $in: wIds },
-        ...tenantFilter,
-      }).toArray();
-      resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+      const validIds = warehouseIdsArray.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+      if (validIds.length > 0) {
+        resolvedWarehouses = await db.collection('warehouses').find({
+          _id: { $in: validIds },
+          ...tenantFilter,
+        }).toArray();
+        resolvedWarehouse = resolvedWarehouses.length === 1 ? resolvedWarehouses[0] : resolvedWarehouses[0]; // fallback to first for profile
+      } else {
+        resolvedWarehouses = [];
+        resolvedWarehouse = null;
+      }
     } catch (e) {
       console.error('Error fetching warehouses:', e);
     }
