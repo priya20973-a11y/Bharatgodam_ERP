@@ -424,13 +424,20 @@ export default function ClientInvoicesPage() {
   };
 
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
-    const invoiceId = encodeURIComponent(invoice.invoiceId || invoice.bookingId);
-    const warehouseQuery = invoice.warehouseId ? `&warehouseId=${encodeURIComponent(invoice.warehouseId)}` : '';
+    const invoiceId = invoice.invoiceId || invoice.bookingId;
+    const invoiceIdEncoded = encodeURIComponent(invoiceId);
+    let warehouseQuery = '';
+
+    // Avoid duplicate warehouse query when the invoice ID already contains the warehouse segment.
+    if (invoice.warehouseId && invoiceId && !invoiceId.endsWith(`-${invoice.warehouseId}`)) {
+      warehouseQuery = `&warehouseId=${encodeURIComponent(invoice.warehouseId)}`;
+    }
+
     // Only use transaction mode when user explicitly selected it.
     // Do NOT infer mode from ID format — all generated IDs match the
     // transaction pattern, causing incorrect amounts for ledger invoices.
     const modeQuery = invoiceMode === 'transaction' ? '&mode=transactions' : '';
-    const url = `/api/invoice/html?id=${invoiceId}${warehouseQuery}${modeQuery}`;
+    const url = `/api/invoice/html?id=${invoiceIdEncoded}${warehouseQuery}${modeQuery}`;
     window.open(url, '_blank', 'noopener');
   };
 
