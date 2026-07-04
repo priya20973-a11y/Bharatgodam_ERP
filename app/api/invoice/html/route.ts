@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
         'warehouseId'
       ) || undefined;
 
+      const debug = request.nextUrl.searchParams.get('debug') === 'true';
+
     const invoiceMode =
       request.nextUrl.searchParams.get('mode') ||
       undefined;
@@ -34,6 +36,48 @@ export async function GET(request: NextRequest) {
           ? 'transactions'
           : undefined
       );
+
+    if (debug) {
+      // Provide a safe diagnostic JSON response for production debugging.
+      try {
+        const parsed = { parts: id ? id.split('-') : [] };
+        const attemptWithWarehouse = await resolveMonthlyInvoiceFromId(
+          id,
+          warehouseId,
+          tenantFilter,
+          invoiceMode === 'transactions' ? 'transactions' : undefined
+        );
+        const attemptWithoutWarehouse = await resolveMonthlyInvoiceFromId(
+          id,
+          undefined,
+          tenantFilter,
+          invoiceMode === 'transactions' ? 'transactions' : undefined
+        );
+
+        const summarize = (inv: any) => {
+          if (!inv) return { found: false };
+          return {
+            found: true,
+            invoiceNumber: inv.invoiceNumber || inv.invoiceId || null,
+            warehouseId: inv.warehouseId || inv.warehouseId === undefined ? inv.warehouseId : null,
+            warehouseName: inv.warehouseName || null,
+            periodsCount: Array.isArray(inv.periods) ? inv.periods.length : 0,
+            transactionsCount: Array.isArray(inv.transactions) ? inv.transactions.length : 0,
+          };
+        };
+
+        return NextResponse.json({
+          id,
+          warehouseId,
+          parsed,
+          attemptWithWarehouse: summarize(attemptWithWarehouse),
+          attemptWithoutWarehouse: summarize(attemptWithoutWarehouse),
+        });
+      } catch (e) {
+        console.error('[invoice/html] debug response failed', e);
+        return new NextResponse('Debug failed', { status: 500 });
+      }
+    }
 
     if (!monthlyInvoice) {
       console.warn('[invoice/html] initial resolution returned null', { id, warehouseId, invoiceMode });
