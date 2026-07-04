@@ -390,9 +390,9 @@ export default function ProfilePage() {
               <input
                 type="text"
                 value={profileForm.companyName}
-                readOnly
-                disabled
-                className="w-full rounded-md border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700 outline-none"
+                onChange={(event) => setProfileForm({ ...profileForm, companyName: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="Company name"
               />
             </label>
 

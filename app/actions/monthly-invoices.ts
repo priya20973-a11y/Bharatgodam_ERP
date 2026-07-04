@@ -4,6 +4,7 @@ import { getDb } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { formatTimeStateForDisplay } from '@/lib/ledger-time-state-engine';
+import { calculateStorageDays } from '@/lib/storage-engine';
 
 export interface MonthlyInvoiceData {
   bookingId: string;
@@ -151,7 +152,11 @@ export async function getClientMonthlyInvoicesTimeState(clientName: string) {
         startDate: entry.periodStartDate,
         endDate: entry.periodEndDate,
         quantityMT: entry.quantityMT,
-        daysTotal: Math.ceil((new Date(entry.periodEndDate).getTime() - new Date(entry.periodStartDate).getTime()) / (1000 * 60 * 60 * 24)) + 1,
+        daysTotal: calculateStorageDays(
+          entry.periodStartDate,
+          entry.periodEndDate || entry.periodStartDate,
+          'COMPLETED'
+        ),
         rentTotal: entry.rentCalculated || 0,
         status: entry.status,
       }));

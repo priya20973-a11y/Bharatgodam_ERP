@@ -205,7 +205,16 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       0
     );
 
-  const taxableAmount = Number(invoice.totalRent || 0) + adjustmentTotal;
+  const invoiceRowSource = ((invoice.transactions?.length
+    ? invoice.transactions
+    : invoice.periods || []) as any[]);
+
+  const billingTotal = invoiceRowSource.reduce(
+    (sum, row) => sum + Number(row.rentTotal || 0),
+    0
+  );
+
+  const taxableAmount = billingTotal + adjustmentTotal;
   let totalTaxAmount = Number(invoice.totalTaxAmount || 0);
   const taxAdjustment = Number(invoice.adjustmentAmount || 0);
 
@@ -241,7 +250,9 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
 
   const previousBalance = Number(invoice.previousBalance || 0);
   const paymentsReceived = Number(invoice.currentPayments || 0);
-  const outstandingBalance = getTotalDue(invoice);
+  const outstandingBalance = invoice.newBalance !== undefined && invoice.newBalance !== null
+    ? Number(invoice.newBalance || 0)
+    : Math.max(0, billingTotal + adjustmentTotal + previousBalance - paymentsReceived);
 
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
@@ -994,7 +1005,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 <div class="invoice-summary-card">
                   <div class="summary-row-item">
                     <span>Monthly Storage Rent</span>
-                    <span>₹${formatAmount(invoice.totalRent)}</span>
+                    <span>₹${formatAmount(billingTotal)}</span>
                   </div>
                   ${hasAdditionalCharges ? `
                     <div class="summary-row-item">
