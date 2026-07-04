@@ -100,6 +100,59 @@ function resolveClientGst(client: any) {
   return client?.gstNumber || client?.gst || client?.gstin || '';
 }
 
+function buildWarehouseMatch(warehouseId?: string) {
+  if (!warehouseId?.trim()) return {};
+
+  const parts = warehouseId
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (!parts.length) return {};
+
+  const objectIds = parts
+    .filter((id) => ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
+
+  const warehouseValues = [
+    ...new Set([
+      ...parts,
+      ...objectIds,
+    ])
+  ];
+
+  return {
+    $or: [
+      { warehouseId: { $in: warehouseValues } },
+      { warehouseIds: { $in: warehouseValues } },
+    ],
+  };
+}
+
+function buildExactWarehouseMatch(warehouseId?: string) {
+  if (!warehouseId?.trim()) return null;
+
+  const parts = warehouseId
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 1) return null;
+
+  const objectIds = parts
+    .filter((id) => ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
+
+  const exactMatch: any = {
+    warehouseIds: {
+      $all: objectIds.length > 0 ? objectIds : parts,
+      $size: parts.length,
+    },
+  };
+
+  return exactMatch;
+}
+
 async function resolveInvoiceCompanyProfile(
   db: any,
   warehouse: any,
@@ -147,7 +200,8 @@ export async function findInvoiceMasterByIdentifier(
   db: any,
   id: string,
   tenantFilter: any,
-  mode?: 'ledger' | 'transactions'
+  mode?: 'ledger' | 'transactions',
+  warehouseId?: string
 ) {
   if (!id?.trim()) return null;
 
@@ -180,6 +234,14 @@ export async function findInvoiceMasterByIdentifier(
     });
   }
 
+  if (!invoiceMaster) {
+    invoiceMaster = await db.collection('invoice_master').findOne({
+      invoiceNumber: id,
+      ...invoiceTypeFilter,
+      ...tenantFilter,
+    });
+  }
+
   if (!invoiceMaster && id.includes('-')) {
     const parts = id.split('-');
 
@@ -190,35 +252,52 @@ export async function findInvoiceMasterByIdentifier(
       /^\d{2}$/.test(parts[2])
     ) {
       const clientId = parts[0];
-
       const invoiceMonth = `${parts[1]}-${parts[2]}`;
-
-      const warehouseId =
-        parts.length > 3 ? parts.slice(3).join('-') : undefined;
+      const invoiceWarehouseId =
+        warehouseId || (parts.length > 3 ? parts.slice(3).join('-') : undefined);
 
       try {
-        const query: any = {
+        const baseQuery: any = {
           clientId: new ObjectId(clientId),
-          invoiceMonth,
           ...invoiceTypeFilter,
           ...tenantFilter,
         };
 
-        if (warehouseId) {
-          const parts = warehouseId.split(',').map((s) => s.trim()).filter(Boolean);
-          const objectIds = parts.filter((p) => ObjectId.isValid(p)).map((p) => new ObjectId(p));
-          if (objectIds.length === 1) {
-            query.warehouseId = objectIds[0];
-          } else if (objectIds.length > 1) {
-            query.warehouseIds = { $in: objectIds };
-          } else {
-            // No valid ObjectId found; avoid adding warehouse filters to prevent BSON errors
-          }
+        const exactWarehouseMatch = buildExactWarehouseMatch(
+          invoiceWarehouseId
+        );
+
+        if (exactWarehouseMatch) {
+          invoiceMaster = await db
+            .collection('invoice_master')
+            .findOne({
+              ...baseQuery,
+              invoiceMonth,
+              ...exactWarehouseMatch,
+            });
         }
 
-        invoiceMaster = await db
-          .collection('invoice_master')
-          .findOne(query);
+        if (!invoiceMaster) {
+          const query: any = {
+            ...baseQuery,
+            invoiceMonth,
+            ...buildWarehouseMatch(invoiceWarehouseId),
+          };
+          invoiceMaster = await db
+            .collection('invoice_master')
+            .findOne(query);
+        }
+
+        if (!invoiceMaster) {
+          const legacyQuery: any = {
+            ...baseQuery,
+            month: invoiceMonth,
+            ...buildWarehouseMatch(invoiceWarehouseId),
+          };
+          invoiceMaster = await db
+            .collection('invoice_master')
+            .findOne(legacyQuery);
+        }
       } catch (e) {
         console.error('Error in findInvoiceMasterByIdentifier:', e);
         invoiceMaster = null;
@@ -245,15 +324,66 @@ function buildTransactionInvoiceIdentifierFromMaster(master: any): string | null
   const clientId = master.clientId.toString?.()
     ? master.clientId.toString()
     : String(master.clientId);
-  const warehouseId = master.warehouseId
-    ? master.warehouseId.toString?.()
+
+  let warehouseId: string | undefined;
+  if (master.warehouseId) {
+    warehouseId = master.warehouseId.toString?.()
       ? master.warehouseId.toString()
-      : String(master.warehouseId)
-    : undefined;
+      : String(master.warehouseId);
+  } else if (
+    Array.isArray(master.warehouseIds) &&
+    master.warehouseIds.length > 0
+  ) {
+    warehouseId = master.warehouseIds
+      .map((id: any) =>
+        id?.toString?.() ? id.toString() : String(id || '')
+      )
+      .filter(Boolean)
+      .join(',');
+  }
 
   return warehouseId
     ? `${clientId}-${master.invoiceMonth}-${warehouseId}`
     : `${clientId}-${master.invoiceMonth}`;
+}
+
+async function resolveInvoiceMasterWarehouses(
+  db: any,
+  invoiceMaster: any,
+  tenantFilter: any
+) {
+  if (!invoiceMaster) {
+    return { warehouse: null, warehouses: [] as any[] };
+  }
+
+  if (invoiceMaster.warehouseId) {
+    const warehouse = await db.collection('warehouses').findOne({
+      _id: invoiceMaster.warehouseId,
+      ...tenantFilter,
+    });
+    return { warehouse, warehouses: warehouse ? [warehouse] : [] };
+  }
+
+  const warehouseIdFilters: Array<ObjectId> = [];
+  if (Array.isArray(invoiceMaster.warehouseIds)) {
+    for (const id of invoiceMaster.warehouseIds) {
+      const parsedId = String(id || '');
+      if (ObjectId.isValid(parsedId)) {
+        warehouseIdFilters.push(new ObjectId(parsedId));
+      }
+    }
+  }
+
+  if (!warehouseIdFilters.length) {
+    return { warehouse: null, warehouses: [] };
+  }
+
+  const warehouses = await db.collection('warehouses').find({
+    _id: { $in: warehouseIdFilters },
+    ...tenantFilter,
+  }).toArray();
+
+  return { warehouse: warehouses[0] || null, warehouses };
 }
 
 export async function buildMonthlyInvoiceFromTransactions(
@@ -283,6 +413,11 @@ export async function buildMonthlyInvoiceFromTransactions(
     warehouseId ||
     (warehouseParts.length ? warehouseParts.join('-') : undefined);
 
+  const isMultipleWarehouses = resolvedWarehouseId?.includes(',');
+  const warehouseIdsArray = isMultipleWarehouses && resolvedWarehouseId
+    ? resolvedWarehouseId.split(',').map(id => id.trim()).filter(Boolean)
+    : resolvedWarehouseId ? [resolvedWarehouseId] : [];
+
   if (!tenantFilter) {
     try {
       const session = await requireSession();
@@ -296,7 +431,8 @@ export async function buildMonthlyInvoiceFromTransactions(
     db,
     id,
     tenantFilter,
-    'transactions'
+    'transactions',
+    warehouseId
   );
 
   const transactions = await getTransactionsForInvoiceMonth(
@@ -307,10 +443,46 @@ export async function buildMonthlyInvoiceFromTransactions(
     tenantFilter
   );
 
-  const transactionRows = transformTransactionsToBillingRows(
+  let transactionRows = transformTransactionsToBillingRows(
     transactions,
     invoiceMonth
   );
+
+  if ((!transactionRows || !transactionRows.length) && resolvedWarehouseId && resolvedWarehouseId.includes(',')) {
+    const fallbackRows: any[] = [];
+    for (const singleWarehouseId of warehouseIdsArray) {
+      const partialTransactions = await getTransactionsForInvoiceMonth(
+        db,
+        clientId,
+        singleWarehouseId,
+        invoiceMonth,
+        tenantFilter
+      );
+      const partialRows = transformTransactionsToBillingRows(
+        partialTransactions,
+        invoiceMonth
+      );
+      console.log('[buildMonthlyInvoiceFromTransactions] multi-warehouse fallback partial rows', {
+        id,
+        invoiceMonth,
+        singleWarehouseId,
+        transactionCount: partialTransactions.length,
+        billingRowCount: partialRows.length,
+      });
+      if (partialRows.length) {
+        fallbackRows.push(...partialRows);
+      }
+    }
+    if (fallbackRows.length) {
+      console.log('[buildMonthlyInvoiceFromTransactions] multi-warehouse fallback succeeded', {
+        id,
+        invoiceMonth,
+        resolvedWarehouseId,
+        fallbackRows: fallbackRows.length,
+      });
+      transactionRows = fallbackRows;
+    }
+  }
 
   if (!transactionRows || !transactionRows.length) {
     return null;
@@ -318,11 +490,6 @@ export async function buildMonthlyInvoiceFromTransactions(
 
   const client = await findClientDocument(db, clientId, tenantFilter);
   if (!client) return null;
-
-  const isMultipleWarehouses = resolvedWarehouseId?.includes(',');
-  const warehouseIdsArray = isMultipleWarehouses && resolvedWarehouseId
-    ? resolvedWarehouseId.split(',').map(id => id.trim()).filter(Boolean)
-    : resolvedWarehouseId ? [resolvedWarehouseId] : [];
 
   let resolvedWarehouse = null;
   let resolvedWarehouses: any[] = [];
@@ -364,7 +531,7 @@ export async function buildMonthlyInvoiceFromTransactions(
     const existingInvoices = await db
       .collection('invoice_master')
       .find({
-        ...(isMultipleWarehouses ? { warehouseIds: { $in: warehouseIdsArray.map(id => new ObjectId(id)) } } : { warehouseId: new ObjectId(resolvedWarehouseId) }),
+        ...buildWarehouseMatch(resolvedWarehouseId),
         invoiceMonth: invoiceMonthString,
         invoiceType: 'transaction',
         invoiceId: { $regex: invoiceIdPattern },
@@ -535,7 +702,9 @@ export async function buildMonthlyInvoiceFromLedger(
   const existingMaster = await findInvoiceMasterByIdentifier(
     db,
     id,
-    tenantFilter
+    tenantFilter,
+    undefined,
+    warehouseId
   );
 
   const ledgerResult = await getClientMonthlyLedger(
@@ -893,6 +1062,20 @@ export async function getTransactionsForInvoiceMonth(
       .find(query)
       .sort({ date: 1, inwardDate: 1, actualOutwardDate: 1 })
       .toArray();
+
+    if (
+      (!transactions || transactions.length === 0) &&
+      warehouseId &&
+      String(warehouseId).includes(',')
+    ) {
+      console.warn('[getTransactionsForInvoiceMonth] no transactions found for multi-warehouse query', {
+        clientId,
+        invoiceMonth,
+        warehouseId,
+        warehouseIdValues,
+        query,
+      });
+    }
 
     const commodityIds: string[] = Array.from(
       new Set(
@@ -1321,7 +1504,8 @@ export async function resolveMonthlyInvoiceFromId(
       db,
       id,
       tenantFilter,
-      isTransactionMode ? 'transactions' : undefined
+      isTransactionMode ? 'transactions' : undefined,
+      warehouseId
     );
 
   async function tryBuildTransactionInvoice(invoiceIdentifier: string) {
@@ -1404,14 +1588,42 @@ export async function resolveMonthlyInvoiceFromId(
       ...tenantFilter,
     });
 
-    const warehouse = await db
-      .collection('warehouses')
-      .findOne({
-        _id: invoiceMaster.warehouseId,
-        ...tenantFilter,
-      });
+    const { warehouse, warehouses } = await resolveInvoiceMasterWarehouses(
+      db,
+      invoiceMaster,
+      tenantFilter
+    );
 
-    if (!client || !warehouse) return null;
+    if (!client) return null;
+
+    if (
+      !warehouse &&
+      !(
+        Array.isArray(invoiceMaster.warehouseIds) &&
+        invoiceMaster.warehouseIds.length > 0
+      )
+    ) {
+      return null;
+    }
+
+    const invoiceWarehouseId = invoiceMaster.warehouseId
+      ? invoiceMaster.warehouseId.toString?.()
+        ? invoiceMaster.warehouseId.toString()
+        : String(invoiceMaster.warehouseId)
+      : Array.isArray(invoiceMaster.warehouseIds) &&
+        invoiceMaster.warehouseIds.length > 0
+      ? invoiceMaster.warehouseIds
+          .map((id: any) =>
+            id?.toString?.() ? id.toString() : String(id || '')
+          )
+          .filter(Boolean)
+          .join(',')
+      : undefined;
+
+    const invoiceWarehouseName = Array.isArray(invoiceMaster.warehouseIds) &&
+      invoiceMaster.warehouseIds.length > 1
+      ? 'Multiple Warehouses'
+      : warehouse?.name || '';
 
     const lineItems = await db
       .collection('invoice_line_items')
@@ -1431,14 +1643,14 @@ export async function resolveMonthlyInvoiceFromId(
 
     if (
       invoiceMaster.clientId &&
-      invoiceMaster.warehouseId &&
+      invoiceWarehouseId &&
       invoiceMaster.invoiceMonth
     ) {
       const ledgerResult =
         await getClientMonthlyLedger(
           invoiceMaster.clientId.toString(),
           invoiceMaster.invoiceMonth,
-          invoiceMaster.warehouseId.toString(),
+          invoiceWarehouseId,
           tenantFilter
         );
 
@@ -1456,7 +1668,7 @@ export async function resolveMonthlyInvoiceFromId(
       await getTransactionsForInvoiceMonth(
         db,
         invoiceMaster.clientId,
-        invoiceMaster.warehouseId,
+        invoiceWarehouseId,
         invoiceMaster.invoiceMonth,
         tenantFilter
       );

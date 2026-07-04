@@ -351,14 +351,31 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   const client = await db.collection('clients').findOne({ _id: clientObjectId, ...(tenantFilter || {}) });
   const clientName = client?.name || client?.clientName || 'Unknown Client';
 
-  const transactionQuery: any = { clientId: clientId, ...(tenantFilter || {}) };
+  const clientIdFilters: Array<string | ObjectId> = [clientId];
+  if (ObjectId.isValid(clientId)) {
+    clientIdFilters.push(new ObjectId(clientId));
+  }
+
+  const transactionQuery: any = {
+    clientId: { $in: clientIdFilters },
+    ...(tenantFilter || {}),
+  };
+
   let warehouseIdsArray: string[] = [];
   if (warehouseId && warehouseId !== 'ALL') {
     warehouseIdsArray = warehouseId.split(',').map(id => id.trim()).filter(Boolean);
-    if (warehouseIdsArray.length === 1) {
-      transactionQuery.warehouseId = warehouseIdsArray[0];
-    } else if (warehouseIdsArray.length > 1) {
-      transactionQuery.warehouseId = { $in: warehouseIdsArray };
+    const warehouseIdFilters: Array<string | ObjectId> = [];
+    warehouseIdsArray.forEach((id) => {
+      warehouseIdFilters.push(id);
+      if (ObjectId.isValid(id)) {
+        warehouseIdFilters.push(new ObjectId(id));
+      }
+    });
+
+    if (warehouseIdFilters.length === 1) {
+      transactionQuery.warehouseId = warehouseIdFilters[0];
+    } else if (warehouseIdFilters.length > 1) {
+      transactionQuery.warehouseId = { $in: warehouseIdFilters };
     }
   }
 
