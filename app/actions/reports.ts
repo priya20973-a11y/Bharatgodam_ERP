@@ -679,7 +679,8 @@ export async function getClientOptions() {
         return {
           label: c.name,
           value: c._id?.toString() || '',
-          wspName
+          wspName,
+          userId
         };
       })
     ];

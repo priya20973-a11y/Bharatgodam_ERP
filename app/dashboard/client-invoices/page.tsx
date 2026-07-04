@@ -102,7 +102,7 @@ const TAX_GROUPS = [
 export default function ClientInvoicesPage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
-  const [clients, setClients] = useState<{ label: string; value: string; wspName?: string }[]>([]);
+  const [clients, setClients] = useState<{ label: string; value: string; wspName?: string; userId?: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ label: string; value: string }[]>([]);
   const [commodities, setCommodities] = useState<{ label: string; value: string }[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
@@ -161,7 +161,7 @@ export default function ClientInvoicesPage() {
         const cUserId = c.userId ? String(c.userId) : '';
         const cUserEmail = (c.wspName || '').trim().toLowerCase();
         // Note: getClientOptions returns wspName not userEmail; try matching by client record via separate lookup
-        return c.value === userIdStr || c.value === userEmail;
+        return cUserId === userIdStr || cUserEmail === userEmail;
       });
       if (matched) {
         setSelectedClient(matched.value);
