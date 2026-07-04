@@ -279,22 +279,6 @@ export default function ClientInvoicesPage() {
     }
   }, [invoiceMode]);
 
-  const normalizeWarehouseSelection = (warehouseIds: string[]) => {
-    const cleaned = warehouseIds
-      .map((id) => String(id).trim())
-      .filter(Boolean);
-
-    if (cleaned.length === 0) return undefined;
-
-    if (cleaned.length > 1) {
-      console.warn('[client-invoices] multiple warehouses selected; using the first valid warehouse only', {
-        selectedWarehouses: cleaned,
-      });
-    }
-
-    return cleaned[0];
-  };
-
   // Load invoices with client, warehouse and month filter
   const loadInvoices = async (
     clientId: string,
@@ -305,19 +289,12 @@ export default function ClientInvoicesPage() {
     setLoading(true);
     setInvoices([]);
 
-    const warehouseId = normalizeWarehouseSelection(warehouseIds);
-    if (!warehouseId) {
-      toast.error('Please select exactly one warehouse before loading invoices.');
-      setLoading(false);
-      return;
-    }
-
     try {
       if (mode === 'transaction') {
         const result = await getClientTransactionInvoice(
           clientId,
           month,
-          warehouseId
+          warehouseIds.length > 0 ? warehouseIds.join(',') : undefined
         );
 
         if (result.success && result.data) {
@@ -329,7 +306,7 @@ export default function ClientInvoicesPage() {
         return;
       }
 
-      const result = await getClientMonthlyLedger(clientId, month, warehouseId);
+      const result = await getClientMonthlyLedger(clientId, month, warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
       if (result.success && result.data) {
         const clientResult = await getClientOptions();
         const warehouseResult = await getWarehouseOptions();
@@ -338,7 +315,7 @@ export default function ClientInvoicesPage() {
         const warehouseNames = selectedWMap.map((w: any) => w.label).join(', ');
 
           const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
-          const invoiceWarehouseId = invoice.warehouseId || warehouseId;
+          const invoiceWarehouseId = invoice.warehouseId || (warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
           const invoiceWarehouseName = invoice.warehouseName || warehouseNames || '';
           const invoiceIdValue = invoiceWarehouseId
             ? `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}-${invoiceWarehouseId}`
@@ -448,37 +425,19 @@ export default function ClientInvoicesPage() {
 
   const handleDownloadInvoice = (invoice: MonthlyInvoice) => {
     const invoiceId = invoice.invoiceId || invoice.bookingId;
-    if (!invoiceId) {
-      toast.error('Invoice ID is missing. Cannot load invoice preview.');
-      return;
-    }
-
     const invoiceIdEncoded = encodeURIComponent(invoiceId);
-    const invoiceWarehouseId = normalizeWarehouseSelection(
-      invoice.warehouseId ? [invoice.warehouseId] : selectedWarehouses
-    );
+    let warehouseQuery = '';
 
-    if (!invoiceWarehouseId) {
-      toast.error('Unable to resolve a single warehouse for this invoice.');
-      console.error('[client-invoices] invalid warehouseId selection', {
-        invoiceId,
-        selectedWarehouses,
-      });
-      return;
+    // Avoid duplicate warehouse query when the invoice ID already contains the warehouse segment.
+    if (invoice.warehouseId && invoiceId && !invoiceId.endsWith(`-${invoice.warehouseId}`)) {
+      warehouseQuery = `&warehouseId=${encodeURIComponent(invoice.warehouseId)}`;
     }
 
-    const warehouseQuery = invoice.warehouseId && invoiceId && !invoiceId.endsWith(`-${invoice.warehouseId}`)
-      ? `&warehouseId=${encodeURIComponent(invoiceWarehouseId)}`
-      : '';
+    // Only use transaction mode when user explicitly selected it.
+    // Do NOT infer mode from ID format — all generated IDs match the
+    // transaction pattern, causing incorrect amounts for ledger invoices.
     const modeQuery = invoiceMode === 'transaction' ? '&mode=transactions' : '';
     const url = `/api/invoice/html?id=${invoiceIdEncoded}${warehouseQuery}${modeQuery}`;
-
-    console.debug('[client-invoices] invoice preview URL built', {
-      invoiceId,
-      warehouseId: invoiceWarehouseId,
-      url,
-    });
-
     window.open(url, '_blank', 'noopener');
   };
 
