@@ -314,12 +314,12 @@ export default function ClientInvoicesPage() {
         const selectedWMap = warehouseResult.filter((w: any) => warehouseIds.includes(w.value));
         const warehouseNames = selectedWMap.map((w: any) => w.label).join(', ');
 
-        const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
+          const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
           const invoiceWarehouseId = invoice.warehouseId || (warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
           const invoiceWarehouseName = invoice.warehouseName || warehouseNames || '';
           const invoiceIdValue = invoiceWarehouseId
-            ? `${clientId}-${invoice.month}-${invoiceWarehouseId}`
-            : `${clientId}-${invoice.month}`;
+            ? `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}-${invoiceWarehouseId}`
+            : `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}`;
           const additionalChargeItems = (invoice.additionalChargeItems || []).map((item: any, idx: number) => ({
             id: item.id ? String(item.id) : getAdditionalChargeItemRowId(invoiceIdValue, item, idx),
             name: item.name,
@@ -331,15 +331,16 @@ export default function ClientInvoicesPage() {
             clientName: client?.label || result.data.clientName || '',
             month: invoice.month.split('-')[1].padStart(2, '0'),
             year: parseInt(invoice.month.split('-')[0]),
-            periods: invoice.rows.map((period: any) => ({
-              startDate: period.fromDate,
-              endDate: period.toDate,
-              quantityMT: Number(period.qty ?? 0),
-              daysTotal: Number(period.days ?? 0),
-              rentTotal: Number(period.rent ?? 0),
-              status: period.status || 'COMPLETED',
-              commodityName: period.commodityName || period.commodity || '',
-            })),
+              periods: invoice.rows.map((period: any) => ({
+                startDate: period.fromDate,
+                endDate: period.toDate,
+                quantityMT: Number(period.qty ?? 0),
+                daysTotal: Number(period.days ?? 0),
+                rentTotal: Number(period.rent ?? 0),
+                status: period.status || 'COMPLETED',
+                commodityName: period.commodityName || period.commodity || '',
+                warehouseName: invoiceWarehouseName,
+              })),
             warehouseId: invoiceWarehouseId,
             warehouseName: invoiceWarehouseName,
             totalRent: Number(invoice.summary.totalRent ?? 0),
@@ -362,6 +363,22 @@ export default function ClientInvoicesPage() {
         });
 
         setInvoices(transformedInvoices);
+
+        // Populate the transactions table from ledger periods so on-screen display matches ledger/HTML
+        const ledgerTransactions = transformedInvoices.flatMap((inv) => {
+          return (inv.periods || []).map((p: any, idx: number) => ({
+            _id: `${inv.invoiceId || inv.bookingId || 'inv'}-period-${idx}`,
+            date: p.startDate || '',
+            direction: 'STORAGE',
+            commodityName: p.commodityName || '',
+            warehouseName: p.warehouseName || inv.warehouseName || '',
+            quantityMT: Number(p.quantityMT || 0),
+            bags: p.bags || '',
+            storageDays: p.daysTotal ?? 0,
+          }));
+        });
+
+        setTransactions(ledgerTransactions);
 
         const invoiceIds = transformedInvoices.map((invoice) => invoice.invoiceId || '').filter(Boolean);
         if (invoiceIds.length > 0) {
