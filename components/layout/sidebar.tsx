@@ -36,11 +36,24 @@ export default function Sidebar({ session }: SidebarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
-  const isAdmin = session?.user && (session.user as any).role === 'ADMIN';
+  const role = session?.user && (session.user as any).role;
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+  const isClientUser = role === 'FARMER' || role === 'FPO' || role === 'COMPANY';
+
+  // If client user, only show a minimal set of pages relevant to clients
+  const clientNavItems = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
+    { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
+    { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
+  ];
+
   const wspItemsForAdmin = wspNavItems.filter((item) => item.name !== 'Profile');
   const allNavItems = isAdmin
     ? [...wspItemsForAdmin, ...adminNavItems]
-    : wspNavItems;
+    : isClientUser
+      ? clientNavItems
+      : wspNavItems;
 
   return (
     <>

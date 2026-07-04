@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { getDb } from '@/lib/mongodb';
 import { appendOwnershipForMongo, getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
+import bcrypt from 'bcryptjs';
+
+const DEFAULT_CLIENT_PASSWORD = '123456';
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
@@ -17,6 +20,42 @@ const aadhaarRegex = /^[0-9]{12}$/;
 const isNAValue = (value: string) => value.trim().toUpperCase() === 'NA';
 const normalizeAadhaarValue = (value: string) => value.replace(/\s+/g, '');
 const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null;
+
+function generateClientLoginEmail(name: string, clientType: string) {
+  const safeName = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  const suffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 900 + 100)}`;
+  return `${safeName || 'client'}-${clientType.toLowerCase()}-${suffix}@bharatgodam.com`;
+}
+
+async function createClientUserAccount(db: any, clientName: string, clientType: string, mobile: string, address: string, gstNumber: string, preferredEmail?: string) {
+  const loginEmail = preferredEmail && preferredEmail.trim().length > 0 ? preferredEmail.trim().toLowerCase() : generateClientLoginEmail(clientName, clientType);
+  const existing = await db.collection('users').findOne({ email: loginEmail });
+  if (existing) {
+    throw new Error('A user with that email already exists');
+  }
+  const hashedPassword = await bcrypt.hash(DEFAULT_CLIENT_PASSWORD, 12);
+  const userPayload = {
+    fullName: clientName,
+    email: loginEmail,
+    password: hashedPassword,
+    companyName: clientName,
+    phoneNumber: mobile,
+    warehouseLocation: address,
+    gstNumber,
+    role: clientType.toUpperCase(),
+    status: 'ACTIVE',
+    isNewRegistration: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const result = await db.collection('users').insertOne(userPayload);
+  return { userId: result.insertedId, userEmail: loginEmail, password: DEFAULT_CLIENT_PASSWORD };
+}
 
 function validateClientPayload(payload: {
   mobile: string;
@@ -248,14 +287,43 @@ export async function POST(request: Request) {
       updatedAt: new Date(),
     }, session);
 
+    // Require email for new clients
+    const providedEmail = normalizeEmail((body as any).email || '');
+    if (!providedEmail) {
+      return NextResponse.json({ success: false, message: 'Email is required for new client' }, { status: 400 });
+    }
+
+    client.email = providedEmail;
+
     const result = await db.collection('clients').insertOne(client);
+
+    const credentials = await createClientUserAccount(
+      db,
+      nameValue,
+      String(type),
+      mobile,
+      address,
+      gstNumber,
+      providedEmail
+    );
+
+    await db.collection('clients').updateOne(
+      { _id: result.insertedId },
+      { $set: { userId: credentials.userId, userEmail: credentials.userEmail, email: providedEmail } }
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Client created successfully',
       client: {
         id: result.insertedId.toString(),
-        ...client
+        ...client,
+        userId: credentials.userId,
+        userEmail: credentials.userEmail,
+      },
+      credentials: {
+        email: credentials.userEmail,
+        password: credentials.password,
       }
     });
 

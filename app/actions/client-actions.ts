@@ -1,6 +1,7 @@
 'use server';
 
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import connectToDatabase from '@/lib/mongoose';
 import Client from '@/lib/models/Client';
 import Inward from '@/lib/models/Inward';
@@ -8,6 +9,46 @@ import Outward from '@/lib/models/Outward';
 import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
+
+const DEFAULT_CLIENT_PASSWORD = '123456';
+
+function generateClientLoginEmail(name: string, clientType: string) {
+  const safeName = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  const suffix = Date.now().toString().slice(-6);
+  return `${safeName || 'client'}-${clientType.toLowerCase()}-${suffix}@bharatgodam.com`;
+}
+
+async function createClientUserAccount(db: any, clientName: string, clientType: string, mobile: string, address: string, gstNumber: string, preferredEmail?: string) {
+  const loginEmail = preferredEmail && preferredEmail.trim().length > 0 ? preferredEmail.trim().toLowerCase() : generateClientLoginEmail(clientName, clientType);
+  // Ensure no existing user with same email
+  const existing = await db.collection('users').findOne({ email: loginEmail });
+  if (existing) {
+    throw new Error('A user with that email already exists. Choose a different email');
+  }
+
+  const hashedPassword = await bcrypt.hash(DEFAULT_CLIENT_PASSWORD, 12);
+  const userPayload = {
+    fullName: clientName,
+    email: loginEmail,
+    password: hashedPassword,
+    companyName: clientName,
+    phoneNumber: mobile,
+    warehouseLocation: address,
+    gstNumber,
+    role: clientType,
+    status: 'ACTIVE',
+    isNewRegistration: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const result = await db.collection('users').insertOne(userPayload);
+  return { userId: result.insertedId, userEmail: loginEmail, password: DEFAULT_CLIENT_PASSWORD };
+}
 
 const mobileRegex = /^[0-9]{10}$/;
 const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
@@ -122,6 +163,7 @@ export async function createClient(data: {
   gstNumber: string;
   state?: string;
   commodityIds?: string[];
+  email?: string;
 }) {
   await connectToDatabase();
   try {
@@ -170,8 +212,34 @@ export async function createClient(data: {
     }
 
     const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey }, session));
+
+    const db = await getDb();
+    const credentials = await createClientUserAccount(
+      db,
+      nameValue,
+      data.clientType,
+      data.mobile,
+      data.address,
+      data.gstNumber,
+      (data as any).email
+    );
+
+    const updatedClient = await Client.findByIdAndUpdate(
+      client._id,
+      { userId: credentials.userId, userEmail: credentials.userEmail, email: (data as any).email || credentials.userEmail },
+      { new: true }
+    );
+
+    const responseClient = updatedClient ? JSON.parse(JSON.stringify(updatedClient)) : JSON.parse(JSON.stringify(client));
     revalidatePath('/dashboard/clients');
-    return { success: true, data: JSON.parse(JSON.stringify(client)) };
+    return {
+      success: true,
+      data: responseClient,
+      credentials: {
+        email: credentials.userEmail,
+        password: credentials.password,
+      },
+    };
   } catch (error: unknown) {
     const message = error instanceof Error && /duplicate key/i.test(error.message)
       ? 'Client name already exists for your account'
@@ -243,6 +311,45 @@ export async function updateClient(id: string, data: Partial<{
       data,
       { new: true }
     );
+
+    if (client) {
+      const userUpdate: any = { updatedAt: new Date() };
+      if (data.name) {
+        userUpdate.fullName = data.name;
+        userUpdate.companyName = data.name;
+      }
+      if (data.clientType) {
+        userUpdate.role = data.clientType;
+      }
+      if (data.mobile) {
+        userUpdate.phoneNumber = data.mobile;
+      }
+      if (data.address) {
+        userUpdate.warehouseLocation = data.address;
+      }
+      if (data.gstNumber) {
+        userUpdate.gstNumber = data.gstNumber;
+      }
+      if ((data as any).email) {
+        userUpdate.email = (data as any).email;
+      }
+
+      if (Object.keys(userUpdate).length > 1) {
+        const db = await getDb();
+        const userQuery: any = {};
+
+        if (client.userId) {
+          userQuery._id = client.userId;
+        } else if (client.userEmail) {
+          userQuery.email = client.userEmail;
+        }
+
+        if (Object.keys(userQuery).length > 0) {
+          await db.collection('users').updateOne({ ...userQuery }, { $set: userUpdate });
+        }
+      }
+    }
+
     revalidatePath('/dashboard/clients');
     return { success: true, data: JSON.parse(JSON.stringify(client)) };
   } catch (error: unknown) {

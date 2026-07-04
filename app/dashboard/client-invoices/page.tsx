@@ -150,6 +150,25 @@ export default function ClientInvoicesPage() {
     loadMasterData();
   }, []);
 
+  // Auto-select client for client users
+  useEffect(() => {
+    if (!clients.length || !session?.user) return;
+    const role = (session.user as any).role;
+    if (role === 'FARMER' || role === 'FPO' || role === 'COMPANY') {
+      const userIdStr = String((session.user as any).id || '');
+      const userEmail = String((session.user as any).email || '').trim().toLowerCase();
+      const matched = clients.find(c => {
+        const cUserId = c.userId ? String(c.userId) : '';
+        const cUserEmail = (c.wspName || '').trim().toLowerCase();
+        // Note: getClientOptions returns wspName not userEmail; try matching by client record via separate lookup
+        return c.value === userIdStr || c.value === userEmail;
+      });
+      if (matched) {
+        setSelectedClient(matched.value);
+      }
+    }
+  }, [clients, session]);
+
   useEffect(() => {
     const loadTransactions = async () => {
       if ((!selectedClient || selectedClient === 'ALL') && (selectedWarehouses.length === 0 || selectedWarehouses.includes('ALL'))) {

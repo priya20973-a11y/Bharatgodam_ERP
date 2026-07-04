@@ -73,6 +73,8 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
             aadharNumber: client.aadharNumber || '',
             gstNumber: client.gstNumber || '',
             commodityIds: client.commodityIds || [],
+            email: client.email || client.userEmail || '',
+            state: client.state || '',
           });
         }}
         onDelete={handleDelete}

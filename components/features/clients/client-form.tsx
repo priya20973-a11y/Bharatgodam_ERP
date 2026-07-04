@@ -62,6 +62,7 @@ interface ClientFormState {
   gstNumber: string;
   state: string;
   commodityIds: string[];
+  email?: string;
 }
 
 export default function ClientForm({ client, availableCommodities, onSuccess }: ClientFormProps) {
@@ -77,6 +78,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
     gstNumber: client?.gstNumber || '',
     state: client?.state || '',
     commodityIds: client?.commodityIds || [],
+    email: client?.email || '',
   });
 
   const isNAValue = (value: string) => value.trim().toUpperCase() === 'NA';
@@ -113,6 +115,16 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       validationErrors.gstNumber = 'Enter valid GSTIN or NA if not available';
     }
 
+    // Email required for new clients
+    const emailVal = (formData as any).email?.trim() || '';
+    if (!client) {
+      if (!emailVal) {
+        validationErrors.email = 'Email is required for new clients';
+      } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) {
+        validationErrors.email = 'Enter a valid email address';
+      }
+    }
+
     if (!client && !formData.state) {
       validationErrors.state = 'State is required';
     }
@@ -139,6 +151,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
       gstNumber: client?.gstNumber || '',
       state: client?.state || '',
       commodityIds: client?.commodityIds || [],
+      email: client?.email || '',
     });
   }, [client]);
 
@@ -163,6 +176,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
         gstNumber: formData.gstNumber,
         state: formData.state,
         commodityIds: formData.commodityIds,
+        email: formData.email,
       };
 
       const res = client
@@ -170,7 +184,14 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
         : await createClient(payload as any);
 
       if (res.success) {
-        toast.success(client ? 'Client updated' : 'Client registered');
+        if (!client && res.credentials) {
+          toast.success('Client registered');
+          window.alert(
+            `Client account created successfully.\n\nLogin Email: ${res.credentials.email}\nPassword: ${res.credentials.password}`
+          );
+        } else {
+          toast.success(client ? 'Client updated' : 'Client registered');
+        }
         onSuccess();
       } else {
         toast.error(res.error || 'Failed to save client');
@@ -206,6 +227,17 @@ export default function ClientForm({ client, availableCommodities, onSuccess }: 
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g. Akshay Vadher"
           />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Email {client ? '' : '*'}</label>
+          <Input
+            required={!client}
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder="user@example.com"
+          />
+          {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Client Type</label>

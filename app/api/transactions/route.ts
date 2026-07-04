@@ -361,6 +361,13 @@ export async function POST(request: Request) {
           message: `Client '${clientId}' not found in Client Master. Please add to Master first.`
         }, { status: 400 });
       }
+      // Enforce: client must have an email configured before allowing transactions
+      if (!clientFromMaster.email || String(clientFromMaster.email).trim() === '') {
+        return NextResponse.json({
+          success: false,
+          message: `Client '${clientFromMaster.name || clientId}' does not have an email configured. Please add an email in Client Master before recording transactions.`
+        }, { status: 400 });
+      }
     } catch (e) {
       return NextResponse.json({
         success: false,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { getClients } from '@/app/actions/client-actions';
+import { useSession } from 'next-auth/react';
 import { LedgerCalculator } from '@/components/features/ledger';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,24 @@ export default function LedgerDashboard() {
     loadClients();
     loadWarehouses();
   }, []);
+
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    // If this is a client user, auto-select their client record
+    if (!clients.length || !session?.user) return;
+    const role = (session.user as any).role;
+    if (role === 'FARMER' || role === 'FPO' || role === 'COMPANY') {
+      const userIdStr = String((session.user as any).id || '');
+      const userEmail = String((session.user as any).email || '').trim().toLowerCase();
+      const matched = clients.find(c => {
+        const cUserId = c.userId ? String(c.userId) : '';
+        const cUserEmail = (c.userEmail || '').trim().toLowerCase();
+        return cUserId === userIdStr || (cUserEmail && cUserEmail === userEmail);
+      });
+      if (matched) setSelectedClient(matched);
+    }
+  }, [clients, session]);
 
   const loadClients = async () => {
     setLoading(true);

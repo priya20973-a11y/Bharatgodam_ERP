@@ -32,7 +32,7 @@ export default async function TransactionsReportWrapper() {
       })
       .filter((id): id is ObjectId => id !== null);
 
-    const tenantWarehouseMatch = {
+    const tenantWarehouseMatch: any = {
       $and: [
         tenantFilter,
         {
@@ -44,6 +44,28 @@ export default async function TransactionsReportWrapper() {
         },
       ],
     };
+
+    // If the logged-in user is a client-type user, further restrict to their client record(s)
+    const role = session.user?.role;
+    const isClientUser = role === 'FARMER' || role === 'FPO' || role === 'COMPANY';
+    let clientIdFilterValues: any[] = [];
+    if (isClientUser) {
+      const userEmail = String(session.user?.email || '').trim().toLowerCase();
+      const userIdStr = String(session.user?.id || '');
+      const clientQuery: any = {
+        $or: [
+          { userId: userIdStr },
+          { userEmail: { $regex: new RegExp(`^${userEmail.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+        ],
+        ...getTenantFilterForMongo(session)
+      };
+      const matchedClients = await db.collection('clients').find(clientQuery).project({ _id: 1 }).toArray();
+      clientIdFilterValues = matchedClients.map((c: any) => c._id).filter(Boolean);
+      if (clientIdFilterValues.length > 0) {
+        // append clientId filter to tenantWarehouseMatch so subsequent queries only return that client's records
+        tenantWarehouseMatch.$and.push({ clientId: { $in: clientIdFilterValues } });
+      }
+    }
 
     const [transactions, inwards, outwards, stockEntries] = await Promise.all([
       // Fetch transactions with warehouse lookup to get CURRENT warehouse name
