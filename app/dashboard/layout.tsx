@@ -16,6 +16,11 @@ export default async function DashboardLayout({
     redirect('/');
   }
 
+  // Redirect Cold Storage users to their dedicated layout
+  if ((session.user as any).storagePlan === 'COLD') {
+    redirect('/cold/dashboard');
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
       {/* Persistent Sidebar */}

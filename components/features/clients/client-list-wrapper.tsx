@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { UserPlus2, X } from 'lucide-react';
 import { getClients, deleteClient } from '@/app/actions/client-actions';
 import { toast, Toaster } from 'react-hot-toast';
+import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
-export default function ClientListWrapper({ initialClients, initialCommodities }: { initialClients: any[]; initialCommodities: any[] }) {
+export default function ClientListWrapper({ initialClients, initialCommodities, isColdStorage = false }: { initialClients: any[]; initialCommodities: any[]; isColdStorage?: boolean }) {
+  const { t } = useColdTranslation();
   const [clients, setClients] = useState(initialClients);
   const [isAdding, setIsAdding] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
@@ -21,13 +23,13 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this client?')) {
+    if (confirm(t('clients.deleteConfirm'))) {
       const res = await deleteClient(id);
       if (res.success) {
-        toast.success('Client deleted');
+        toast.success(t('clients.deleteSuccess'));
         refreshData();
       } else {
-        toast.error(res.error || 'Failed to delete client');
+        toast.error(res.error || t('clients.deleteFailed'));
       }
     }
   };
@@ -36,7 +38,7 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
     <div className="space-y-4">
       <Toaster />
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Business Partners</h2>
+        <h2 className="text-xl font-semibold">{t('clients.businessPartners')}</h2>
         <Button
           onClick={() => {
             setEditingClient(null);
@@ -44,7 +46,7 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
           }}
           variant={isAdding ? "outline" : "default"}
         >
-          {isAdding ? <><X className="mr-2 h-4 w-4" /> Cancel</> : <><UserPlus2 className="mr-2 h-4 w-4" /> Register Client</>}
+          {isAdding ? <><X className="mr-2 h-4 w-4" /> {t('common.cancel')}</> : <><UserPlus2 className="mr-2 h-4 w-4" /> {t('clients.registerClient')}</>}
         </Button>
       </div>
 
@@ -54,6 +56,7 @@ export default function ClientListWrapper({ initialClients, initialCommodities }
             client={editingClient}
             availableCommodities={initialCommodities}
             onSuccess={refreshData}
+            isColdStorage={isColdStorage}
           />
         </div>
       )}

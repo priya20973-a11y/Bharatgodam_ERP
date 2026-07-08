@@ -23,6 +23,7 @@ export async function GET() {
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
+        address: user.address || null,
         warehouseLocation: user.warehouseLocation || '',
         state: user.state || '',
         gstNumber: user.gstNumber || null,
@@ -35,6 +36,7 @@ export async function GET() {
         panNumber: user.panNumber || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
+        coldLanguage: user.coldLanguage || 'en',
       },
     });
   } catch (error: any) {
@@ -69,7 +71,8 @@ export async function PATCH(req: Request) {
       bankBranch,
       companyLogo,
       panNumber,
-      termsAndConditions
+      termsAndConditions,
+      coldLanguage
     } = body;
 
     const db = await getDb();
@@ -99,38 +102,42 @@ export async function PATCH(req: Request) {
     const trimmedPan = merged.panNumber ? merged.panNumber.toString().trim().toUpperCase() : '';
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
-    if (isNew) {
-      if (!merged.state || !merged.state.toString().trim()) {
-        return NextResponse.json({ message: 'State is required.' }, { status: 400 });
-      }
-      if (!merged.bankName || !merged.bankName.toString().trim() ||
-          !merged.accountName || !merged.accountName.toString().trim() ||
-          !merged.bankAccountNumber || !merged.bankAccountNumber.toString().trim() ||
-          !merged.ifscCode || !merged.ifscCode.toString().trim() ||
-          !merged.bankBranch || !merged.bankBranch.toString().trim()) {
-        return NextResponse.json({ message: 'All bank details are required.' }, { status: 400 });
-      }
-      if (!merged.companyLogo) {
-        return NextResponse.json({ message: 'Company logo is required.' }, { status: 400 });
-      }
-      if (!trimmedGst) {
-        return NextResponse.json({ message: 'GST Number is required (use NA if not applicable).' }, { status: 400 });
-      }
-      if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
-        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
-      }
-      if (!trimmedPan) {
-        return NextResponse.json({ message: 'PAN Number is required.' }, { status: 400 });
-      }
-      if (!panRegex.test(trimmedPan)) {
-        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
-      }
-    } else {
-      if (trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
-        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
-      }
-      if (trimmedPan && !panRegex.test(trimmedPan)) {
-        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+    const isProfileUpdate = Object.keys(body).some(key => key !== 'coldLanguage');
+
+    if (isProfileUpdate) {
+      if (isNew) {
+        if (!merged.state || !merged.state.toString().trim()) {
+          return NextResponse.json({ message: 'State is required.' }, { status: 400 });
+        }
+        if (!merged.bankName || !merged.bankName.toString().trim() ||
+            !merged.accountName || !merged.accountName.toString().trim() ||
+            !merged.bankAccountNumber || !merged.bankAccountNumber.toString().trim() ||
+            !merged.ifscCode || !merged.ifscCode.toString().trim() ||
+            !merged.bankBranch || !merged.bankBranch.toString().trim()) {
+          return NextResponse.json({ message: 'All bank details are required.' }, { status: 400 });
+        }
+        if (!merged.companyLogo) {
+          return NextResponse.json({ message: 'Company logo is required.' }, { status: 400 });
+        }
+        if (!trimmedGst) {
+          return NextResponse.json({ message: 'GST Number is required (use NA if not applicable).' }, { status: 400 });
+        }
+        if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+          return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+        }
+        if (!trimmedPan) {
+          return NextResponse.json({ message: 'PAN Number is required.' }, { status: 400 });
+        }
+        if (!panRegex.test(trimmedPan)) {
+          return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+        }
+      } else {
+        if (gstNumber !== undefined && trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+          return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+        }
+        if (panNumber !== undefined && trimmedPan && !panRegex.test(trimmedPan)) {
+          return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+        }
       }
     }
 
@@ -160,6 +167,7 @@ export async function PATCH(req: Request) {
     if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
     if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
     if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
+    if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -192,6 +200,7 @@ export async function PATCH(req: Request) {
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
+        address: user.address || null,
         warehouseLocation: user.warehouseLocation || '',
         state: user.state || '',
         gstNumber: user.gstNumber || null,
@@ -204,6 +213,7 @@ export async function PATCH(req: Request) {
         panNumber: user.panNumber || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
+        coldLanguage: user.coldLanguage || 'en',
       },
     });
   } catch (error: any) {

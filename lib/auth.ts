@@ -50,6 +50,7 @@ export const authOptions: NextAuthOptions = {
           fullName: user.fullName || '',
           companyName: user.companyName || '',
           phoneNumber: user.phoneNumber || '',
+          address: user.address || null,
           warehouseLocation: user.warehouseLocation || '',
           gstNumber: user.gstNumber || null,
           bankName: user.bankName || null,
@@ -58,6 +59,8 @@ export const authOptions: NextAuthOptions = {
           bankBranch: user.bankBranch || null,
           state: user.state || '',
           isNewRegistration: !!user.isNewRegistration,
+          storagePlan: user.storagePlan || 'DRY',
+          coldLanguage: user.coldLanguage || 'en',
         };
       },
     }),
@@ -68,22 +71,28 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     // Append user details to the JWT token
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === 'update' && session?.coldLanguage) {
+        token.coldLanguage = session.coldLanguage;
+      }
+      
       if (user) {
         token.id = user.id;
         token.role = (user as any).role?.toString().toUpperCase();
         token.fullName = (user as any).fullName || '';
         token.companyName = (user as any).companyName || '';
         token.phoneNumber = (user as any).phoneNumber || '';
+        token.address = (user as any).address || null;
         token.warehouseLocation = (user as any).warehouseLocation || '';
         token.gstNumber = (user as any).gstNumber || null;
         token.bankName = (user as any).bankName || null;
         token.bankAccountNumber = (user as any).bankAccountNumber || null;
         token.ifscCode = (user as any).ifscCode || null;
         token.bankBranch = (user as any).bankBranch || null;
-        token.companyLogo = (user as any).companyLogo || null;
         token.state = (user as any).state || '';
         token.isNewRegistration = (user as any).isNewRegistration || false;
+        token.storagePlan = (user as any).storagePlan || 'DRY';
+        token.coldLanguage = (user as any).coldLanguage || 'en';
       }
       return token;
     },
@@ -95,15 +104,17 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).fullName = token.fullName;
         (session.user as any).companyName = token.companyName;
         (session.user as any).phoneNumber = token.phoneNumber;
+        (session.user as any).address = token.address || null;
         (session.user as any).warehouseLocation = token.warehouseLocation;
         (session.user as any).gstNumber = token.gstNumber;
         (session.user as any).bankName = token.bankName || null;
         (session.user as any).bankAccountNumber = token.bankAccountNumber || null;
         (session.user as any).ifscCode = token.ifscCode || null;
         (session.user as any).bankBranch = token.bankBranch || null;
-        (session.user as any).companyLogo = token.companyLogo || null;
         (session.user as any).state = token.state || '';
         (session.user as any).isNewRegistration = token.isNewRegistration || false;
+        (session.user as any).storagePlan = token.storagePlan || 'DRY';
+        (session.user as any).coldLanguage = token.coldLanguage || 'en';
       }
       return session;
     },

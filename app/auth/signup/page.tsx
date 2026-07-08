@@ -67,6 +67,7 @@ export default function SignupPage() {
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [gstNotApplicable, setGstNotApplicable] = useState(false);
+  const [isColdStorage, setIsColdStorage] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -189,6 +190,7 @@ export default function SignupPage() {
           ...formData,
           gstNumber: gstNotApplicable ? 'NA' : formData.gstNumber,
           role: 'WSP',
+          storagePlan: isColdStorage ? 'COLD' : 'DRY',
         }),
       });
 
@@ -494,6 +496,22 @@ export default function SignupPage() {
                 />
               </div>
               {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
+            </div>
+
+            {/* Cold Storage Plan */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isColdStorage"
+                  checked={isColdStorage}
+                  onChange={(e) => setIsColdStorage(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="isColdStorage" className="text-sm font-medium text-gray-700 select-none">
+                  Enable Cold Storage
+                </label>
+              </div>
             </div>
 
             {/* Bank Details */}
