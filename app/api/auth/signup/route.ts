@@ -23,7 +23,8 @@ export async function POST(req: Request) {
       bankBranch,
       companyLogo,
       panNumber,
-      role
+      role,
+      storagePlan
     } = body;
 
     // Validation
@@ -158,6 +159,7 @@ export async function POST(req: Request) {
       companyLogo,
       panNumber: trimmedPan,
       role: normalizedRole,
+      storagePlan: storagePlan || 'DRY',
       status: 'PENDING_APPROVAL',
       isNewRegistration: true,
       createdAt: new Date(),

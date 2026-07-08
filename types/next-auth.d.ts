@@ -8,6 +8,7 @@ declare module "next-auth" {
     email: string;
     companyName?: string;
     phoneNumber?: string;
+    address?: string | null;
     warehouseLocation?: string;
     gstNumber?: string;
     bankName?: string;
@@ -18,6 +19,8 @@ declare module "next-auth" {
     companyLogo?: string | null;
     state?: string;
     isNewRegistration?: boolean;
+    storagePlan?: string;
+    coldLanguage?: string;
   }
 
   interface Session {
