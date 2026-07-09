@@ -18,20 +18,19 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Handle Sign In
+      // Handle Sign In with native redirect to avoid router fetch conflicts
       const result = await signIn('credentials', {
-        redirect: false,
+        redirect: true,
+        callbackUrl: '/dashboard',
         email,
         password,
       });
 
       if (result?.error) {
         alert(`Error: ${result.error}`);
-      } else {
-        // Secure, fast client-side redirect!
-        router.push('/dashboard'); 
-        router.refresh(); // Forces Next.js to check the new session state
+        setIsLoading(false);
       }
+      // If successful, NextAuth will automatically redirect to /dashboard via window.location
     } catch (error) {
       console.error('Authentication error:', error);
       alert('Network error. Please try again.');

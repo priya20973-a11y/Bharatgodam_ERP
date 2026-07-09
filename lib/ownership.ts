@@ -15,7 +15,8 @@ function normalizeEmail(email?: string | null) {
 }
 
 export function isAdmin(session: Session | null) {
-  return session?.user?.role?.toString().toUpperCase() === ADMIN_ROLE;
+  const role = session?.user?.role?.toString().toUpperCase();
+  return role === ADMIN_ROLE || role === 'SUPER_ADMIN';
 }
 
 export function isWsp(session: Session | null) {

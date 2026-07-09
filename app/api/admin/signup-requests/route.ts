@@ -86,6 +86,7 @@ export async function POST(req: Request) {
         bankBranch: request.bankBranch || null,
         companyLogo: request.companyLogo || null,
         role: normalizedRole,
+        storagePlan: request.storagePlan || 'DRY',
         status: 'ACTIVE',
         isNewRegistration: !!request.isNewRegistration,
         createdAt: new Date(),

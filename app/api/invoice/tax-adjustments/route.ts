@@ -128,21 +128,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine GST split type based on Warehouse State and Billing State
-    const taxType = whState && parsed.billingState
-      ? (whState.trim().toLowerCase() === parsed.billingState.trim().toLowerCase() ? 'CGST_SGST' : 'IGST')
+    const safeWhState = typeof whState === 'string' ? whState.trim().toLowerCase() : '';
+    const safeBillingState = typeof parsed.billingState === 'string' ? parsed.billingState.trim().toLowerCase() : '';
+    
+    const taxType = safeWhState && safeBillingState
+      ? (safeWhState === safeBillingState ? 'CGST_SGST' : 'IGST')
       : 'IGST';
 
     // 2. Fetch or compute the base rent and additional charges
-    const rentAmount = Number(invoiceMaster.totalAmount ?? invoiceMaster.totalRent ?? 0);
+    const rentAmount = Number(invoiceMaster.totalAmount ?? invoiceMaster.totalRent ?? 0) || 0;
     // Find additional charges total (from invoice_adjustments)
     const adjustments = await db.collection('invoice_adjustments').find({
       invoiceId: parsed.invoiceId
     }).toArray();
-    const additionalCharges = adjustments.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+    const additionalCharges = adjustments.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
 
     const taxableAmount = rentAmount + additionalCharges;
     const taxRate = TAX_RATES[parsed.taxGroup] || 0;
-    const totalTaxAmount = Number((taxableAmount * taxRate).toFixed(2));
+    const totalTaxAmount = Number((taxableAmount * taxRate).toFixed(2)) || 0;
 
     let cgstAmount = 0;
     let sgstAmount = 0;
@@ -150,8 +153,8 @@ export async function POST(request: NextRequest) {
 
     if (totalTaxAmount > 0 && taxType) {
       if (taxType === 'CGST_SGST') {
-        cgstAmount = Number((totalTaxAmount / 2).toFixed(2));
-        sgstAmount = Number((totalTaxAmount / 2).toFixed(2));
+        cgstAmount = Number((totalTaxAmount / 2).toFixed(2)) || 0;
+        sgstAmount = Number((totalTaxAmount / 2).toFixed(2)) || 0;
       } else {
         igstAmount = totalTaxAmount;
       }

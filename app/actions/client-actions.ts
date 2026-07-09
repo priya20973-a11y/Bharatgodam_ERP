@@ -64,11 +64,17 @@ function validateClientData(data: {
   panNumber?: string;
   aadharNumber?: string;
   gstNumber?: string;
-}) {
+}, isColdStorage: boolean = false) {
   if (data.mobile !== undefined) {
     const mobile = data.mobile.trim();
-    if (!mobile) return 'Mobile number is required';
-    if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+    if (isColdStorage) {
+      if (!mobile) return 'Mobile number is required';
+      if (isNAValue(mobile)) return 'Mobile number is mandatory and cannot be NA';
+      if (!mobileRegex.test(mobile)) return 'Mobile number must be 10 digits';
+    } else {
+      if (!mobile) return 'Mobile number is required';
+      if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+    }
   }
 
   if (data.panNumber !== undefined) {
@@ -164,21 +170,22 @@ export async function createClient(data: {
   state?: string;
   commodityIds?: string[];
   email?: string;
-}) {
+}, isColdStorage: boolean = false) {
   await connectToDatabase();
   try {
     if (!data.state || !data.state.trim()) {
       return { success: false, error: 'State is required' };
     }
 
-    const validationError = validateClientData(data);
+    const validationError = validateClientData(data, isColdStorage);
     if (validationError) {
       return { success: false, error: validationError };
     }
 
     const session = await requireSession();
     const nameValue = data.name.trim();
-    const nameKey = nameValue.toUpperCase();
+    const baseNameKey = nameValue.toUpperCase();
+    const nameKey = isColdStorage ? `${baseNameKey}_${data.mobile.trim()}` : baseNameKey;
 
     const email = normalizeEmail(session.user.email);
     const ownerFilter: any = {
@@ -195,20 +202,29 @@ export async function createClient(data: {
       ]
     };
 
-    const existingClient = await Client.findOne({
-      $and: [
-        ownerFilter,
-        {
-          $or: [
-            { nameKey },
-            { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
-          ]
-        }
-      ]
-    });
+    if (isColdStorage) {
+      const existingClientByMobile = await Client.findOne({
+        $and: [ownerFilter, { mobile: data.mobile.trim() }]
+      });
+      if (existingClientByMobile) {
+        return { success: false, error: 'Mobile number already exists for another client' };
+      }
+    } else {
+      const existingClient = await Client.findOne({
+        $and: [
+          ownerFilter,
+          {
+            $or: [
+              { nameKey },
+              { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+            ]
+          }
+        ]
+      });
 
-    if (existingClient) {
-      return { success: false, error: 'Client name already exists for your account' };
+      if (existingClient) {
+        return { success: false, error: 'Client name already exists for your account' };
+      }
     }
 
     const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey }, session));
@@ -259,10 +275,10 @@ export async function updateClient(id: string, data: Partial<{
   gstNumber: string;
   state?: string;
   commodityIds?: string[];
-}>) {
+}>, isColdStorage: boolean = false) {
   await connectToDatabase();
   try {
-    const validationError = validateClientData(data);
+    const validationError = validateClientData(data as any, isColdStorage);
     if (validationError) {
       return { success: false, error: validationError };
     }
@@ -270,7 +286,8 @@ export async function updateClient(id: string, data: Partial<{
     const session = await requireSession();
     if (data.name) {
       const nameValue = data.name.trim();
-      const nameKey = nameValue.toUpperCase();
+      const baseNameKey = nameValue.toUpperCase();
+      const nameKey = isColdStorage && data.mobile ? `${baseNameKey}_${data.mobile.trim()}` : baseNameKey;
       data.name = nameValue;
       data.nameKey = nameKey;
 
@@ -288,21 +305,33 @@ export async function updateClient(id: string, data: Partial<{
             : [])
         ]
       };
-      const existingClient = await Client.findOne({
-        _id: { $ne: id },
-        $and: [
-          ownerFilter,
-          {
-            $or: [
-              { nameKey },
-              { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
-            ]
+      if (isColdStorage) {
+        if (data.mobile) {
+          const existingClientByMobile = await Client.findOne({
+            _id: { $ne: id },
+            $and: [ownerFilter, { mobile: data.mobile.trim() }]
+          });
+          if (existingClientByMobile) {
+            return { success: false, error: 'Mobile number already exists for another client' };
           }
-        ]
-      });
+        }
+      } else {
+        const existingClient = await Client.findOne({
+          _id: { $ne: id },
+          $and: [
+            ownerFilter,
+            {
+              $or: [
+                { nameKey },
+                { name: { $regex: new RegExp(`^${nameValue.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+              ]
+            }
+          ]
+        });
 
-      if (existingClient) {
-        return { success: false, error: 'Client name already exists for your account' };
+        if (existingClient) {
+          return { success: false, error: 'Client name already exists for your account' };
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getDb } from '@/lib/mongodb';
 import bcrypt from 'bcryptjs';
+import { ObjectId } from 'mongodb';
 
 const nextAuthUrl =
   process.env.NEXTAUTH_URL ||
@@ -43,21 +44,42 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid password');
         }
 
+        let userForSession = user;
+        
+        if (user.role === 'STAFF') {
+          // If the user is STAFF, we authenticate them, but load the parent WSP for session data isolation
+          const parentWsp = await db.collection('users').findOne({ _id: new ObjectId(user.wspId) });
+          if (!parentWsp) {
+            throw new Error('Parent WSP account not found. Please contact administrator.');
+          }
+          userForSession = parentWsp;
+        }
+
         return {
-          id: user._id.toString(),
-          email: user.email,
-          role: user.role?.toString().toUpperCase(),
-          fullName: user.fullName || '',
-          companyName: user.companyName || '',
-          phoneNumber: user.phoneNumber || '',
-          warehouseLocation: user.warehouseLocation || '',
-          gstNumber: user.gstNumber || null,
-          bankName: user.bankName || null,
-          bankAccountNumber: user.bankAccountNumber || null,
-          ifscCode: user.ifscCode || null,
-          bankBranch: user.bankBranch || null,
-          state: user.state || '',
-          isNewRegistration: !!user.isNewRegistration,
+          id: userForSession._id.toString(),
+          email: userForSession.email,
+          role: userForSession.role?.toString().toUpperCase(),
+          fullName: userForSession.fullName || '',
+          companyName: userForSession.companyName || '',
+          phoneNumber: userForSession.phoneNumber || '',
+          address: userForSession.address || null,
+          warehouseLocation: userForSession.warehouseLocation || '',
+          gstNumber: userForSession.gstNumber || null,
+          bankName: userForSession.bankName || null,
+          bankAccountNumber: userForSession.bankAccountNumber || null,
+          ifscCode: userForSession.ifscCode || null,
+          bankBranch: userForSession.bankBranch || null,
+          state: userForSession.state || '',
+          isNewRegistration: !!userForSession.isNewRegistration,
+          storagePlan: userForSession.storagePlan || 'DRY',
+          coldLanguage: userForSession.coldLanguage || 'en',
+          
+          // Staff properties
+          ...(user.role === 'STAFF' ? {
+            staffId: user._id.toString(),
+            isStaff: true,
+            permissions: user.permissions || {},
+          } : {})
         };
       },
     }),
@@ -68,22 +90,34 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     // Append user details to the JWT token
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === 'update' && session?.coldLanguage) {
+        token.coldLanguage = session.coldLanguage;
+      }
+      
       if (user) {
         token.id = user.id;
         token.role = (user as any).role?.toString().toUpperCase();
         token.fullName = (user as any).fullName || '';
         token.companyName = (user as any).companyName || '';
         token.phoneNumber = (user as any).phoneNumber || '';
+        token.address = (user as any).address || null;
         token.warehouseLocation = (user as any).warehouseLocation || '';
         token.gstNumber = (user as any).gstNumber || null;
         token.bankName = (user as any).bankName || null;
         token.bankAccountNumber = (user as any).bankAccountNumber || null;
         token.ifscCode = (user as any).ifscCode || null;
         token.bankBranch = (user as any).bankBranch || null;
-        token.companyLogo = (user as any).companyLogo || null;
         token.state = (user as any).state || '';
         token.isNewRegistration = (user as any).isNewRegistration || false;
+        token.storagePlan = (user as any).storagePlan || 'DRY';
+        token.coldLanguage = (user as any).coldLanguage || 'en';
+        
+        if ((user as any).isStaff) {
+          token.staffId = (user as any).staffId;
+          token.isStaff = true;
+          token.permissions = (user as any).permissions;
+        }
       }
       return token;
     },
@@ -95,15 +129,23 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).fullName = token.fullName;
         (session.user as any).companyName = token.companyName;
         (session.user as any).phoneNumber = token.phoneNumber;
+        (session.user as any).address = token.address || null;
         (session.user as any).warehouseLocation = token.warehouseLocation;
         (session.user as any).gstNumber = token.gstNumber;
         (session.user as any).bankName = token.bankName || null;
         (session.user as any).bankAccountNumber = token.bankAccountNumber || null;
         (session.user as any).ifscCode = token.ifscCode || null;
         (session.user as any).bankBranch = token.bankBranch || null;
-        (session.user as any).companyLogo = token.companyLogo || null;
         (session.user as any).state = token.state || '';
         (session.user as any).isNewRegistration = token.isNewRegistration || false;
+        (session.user as any).storagePlan = token.storagePlan || 'DRY';
+        (session.user as any).coldLanguage = token.coldLanguage || 'en';
+        
+        if (token.isStaff) {
+          (session.user as any).staffId = token.staffId;
+          (session.user as any).isStaff = true;
+          (session.user as any).permissions = token.permissions;
+        }
       }
       return session;
     },

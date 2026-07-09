@@ -23,6 +23,7 @@ const wspNavItems = [
 ];
 
 const adminNavItems = [
+  { name: 'Cold Storage', href: '/cold/dashboard', icon: LayoutDashboard },
   { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
   // { name: 'Invoice Download', href: '/admin/invoices', icon: Receipt },
   { name: 'Signup Requests', href: '/admin/signup-requests', icon: Mail },
