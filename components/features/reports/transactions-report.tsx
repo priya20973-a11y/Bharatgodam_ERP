@@ -34,7 +34,7 @@ import { useRouter } from 'next/navigation';
 interface TransactionRecord {
   _id: string;
   sourceType?: string;
-  direction: 'INWARD' | 'OUTWARD';
+  direction: 'INWARD' | 'OUTWARD' | 'No Data Found';
   date: string;
   clientName: string;
   clientId: string;
@@ -79,6 +79,8 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     pageSize: 20,
   });
   const [liveTransactions, setLiveTransactions] = useState<TransactionRecord[]>(transactions);
+  const [isDailyReport, setIsDailyReport] = useState(false);
+  const [dailyDateFilter, setDailyDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     setLiveTransactions(transactions);
@@ -204,6 +206,53 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
   };
 
   const filteredTransactions = useMemo(() => {
+    if (isDailyReport) {
+      const dailyTransactions = liveTransactions.filter((item) => {
+        const itemDate = item.date ? new Date(item.date).toISOString().split('T')[0] : '';
+        return itemDate === dailyDateFilter;
+      });
+
+      const clientIdsWithTransactions = new Set(dailyTransactions.map(t => t.clientId));
+
+      const dummyRecords: TransactionRecord[] = [];
+      clientOptions.forEach(client => {
+        if (client.value !== 'ALL' && !clientIdsWithTransactions.has(client.value)) {
+          dummyRecords.push({
+            _id: `dummy-${client.value}`,
+            direction: 'No Data Found',
+            date: dailyDateFilter,
+            clientName: client.label,
+            clientId: client.value,
+            commodityName: '-',
+            commodityId: '',
+            warehouseName: '-',
+            warehouseId: '',
+            quantityMT: null as any,
+            bagsCount: undefined,
+            gatePass: undefined,
+            stackNo: undefined,
+            lotNo: undefined,
+            status: undefined,
+            createdAt: '',
+          });
+        }
+      });
+
+      const combinedDaily = [...dailyTransactions, ...dummyRecords];
+      
+      return combinedDaily.filter((item) => {
+        const matchesClient =
+          clientFilter === 'ALL' ||
+          item.clientId === clientFilter ||
+          item.clientName === clientFilter;
+        const matchesWarehouse =
+          warehouseFilter === 'ALL' ||
+          item.warehouseId === warehouseFilter ||
+          item.warehouseName === warehouseFilter;
+        return matchesClient && matchesWarehouse;
+      });
+    }
+
     return liveTransactions.filter((item) => {
       const matchesClient =
         clientFilter === 'ALL' ||
@@ -217,7 +266,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       const matchesMonth = monthFilter === 'ALL' || itemMonth === monthFilter;
       return matchesClient && matchesWarehouse && matchesMonth;
     });
-  }, [liveTransactions, clientFilter, warehouseFilter, monthFilter]);
+  }, [liveTransactions, clientFilter, warehouseFilter, monthFilter, isDailyReport, dailyDateFilter, clientOptions]);
 
   const monthDropdownOptions = useMemo(() => {
     const uniqueMonths = Array.from(
@@ -246,6 +295,9 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Type',
       cell: ({ row }) => {
         const direction = row.getValue('direction') as string;
+        if (direction === 'No Data Found') {
+          return <Badge variant="secondary" className="bg-slate-100 text-slate-500 whitespace-nowrap">No Data Found</Badge>;
+        }
         return (
           <Badge
             variant={direction === 'INWARD' ? 'success' : 'destructive'}
@@ -261,6 +313,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Date',
       cell: ({ row }) => {
         const date = row.getValue('date') as string;
+        if (!date || date === '-') return <span className="text-slate-400">—</span>;
         return new Date(date).toLocaleDateString('en-IN');
       },
     },
@@ -278,7 +331,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Commodity',
       cell: ({ row }) => {
         const value = row.getValue('commodityName');
-        if (typeof value === 'object' || value === undefined || value === null) return <span className="text-indigo-600 font-medium">N.A.</span>;
+        if (typeof value === 'object' || value === undefined || value === null || value === '-') return <span className="text-slate-400">—</span>;
         return <span className="text-indigo-600 font-medium">{String(value)}</span>;
       },
     },
@@ -287,7 +340,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Warehouse',
       cell: ({ row }) => {
         const value = row.getValue('warehouseName');
-        if (typeof value === 'object' || value === undefined || value === null) return <span className="text-slate-700">N.A.</span>;
+        if (typeof value === 'object' || value === undefined || value === null || value === '-') return <span className="text-slate-400">—</span>;
         return <span className="text-slate-700">{String(value)}</span>;
       },
     },
@@ -296,7 +349,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Qty (MT)',
       cell: ({ row }) => {
         const value = row.getValue('quantityMT');
-        if (typeof value !== 'number') return null;
+        if (typeof value !== 'number') return <span className="text-slate-400">—</span>;
         return <span className="font-bold">{value.toFixed(2)}</span>;
       },
     },
@@ -305,7 +358,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Bags',
       cell: ({ row }) => {
         const value = row.getValue('bagsCount');
-        if (typeof value === 'object' || value === undefined || value === null) return <span>N.A.</span>;
+        if (typeof value === 'object' || value === undefined || value === null || value === '-') return <span className="text-slate-400">—</span>;
         return <span>{String(value)}</span>;
       },
     },
@@ -341,7 +394,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Created',
       cell: ({ row }) => {
         const createdAt = row.getValue('createdAt');
-        if (!createdAt) return null;
+        if (!createdAt || createdAt === '-') return <span className="text-slate-400">—</span>;
         return new Date(createdAt as string).toLocaleDateString('en-IN');
       },
     },
@@ -399,17 +452,16 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     try {
       const exportData = filteredTransactions.map((item) => ({
         'Direction': item.direction,
-        'Date': new Date(item.date).toLocaleDateString('en-IN'),
+        'Date': item.date ? new Date(item.date).toLocaleDateString('en-IN') : '-',
         'Client': item.clientName,
         'Commodity': item.commodityName,
         'Warehouse': item.warehouseName,
-        'Qty (MT)': item.quantityMT,
+        'Qty (MT)': item.quantityMT !== null ? item.quantityMT : '-',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',
         'Gate Pass': item.gatePass || '',
         'Stack No': item.stackNo || '',
         'Lot No': item.lotNo || '',
-        'Status': item.status || '',
-        'Created': new Date(item.createdAt).toLocaleDateString('en-IN'),
+        'Created': item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '-',
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -445,14 +497,23 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
           <h2 className="text-2xl font-bold text-slate-900">Transactions Report</h2>
           <p className="text-slate-500 font-medium">All inward and outward transactions</p>
         </div>
-        <Button
-          onClick={exportToCSV}
-          disabled={transactions.length === 0}
-          className="font-bold bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsDailyReport(!isDailyReport)}
+            variant={isDailyReport ? "default" : "outline"}
+            className={`font-bold flex items-center gap-2 ${isDailyReport ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+          >
+            Daily Report
+          </Button>
+          <Button
+            onClick={exportToCSV}
+            disabled={transactions.length === 0}
+            className="font-bold bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -490,21 +551,33 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
             </Select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="font-semibold text-slate-700 w-full">
-                <SelectValue placeholder="All Months" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthDropdownOptions.map((month) => (
-                  <SelectItem key={month.value} value={month.value} className="font-medium">
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isDailyReport ? (
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date</label>
+              <Input
+                type="date"
+                value={dailyDateFilter}
+                onChange={(e) => setDailyDateFilter(e.target.value)}
+                className="w-full text-slate-700 font-semibold"
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
+              <Select value={monthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger className="font-semibold text-slate-700 w-full">
+                  <SelectValue placeholder="All Months" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthDropdownOptions.map((month) => (
+                    <SelectItem key={month.value} value={month.value} className="font-medium">
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Search</label>

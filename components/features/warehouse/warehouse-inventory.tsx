@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Package, TrendingUp, AlertTriangle, Building2, Loader2, Scale, RefreshCw, ChevronDown } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, Building2, Loader2, Scale, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { formatWeight } from '@/lib/utils';
 
 interface CommodityData {
@@ -41,19 +41,39 @@ export default function WarehouseInventory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [mounted, setMounted] = useState(false);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const getSelectedMonthLabel = () => {
+    if (selectedMonth === 'ALL') return 'Current Inventory';
+    const [year, month] = selectedMonth.split('-');
+    return `${MONTHS[parseInt(month, 10) - 1]} ${year}`;
+  };
+
+
 
   useEffect(() => {
     setMounted(true);
-    fetchInventoryData();
+    fetchInventoryData(selectedWarehouse, selectedMonth);
   }, []);
 
-  const fetchInventoryData = async (warehouseId?: string) => {
+  const fetchInventoryData = async (warehouseId?: string, month?: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const query = warehouseId ? `?warehouseId=${warehouseId}` : '';
+      const params = new URLSearchParams();
+      if (warehouseId) params.append('warehouseId', warehouseId);
+      if (month && month !== 'ALL') params.append('month', month);
+      
+      const query = params.toString() ? `?${params.toString()}` : '';
       const response = await fetch(`/api/warehouse/inventory${query}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch inventory data (${response.status})`);
@@ -80,7 +100,12 @@ export default function WarehouseInventory() {
 
   const handleWarehouseChange = (warehouseId: string) => {
     setSelectedWarehouse(warehouseId);
-    fetchInventoryData(warehouseId);
+    fetchInventoryData(warehouseId, selectedMonth);
+  };
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    fetchInventoryData(selectedWarehouse, month);
   };
 
   const getCapacityStatus = (percentage: number) => {
@@ -128,7 +153,7 @@ export default function WarehouseInventory() {
           <h4 className="font-bold text-slate-800 text-sm mt-2">Error loading inventory</h4>
           <p className="text-slate-500 text-xs mt-0.5">{error}</p>
           <button
-            onClick={() => fetchInventoryData(selectedWarehouse)}
+            onClick={() => fetchInventoryData(selectedWarehouse, selectedMonth)}
             className="mt-3 flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition active:scale-95 shadow-sm"
           >
             <RefreshCw className="h-3 w-3" />
@@ -166,6 +191,63 @@ export default function WarehouseInventory() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-205 rounded-xl bg-white text-slate-750 text-xs font-semibold shadow-sm hover:bg-slate-50/50 transition-colors"
+            >
+              <Calendar className="h-3.5 w-3.5 text-slate-500" />
+              <span>{getSelectedMonthLabel()}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+            
+            {isMonthPickerOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsMonthPickerOpen(false)} />
+                <div className="absolute right-0 mt-2 p-3 bg-white border border-slate-200 rounded-xl shadow-lg z-20 w-64">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <button onClick={() => setPickerYear(y => y - 1)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm font-bold text-slate-800">{pickerYear}</span>
+                    <button onClick={() => setPickerYear(y => y + 1)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {MONTHS.map((m, idx) => {
+                      const monthVal = `${pickerYear}-${String(idx + 1).padStart(2, '0')}`;
+                      const isSelected = selectedMonth === monthVal;
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            handleMonthChange(monthVal);
+                            setIsMonthPickerOpen(false);
+                          }}
+                          className={`py-1.5 text-xs font-semibold rounded-lg transition-colors ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-700 hover:bg-indigo-50'}`}
+                        >
+                          {m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        handleMonthChange('ALL');
+                        setIsMonthPickerOpen(false);
+                      }}
+                      className={`w-full py-1.5 text-xs font-semibold rounded-lg transition-colors ${selectedMonth === 'ALL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'}`}
+                    >
+                      Current Inventory (All Time)
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="relative flex items-center">
             <select
               value={selectedWarehouse}
@@ -182,7 +264,7 @@ export default function WarehouseInventory() {
           </div>
 
           <button
-            onClick={() => fetchInventoryData(selectedWarehouse)}
+            onClick={() => fetchInventoryData(selectedWarehouse, selectedMonth)}
             className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white text-slate-650 text-xs font-semibold rounded-xl hover:bg-slate-50 transition shadow-sm group"
           >
             <RefreshCw className={`h-3 w-3 text-slate-400 transition-transform duration-500 group-hover:rotate-180 ${loading ? 'animate-spin text-indigo-500' : ''}`} />

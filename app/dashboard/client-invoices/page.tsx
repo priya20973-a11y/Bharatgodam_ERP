@@ -110,6 +110,9 @@ export default function ClientInvoicesPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [isWarehouseDropdownOpen, setIsWarehouseDropdownOpen] = useState(false);
   const [invoiceMode, setInvoiceMode] = useState<'ledger' | 'transaction'>('ledger');
+  const [isCustomDateRange, setIsCustomDateRange] = useState<boolean>(false);
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [taxSavingStatus, setTaxSavingStatus] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -240,17 +243,19 @@ export default function ClientInvoicesPage() {
       return;
     }
 
-    // Load invoices only when client, warehouse and month are selected
-    if (selectedMonth && selectedWarehouses.length > 0 && !selectedWarehouses.includes('ALL')) {
-      await loadInvoices(clientId, selectedWarehouses, selectedMonth, invoiceMode);
+    // Load invoices only when client, warehouse and date are selected
+    const hasValidDate = isCustomDateRange ? (fromDate && toDate) : selectedMonth;
+    if (hasValidDate && selectedWarehouses.length > 0 && !selectedWarehouses.includes('ALL')) {
+      await loadInvoices(clientId, selectedWarehouses, selectedMonth, invoiceMode, isCustomDateRange ? fromDate : undefined, isCustomDateRange ? toDate : undefined);
     }
   };
 
   // Handle warehouse selection
   const handleWarehouseChange = async (warehouseIds: string[]) => {
     setSelectedWarehouses(warehouseIds);
-    if (selectedClient && selectedClient !== 'ALL' && selectedMonth && warehouseIds.length > 0) {
-      await loadInvoices(selectedClient, warehouseIds, selectedMonth, invoiceMode);
+    const hasValidDate = isCustomDateRange ? (fromDate && toDate) : selectedMonth;
+    if (selectedClient && selectedClient !== 'ALL' && hasValidDate && warehouseIds.length > 0) {
+      await loadInvoices(selectedClient, warehouseIds, selectedMonth, invoiceMode, isCustomDateRange ? fromDate : undefined, isCustomDateRange ? toDate : undefined);
     }
   };
 
@@ -261,30 +266,34 @@ export default function ClientInvoicesPage() {
       selectedClient &&
       selectedClient !== 'ALL' &&
       selectedWarehouses.length > 0 &&
-      !selectedWarehouses.includes('ALL')
+      !selectedWarehouses.includes('ALL') &&
+      !isCustomDateRange
     ) {
       await loadInvoices(selectedClient, selectedWarehouses, month, invoiceMode);
     }
   };
 
   useEffect(() => {
+    const hasValidDate = isCustomDateRange ? (fromDate && toDate) : selectedMonth;
     if (
       selectedClient &&
       selectedClient !== 'ALL' &&
       selectedWarehouses.length > 0 &&
       !selectedWarehouses.includes('ALL') &&
-      selectedMonth
+      hasValidDate
     ) {
-      loadInvoices(selectedClient, selectedWarehouses, selectedMonth, invoiceMode);
+      loadInvoices(selectedClient, selectedWarehouses, selectedMonth, invoiceMode, isCustomDateRange ? fromDate : undefined, isCustomDateRange ? toDate : undefined);
     }
-  }, [invoiceMode]);
+  }, [invoiceMode, isCustomDateRange, fromDate, toDate]);
 
   // Load invoices with client, warehouse and month filter
   const loadInvoices = async (
     clientId: string,
     warehouseIds: string[],
     month: string,
-    mode: 'ledger' | 'transaction' = invoiceMode
+    mode: 'ledger' | 'transaction' = invoiceMode,
+    customFrom?: string,
+    customTo?: string
   ) => {
     setLoading(true);
     setInvoices([]);
@@ -306,7 +315,7 @@ export default function ClientInvoicesPage() {
         return;
       }
 
-      const result = await getClientMonthlyLedger(clientId, month, warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
+      const result = await getClientMonthlyLedger(clientId, month, warehouseIds.length > 0 ? warehouseIds.join(',') : undefined, undefined, customFrom, customTo);
       if (result.success && result.data) {
         const clientResult = await getClientOptions();
         const warehouseResult = await getWarehouseOptions();
@@ -317,9 +326,18 @@ export default function ClientInvoicesPage() {
           const transformedInvoices: MonthlyInvoice[] = result.data.months.map((invoice: any) => {
           const invoiceWarehouseId = invoice.warehouseId || (warehouseIds.length > 0 ? warehouseIds.join(',') : undefined);
           const invoiceWarehouseName = invoice.warehouseName || warehouseNames || '';
-          const invoiceIdValue = invoiceWarehouseId
-            ? `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}-${invoiceWarehouseId}`
-            : `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}`;
+          
+          let invoiceIdValue = '';
+          if (customFrom && customTo) {
+            invoiceIdValue = invoiceWarehouseId 
+              ? `${clientId}-custom-${customFrom}-to-${customTo}-${invoiceWarehouseId}`
+              : `${clientId}-custom-${customFrom}-to-${customTo}`;
+          } else {
+            invoiceIdValue = invoiceWarehouseId
+              ? `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}-${invoiceWarehouseId}`
+              : `${clientId}-${invoice.month.split('-')[0]}-${invoice.month.split('-')[1].padStart(2, '0')}`;
+          }
+          
           const additionalChargeItems = (invoice.additionalChargeItems || []).map((item: any, idx: number) => ({
             id: item.id ? String(item.id) : getAdditionalChargeItemRowId(invoiceIdValue, item, idx),
             name: item.name,
@@ -329,8 +347,8 @@ export default function ClientInvoicesPage() {
           return {
             bookingId: clientId,
             clientName: client?.label || result.data.clientName || '',
-            month: invoice.month.split('-')[1].padStart(2, '0'),
-            year: parseInt(invoice.month.split('-')[0]),
+            month: (customFrom && customTo) ? `Custom` : invoice.month.split('-')[1].padStart(2, '0'),
+            year: (customFrom && customTo) ? new Date(customFrom).getFullYear() : parseInt(invoice.month.split('-')[0]),
               periods: invoice.rows.map((period: any) => ({
                 startDate: period.fromDate,
                 endDate: period.toDate,
@@ -1095,15 +1113,48 @@ export default function ClientInvoicesPage() {
                     </>
                   )}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Month *</label>
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => handleMonthChange(e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-slate-700">Invoice Period *</label>
+                    <label className="flex items-center gap-1.5 text-xs text-indigo-600 cursor-pointer hover:text-indigo-800">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                        checked={isCustomDateRange}
+                        onChange={(e) => setIsCustomDateRange(e.target.checked)}
+                      />
+                      Custom Range
+                    </label>
+                  </div>
+                  
+                  {isCustomDateRange ? (
+                    <div className="flex gap-2 w-full">
+                      <div className="flex-1">
+                        <input
+                          type="date"
+                          value={fromDate}
+                          onChange={(e) => setFromDate(e.target.value)}
+                          className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="date"
+                          value={toDate}
+                          onChange={(e) => setToDate(e.target.value)}
+                          min={fromDate}
+                          className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => handleMonthChange(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
                 </div>
               </>
             ) : (
@@ -1266,11 +1317,11 @@ export default function ClientInvoicesPage() {
       {/* Monthly Invoices */}
       {!loading && selectedClient && (
         <div className="space-y-4">
-          {!selectedMonth ? (
+          {!(isCustomDateRange ? (fromDate && toDate) : selectedMonth) ? (
             <Card>
               <CardContent className="flex items-center justify-center py-12">
                 <p className="text-slate-600 text-center">
-                  <span className="block mb-2">📅 Please select an invoice month to view invoices</span>
+                  <span className="block mb-2">📅 Please select an invoice period to view invoices</span>
                   <span className="text-sm text-slate-500">Warehouse selection is required</span>
                 </p>
               </CardContent>

@@ -327,7 +327,7 @@ export async function generateClientMonthlyLedger(
   return monthlyLedgers;
 }
 
-export async function getClientMonthlyLedger(clientId: string, month?: string, warehouseId?: string, tenantFilter?: any) {
+export async function getClientMonthlyLedger(clientId: string, month?: string, warehouseId?: string, tenantFilter?: any, customFromDate?: string, customToDate?: string) {
   console.log(`=== GETTING CLIENT LEDGER FOR CLIENT: ${clientId}, MONTH: ${month || 'ALL'}, WAREHOUSE: ${warehouseId || 'ANY'} ===`);
 
   if (!tenantFilter) {
@@ -442,7 +442,37 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
     const periods = generateStoragePeriods(group.txns, undefined, rate);
 
-    periods.forEach(period => {
+    let filteredPeriods = periods;
+    if (customFromDate && customToDate) {
+      const rangeStart = new Date(customFromDate);
+      const rangeEnd = new Date(customToDate);
+      
+      filteredPeriods = periods.map(period => {
+        const pStart = new Date(period.fromDate);
+        const pEnd = new Date(period.toDate);
+        
+        const effectiveFrom = pStart > rangeStart ? pStart : rangeStart;
+        const effectiveTo = pEnd < rangeEnd ? pEnd : rangeEnd;
+        
+        if (effectiveFrom <= effectiveTo) {
+          const diffTime = Math.abs(effectiveTo.getTime() - effectiveFrom.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const days = Math.max(1, diffDays + 1);
+          const rent = period.qty * rate * days;
+          
+          return {
+            ...period,
+            fromDate: effectiveFrom.toISOString().split('T')[0],
+            toDate: effectiveTo.toISOString().split('T')[0],
+            days,
+            rent
+          };
+        }
+        return null;
+      }).filter(Boolean) as any[];
+    }
+
+    filteredPeriods.forEach(period => {
       const dailyRate = rate;
       const calculation = `${roundCurrency(period.qty).toFixed(2)} MT × ₹${dailyRate.toFixed(2)}/MT/day × ${period.days} days`;
       allPeriods.push({
@@ -463,7 +493,10 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
   const grouped = new Map<string, { month: string; warehouseId?: string; warehouseName?: string; rows: ClientMonthlyLedgerRow[] }>();
   allPeriods.forEach(row => {
-    const monthKey = formatMonthKey(normalizeDate(row.fromDate));
+    let monthKey = formatMonthKey(normalizeDate(row.fromDate));
+    if (customFromDate && customToDate) {
+      monthKey = `Custom Range: ${customFromDate} to ${customToDate}`;
+    }
     // If multiple warehouses are requested, combine them into one invoice for the month
     const warehouseKey = warehouseIdsArray.length > 1 ? warehouseId : (row.warehouseId || 'ALL');
     const groupKey = `${monthKey}::${warehouseKey}`;
@@ -700,7 +733,12 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
   }
 
   const availableMonths = Array.from(new Set(monthlyLedgers.map(m => m.month)));
-  const filteredMonths = month ? monthlyLedgers.filter(m => m.month === month) : monthlyLedgers;
+  let filteredMonths = monthlyLedgers;
+  if (customFromDate && customToDate) {
+    // Keep all (it should be grouped under the custom range key)
+  } else if (month) {
+    filteredMonths = monthlyLedgers.filter(m => m.month === month);
+  }
   const outstanding = filteredMonths.length > 0 ? filteredMonths[filteredMonths.length - 1].summary.outstanding : 0;
 
   console.log('FINAL CLIENT LEDGER DATA:', {

@@ -8,7 +8,6 @@ import { ObjectId } from 'mongodb';
 import { getTenantFilterForMongo, isAdmin, isWsp } from '@/lib/ownership';
 import { getClientRevenueAnalytics } from '@/app/actions/transaction-actions';
 import TransactionsReportWrapper from '@/components/features/reports/transactions-report-wrapper';
-import WarehouseInventory from '@/components/features/warehouse/warehouse-inventory';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -582,10 +581,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Warehouse Inventory Section */}
-      <div className="rounded-3xl bg-white p-6 md:p-8 shadow-md shadow-slate-100/50 border border-slate-100/80">
-        <WarehouseInventory />
-      </div>
     </div>
   );
 }
