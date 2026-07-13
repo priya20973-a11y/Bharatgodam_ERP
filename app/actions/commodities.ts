@@ -28,6 +28,7 @@ export async function fetchCommodities() {
       _id: item._id,
       name: item.name,
       ratePerMtPerDay: item.ratePerMtPerDay,
+      hsnCode: item.hsnCode || '',
       updatedAt: item.updatedAt,
       createdAt: item.createdAt,
       userId: item.userId,
@@ -37,11 +38,18 @@ export async function fetchCommodities() {
   })));
 }
 
-export async function addCommodity(data: { name: string; ratePerMtPerDay: number }) {
+export async function addCommodity(data: { name: string; ratePerMtPerDay: number; hsnCode?: string }) {
   await connectToDatabase();
   try {
     const session = await requireSession();
     const nameVal = data.name.trim().toUpperCase();
+    const hsnTrimmed = data.hsnCode?.trim();
+
+    if (hsnTrimmed) {
+      if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnTrimmed)) {
+        return { success: false, error: 'Invalid HSN Code. It must be exactly 4, 6, or 8 digits.' };
+      }
+    }
 
     // Check if a commodity with the same name already exists for the current user/WSP
     const email = session.user.email?.trim().toLowerCase() || null;
@@ -63,7 +71,11 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
       return { success: false, error: 'Commodity name already exists for this WSP. Please use a different name.' };
     }
 
-    const item = await Commodity.create(appendOwnership({ ...data, name: nameVal }, session));
+    const itemData = { ...data, name: nameVal };
+    if (hsnTrimmed) itemData.hsnCode = hsnTrimmed;
+    else delete itemData.hsnCode;
+
+    const item = await Commodity.create(appendOwnership(itemData, session));
     revalidatePath('/dashboard/commodities');
     return { success: true, data: JSON.parse(JSON.stringify(item)) };
   } catch (error: any) {
@@ -74,11 +86,18 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
   }
 }
 
-export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number }) {
+export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number; hsnCode?: string }) {
   await connectToDatabase();
   try {
     const session = await requireSession();
     const nameVal = data.name.trim().toUpperCase();
+    const hsnTrimmed = data.hsnCode?.trim();
+
+    if (hsnTrimmed) {
+      if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnTrimmed)) {
+        return { success: false, error: 'Invalid HSN Code. It must be exactly 4, 6, or 8 digits.' };
+      }
+    }
 
     // Check if a commodity with the same name already exists for the current user/WSP, excluding this commodity
     const email = session.user.email?.trim().toLowerCase() || null;
@@ -101,9 +120,13 @@ export async function updateCommodity(id: string, data: { name: string; ratePerM
       return { success: false, error: 'Commodity name already exists for this WSP. Please use a different name.' };
     }
 
+    const itemData = { ...data, name: nameVal };
+    if (hsnTrimmed) itemData.hsnCode = hsnTrimmed;
+    else itemData.hsnCode = '';
+
     const item = await Commodity.findOneAndUpdate(
-      { _id: id, ...getTenantFilter(session) },
-      { ...data, name: nameVal },
+      { _id: id, ...ownerFilter },
+      { $set: itemData },
       { new: true }
     );
     revalidatePath('/dashboard/commodities');

@@ -66,6 +66,7 @@ interface MonthlyInvoice {
   igstAmount?: number;
   totalTaxAmount?: number;
   adjustmentAmount?: number;
+  adjustment?: number;
   notes?: string;
 }
 
@@ -617,7 +618,8 @@ export default function ClientInvoicesPage() {
     const baseRent = Number(invoice.totalRent || 0);
     const additionalCharges = getAdjustmentTotal(invoice);
     const taxAmount = Number(invoice.totalTaxAmount || 0);
-    return roundCurrency(baseRent + additionalCharges + taxAmount);
+    const adjustment = Number(invoice.adjustment || invoice.adjustmentAmount || 0);
+    return roundCurrency(baseRent + additionalCharges + taxAmount + adjustment);
   };
 
   const getTotalChargeAmount = (invoice: MonthlyInvoice) => {
@@ -843,7 +845,8 @@ export default function ClientInvoicesPage() {
     invoiceId: string,
     billingState: string,
     taxGroup: string,
-    notes?: string
+    notes?: string,
+    adjustment?: number
   ) => {
     if (!invoiceId) return;
 
@@ -858,7 +861,7 @@ export default function ClientInvoicesPage() {
           invoiceId,
           billingState,
           taxGroup,
-          adjustment: 0,
+          adjustment: adjustment || 0,
           notes,
         }),
       });
@@ -883,6 +886,7 @@ export default function ClientInvoicesPage() {
               igstAmount: Number(data.igstAmount),
               totalTaxAmount: Number(data.totalTaxAmount),
               adjustmentAmount: Number(data.adjustmentAmount),
+              adjustment: Number(data.adjustment),
               notes: data.notes !== undefined ? data.notes : item.notes,
             }
             : item
@@ -1510,7 +1514,8 @@ export default function ClientInvoicesPage() {
                                 invoice.invoiceId || '',
                                 val,
                                 invoice.taxGroup || 'No Tax',
-                                invoice.notes
+                                invoice.notes,
+                                invoice.adjustment
                               );
                             }}
                           >
@@ -1537,7 +1542,8 @@ export default function ClientInvoicesPage() {
                                 invoice.invoiceId || '',
                                 invoice.billingState || '',
                                 val,
-                                invoice.notes
+                                invoice.notes,
+                                invoice.adjustment
                               );
                             }}
                           >
@@ -1552,6 +1558,33 @@ export default function ClientInvoicesPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-slate-200 mt-4">
+                        {/* Adjustment */}
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="block text-xs font-medium text-slate-600">Adjustment (₹)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={invoice.adjustment ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Number(e.target.value);
+                              setInvoices((prev) => prev.map((item) => item.invoiceId === invoice.invoiceId ? { ...item, adjustment: val } : item));
+                            }}
+                            onBlur={() => {
+                              handleTaxAutoSave(
+                                invoice.invoiceId || '',
+                                invoice.billingState || '',
+                                invoice.taxGroup || 'No Tax',
+                                invoice.notes,
+                                invoice.adjustment
+                              );
+                            }}
+                            placeholder="e.g. -500 or 1000"
+                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
                       </div>
 
@@ -1597,7 +1630,8 @@ export default function ClientInvoicesPage() {
                               invoice.invoiceId || '',
                               invoice.billingState || '',
                               invoice.taxGroup || 'No Tax',
-                              invoice.notes
+                              invoice.notes,
+                              invoice.adjustment
                             );
                           }}
                           placeholder="e.g. Thanks for your business."

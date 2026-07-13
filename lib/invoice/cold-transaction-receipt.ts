@@ -30,16 +30,8 @@ export function generateColdTransactionReceiptHTML(
     commodityDisplay += ` (${commodityType})`;
   }
 
-  if (data.grade) {
-    const gradeTranslate: Record<string, string> = {
-      'Large': lang === 'gu' ? 'મોટા' : 'Large',
-      'Small': lang === 'gu' ? 'જીણ' : 'Small',
-      'Mixed': lang === 'gu' ? 'સોલાટ' : 'Mixed'
-    };
-    const mappedGrade = gradeTranslate[data.grade] || data.grade;
-    commodityDisplay += `(${mappedGrade})`;
-  } else if (data.gradingType && data.gradingType !== 'Grading') {
-    commodityDisplay += `(${data.gradingType})`;
+  if (data.gradingType && !commodityDisplay.includes(data.gradingType)) {
+    commodityDisplay += ` (${data.gradingType})`;
   }
 
   const tableLabel = data.tableLabel || '';

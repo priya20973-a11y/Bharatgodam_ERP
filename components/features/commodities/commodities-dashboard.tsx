@@ -12,10 +12,18 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
   const [items, setItems] = useState(initialData);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', ratePerMtPerDay: 0 });
+  const [formData, setFormData] = useState({ name: '', ratePerMtPerDay: 0, hsnCode: '' });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const hsnTrim = formData.hsnCode?.trim();
+    if (hsnTrim) {
+      if (!/^\d{4}$|^\d{6}$|^\d{8}$/.test(hsnTrim)) {
+        toast.error('HSN Code must be exactly 4, 6, or 8 digits.');
+        return;
+      }
+    }
+
     const res = editingId 
       ? await updateCommodity(editingId, formData)
       : await addCommodity(formData);
@@ -67,10 +75,18 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
               placeholder="6.00"
             />
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">HSN Code (Optional)</label>
+            <Input 
+              value={formData.hsnCode} 
+              onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })} 
+              placeholder="e.g. 1006"
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2">
           {editingId && (
-            <Button variant="outline" type="button" onClick={() => { setEditingId(null); setFormData({ name: '', ratePerMtPerDay: 0 }); }}>
+            <Button variant="outline" type="button" onClick={() => { setEditingId(null); setFormData({ name: '', ratePerMtPerDay: 0, hsnCode: '' }); }}>
               Cancel
             </Button>
           )}
@@ -85,6 +101,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead className="font-bold">Commodity</TableHead>
+              <TableHead className="font-bold">HSN Code</TableHead>
               <TableHead className="font-bold">Daily Rate (₹/MT)</TableHead>
               <TableHead className="font-bold">Added By</TableHead>
               <TableHead className="text-right font-bold">Actions</TableHead>
@@ -95,6 +112,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
               items.filter(item => item && item._id).map((item) => (
                 <TableRow key={item._id.toString()}>
                   <TableCell className="font-bold tracking-tight text-slate-900">{item.name}</TableCell>
+                  <TableCell className="text-sm text-slate-600">{item.hsnCode || '-'}</TableCell>
                   <TableCell>
                     <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
                       ₹{item.ratePerMtPerDay ? item.ratePerMtPerDay.toFixed(2) : '0.00'}
@@ -102,7 +120,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
                   </TableCell>
                   <TableCell className="text-sm text-slate-600">{item.wspName || 'Unknown'}</TableCell>
                   <TableCell className="text-right space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingId(item._id); setFormData({ name: item.name, ratePerMtPerDay: item.ratePerMtPerDay }); }}>
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingId(item._id); setFormData({ name: item.name, ratePerMtPerDay: item.ratePerMtPerDay, hsnCode: item.hsnCode || '' }); }}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(item._id)}>

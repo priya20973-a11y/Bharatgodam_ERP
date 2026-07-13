@@ -12,6 +12,7 @@ export interface Commodity {
   name: string;
   rate: number;
   rateUnit: 'day' | 'month';
+  hsnCode?: string;
 }
 
 export interface Client {

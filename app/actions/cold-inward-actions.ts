@@ -102,6 +102,11 @@ export async function createColdInward(data: any) {
       return { success: false, error: `Quantity exceeds available stack capacity. Available: ${capacityInfo.availableCapacity} Kg` };
     }
 
+    // Clean up empty strings for enums to avoid validation errors
+    if (data.grade === '') {
+      delete data.grade;
+    }
+
     const inward = await ColdInward.create(appendOwnership({
       ...data,
       date: data.date ? new Date(data.date) : new Date(),

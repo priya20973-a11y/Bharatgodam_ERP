@@ -62,8 +62,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="text-right text-slate-700">{formatNumber(w.floorNo)}</TableCell>
                   <TableCell className="text-right text-slate-700">{formatNumber(w.stackNo)}</TableCell>
                   <TableCell className="text-slate-700">
-                    {w.grade || '-'} 
-                    {w.gradingType ? ` (${w.gradingType})` : ''}
+                    {w.gradingType || '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)}</TableCell>
                   <TableCell className="text-right text-slate-700">{formatNumber(w.bagsCount)}</TableCell>

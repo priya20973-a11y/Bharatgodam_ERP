@@ -160,12 +160,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const adjustmentAmount = 0;
-    const finalTotal = Number((taxableAmount + totalTaxAmount).toFixed(2));
+    const adjustmentAmount = parsed.adjustment || 0;
+    const finalTotal = Number((taxableAmount + totalTaxAmount + adjustmentAmount).toFixed(2));
 
-    if (finalTotal < 0) {
-      return NextResponse.json({ success: false, message: 'Total amount cannot be negative' }, { status: 400 });
-    }
+    // Note: Allowing finalTotal to be negative if adjustment is negative enough
 
     const updateFields: any = {
       billingState: parsed.billingState,
@@ -176,6 +174,7 @@ export async function POST(request: NextRequest) {
       igstAmount,
       totalTaxAmount,
       adjustmentAmount,
+      adjustment: adjustmentAmount,
       ...(parsed.notes !== undefined ? { notes: parsed.notes } : {}),
       updatedAt: new Date(),
     };
@@ -206,6 +205,7 @@ export async function POST(request: NextRequest) {
         igstAmount,
         totalTaxAmount,
         adjustmentAmount,
+        adjustment: adjustmentAmount,
         notes: parsed.notes,
       }
     });

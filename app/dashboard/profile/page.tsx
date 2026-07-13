@@ -47,6 +47,7 @@ interface ProfileData {
   id: string;
   fullName: string;
   email: string;
+  invoiceEmail?: string | null;
   role: string;
   companyName?: string;
   phoneNumber?: string;
@@ -61,6 +62,7 @@ interface ProfileData {
   bankBranch?: string | null;
   companyLogo?: string | null;
   panNumber?: string | null;
+  iecCode?: string | null;
   termsAndConditions?: string | null;
   isNewRegistration?: boolean;
 }
@@ -68,6 +70,7 @@ interface ProfileData {
 const initialProfileForm = {
   fullName: '',
   email: '',
+  invoiceEmail: '',
   companyName: '',
   phoneNumber: '',
   address: '',
@@ -81,6 +84,7 @@ const initialProfileForm = {
   bankBranch: '',
   companyLogo: '',
   panNumber: '',
+  iecCode: '',
   termsAndConditions: '',
 };
 
@@ -130,6 +134,7 @@ export default function ProfilePage() {
       setProfileForm({
         fullName: data.user.fullName || '',
         email: data.user.email || '',
+        invoiceEmail: data.user.invoiceEmail || '',
         companyName: data.user.companyName || '',
         phoneNumber: data.user.phoneNumber || '',
         address: data.user.address || '',
@@ -143,6 +148,7 @@ export default function ProfilePage() {
         bankBranch: data.user.bankBranch || '',
         companyLogo: data.user.companyLogo || '',
         panNumber: data.user.panNumber || '',
+        iecCode: data.user.iecCode || '',
         termsAndConditions: data.user.termsAndConditions || '',
       });
       setLogoPreview(data.user.companyLogo || null);
@@ -183,6 +189,9 @@ export default function ProfilePage() {
 
     const panTrimmed = profileForm.panNumber?.trim().toUpperCase() || '';
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+
+    const iecTrimmed = profileForm.iecCode?.trim().toUpperCase() || '';
+    const iecRegex = /^[A-Z0-9]{10}$/;
 
     if (isNew) {
       if (!profileForm.state) {
@@ -240,6 +249,11 @@ export default function ProfilePage() {
         setSavingProfile(false);
         return;
       }
+      if (iecTrimmed && !iecRegex.test(iecTrimmed)) {
+        setError('Invalid IEC Code format (must be exactly 10 alphanumeric characters).');
+        setSavingProfile(false);
+        return;
+      }
     } else {
       if (gstTrimmed && gstTrimmed !== 'NA' && !gstRegex.test(gstTrimmed)) {
         setError('Invalid GSTIN format (must be 15 characters, or NA).');
@@ -248,6 +262,11 @@ export default function ProfilePage() {
       }
       if (panTrimmed && !panRegex.test(panTrimmed)) {
         setError('Invalid PAN format (must be AAAAA9999A).');
+        setSavingProfile(false);
+        return;
+      }
+      if (iecTrimmed && !iecRegex.test(iecTrimmed)) {
+        setError('Invalid IEC Code format (must be exactly 10 alphanumeric characters).');
         setSavingProfile(false);
         return;
       }
@@ -364,13 +383,24 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Email Address</span>
+              <span className="text-sm font-medium text-slate-700">Login Email Address</span>
               <input
                 type="email"
                 value={profileForm.email}
                 readOnly
                 disabled
                 className="w-full rounded-md border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700 outline-none"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Invoice Email (Optional)</span>
+              <input
+                type="email"
+                value={profileForm.invoiceEmail}
+                onChange={(event) => setProfileForm({ ...profileForm, invoiceEmail: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="Alternative email for invoices"
               />
             </label>
 
@@ -543,6 +573,17 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">IEC Code (Optional)</span>
+              <input
+                type="text"
+                value={profileForm.iecCode}
+                onChange={(event) => setProfileForm({ ...profileForm, iecCode: event.target.value.toUpperCase() })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 uppercase"
+                placeholder="0123456789 or ABCDE12345"
+              />
+            </label>
+
+            <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">
                 Bank Name{profile?.isNewRegistration ? ' *' : ''}
               </span>
@@ -629,6 +670,7 @@ export default function ProfilePage() {
               setProfileForm({
                 fullName: profile?.fullName || '',
                 email: profile?.email || '',
+                invoiceEmail: profile?.invoiceEmail || '',
                 companyName: profile?.companyName || '',
                 phoneNumber: profile?.phoneNumber || '',
                 address: profile?.address || '',
@@ -642,6 +684,7 @@ export default function ProfilePage() {
                 bankBranch: profile?.bankBranch || '',
                 companyLogo: profile?.companyLogo || '',
                 panNumber: profile?.panNumber || '',
+                iecCode: profile?.iecCode || '',
                 termsAndConditions: profile?.termsAndConditions || '',
               });
               setMessage(null);

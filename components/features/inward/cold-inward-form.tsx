@@ -211,7 +211,6 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           </div>
         )}
 
-
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded border">

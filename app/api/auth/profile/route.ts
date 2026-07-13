@@ -21,6 +21,7 @@ export async function GET() {
         id: user._id.toString(),
         fullName: user.fullName || '',
         email: user.email || '',
+        invoiceEmail: user.invoiceEmail || null,
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
@@ -35,6 +36,7 @@ export async function GET() {
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
         panNumber: user.panNumber || null,
+        iecCode: user.iecCode || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
         coldLanguage: user.coldLanguage || 'en',
@@ -61,6 +63,7 @@ export async function PATCH(req: Request) {
     const {
       fullName,
       companyName,
+      invoiceEmail,
       phoneNumber,
       address,
       warehouseLocation,
@@ -73,6 +76,7 @@ export async function PATCH(req: Request) {
       bankBranch,
       companyLogo,
       panNumber,
+      iecCode,
       termsAndConditions,
       coldLanguage
     } = body;
@@ -104,6 +108,9 @@ export async function PATCH(req: Request) {
     const trimmedPan = merged.panNumber ? merged.panNumber.toString().trim().toUpperCase() : '';
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
+    const trimmedIec = iecCode ? iecCode.toString().trim().toUpperCase() : '';
+    const iecRegex = /^[A-Z0-9]{10}$/;
+
     const isProfileUpdate = Object.keys(body).some(key => key !== 'coldLanguage');
 
     if (isProfileUpdate) {
@@ -133,6 +140,9 @@ export async function PATCH(req: Request) {
         if (!panRegex.test(trimmedPan)) {
           return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
         }
+        if (trimmedIec && !iecRegex.test(trimmedIec)) {
+          return NextResponse.json({ message: 'Invalid IEC Code format (must be exactly 10 alphanumeric characters).' }, { status: 400 });
+        }
       } else {
         if (gstNumber !== undefined && trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
           return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
@@ -140,12 +150,15 @@ export async function PATCH(req: Request) {
         if (panNumber !== undefined && trimmedPan && !panRegex.test(trimmedPan)) {
           return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
         }
+        if (iecCode !== undefined && trimmedIec && !iecRegex.test(trimmedIec)) {
+          return NextResponse.json({ message: 'Invalid IEC Code format (must be exactly 10 alphanumeric characters).' }, { status: 400 });
+        }
       }
     }
 
     if (isStaff && isProfileUpdate) {
        // Staff cannot update these WSP fields
-       if (companyName !== undefined || gstNumber !== undefined || panNumber !== undefined || bankName !== undefined || companyLogo !== undefined || address !== undefined || warehouseLocation !== undefined || state !== undefined) {
+       if (companyName !== undefined || gstNumber !== undefined || panNumber !== undefined || bankName !== undefined || companyLogo !== undefined || address !== undefined || warehouseLocation !== undefined || state !== undefined || invoiceEmail !== undefined || iecCode !== undefined) {
           // just ignore them or return error
           // to be safe, we will just not add them to updates below
        }
@@ -166,6 +179,7 @@ export async function PATCH(req: Request) {
     }
     if (!isStaff) {
       if (companyName !== undefined) updates.companyName = companyName;
+      if (invoiceEmail !== undefined) updates.invoiceEmail = invoiceEmail || null;
       if (address !== undefined) updates.address = address || null;
       if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
       if (state !== undefined) updates.state = state || '';
@@ -177,6 +191,7 @@ export async function PATCH(req: Request) {
       if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
       if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
       if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
+      if (iecCode !== undefined) updates.iecCode = trimmedIec || null;
       if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
     }
     if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;

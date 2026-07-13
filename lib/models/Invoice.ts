@@ -25,6 +25,7 @@ export interface IInvoice extends Document {
   userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
+  adjustment: number;
 }
 
 const InvoiceSchema: Schema = new Schema(
@@ -51,6 +52,7 @@ const InvoiceSchema: Schema = new Schema(
     generatedAt: { type: Date, default: Date.now },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
+    adjustment: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

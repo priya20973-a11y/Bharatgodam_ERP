@@ -11,15 +11,40 @@ function escapeRegExp(value: string) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
     const db = await getDb();
-
-    // Get commodities from warehouse_config
-    const config = await db.collection('warehouse_config').findOne({});
-    const commodities = config?.commodities || [
-      { id: 'comm1', name: 'Rice Paddy', rate: 10, rateUnit: 'day' },
-      { id: 'comm2', name: 'Wheat', rate: 8, rateUnit: 'day' },
-      { id: 'comm3', name: 'Corn', rate: 12, rateUnit: 'day' },
-    ];
+    
+    let commodities: any[] = [];
+    
+    if (session?.user?.id) {
+      // Fetch user specific commodities
+      let ownerId: ObjectId | string = session.user.id;
+      try {
+        ownerId = new ObjectId(String(session.user.id));
+      } catch {
+        ownerId = session.user.id;
+      }
+      
+      commodities = await db.collection('commodities').find({ userId: ownerId }).toArray();
+    }
+    
+    if (commodities.length === 0) {
+      // Fallback to warehouse config if no user specific commodities
+      const config = await db.collection('warehouse_config').findOne({});
+      commodities = config?.commodities || [
+        { id: 'comm1', name: 'Rice Paddy', rate: 10, rateUnit: 'day', hsnCode: '1006' },
+        { id: 'comm2', name: 'Wheat', rate: 8, rateUnit: 'day', hsnCode: '1001' },
+        { id: 'comm3', name: 'Corn', rate: 12, rateUnit: 'day', hsnCode: '1005' },
+      ];
+    } else {
+      commodities = commodities.map(c => ({
+        id: c._id.toString(),
+        name: c.name,
+        rate: c.ratePerMtPerDay || c.rate,
+        rateUnit: c.rateUnit || 'day',
+        hsnCode: c.hsnCode || ''
+      }));
+    }
 
     return NextResponse.json({
       success: true,
@@ -43,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, rate, rateUnit } = body;
+    const { name, rate, rateUnit, hsnCode } = body;
 
     if (!name || !rate || !rateUnit) {
       return NextResponse.json({
@@ -81,6 +106,7 @@ export async function POST(request: Request) {
         name: normalizedName,
         rate: Number(rate),
         rateUnit,
+        hsnCode: hsnCode ? String(hsnCode).trim() : '',
         createdAt: new Date(),
       },
       session

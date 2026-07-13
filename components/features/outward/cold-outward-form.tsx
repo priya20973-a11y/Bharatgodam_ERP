@@ -325,19 +325,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcKataBharati.toFixed(2)}</div>
               </div>
               
-              {autoGradingType === 'Grading' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('outward.grade')}</label>
-                  <Select value={item.grade} onValueChange={(v) => handleItemChange(item.inwardId, 'grade', v)} required>
-                    <SelectTrigger><SelectValue placeholder={t('outward.selectGrade')} /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Large">{t('outward.gradeLarge')}</SelectItem>
-                      <SelectItem value="Small">{t('outward.gradeSmall')}</SelectItem>
-                      <SelectItem value="Mixed">{t('outward.gradeMixed')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+
             </div>
           </div>
         );

@@ -38,9 +38,12 @@ export interface MonthlyInvoiceData {
   companyAddress?: string;
   companyPhone?: string;
   companyEmail?: string;
+  invoiceEmail?: string;
+  icCode?: string;
   companyLogo?: string;
   companyGst?: string;
   companyPan?: string;
+  iecCode?: string;
   bankName?: string;
   accountName?: string;
   bankAccountNumber?: string;
@@ -66,6 +69,7 @@ export interface MonthlyInvoiceData {
   igstAmount?: number;
   totalTaxAmount?: number;
   adjustmentAmount?: number;
+  adjustment?: number;
   invoiceDate: string;
   invoiceNumber?: string;
   notes?: string;

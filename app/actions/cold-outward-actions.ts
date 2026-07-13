@@ -137,6 +137,10 @@ export async function createColdOutward(data: any) {
       return { success: false, error: `Quantity exceeds available stock. Available: ${adjustedAvailableStock} Kg` };
     }
 
+    if (data.grade === '') {
+      delete data.grade;
+    }
+
     let rentRs = 0;
     const commodity = await ColdCommodity.findById(data.commodityId);
     const outDate = data.date ? new Date(data.date) : new Date();
@@ -202,6 +206,10 @@ export async function createBatchColdOutwards(payload: any) {
       const adjustedAvailableStock = stockInfo.availableStock + (Number(item.plusMinus) || 0);
       if (item.quantityKg > adjustedAvailableStock) {
         return { success: false, error: `Quantity exceeds available stock for one of the items. Available: ${adjustedAvailableStock} Kg` };
+      }
+
+      if (item.grade === '') {
+        delete item.grade;
       }
 
       let rentRs = 0;

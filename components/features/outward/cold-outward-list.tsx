@@ -73,8 +73,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
               
               const displayGrade = (w.isBatch && !sameGrade) ? t('outward.mixedMulti') : (
                 <>
-                  {w.grade ? (t(`inward.grade${w.grade}`) !== `inward.grade${w.grade}` ? t(`inward.grade${w.grade}`) : w.grade) : '-'}
-                  {w.gradingType ? ` (${w.gradingType})` : ''}
+                  {w.gradingType || '-'}
                 </>
               );
 

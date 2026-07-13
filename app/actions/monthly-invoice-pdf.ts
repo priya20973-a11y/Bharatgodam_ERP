@@ -185,10 +185,13 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const companyAddress =
     invoice.companyAddress ||
     'Agri crop care Warehouse, Vraj 3, Patidad road, Gundala, Gondal';
-  const contactEmail = invoice.companyEmail || 'agricropwl@outlook.com';
+  const contactEmail = invoice.invoiceEmail || invoice.companyEmail || 'agricropwl@outlook.com';
   const contactPhone = invoice.companyPhone || '+91 9913305200';
   const logoSrc = await getLogoDataUri(invoice.companyLogo || undefined);
   const logoAlt = `${companyName} Logo`;
+  const companyGst = invoice.companyGst || '';
+  const companyPan = invoice.companyPan || '';
+  const iecCode = invoice.iecCode || '';
   const invoiceDate = formatInvoiceDate(invoice.invoiceDate);
   const TAX_RATES: Record<string, number> = {
     'Non-GST Supply': 0,
@@ -216,9 +219,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
 
   const taxableAmount = billingTotal + adjustmentTotal;
   let totalTaxAmount = Number(invoice.totalTaxAmount || 0);
-  const taxAdjustment = Number(invoice.adjustmentAmount || 0);
-
-  const companyGst = invoice.companyGst || '';
+  const taxAdjustment = Number(invoice.adjustment || invoice.adjustmentAmount || 0);
   if (companyGst.trim().toUpperCase() === 'NA') {
     totalTaxAmount = 0;
   }
@@ -256,13 +257,13 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
 
   const panNumber = invoice.panNumber ? invoice.panNumber : '';
   const gstNumber = invoice.gstNumber ? invoice.gstNumber : '';
-  const companyPan = invoice.companyPan || '';
 
   const db = await getDb();
   let clientAddress = '';
   let clientMobile = '';
   const clientState = invoice.billingState || '';
 
+  let clientUserId: ObjectId | string | null = null;
   if (invoice.bookingId) {
     try {
       const client = await db.collection('clients').findOne({
@@ -271,10 +272,30 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       if (client) {
         clientAddress = client.address || '';
         clientMobile = client.mobile || '';
+        clientUserId = client.userId || null;
       }
     } catch (err) {
       console.error('Error fetching client details in HTML generator:', err);
     }
+  }
+
+  // Fetch commodities to map HSN codes
+  const hsnMap: Record<string, string> = {};
+  try {
+    const query: any = {};
+    if (clientUserId) {
+      query.userId = clientUserId;
+    } else if (invoice.companyEmail) {
+      query.userEmail = invoice.companyEmail;
+    }
+    const commodities = await db.collection('commodities').find(query).toArray();
+    for (const c of commodities) {
+      if (c.name) {
+        hsnMap[c.name.toUpperCase()] = c.hsnCode || '-';
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching commodities in HTML generator:', err);
   }
 
   const adjustmentRows = (invoice.additionalChargeItems || [])
@@ -353,6 +374,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         ? `₹${formatAmount(row.ratePerMTPerDay)}`
         : '-';
       const commodityLabel = row.commodityName || 'Unknown';
+      const hsnValue = hsnMap[commodityLabel.toUpperCase()] || '-';
       const warehouseCell = showWarehouseColumn 
         ? `<td>${row.customWarehouseId || ''}</td>` 
         : '';
@@ -362,6 +384,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           <td>${dateRange}</td>
           <td>${row.direction}</td>
           <td>${commodityLabel}</td>
+          <td>${hsnValue}</td>
           ${warehouseCell}
           <td class="text-right">${bagsValue}</td>
           <td class="text-right">${formatQty(row.quantityMT)}</td>
@@ -382,7 +405,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Monthly Invoice - ${invoice.clientName}</title>
+        <title>${totalTaxAmount > 0 ? 'Tax Invoice' : 'Bill of Supply'} - ${invoice.clientName}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -815,12 +838,13 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 ${logoSrc ? `<img class="logo-image" src="${logoSrc}" alt="${logoAlt}" />` : ''}
                 <div class="company-info">
                   <div class="company-name">${companyName}</div>
-                  <div class="company-details">
-                    <p>📍 ${companyAddress}</p>
-                    <p>📞 ${contactPhone} &nbsp;|&nbsp; ✉️ ${contactEmail}</p>
-                    ${companyGst ? `<p class="gstin-badge">GSTIN: ${companyGst}</p>` : ''}
-                    ${companyPan ? `<p class="gstin-badge" style="margin-top: 2px;">PAN: ${companyPan}</p>` : ''}
-                  </div>
+                    <div class="company-details">
+                      <p>📍 ${companyAddress}</p>
+                      <p>📞 ${contactPhone} &nbsp;|&nbsp; ✉️ ${contactEmail}</p>
+                      ${companyGst ? `<p class="gstin-badge">GSTIN: ${companyGst}</p>` : ''}
+                      ${companyPan ? `<p class="pan-badge">PAN: ${companyPan}</p>` : ''}
+                      ${iecCode ? `<p class="iec-badge">IEC Code: ${iecCode}</p>` : ''}
+                    </div>
                   ${(invoice as any).warehouses && (invoice as any).warehouses.length > 0 ? `
                   <div style="margin-top: 10px; font-size: 10px; font-weight: 600; color: #0F2D52;">
                     Warehouses: 
@@ -830,7 +854,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 </div>
               </div>
               <div class="header-right">
-                <div class="invoice-title">Monthly Invoice</div>
+                <div class="invoice-title">${totalTaxAmount > 0 ? 'Tax Invoice' : 'Bill of Supply'}</div>
                 <div class="invoice-details-grid">
                   <div class="detail-label">Invoice Number:</div>
                   <div class="detail-value highlight-text">${formattedInvoiceNumber}</div>
@@ -869,19 +893,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                 </div>
               </div>
 
-              <!-- Ship To Section -->
-              <div class="bill-to-card">
-                <div class="card-header">
-                  Ship To
-                </div>
-                <div class="card-body">
-                  <div class="client-stacked-address">
-                    ${clientAddress ? `<div>${clientAddress.replace(/\n/g, '<br>')}</div>` : ''}
-                    ${clientState ? `<div>${clientState}</div>` : ''}
-                    <div>India</div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <!-- Storage Transactions Section -->
@@ -896,6 +907,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                       <th>Date</th>
                       <th>Direction</th>
                       <th>Commodity</th>
+                      <th>HSN Code</th>
                       ${showWarehouseColumn ? '<th>Warehouse</th>' : ''}
                       <th class="text-right">No. of Bags</th>
                       <th class="text-right">Qty (MT)</th>
