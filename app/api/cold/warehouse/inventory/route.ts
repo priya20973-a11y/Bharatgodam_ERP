@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     if (activeFloor) {
       totalCapacity = activeFloor.stacks.reduce((acc: number, stack: any) => acc + (stack.capacity || 0), 0);
-      floors = activeChamber.floors.map((f: any) => ({ floorNo: f.floorNo, name: f.name }));
+      floors = activeChamber?.floors.map((f: any) => ({ floorNo: f.floorNo, name: f.name })) || [];
     } else if (activeChamber) {
       totalCapacity = activeChamber.floors.reduce((fAcc: number, f: any) => 
         fAcc + f.stacks.reduce((sAcc: number, stack: any) => sAcc + (stack.capacity || 0), 0)

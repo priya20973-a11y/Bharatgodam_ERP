@@ -100,7 +100,7 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     const stackData = Array.from(stacksMap.values()).map(s => {
       const activeCommodities = Array.from(s.commodities.entries())
         .filter(([_, qty]: any) => qty > 0)
-        .map(([name, _]) => name);
+        .map(([name, _]: any) => name);
 
       let status = 'Empty';
       if (s.usedCapacity > 0) {
