@@ -377,7 +377,7 @@ export default async function DashboardPage() {
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {stats.map((stat) => {
+        {stats.map((stat: any) => {
           const Icon = stat.icon;
           const cardContent = (
             <div className="group relative w-full overflow-hidden rounded-3xl bg-white p-6 shadow-sm border border-slate-100/80 hover:border-indigo-100 hover:shadow-md hover:shadow-indigo-500/5 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5">
