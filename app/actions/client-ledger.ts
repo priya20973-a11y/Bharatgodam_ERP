@@ -381,104 +381,69 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
   const transactions = await db.collection('transactions').find(transactionQuery, { sort: { date: 1 } }).toArray();
 
-  const commodityIds = [...new Set(transactions.map(t => t.commodityId))];
-  const commodities = await db.collection('commodities').find(
-    { _id: { $in: commodityIds.map(id => new ObjectId(id)) }, ...(tenantFilter || {}) }
-  ).toArray();
-  const commodityMap = new Map(commodities.map(c => [c._id.toString(), c]));
-
-  const txnGroups = new Map<string, { txns: Transaction[]; warehouseId: string }>();
-  const warehouseIds = new Set<string>();
-
+  const monthKeysSet = new Set<string>();
   transactions.forEach(txn => {
-    const key = `${txn.commodityId}-${txn.warehouseId}`;
-    if (!txnGroups.has(key)) txnGroups.set(key, { txns: [], warehouseId: txn.warehouseId });
-    txnGroups.get(key)?.txns.push({
-      date: (() => {
-        if (txn.date instanceof Date) {
-          return txn.date.toISOString().split('T')[0];
-        }
-        if (typeof txn.date === 'string') {
-          const raw = txn.date.trim();
-          const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-          if (match) {
-            return `${match[1]}-${match[2]}-${match[3]}`;
-          }
-          const parsed = new Date(raw);
-          if (!Number.isNaN(parsed.getTime())) {
-            const y = parsed.getFullYear();
-            const m = String(parsed.getMonth() + 1).padStart(2, '0');
-            const d = String(parsed.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-          }
-        }
-        return txn.date;
-      })(),
-      type: txn.direction === 'INWARD' ? 'INWARD' : 'OUTWARD',
-      qty: txn.quantityMT || 0,
-      clientId: txn.clientId,
-      commodityId: txn.commodityId,
-      warehouseId: txn.warehouseId
-    });
-
-    warehouseIds.add(txn.warehouseId);
+    const d = txn.date || txn.inwardDate || txn.outwardDate;
+    if (d) {
+      let dObj: Date;
+      if (d instanceof Date) dObj = d;
+      else dObj = new Date(d);
+      if (!Number.isNaN(dObj.getTime())) {
+        monthKeysSet.add(`${dObj.getUTCFullYear()}-${String(dObj.getUTCMonth() + 1).padStart(2, '0')}`);
+      }
+    }
   });
 
-  const warehouseDocs = warehouseIds.size
-    ? await db.collection('warehouses').find({
-        _id: { $in: Array.from(warehouseIds).map((id) => new ObjectId(id)) },
-        ...(tenantFilter || {}),
-      }).toArray()
-    : [];
-  const warehouseMap = new Map(warehouseDocs.map((warehouse) => [warehouse._id?.toString() || '', warehouse]));
+  const monthKeysToProcess = month ? [month] : Array.from(monthKeysSet).sort();
 
-  const allPeriods: ClientMonthlyLedgerRow[] = [];
-  txnGroups.forEach((group, key) => {
-    const [commodityId, warehouseId] = key.split('-');
-    const commodity = commodityMap.get(commodityId);
-    const warehouse = warehouseMap.get(warehouseId);
-    const rate = commodity?.ratePerMtPerDay || 10;
-    const monthlyRate = roundCurrency(rate * 30);
-
-    const periods = generateStoragePeriods(group.txns, undefined, rate);
-
-    periods.forEach(period => {
-      const dailyRate = rate;
-      const calculation = `${roundCurrency(period.qty).toFixed(2)} MT × ₹${dailyRate.toFixed(2)}/MT/day × ${period.days} days`;
-      allPeriods.push({
-        commodity: commodity?.name || 'Unknown Commodity',
-        rate: monthlyRate,
-        fromDate: period.fromDate,
-        toDate: period.toDate,
-        qty: period.qty,
-        days: period.days,
-        rent: roundCurrency(period.rent),
-        status: period.status,
-        calculation,
-        warehouseId,
-        warehouseName: warehouse?.warehouseId ? `${warehouse.warehouseId} - ${warehouse.name}` : (warehouse?.name || ''),
-      });
-    });
-  });
+  const { getTransactionsForInvoiceMonth, transformTransactionsToBillingRows } = await import('@/app/api/invoice/utils');
 
   const grouped = new Map<string, { month: string; warehouseId?: string; warehouseName?: string; rows: ClientMonthlyLedgerRow[] }>();
-  allPeriods.forEach(row => {
-    const monthKey = formatMonthKey(normalizeDate(row.fromDate));
-    // If multiple warehouses are requested, combine them into one invoice for the month
-    const warehouseKey = warehouseIdsArray.length > 1 ? warehouseId : (row.warehouseId || 'ALL');
-    const groupKey = `${monthKey}::${warehouseKey}`;
 
-    if (!grouped.has(groupKey)) {
-      grouped.set(groupKey, {
-        month: monthKey,
-        warehouseId: warehouseIdsArray.length > 1 ? warehouseId : row.warehouseId,
-        warehouseName: warehouseIdsArray.length > 1 ? 'Multiple Warehouses' : row.warehouseName,
-        rows: [],
+  for (const monthKey of monthKeysToProcess) {
+    const monthTxns = await getTransactionsForInvoiceMonth(
+      db,
+      clientId,
+      warehouseId === 'ALL' ? undefined : warehouseId,
+      monthKey,
+      tenantFilter
+    );
+
+    const billingRows = transformTransactionsToBillingRows(monthTxns, monthKey);
+
+    billingRows.forEach((row: any) => {
+      const warehouseKey = warehouseIdsArray.length > 1 ? warehouseId : (row.warehouseId || 'ALL');
+      const groupKey = `${monthKey}::${warehouseKey}`;
+
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
+          month: monthKey,
+          warehouseId: warehouseIdsArray.length > 1 ? warehouseId : row.warehouseId,
+          warehouseName: warehouseIdsArray.length > 1 ? 'Multiple Warehouses' : row.warehouseName,
+          rows: [],
+        });
+      }
+
+      const dailyRate = row.rate || 0;
+      const monthlyRate = roundCurrency(dailyRate * 30);
+      const roundedQty = roundCurrency(row.quantityMT || 0);
+      const calculation = `${roundedQty.toFixed(2)} MT × ₹${dailyRate.toFixed(2)}/MT/day × ${row.daysTotal || 0} days`;
+
+      grouped.get(groupKey)?.rows.push({
+        commodity: row.commodityName || 'Unknown Commodity',
+        rate: monthlyRate,
+        fromDate: row.startDate,
+        toDate: row.endDate,
+        qty: roundedQty,
+        days: row.daysTotal,
+        rent: roundCurrency(row.rentTotal || 0),
+        status: row.status,
+        calculation,
+        warehouseId: row.warehouseId,
+        warehouseName: row.warehouseName,
       });
-    }
-
-    grouped.get(groupKey)?.rows.push(row);
-  });
+    });
+  }
 
   const paymentsResult = await getClientPayments(clientId);
   const payments = paymentsResult.success ? paymentsResult.data : [];

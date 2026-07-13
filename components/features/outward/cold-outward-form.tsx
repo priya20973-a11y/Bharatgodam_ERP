@@ -305,19 +305,19 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Large (Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Large Bags</label>
                 <ColdNumberInput required min="0" value={item.bagsCount ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'bagsCount', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Small (Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Small Bags</label>
                 <ColdNumberInput min="0" value={item.jin ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'jin', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Mixed (Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Mixed Bags</label>
                 <ColdNumberInput min="0" value={item.mixed ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'mixed', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-700">Total (Kg)</label>
+                <label className="text-sm font-medium text-green-700">Total Bags</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcTotalBags.toFixed(2)}</div>
               </div>
               <div className="space-y-2">
