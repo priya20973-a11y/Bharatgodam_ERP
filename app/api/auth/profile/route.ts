@@ -6,7 +6,8 @@ import { ObjectId } from 'mongodb';
 export async function GET() {
   try {
     const session = await requireSession();
-    const userId = session.user.id;
+    const isStaff = (session.user as any).isStaff;
+    const userId = isStaff ? (session.user as any).staffId : session.user.id;
 
     const db = await getDb();
     const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
@@ -23,6 +24,7 @@ export async function GET() {
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
+        address: user.address || null,
         warehouseLocation: user.warehouseLocation || '',
         state: user.state || '',
         gstNumber: user.gstNumber || null,
@@ -35,6 +37,7 @@ export async function GET() {
         panNumber: user.panNumber || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
+        coldLanguage: user.coldLanguage || 'en',
       },
     });
   } catch (error: any) {
@@ -52,7 +55,8 @@ export async function GET() {
 export async function PATCH(req: Request) {
   try {
     const session = await requireSession();
-    const userId = session.user.id;
+    const isStaff = (session.user as any).isStaff;
+    const userId = isStaff ? (session.user as any).staffId : session.user.id;
     const body = await req.json();
     const {
       fullName,
@@ -69,7 +73,8 @@ export async function PATCH(req: Request) {
       bankBranch,
       companyLogo,
       panNumber,
-      termsAndConditions
+      termsAndConditions,
+      coldLanguage
     } = body;
 
     const db = await getDb();
@@ -99,44 +104,55 @@ export async function PATCH(req: Request) {
     const trimmedPan = merged.panNumber ? merged.panNumber.toString().trim().toUpperCase() : '';
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
-    if (isNew) {
-      if (!merged.state || !merged.state.toString().trim()) {
-        return NextResponse.json({ message: 'State is required.' }, { status: 400 });
+    const isProfileUpdate = Object.keys(body).some(key => key !== 'coldLanguage');
+
+    if (isProfileUpdate) {
+      if (isNew) {
+        if (!merged.state || !merged.state.toString().trim()) {
+          return NextResponse.json({ message: 'State is required.' }, { status: 400 });
+        }
+        if (!merged.bankName || !merged.bankName.toString().trim() ||
+            !merged.accountName || !merged.accountName.toString().trim() ||
+            !merged.bankAccountNumber || !merged.bankAccountNumber.toString().trim() ||
+            !merged.ifscCode || !merged.ifscCode.toString().trim() ||
+            !merged.bankBranch || !merged.bankBranch.toString().trim()) {
+          return NextResponse.json({ message: 'All bank details are required.' }, { status: 400 });
+        }
+        if (!merged.companyLogo) {
+          return NextResponse.json({ message: 'Company logo is required.' }, { status: 400 });
+        }
+        if (!trimmedGst) {
+          return NextResponse.json({ message: 'GST Number is required (use NA if not applicable).' }, { status: 400 });
+        }
+        if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+          return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+        }
+        if (!trimmedPan) {
+          return NextResponse.json({ message: 'PAN Number is required.' }, { status: 400 });
+        }
+        if (!panRegex.test(trimmedPan)) {
+          return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+        }
+      } else {
+        if (gstNumber !== undefined && trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
+          return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
+        }
+        if (panNumber !== undefined && trimmedPan && !panRegex.test(trimmedPan)) {
+          return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
+        }
       }
-      if (!merged.bankName || !merged.bankName.toString().trim() ||
-          !merged.accountName || !merged.accountName.toString().trim() ||
-          !merged.bankAccountNumber || !merged.bankAccountNumber.toString().trim() ||
-          !merged.ifscCode || !merged.ifscCode.toString().trim() ||
-          !merged.bankBranch || !merged.bankBranch.toString().trim()) {
-        return NextResponse.json({ message: 'All bank details are required.' }, { status: 400 });
-      }
-      if (!merged.companyLogo) {
-        return NextResponse.json({ message: 'Company logo is required.' }, { status: 400 });
-      }
-      if (!trimmedGst) {
-        return NextResponse.json({ message: 'GST Number is required (use NA if not applicable).' }, { status: 400 });
-      }
-      if (trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
-        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
-      }
-      if (!trimmedPan) {
-        return NextResponse.json({ message: 'PAN Number is required.' }, { status: 400 });
-      }
-      if (!panRegex.test(trimmedPan)) {
-        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
-      }
-    } else {
-      if (trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
-        return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
-      }
-      if (trimmedPan && !panRegex.test(trimmedPan)) {
-        return NextResponse.json({ message: 'Please enter a valid PAN format (AAAAA9999A).' }, { status: 400 });
-      }
+    }
+
+    if (isStaff && isProfileUpdate) {
+       // Staff cannot update these WSP fields
+       if (companyName !== undefined || gstNumber !== undefined || panNumber !== undefined || bankName !== undefined || companyLogo !== undefined || address !== undefined || warehouseLocation !== undefined || state !== undefined) {
+          // just ignore them or return error
+          // to be safe, we will just not add them to updates below
+       }
     }
 
     const updates: Record<string, unknown> = {};
     if (fullName !== undefined) updates.fullName = fullName;
-    if (companyName !== undefined) updates.companyName = companyName;
     if (phoneNumber !== undefined) {
       const phoneRegex = /^[0-9]{10}$/;
       const trimmedPhone = phoneNumber.toString().trim();
@@ -148,18 +164,22 @@ export async function PATCH(req: Request) {
       }
       updates.phoneNumber = phoneNumber;
     }
-    if (address !== undefined) updates.address = address || null;
-    if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
-    if (state !== undefined) updates.state = state || '';
-    if (gstNumber !== undefined) updates.gstNumber = trimmedGst || null;
-    if (bankName !== undefined) updates.bankName = bankName || null;
-    if (accountName !== undefined) updates.accountName = accountName || null;
-    if (bankAccountNumber !== undefined) updates.bankAccountNumber = bankAccountNumber || null;
-    if (ifscCode !== undefined) updates.ifscCode = ifscCode || null;
-    if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
-    if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
-    if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
-    if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
+    if (!isStaff) {
+      if (companyName !== undefined) updates.companyName = companyName;
+      if (address !== undefined) updates.address = address || null;
+      if (warehouseLocation !== undefined) updates.warehouseLocation = warehouseLocation;
+      if (state !== undefined) updates.state = state || '';
+      if (gstNumber !== undefined) updates.gstNumber = trimmedGst || null;
+      if (bankName !== undefined) updates.bankName = bankName || null;
+      if (accountName !== undefined) updates.accountName = accountName || null;
+      if (bankAccountNumber !== undefined) updates.bankAccountNumber = bankAccountNumber || null;
+      if (ifscCode !== undefined) updates.ifscCode = ifscCode || null;
+      if (bankBranch !== undefined) updates.bankBranch = bankBranch || null;
+      if (companyLogo !== undefined) updates.companyLogo = companyLogo || null;
+      if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
+      if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
+    }
+    if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
@@ -192,6 +212,7 @@ export async function PATCH(req: Request) {
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
+        address: user.address || null,
         warehouseLocation: user.warehouseLocation || '',
         state: user.state || '',
         gstNumber: user.gstNumber || null,
@@ -204,6 +225,7 @@ export async function PATCH(req: Request) {
         panNumber: user.panNumber || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
+        coldLanguage: user.coldLanguage || 'en',
       },
     });
   } catch (error: any) {

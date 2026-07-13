@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, User, Trash2 } from "lucide-react";
+import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 interface ClientListProps {
   clients: any[];
@@ -20,29 +21,33 @@ interface ClientListProps {
 }
 
 export default function ClientList({ clients, commodities = [], onEdit, onDelete }: ClientListProps) {
-  const commodityMap = new Map(commodities.map((item) => [item._id?.toString() || item.id, item.name]));
+  const { t, formatNumber } = useColdTranslation();
+  const commodityMap = new Map(commodities.map((item) => [
+    item._id?.toString() || item.id, 
+    item.type ? `${item.name} (${item.type})` : item.name
+  ]));
 
   return (
     <div className="rounded-md border bg-white">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Address</TableHead>
-            <TableHead>Mobile</TableHead>
-            <TableHead className="hidden md:table-cell">Commodity</TableHead>
+            <TableHead>{t('clients.name')}</TableHead>
+            <TableHead>{t('clients.type')}</TableHead>
+            <TableHead>{t('profile.address')}</TableHead>
+            <TableHead>{t('clients.mobile')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('clients.commodity')}</TableHead>
             <TableHead className="hidden md:table-cell">PAN</TableHead>
             <TableHead className="hidden md:table-cell">GSTIN</TableHead>
-            <TableHead className="hidden lg:table-cell">WSP Name</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('clients.wspName')}</TableHead>
+            <TableHead className="text-right">{t('clients.actions')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {clients.length === 0 ? (
             <TableRow>
               <TableCell colSpan={9} className="h-24 text-center">
-                No clients registered.
+                {t('clients.noClients')}
               </TableCell>
             </TableRow>
           ) : (
@@ -60,13 +65,13 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
                     </Badge>
                   </TableCell>
                   <TableCell>{c.address}{c.state ? `, ${c.state}` : ''}</TableCell>
-                  <TableCell>{c.mobile}</TableCell>
+                  <TableCell>{formatNumber(c.mobile)}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-slate-600">
-                    {commodityNames.length > 0 ? commodityNames.join(', ') : 'Any'}
+                    {commodityNames.length > 0 ? commodityNames.join(', ') : t('clients.any')}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{c.panNumber || '—'}</TableCell>
                   <TableCell className="hidden md:table-cell">{c.gstNumber || '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-slate-600">{c.wspName || 'Unknown'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-slate-600">{c.wspName || t('clients.unknown')}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end items-center gap-2">
                       <Button variant="ghost" size="icon" onClick={() => onEdit(c)}>

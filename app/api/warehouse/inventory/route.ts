@@ -41,7 +41,19 @@ export async function GET(request: Request) {
     }
 
     if (!warehouse) {
-      return NextResponse.json({ success: false, error: 'No active warehouses found' }, { status: 404 });
+      return NextResponse.json({
+        success: true,
+        commodities: [],
+        warehouse_stats: {
+          total_capacity: 0,
+          used_capacity: 0,
+          available_capacity: 0,
+          utilization_percentage: 0,
+          warehouse_id: '',
+          warehouse_name: 'No Active Warehouses'
+        },
+        warehouses: []
+      });
     }
 
     const commodityBreakdown = await db.collection('transactions').aggregate([
