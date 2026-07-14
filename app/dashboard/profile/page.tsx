@@ -65,6 +65,7 @@ interface ProfileData {
   iecCode?: string | null;
   termsAndConditions?: string | null;
   isNewRegistration?: boolean;
+  storageChargeSacCode?: string | null;
 }
 
 const initialProfileForm = {
@@ -86,6 +87,7 @@ const initialProfileForm = {
   panNumber: '',
   iecCode: '',
   termsAndConditions: '',
+  storageChargeSacCode: '',
 };
 
 const initialPasswordForm = {
@@ -150,6 +152,7 @@ export default function ProfilePage() {
         panNumber: data.user.panNumber || '',
         iecCode: data.user.iecCode || '',
         termsAndConditions: data.user.termsAndConditions || '',
+        storageChargeSacCode: data.user.storageChargeSacCode || '',
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -192,6 +195,15 @@ export default function ProfilePage() {
 
     const iecTrimmed = profileForm.iecCode?.trim().toUpperCase() || '';
     const iecRegex = /^[A-Z0-9]{10}$/;
+
+    const sacTrimmed = profileForm.storageChargeSacCode?.trim() || '';
+    const sacRegex = /^[0-9]{6}$/;
+
+    if (sacTrimmed && !sacRegex.test(sacTrimmed)) {
+      setError('SAC Code must be exactly 6 numeric digits.');
+      setSavingProfile(false);
+      return;
+    }
 
     if (isNew) {
       if (!profileForm.state) {
@@ -573,6 +585,17 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Storage Charge SAC Code (Optional)</span>
+              <input
+                type="text"
+                value={profileForm.storageChargeSacCode}
+                onChange={(event) => setProfileForm({ ...profileForm, storageChargeSacCode: event.target.value })}
+                className="w-full rounded-md border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 uppercase"
+                placeholder="e.g. 996729"
+              />
+            </label>
+
+            <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">IEC Code (Optional)</span>
               <input
                 type="text"
@@ -686,6 +709,7 @@ export default function ProfilePage() {
                 panNumber: profile?.panNumber || '',
                 iecCode: profile?.iecCode || '',
                 termsAndConditions: profile?.termsAndConditions || '',
+                storageChargeSacCode: profile?.storageChargeSacCode || '',
               });
               setMessage(null);
               setError(null);

@@ -279,23 +279,23 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
     }
   }
 
-  // Fetch commodities to map HSN codes
-  const hsnMap: Record<string, string> = {};
+  let storageChargeSacCode = '-';
   try {
-    const query: any = {};
+    const wspQuery: any = {};
     if (clientUserId) {
-      query.userId = clientUserId;
+      wspQuery._id = ObjectId.isValid(clientUserId as string) ? new ObjectId(clientUserId as string) : clientUserId;
     } else if (invoice.companyEmail) {
-      query.userEmail = invoice.companyEmail;
+      wspQuery.email = invoice.companyEmail;
     }
-    const commodities = await db.collection('commodities').find(query).toArray();
-    for (const c of commodities) {
-      if (c.name) {
-        hsnMap[c.name.toUpperCase()] = c.hsnCode || '-';
+    
+    if (Object.keys(wspQuery).length > 0) {
+      const wsp = await db.collection('users').findOne(wspQuery);
+      if (wsp && wsp.storageChargeSacCode) {
+        storageChargeSacCode = wsp.storageChargeSacCode;
       }
     }
   } catch (err) {
-    console.error('Error fetching commodities in HTML generator:', err);
+    console.error('Error fetching WSP sac code:', err);
   }
 
   const adjustmentRows = (invoice.additionalChargeItems || [])
@@ -303,6 +303,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       (item) => `
         <tr>
           <td>${item.name || 'Additional Charge'}</td>
+          ${totalTaxAmount > 0 ? `<td>${item.sacCode || '-'}</td>` : ''}
           <td class="text-right">₹${formatAmount(Number(item.amount || 0))}</td>
         </tr>
       `
@@ -316,6 +317,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const adjustmentBody = adjustmentRows || `
         <tr>
           <td>Additional Charges</td>
+          ${totalTaxAmount > 0 ? `<td>-</td>` : ''}
           <td class="text-right">₹${formatAmount(adjustmentTotal)}</td>
         </tr>
       `;
@@ -374,7 +376,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         ? `₹${formatAmount(row.ratePerMTPerDay)}`
         : '-';
       const commodityLabel = row.commodityName || 'Unknown';
-      const hsnValue = hsnMap[commodityLabel.toUpperCase()] || '-';
       const warehouseCell = showWarehouseColumn 
         ? `<td>${row.customWarehouseId || ''}</td>` 
         : '';
@@ -384,7 +385,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           <td>${dateRange}</td>
           <td>${row.direction}</td>
           <td>${commodityLabel}</td>
-          <td>${hsnValue}</td>
           ${warehouseCell}
           <td class="text-right">${bagsValue}</td>
           <td class="text-right">${formatQty(row.quantityMT)}</td>
@@ -843,7 +843,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                       <p>📞 ${contactPhone} &nbsp;|&nbsp; ✉️ ${contactEmail}</p>
                       ${companyGst ? `<p class="gstin-badge">GSTIN: ${companyGst}</p>` : ''}
                       ${companyPan ? `<p class="pan-badge">PAN: ${companyPan}</p>` : ''}
-                      ${iecCode ? `<p class="iec-badge">IEC Code: ${iecCode}</p>` : ''}
                     </div>
                   ${(invoice as any).warehouses && (invoice as any).warehouses.length > 0 ? `
                   <div style="margin-top: 10px; font-size: 10px; font-weight: 600; color: #0F2D52;">
@@ -907,7 +906,6 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                       <th>Date</th>
                       <th>Direction</th>
                       <th>Commodity</th>
-                      <th>HSN Code</th>
                       ${showWarehouseColumn ? '<th>Warehouse</th>' : ''}
                       <th class="text-right">No. of Bags</th>
                       <th class="text-right">Qty (MT)</th>
@@ -918,6 +916,14 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                   </thead>
                   <tbody>
                     ${invoiceRowsList}
+                    <tr style="border-top: 1px solid #D9DDE3; background-color: #F8FAFC;">
+                      <td colspan="${showWarehouseColumn ? 7 : 6}" style="font-weight: 700; text-align: right;">
+                        Monthly Storage Rent${totalTaxAmount > 0 ? ` (SAC: ${storageChargeSacCode || '-'})` : ''}
+                      </td>
+                      <td class="text-right font-medium text-dark" style="font-weight: 700; font-size: 9px;">
+                        ₹${formatAmount(billingTotal)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -934,6 +940,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     <thead>
                       <tr>
                         <th>Description</th>
+                        ${totalTaxAmount > 0 ? '<th>SAC Code</th>' : ''}
                         <th class="text-right">Charge Amount (₹)</th>
                       </tr>
                     </thead>

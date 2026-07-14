@@ -11,6 +11,7 @@ const adjustmentPayloadSchema = z.object({
     z.object({
       description: z.string().trim().min(1),
       amount: z.number().nonnegative(),
+      sacCode: z.string().regex(/^[0-9]{6}$/, 'SAC Code must be exactly 6 numeric digits').optional().or(z.literal('')),
     })
   ),
 });
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
         name: adjustment.name || adjustment.note || 'Additional Charge',
         amount: Number((adjustment.amount ?? adjustment.additionalCharges) || 0),
         note: adjustment.note || '',
+        sacCode: adjustment.sacCode || '',
       };
       acc[invoiceId].additionalChargeItems.push(item);
       acc[invoiceId].additionalCharges += item.amount;
@@ -154,6 +156,7 @@ export async function POST(request: NextRequest) {
     const normalizedCharges = parsed.additionalCharges.map((item) => ({
       description: item.description,
       amount: Number(item.amount.toFixed(2)),
+      sacCode: item.sacCode || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
@@ -205,6 +208,7 @@ export async function POST(request: NextRequest) {
             masterId: invoiceMaster?._id?.toString(),
             name: item.description,
             amount: item.amount,
+            sacCode: item.sacCode,
             note: '',
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
@@ -300,6 +304,7 @@ export async function POST(request: NextRequest) {
         additionalChargeItems: normalizedCharges.map((item) => ({
           name: item.description,
           amount: item.amount,
+          sacCode: item.sacCode,
         })),
         additionalCharges: Number(chargeTotal.toFixed(2)),
         totalTaxAmount,

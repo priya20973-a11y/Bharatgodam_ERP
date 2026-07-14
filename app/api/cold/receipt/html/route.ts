@@ -67,7 +67,12 @@ export async function GET(request: NextRequest) {
     }
     
     const db = await getDb();
-    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(session.user.id) });
+    
+    // Resolve correct WSP ID: if STAFF, use staffId instead of own user id
+    const isStaff = (session.user as any).isStaff;
+    const userId = isStaff ? (session.user as any).staffId : session.user.id;
+    
+    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(userId) });
 
     // Parse Mongoose document to plain JSON
     const data = JSON.parse(JSON.stringify(transaction));
@@ -75,7 +80,7 @@ export async function GET(request: NextRequest) {
     
     const userDetails = {
       companyLogo: dbUser?.companyLogo || '',
-      phoneNumber: session.user.phoneNumber || dbUser?.phoneNumber || '',
+      phoneNumber: dbUser?.phoneNumber || session.user.phoneNumber || '',
     };
     
     const language = (session.user as any).coldLanguage || 'en';

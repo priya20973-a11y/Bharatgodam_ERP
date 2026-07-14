@@ -192,7 +192,7 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
       activeStocksMap.set(inward._id.toString(), {
         id: inward._id.toString(),
         client: inward.clientId?.name || 'Unknown',
-        farmer: inward.farmerName || inward.referencePersons?.[0]?.name || '-',
+        farmer: inward.farmerName || '-',
         commodity: commodityDisplay,
         quantity: inward.quantityKg,
         truckNo: inward.truckNo || '-',

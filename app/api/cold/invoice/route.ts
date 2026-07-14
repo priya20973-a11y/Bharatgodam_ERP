@@ -52,10 +52,12 @@ export async function GET(request: Request) {
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
 
-    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(session.user.id) });
+    const isStaff = (session.user as any).isStaff;
+    const userId = isStaff ? (session.user as any).staffId : session.user.id;
+    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(userId) });
     const companyName = t.warehouseId?.name || session.user.companyName || 'Cold Storage Co.';
     const companyAddress = t.warehouseId?.address || session.user.address || session.user.warehouseLocation || 'Default Address, City, State';
-    const mobile = session.user.phoneNumber || '+91-0000000000';
+    const mobile = session.user.phoneNumber || dbUser?.phoneNumber || '+91-0000000000';
     const logoUrl = dbUser?.companyLogo || '';
 
     const refPersons = t.referencePersons && t.referencePersons.length > 0 

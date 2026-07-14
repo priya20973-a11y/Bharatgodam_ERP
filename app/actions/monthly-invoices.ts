@@ -60,6 +60,7 @@ export interface MonthlyInvoiceData {
     name: string;
     amount: number;
     note?: string;
+    sacCode?: string;
   }>;
   billingState?: string;
   taxGroup?: string;

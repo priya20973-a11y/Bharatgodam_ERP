@@ -55,6 +55,7 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Inward (Kg)</TableHead>
                 <TableHead className="text-right">Outward (Kg)</TableHead>
+                <TableHead className="text-right">Net Wt. Change</TableHead>
                 <TableHead className="text-right">Balance (Kg)</TableHead>
                 <TableHead className="text-right">Bags Balance</TableHead>
               </TableRow>
@@ -62,11 +63,11 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">Loading ledger...</TableCell>
+                  <TableCell colSpan={9} className="text-center h-24">Loading ledger...</TableCell>
                 </TableRow>
               ) : transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">No transactions found.</TableCell>
+                  <TableCell colSpan={9} className="text-center h-24">No transactions found.</TableCell>
                 </TableRow>
               ) : (
                 transactions.map((tx) => {
@@ -112,6 +113,9 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                       </TableCell>
                       <TableCell className="text-right text-rose-600 font-medium">
                         {outQty > 0 ? formatNumber(outQty.toFixed(2)) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-600 font-medium">
+                        {tx.type === 'OUTWARD' && tx.plusMinus !== null ? formatNumber(Number(tx.plusMinus).toFixed(2)) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-slate-900">
                         {formatNumber(runningBalance.toFixed(2))}

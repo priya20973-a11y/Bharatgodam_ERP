@@ -17,6 +17,7 @@ interface AdditionalChargeItem {
   name: string;
   amount: number | string;
   note?: string;
+  sacCode?: string;
 }
 
 interface PaymentAllocationRow {
@@ -326,6 +327,7 @@ export default function ClientInvoicesPage() {
             name: item.name,
             amount: Number(item.amount || 0),
             note: item.note || '',
+            sacCode: item.sacCode || '',
           }));
           return {
             bookingId: clientId,
@@ -398,6 +400,7 @@ export default function ClientInvoicesPage() {
                     name: item.name,
                     amount: item.amount,
                     note: item.note || '',
+                    sacCode: item.sacCode || '',
                   })),
                 };
               });
@@ -704,7 +707,7 @@ export default function ClientInvoicesPage() {
     return Number(invoice.additionalCharges || 0);
   };
 
-  const handleUpdateAdjustmentItem = (invoiceId: string, index: number, field: 'name' | 'amount', value: string) => {
+  const handleUpdateAdjustmentItem = (invoiceId: string, index: number, field: 'name' | 'amount' | 'sacCode', value: string) => {
     if (!invoiceId) return;
 
     setInvoices((prev) =>
@@ -718,6 +721,7 @@ export default function ClientInvoicesPage() {
             id: chargeItem.id || getAdditionalChargeItemRowId(invoiceId, chargeItem, idx),
             name: field === 'name' ? value : chargeItem.name,
             amount: field === 'amount' ? value : chargeItem.amount,
+            sacCode: field === 'sacCode' ? value : chargeItem.sacCode,
           };
         });
 
@@ -745,7 +749,9 @@ export default function ClientInvoicesPage() {
               {
                 id: `${invoice.invoiceId}-additional-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 name: '',
-                amount: '',
+                amount: 0,
+                note: '',
+                sacCode: '',
               },
             ],
           }
@@ -778,6 +784,7 @@ export default function ClientInvoicesPage() {
     const items = (invoice.additionalChargeItems || []).map((item) => ({
       description: String(item.name || '').trim(),
       amount: Number(item.amount || 0),
+      sacCode: String(item.sacCode || '').trim(),
     }));
 
     if (items.some((item) => !item.description)) {
@@ -787,6 +794,12 @@ export default function ClientInvoicesPage() {
 
     if (items.some((item) => Number.isNaN(item.amount) || item.amount < 0)) {
       toast.error('Enter a valid non-negative amount for all additional charge rows.');
+      return;
+    }
+
+    const sacRegex = /^[0-9]{6}$/;
+    if (items.some((item) => item.sacCode && !sacRegex.test(item.sacCode))) {
+      toast.error('SAC Code must be exactly 6 numeric digits for all additional charge rows.');
       return;
     }
 
@@ -1408,6 +1421,7 @@ export default function ClientInvoicesPage() {
                             <thead className="bg-slate-100">
                               <tr>
                                 <th className="px-3 py-2 text-left font-semibold text-slate-700">Description</th>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-700">SAC Code</th>
                                 <th className="px-3 py-2 text-right font-semibold text-slate-700">Charge (₹)</th>
                                 <th className="px-3 py-2 text-center font-semibold text-slate-700">Action</th>
                               </tr>
@@ -1429,6 +1443,15 @@ export default function ClientInvoicesPage() {
                                         onChange={(e) => handleUpdateAdjustmentItem(invoice.invoiceId || '', idx, 'name', e.target.value)}
                                         className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Description"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="text"
+                                        value={item.sacCode || ''}
+                                        onChange={(e) => handleUpdateAdjustmentItem(invoice.invoiceId || '', idx, 'sacCode', e.target.value)}
+                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                                        placeholder="e.g. 996729"
                                       />
                                     </td>
                                     <td className="px-3 py-2">

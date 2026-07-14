@@ -32,17 +32,16 @@ export async function GET() {
       // Fallback to warehouse config if no user specific commodities
       const config = await db.collection('warehouse_config').findOne({});
       commodities = config?.commodities || [
-        { id: 'comm1', name: 'Rice Paddy', rate: 10, rateUnit: 'day', hsnCode: '1006' },
-        { id: 'comm2', name: 'Wheat', rate: 8, rateUnit: 'day', hsnCode: '1001' },
-        { id: 'comm3', name: 'Corn', rate: 12, rateUnit: 'day', hsnCode: '1005' },
+        { id: 'comm1', name: 'Rice Paddy', rate: 10, rateUnit: 'day' },
+        { id: 'comm2', name: 'Wheat', rate: 8, rateUnit: 'day' },
+        { id: 'comm3', name: 'Corn', rate: 12, rateUnit: 'day' },
       ];
     } else {
       commodities = commodities.map(c => ({
         id: c._id.toString(),
         name: c.name,
         rate: c.ratePerMtPerDay || c.rate,
-        rateUnit: c.rateUnit || 'day',
-        hsnCode: c.hsnCode || ''
+        rateUnit: c.rateUnit || 'day'
       }));
     }
 
@@ -68,7 +67,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, rate, rateUnit, hsnCode } = body;
+    const { name, rate, rateUnit } = body;
 
     if (!name || !rate || !rateUnit) {
       return NextResponse.json({
@@ -106,7 +105,6 @@ export async function POST(request: Request) {
         name: normalizedName,
         rate: Number(rate),
         rateUnit,
-        hsnCode: hsnCode ? String(hsnCode).trim() : '',
         createdAt: new Date(),
       },
       session

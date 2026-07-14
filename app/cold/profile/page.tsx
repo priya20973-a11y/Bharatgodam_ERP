@@ -32,12 +32,13 @@ interface ProfileData {
   bankBranch?: string | null;
   companyLogo?: string | null;
   isNewRegistration?: boolean;
+  storageChargeSacCode?: string | null;
 }
 
 const initialProfileForm = {
   fullName: '', email: '', companyName: '', phoneNumber: '', address: '', warehouseLocation: '',
   state: '', gstNumber: '', bankName: '', accountName: '', bankAccountNumber: '', ifscCode: '',
-  bankBranch: '', companyLogo: '',
+  bankBranch: '', companyLogo: '', storageChargeSacCode: '',
 };
 
 const initialPasswordForm = {
@@ -96,6 +97,7 @@ export default function ProfilePage() {
         ifscCode: data.user.ifscCode || '',
         bankBranch: data.user.bankBranch || '',
         companyLogo: data.user.companyLogo || '',
+        storageChargeSacCode: data.user.storageChargeSacCode || '',
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -134,6 +136,15 @@ export default function ProfilePage() {
 
     const gstTrimmed = profileForm.gstNumber?.trim().toUpperCase() || '';
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    const sacTrimmed = profileForm.storageChargeSacCode?.trim() || '';
+    const sacRegex = /^[0-9]{6}$/;
+
+    if (sacTrimmed && !sacRegex.test(sacTrimmed)) {
+      setError(t('common.error') + ' - SAC Code must be 6 numeric digits.');
+      setSavingProfile(false);
+      return;
+    }
 
     if (isNew) {
       if (!profileForm.state || !profileForm.bankName.trim() || !profileForm.accountName.trim() || !profileForm.bankAccountNumber.trim() || !profileForm.ifscCode.trim() || !profileForm.bankBranch.trim() || !profileForm.companyLogo || !gstTrimmed) {
@@ -282,16 +293,35 @@ export default function ProfilePage() {
             {profile?.role !== 'STAFF' && (
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700">{t('profile.companyLogo')}{profile?.isNewRegistration ? ' *' : ''}</span>
-                <input type="file" accept="image/*" onChange={(event) => {
+                <input type="file" accept="image/*" onChange={async (event) => {
                   const file = event.target.files?.[0];
                   if (!file) return;
                   const reader = new FileReader();
-                  reader.onload = () => {
+                  reader.onload = async () => {
                     const result = reader.result;
                     if (typeof result === 'string') {
                       setProfileForm({ ...profileForm, companyLogo: result });
                       setLogoPreview(result);
                       setError(null);
+                      
+                      // Save immediately
+                      try {
+                        const response = await fetch('/api/auth/profile', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ companyLogo: result }),
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                          setProfile(data.user);
+                          setMessage(t('profile.profileUpdated') || 'Logo updated successfully');
+                        } else {
+                          setError(data.message || t('common.error'));
+                        }
+                      } catch (err) {
+                        setError(t('common.error'));
+                        console.error(err);
+                      }
                     }
                   };
                   reader.readAsDataURL(file);
@@ -396,7 +426,7 @@ export default function ProfilePage() {
                 phoneNumber: profile?.phoneNumber || '', address: profile?.address || '', warehouseLocation: profile?.warehouseLocation || '',
                 state: profile?.state || '', gstNumber: profile?.gstNumber || '', bankName: profile?.bankName || '',
                 accountName: profile?.accountName || '', bankAccountNumber: profile?.bankAccountNumber || '',
-                ifscCode: profile?.ifscCode || '', bankBranch: profile?.bankBranch || '', companyLogo: profile?.companyLogo || '',
+                ifscCode: profile?.ifscCode || '', bankBranch: profile?.bankBranch || '', companyLogo: profile?.companyLogo || '', storageChargeSacCode: profile?.storageChargeSacCode || '',
               });
               setMessage(null); setError(null); setGstNotApplicable(profile?.gstNumber === 'NA');
             }} className="rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">

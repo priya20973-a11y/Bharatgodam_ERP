@@ -19,7 +19,9 @@ export default async function ColdInvoicesPage() {
   
   // Fetch user details for invoice header
   const db = mongoose.connection.db;
-  const user = db ? await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(session.user.id) }) : null;
+  const isStaff = (session.user as any).isStaff;
+  const userId = isStaff ? (session.user as any).staffId : session.user.id;
+  const user = db ? await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) }) : null;
   
   const userDetails = {
     companyName: user?.companyName || session.user.companyName,

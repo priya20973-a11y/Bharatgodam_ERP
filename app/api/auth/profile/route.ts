@@ -40,6 +40,7 @@ export async function GET() {
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
         coldLanguage: user.coldLanguage || 'en',
+        storageChargeSacCode: user.storageChargeSacCode || null,
       },
     });
   } catch (error: any) {
@@ -78,7 +79,8 @@ export async function PATCH(req: Request) {
       panNumber,
       iecCode,
       termsAndConditions,
-      coldLanguage
+      coldLanguage,
+      storageChargeSacCode
     } = body;
 
     const db = await getDb();
@@ -111,9 +113,13 @@ export async function PATCH(req: Request) {
     const trimmedIec = iecCode ? iecCode.toString().trim().toUpperCase() : '';
     const iecRegex = /^[A-Z0-9]{10}$/;
 
-    const isProfileUpdate = Object.keys(body).some(key => key !== 'coldLanguage');
+    const trimmedSac = storageChargeSacCode ? storageChargeSacCode.toString().trim() : '';
+    const sacRegex = /^[0-9]{6}$/;
 
-    if (isProfileUpdate) {
+    const isProfileUpdate = Object.keys(body).some(key => key !== 'coldLanguage');
+    const isOnlyLogoUpdate = Object.keys(body).length === 1 && body.companyLogo !== undefined;
+
+    if (isProfileUpdate && !isOnlyLogoUpdate) {
       if (isNew) {
         if (!merged.state || !merged.state.toString().trim()) {
           return NextResponse.json({ message: 'State is required.' }, { status: 400 });
@@ -143,6 +149,9 @@ export async function PATCH(req: Request) {
         if (trimmedIec && !iecRegex.test(trimmedIec)) {
           return NextResponse.json({ message: 'Invalid IEC Code format (must be exactly 10 alphanumeric characters).' }, { status: 400 });
         }
+        if (trimmedSac && !sacRegex.test(trimmedSac)) {
+          return NextResponse.json({ message: 'SAC Code must be exactly 6 numeric digits.' }, { status: 400 });
+        }
       } else {
         if (gstNumber !== undefined && trimmedGst && trimmedGst !== 'NA' && !gstRegex.test(trimmedGst)) {
           return NextResponse.json({ message: 'Please enter a valid GSTIN format or NA.' }, { status: 400 });
@@ -153,12 +162,15 @@ export async function PATCH(req: Request) {
         if (iecCode !== undefined && trimmedIec && !iecRegex.test(trimmedIec)) {
           return NextResponse.json({ message: 'Invalid IEC Code format (must be exactly 10 alphanumeric characters).' }, { status: 400 });
         }
+        if (storageChargeSacCode !== undefined && trimmedSac && !sacRegex.test(trimmedSac)) {
+          return NextResponse.json({ message: 'SAC Code must be exactly 6 numeric digits.' }, { status: 400 });
+        }
       }
     }
 
     if (isStaff && isProfileUpdate) {
        // Staff cannot update these WSP fields
-       if (companyName !== undefined || gstNumber !== undefined || panNumber !== undefined || bankName !== undefined || companyLogo !== undefined || address !== undefined || warehouseLocation !== undefined || state !== undefined || invoiceEmail !== undefined || iecCode !== undefined) {
+       if (companyName !== undefined || gstNumber !== undefined || panNumber !== undefined || bankName !== undefined || companyLogo !== undefined || address !== undefined || warehouseLocation !== undefined || state !== undefined || invoiceEmail !== undefined || iecCode !== undefined || storageChargeSacCode !== undefined) {
           // just ignore them or return error
           // to be safe, we will just not add them to updates below
        }
@@ -193,6 +205,7 @@ export async function PATCH(req: Request) {
       if (panNumber !== undefined) updates.panNumber = trimmedPan || null;
       if (iecCode !== undefined) updates.iecCode = trimmedIec || null;
       if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
+      if (storageChargeSacCode !== undefined) updates.storageChargeSacCode = storageChargeSacCode || null;
     }
     if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
@@ -241,6 +254,7 @@ export async function PATCH(req: Request) {
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
         coldLanguage: user.coldLanguage || 'en',
+        storageChargeSacCode: user.storageChargeSacCode || null,
       },
     });
   } catch (error: any) {

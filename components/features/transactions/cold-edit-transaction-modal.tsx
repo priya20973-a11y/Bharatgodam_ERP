@@ -55,7 +55,7 @@ export default function ColdEditTransactionModal({
   const [tableLabel, setTableLabel] = useState('');
   const [jin, setJin] = useState<number | null>(null);
   const [mixed, setMixed] = useState<number | null>(null);
-  const [plusMinus, setPlusMinus] = useState<number | null>(null);
+  const [plusMinus, setPlusMinus] = useState<string | number | null>('-');
   const [truckNo, setTruckNo] = useState('');
   const [weighbridgeSlipNo, setWeighbridgeSlipNo] = useState('');
   const [grossWeight, setGrossWeight] = useState<number | null>(null);
@@ -106,7 +106,7 @@ export default function ColdEditTransactionModal({
       setJin(txn.jin);
       setMixed(txn.mixed);
       if (transactionType === 'OUTWARD') {
-        setPlusMinus(txn.plusMinus);
+        setPlusMinus(txn.plusMinus !== undefined && txn.plusMinus !== null ? txn.plusMinus : '-');
       }
       setTruckNo(txn.truckNo || '');
       setWeighbridgeSlipNo(txn.weighbridgeSlipNo || '');
@@ -314,8 +314,8 @@ export default function ColdEditTransactionModal({
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {transactionType === 'OUTWARD' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-blue-600">Plus/Minus (Kg)</label>
-                  <ColdNumberInput value={plusMinus ?? ''} onChange={(val) => setPlusMinus(val ? Number(val) : null)} />
+                  <label className="text-sm font-medium text-blue-600">Net Weight Change(Kg)</label>
+                  <ColdNumberInput value={plusMinus ?? ''} onChange={(val) => setPlusMinus(val)} />
                 </div>
               )}
               <div className="space-y-2">

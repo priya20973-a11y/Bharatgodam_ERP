@@ -32,6 +32,7 @@ export async function getColdClientLedger(clientId: string) {
     warehouse: t.warehouseId?.name,
     location: `C-${t.chamberNo} / F-${t.floorNo} / S-${t.stackNo}`,
     quantityKg: t.quantityKg,
+    plusMinus: t.type === 'OUTWARD' ? (t.plusMinus || 0) : null,
     totalBags: t.totalBags || t.bagsCount,
     createdAt: t.createdAt
   }));

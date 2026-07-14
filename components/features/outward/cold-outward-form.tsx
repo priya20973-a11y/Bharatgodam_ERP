@@ -80,6 +80,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         bagsCount: inward.bagsCount || null,
         jin: inward.jin || null,
         mixed: inward.mixed || null,
+        plusMinus: '-',
         grossWeight: null,
         emptyWeight: null
       }
@@ -282,12 +283,17 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
             
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - C{item.inward.chamberNo}/F{item.inward.floorNo}/S{item.inward.stackNo} (Available: {(item.inward.availableQty + Number(item.plusMinus || 0)).toFixed(2)} Kg)</h4>
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - C{item.inward.chamberNo}/F{item.inward.floorNo}/S{item.inward.stackNo} (Available: {(() => {
+              const baseQty = Number(item.inward?.availableQty) || 0;
+              const pm = (item.plusMinus === '-' || item.plusMinus === '+') ? 0 : Number(item.plusMinus || 0);
+              const finalQty = baseQty + (isNaN(pm) ? 0 : pm);
+              return finalQty.toFixed(2);
+            })()} Kg)</h4>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Plus/Minus (Kg)</label>
-                <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val ? Number(val) : null)} />
+                <label className="text-sm font-medium text-blue-600">Net Weight Change(Kg)</label>
+                <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-blue-600">{t('outward.quantityKg')} (Gross)</label>

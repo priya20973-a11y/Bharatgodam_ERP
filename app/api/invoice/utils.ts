@@ -39,6 +39,7 @@ function normalizeAdjustmentItems(items: any[]) {
     name: item.name || item.note || 'Additional Charge',
     amount: Number((item.amount ?? item.additionalCharges) || 0),
     note: item.note || '',
+    sacCode: item.sacCode || '',
   }));
 }
 
