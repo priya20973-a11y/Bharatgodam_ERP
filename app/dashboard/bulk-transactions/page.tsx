@@ -6,7 +6,10 @@ export const metadata = {
   description: 'Upload multiple inward and outward transactions using CSV file',
 };
 
-export default function BulkTransactionsPage() {
+import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
+
+export default async function BulkTransactionsPage() {
+  await requireWspPagePermission('bulkUpload');
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">

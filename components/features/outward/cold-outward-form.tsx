@@ -292,7 +292,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Net Weight Change(Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Net Weight Loss(Kg)</label>
                 <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
               </div>
               <div className="space-y-2">

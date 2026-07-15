@@ -477,6 +477,8 @@ export const en: Dictionary = {
     deleteWarehouse: 'Delete Warehouse',
     warehouseCreated: 'Cold Warehouse created',
     warehouseCreationFailed: 'Failed to save cold warehouse',
+    editWarehouse: 'Edit Warehouse',
+    updateWarehouse: 'Update Warehouse',
     addNewWarehouse: 'Add New Cold Storage Warehouse',
     warehouseName: 'Warehouse Name *',
     warehouseNamePlaceholder: 'e.g. Cold Storage A',

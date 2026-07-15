@@ -112,8 +112,8 @@ export default function RevenueDashboard() {
 
   const { summary, warehouseRevenue } = data!;
 
-  const formatDecimal = (value: number) => value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const formatRent = (value: number) => Math.round(value).toLocaleString();
+  const formatDecimal = (value: number) => value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatRent = (value: number) => Math.round(value).toLocaleString('en-IN');
 
   const formatMonthLabel = (monthKey: string) => {
     const [year, month] = monthKey.split('-');
@@ -271,7 +271,7 @@ export default function RevenueDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-slate-900">₹{summary.totalRevenue.toLocaleString()}</div>
+            <div className="text-3xl font-black text-slate-900">₹{summary.totalRevenue.toLocaleString('en-IN')}</div>
             <p className="text-xs text-slate-400 mt-1">Total billing generated across all clients.</p>
           </CardContent>
         </Card>
@@ -283,7 +283,7 @@ export default function RevenueDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-emerald-600">₹{summary.ownerEarnings.toLocaleString()}</div>
+            <div className="text-3xl font-black text-emerald-600">₹{summary.ownerEarnings.toLocaleString('en-IN')}</div>
             <p className="text-xs text-slate-400 mt-1">Net profit disbursed to warehouse operators.</p>
           </CardContent>
         </Card>
@@ -295,7 +295,7 @@ export default function RevenueDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-amber-600">₹{summary.platformCommissions.toLocaleString()}</div>
+            <div className="text-3xl font-black text-amber-600">₹{summary.platformCommissions.toLocaleString('en-IN')}</div>
             <p className="text-xs text-slate-400 mt-1">Management fees and platform service charges.</p>
           </CardContent>
         </Card>

@@ -6,6 +6,8 @@ import { Loader2, Boxes } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
+import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
+
 export const metadata = {
   title: 'Commodity Master Directory | Logistics ERP',
 };
@@ -22,6 +24,7 @@ function TableSkeletonLoader() {
 
 // Data Execution Wrapper Module
 async function DirectoryContainer() {
+  await requireWspPagePermission('commodityMaster');
   const session = await getServerSession(authOptions);
   const role = session?.user?.role?.toString().toUpperCase();
   const isAdminUser = role === 'ADMIN' || role === 'WSP';

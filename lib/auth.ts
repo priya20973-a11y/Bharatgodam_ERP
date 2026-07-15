@@ -79,6 +79,11 @@ export const authOptions: NextAuthOptions = {
             staffId: user._id.toString(),
             isStaff: true,
             permissions: user.permissions || {},
+          } : {}),
+          
+          // WSP specific permissions for Dry Storage
+          ...(user.role === 'WSP' && userForSession.storagePlan !== 'COLD' ? {
+            wspPermissions: userForSession.wspPermissions || {},
           } : {})
         };
       },
@@ -118,6 +123,10 @@ export const authOptions: NextAuthOptions = {
           token.isStaff = true;
           token.permissions = (user as any).permissions;
         }
+        
+        if ((user as any).role === 'WSP' && (user as any).storagePlan !== 'COLD') {
+          token.wspPermissions = (user as any).wspPermissions || {};
+        }
       }
       return token;
     },
@@ -145,6 +154,10 @@ export const authOptions: NextAuthOptions = {
           (session.user as any).staffId = token.staffId;
           (session.user as any).isStaff = true;
           (session.user as any).permissions = token.permissions;
+        }
+        
+        if (token.role === 'WSP' && token.storagePlan !== 'COLD') {
+          (session.user as any).wspPermissions = token.wspPermissions || {};
         }
       }
       return session;

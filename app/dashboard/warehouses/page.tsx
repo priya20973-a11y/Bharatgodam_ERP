@@ -5,7 +5,10 @@ export const metadata = {
   title: 'Warehouse Master | ERP',
 };
 
+import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
+
 export default async function WarehousesPage() {
+  await requireWspPagePermission('warehouseMaster');
   const warehouses = await getWarehouses({ includeInactive: true });
 
   return (

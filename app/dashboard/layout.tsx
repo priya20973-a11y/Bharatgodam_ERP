@@ -21,6 +21,18 @@ export default async function DashboardLayout({
     redirect('/cold/dashboard');
   }
 
+  // Inject fresh WSP permissions into the session from DB so the sidebar reflects changes immediately
+  const user = session.user as any;
+  if (user.role === 'WSP' && user.storagePlan !== 'COLD' && !user.isStaff) {
+    const { getDb } = await import('@/lib/mongodb');
+    const { ObjectId } = await import('mongodb');
+    const db = await getDb();
+    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
+    if (dbUser) {
+      user.wspPermissions = dbUser.wspPermissions || {};
+    }
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
       {/* Persistent Sidebar */}

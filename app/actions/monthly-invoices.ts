@@ -1,8 +1,10 @@
 'use server';
 
 import { getDb } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 import { formatTimeStateForDisplay } from '@/lib/ledger-time-state-engine';
 import { calculateStorageDays } from '@/lib/storage-engine';
 
@@ -81,6 +83,7 @@ export interface MonthlyInvoiceData {
  * Groups time-state periods by month to create monthly invoices
  */
 export async function getClientMonthlyInvoicesTimeState(clientName: string) {
+  await requireWspActionPermission('invoice');
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -211,6 +214,7 @@ export async function recordMonthlyPayment(
   paymentMethod?: string,
   referenceNumber?: string
 ) {
+  await requireWspActionPermission('invoice');
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {

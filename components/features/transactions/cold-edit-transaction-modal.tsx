@@ -314,7 +314,7 @@ export default function ColdEditTransactionModal({
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {transactionType === 'OUTWARD' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-blue-600">Net Weight Change(Kg)</label>
+                  <label className="text-sm font-medium text-blue-600">Net Weight Loss(Kg)</label>
                   <ColdNumberInput value={plusMinus ?? ''} onChange={(val) => setPlusMinus(val)} />
                 </div>
               )}

@@ -13,6 +13,7 @@ import { calculateRent } from '@/lib/pricing-engine';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 
 async function createTransactionSession() {
   const dbConnection = await connectToDatabase();
@@ -288,7 +289,11 @@ export async function processInward(data: {
   gatePass?: string;
   date?: string | Date;
   outwardDate: string | Date;
+  isColdStorage?: boolean;
 }) {
+  if (!data.isColdStorage) {
+    await requireWspActionPermission('inward');
+  }
   const authSession = await requireSession();
   const session = await createTransactionSession();
   const createOptions: { session: mongoose.ClientSession } | undefined = session ? { session } : undefined;
@@ -461,7 +466,11 @@ export async function processOutward(data: {
   lotNo?: string;
   gatePass?: string;
   date?: string | Date;
+  isColdStorage?: boolean;
 }) {
+  if (!data.isColdStorage) {
+    await requireWspActionPermission('outward');
+  }
   const authSession = await requireSession();
   const session = await createTransactionSession();
 

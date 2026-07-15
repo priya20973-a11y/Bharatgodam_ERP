@@ -134,6 +134,54 @@ export async function createColdWarehouse(data: {
   }
 }
 
+export async function updateColdWarehouse(id: string, data: Partial<{
+  name: string;
+  address: string;
+  referencePersons: any[];
+}>) {
+  await connectToDatabase();
+  try {
+    const session = await requireSession();
+    if (!hasPermission(session, 'warehouse', 'edit')) throw new Error('Forbidden: Insufficient permissions');
+    
+    // Fetch warehouse first
+    const warehouse = await ColdWarehouse.findOne({ _id: id, ...getTenantFilter(session) });
+    if (!warehouse) {
+      throw new Error('Cold Warehouse not found');
+    }
+
+    if (data.name) {
+      const email = session.user.email?.trim().toLowerCase() || null;
+      const ownerFilter: any = {
+        $or: [
+          { userId: session.user.id },
+          ...(email ? [{ userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } } ] : [])
+        ]
+      };
+      
+      const duplicate = await ColdWarehouse.findOne({
+        ...ownerFilter,
+        name: data.name,
+        _id: { $ne: id }
+      });
+      if (duplicate) {
+        return { success: false, error: 'Cold Warehouse name already exists for this WSP.' };
+      }
+    }
+
+    // Only allow specific updates to avoid corrupting stack layouts/hierarchy
+    if (data.name) warehouse.name = data.name;
+    if (data.address) warehouse.address = data.address;
+    if (data.referencePersons) warehouse.referencePersons = data.referencePersons as any;
+
+    await warehouse.save();
+    revalidatePath('/cold/dashboard/warehouses');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function toggleColdWarehouseStatus(id: string) {
   await connectToDatabase();
   try {

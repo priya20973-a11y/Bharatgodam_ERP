@@ -9,6 +9,7 @@ import Outward from '@/lib/models/Outward';
 import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 
 const DEFAULT_CLIENT_PASSWORD = '123456';
 
@@ -171,6 +172,7 @@ export async function createClient(data: {
   commodityIds?: string[];
   email?: string;
 }, isColdStorage: boolean = false) {
+  await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
     if (!data.state || !data.state.trim()) {
@@ -284,6 +286,7 @@ export async function updateClient(id: string, data: Partial<{
   state?: string;
   commodityIds?: string[];
 }>, isColdStorage: boolean = false) {
+  await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
     const validationError = validateClientData(data as any, isColdStorage);
@@ -398,6 +401,7 @@ export async function updateClient(id: string, data: Partial<{
 }
 
 export async function deleteClient(id: string) {
+  await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();

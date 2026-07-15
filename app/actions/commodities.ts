@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 
 export async function fetchCommodities() {
   await connectToDatabase();
@@ -38,6 +39,7 @@ export async function fetchCommodities() {
 }
 
 export async function addCommodity(data: { name: string; ratePerMtPerDay: number }) {
+  await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -77,6 +79,7 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
 }
 
 export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number }) {
+  await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -121,6 +124,7 @@ export async function updateCommodity(id: string, data: { name: string; ratePerM
 }
 
 export async function deleteCommodity(id: string) {
+  await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();

@@ -8,7 +8,10 @@ export const metadata = {
   title: 'Inward Transaction | ERP',
 };
 
+import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
+
 export default async function InwardPage() {
+  await requireWspPagePermission('inward');
   const [clients, commodities, warehouses] = await Promise.all([
     getClients(),
     fetchCommodities(),

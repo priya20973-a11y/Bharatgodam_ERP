@@ -10,13 +10,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Power, Trash2 } from "lucide-react";
+import { Power, Trash2, Pencil } from "lucide-react";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 interface ColdWarehouseListProps {
   warehouses: any[];
   onToggleStatus?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (warehouse: any) => void;
   isAdmin?: boolean;
 }
 
@@ -24,6 +25,7 @@ export default function ColdWarehouseList({
   warehouses, 
   onToggleStatus, 
   onDelete, 
+  onEdit,
   isAdmin 
 }: ColdWarehouseListProps) {
   const { t, formatNumber } = useColdTranslation();
@@ -69,6 +71,17 @@ export default function ColdWarehouseList({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end items-center gap-1">
+                      {onEdit && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          title={t('warehouses.editWarehouse') || 'Edit Warehouse'}
+                          className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all rounded-full h-8 w-8"
+                          onClick={() => onEdit(w)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       {onToggleStatus && (
                         <Button 
                           variant="ghost" 

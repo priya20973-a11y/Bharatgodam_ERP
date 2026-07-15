@@ -6,7 +6,10 @@ export const metadata = {
   title: 'Client Master | ERP',
 };
 
+import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
+
 export default async function ClientsPage() {
+  await requireWspPagePermission('clientMaster');
   const [clients, commodities] = await Promise.all([getClients(), fetchCommodities()]);
 
   return (

@@ -3,28 +3,33 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail } from 'lucide-react';
+import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail, Layers, Shield } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import type { Session } from 'next-auth';
+import { hasWspPermission, WspModuleId } from '@/lib/wsp-permissions';
 
-const wspNavItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+type NavItem = { name: string; href: string; icon: any; moduleId?: WspModuleId };
+
+const wspNavItems: NavItem[] = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleId: 'dashboard' },
   { name: 'Profile', href: '/dashboard/profile', icon: Settings },
-  { name: 'Warehouse Master', href: '/dashboard/warehouses', icon: Box },
-  { name: 'Commodity Master', href: '/dashboard/commodities', icon: Package },
-  { name: 'Client Master', href: '/dashboard/clients', icon: Users },
-  { name: 'Inward Transaction', href: '/dashboard/inward', icon: ArrowDownToLine },
-  { name: 'Outward Transaction', href: '/dashboard/outward', icon: ArrowUpFromLine },
-  { name: 'Bulk Upload', href: '/dashboard/bulk-transactions', icon: Upload },
-  { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
-  { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
-  { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
-  { name: 'Revenue split for Storage Charges', href: '/dashboard/revenue', icon: DollarSign },
+  { name: 'Warehouse Master', href: '/dashboard/warehouses', icon: Box, moduleId: 'warehouseMaster' },
+  { name: 'Commodity Master', href: '/dashboard/commodities', icon: Package, moduleId: 'commodityMaster' },
+  { name: 'Client Master', href: '/dashboard/clients', icon: Users, moduleId: 'clientMaster' },
+  { name: 'Warehouse Inventory', href: '/dashboard/warehouse', icon: Layers, moduleId: 'warehouseInventory' },
+  { name: 'Inward Transaction', href: '/dashboard/inward', icon: ArrowDownToLine, moduleId: 'inward' },
+  { name: 'Outward Transaction', href: '/dashboard/outward', icon: ArrowUpFromLine, moduleId: 'outward' },
+  { name: 'Bulk Upload', href: '/dashboard/bulk-transactions', icon: Upload, moduleId: 'bulkUpload' },
+  { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2, moduleId: 'transactionReport' },
+  { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt, moduleId: 'invoice' },
+  { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText, moduleId: 'ledger' },
+  { name: 'Revenue split for Storage Charges', href: '/dashboard/revenue', icon: DollarSign, moduleId: 'revenueSplit' },
 ];
 
 const adminNavItems = [
   { name: 'Cold Storage', href: '/cold/dashboard', icon: LayoutDashboard },
   { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
+  { name: 'WSP Permissions', href: '/admin/wsp-permissions', icon: Shield },
   // { name: 'Invoice Download', href: '/admin/invoices', icon: Receipt },
   { name: 'Signup Requests', href: '/admin/signup-requests', icon: Mail },
 ];
@@ -44,17 +49,27 @@ export default function Sidebar({ session }: SidebarProps) {
   // If client user, only show a minimal set of pages relevant to clients
   const clientNavItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Warehouse Inventory', href: '/dashboard/warehouse', icon: Layers },
     { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
     { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
     { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
   ];
 
   const wspItemsForAdmin = wspNavItems.filter((item) => item.name !== 'Profile');
+  
+  // Filter WSP items based on permissions
+  const filteredWspNavItems = wspNavItems.filter(item => {
+    if (item.moduleId) {
+      return hasWspPermission(session, item.moduleId);
+    }
+    return true; // Profile has no moduleId, always show
+  });
+
   const allNavItems = isAdmin
     ? [...wspItemsForAdmin, ...adminNavItems]
     : isClientUser
       ? clientNavItems
-      : wspNavItems;
+      : filteredWspNavItems;
 
   return (
     <>

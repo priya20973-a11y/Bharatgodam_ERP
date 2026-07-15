@@ -5,6 +5,7 @@ import { getTenantFilterForMongo, appendOwnership, requireSession } from '@/lib/
 import { ObjectId } from 'mongodb';
 import { buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
 import type { IDetailedBooking, IClient, IInvoiceMaster, IInvoiceLineItem, IWarehouse } from '@/types/schemas';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 
 export interface ReportFilter {
   startDate?: string;
@@ -55,6 +56,7 @@ type ReportRow = ReportRecord & {
 };
 
 export async function getFilteredBookings(filters: ReportFilter = {}) {
+  await requireWspActionPermission('transactionReport');
   try {
     const session = await requireSession();
     const db = await getDb();
@@ -1095,6 +1097,7 @@ export async function recordPayment(
   notes?: string,
   allocations: PaymentAllocationDetail[] = []
 ) {
+  await requireWspActionPermission('invoice');
   try {
     const session = await requireSession();
     const db = await getDb();

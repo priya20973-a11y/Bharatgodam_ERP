@@ -15,6 +15,15 @@ export async function GET(request: Request) {
     const tenantFilter = getTenantFilterForMongo(session);
     const { searchParams } = new URL(request.url);
     const requestedWarehouseId = searchParams.get('warehouseId');
+    const month = searchParams.get('month');
+    
+    let dateFilter = {};
+    if (month && month !== 'ALL') {
+      const [year, m] = month.split('-');
+      const lastDay = new Date(Number(year), Number(m), 0).getDate();
+      const monthEnd = new Date(`${year}-${m}-${String(lastDay).padStart(2, '0')}T23:59:59.999Z`);
+      dateFilter = { date: { $lte: monthEnd } };
+    }
 
     const db = await getDb();
     const warehouseCollection = db.collection('warehouses');
@@ -60,7 +69,8 @@ export async function GET(request: Request) {
       {
         $match: {
           warehouseId: warehouse._id.toString(),
-          ...tenantFilter
+          ...tenantFilter,
+          ...dateFilter
         }
       },
       {

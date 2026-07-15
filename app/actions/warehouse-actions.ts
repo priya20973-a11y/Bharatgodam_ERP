@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession, isAdmin } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import mongoose from 'mongoose';
+import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 
 export async function getWarehouses(options?: { includeInactive?: boolean }) {
   await connectToDatabase();
@@ -60,6 +61,7 @@ export async function createWarehouse(data: {
   address: string;
   totalCapacity: number;
 }) {
+  await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -100,6 +102,7 @@ export async function updateWarehouse(id: string, data: Partial<{
   totalCapacity: number;
   status: string;
 }>) {
+  await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -157,6 +160,7 @@ export async function updateWarehouse(id: string, data: Partial<{
 }
 
 export async function toggleWarehouseStatus(id: string) {
+  await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -184,6 +188,7 @@ export async function toggleWarehouseStatus(id: string) {
 }
 
 export async function deleteWarehouse(id: string) {
+  await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
   try {
     const session = await requireSession();

@@ -13,6 +13,7 @@ export default function ColdWarehouseWrapper({ initialColdWarehouses, isAdmin }:
   const { t } = useColdTranslation();
   const [coldWarehouses, setColdWarehouses] = useState(initialColdWarehouses);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
 
   const refreshData = async () => {
     try {
@@ -22,6 +23,7 @@ export default function ColdWarehouseWrapper({ initialColdWarehouses, isAdmin }:
       toast.error(err.message || 'Failed to refresh warehouses');
     }
     setIsAdding(false);
+    setEditingWarehouse(null);
   };
 
   const handleToggleStatus = async (id: string) => {
@@ -68,17 +70,25 @@ export default function ColdWarehouseWrapper({ initialColdWarehouses, isAdmin }:
         <h2 className="text-xl font-semibold">{t('warehouses.registeredWarehouses')}</h2>
         <Button 
           onClick={() => {
-            setIsAdding(!isAdding);
+            if (editingWarehouse) {
+              setEditingWarehouse(null);
+            } else {
+              setIsAdding(!isAdding);
+            }
           }}
-          variant={isAdding ? "outline" : "default"}
+          variant={(isAdding || editingWarehouse) ? "outline" : "default"}
         >
-          {isAdding ? <><X className="mr-2 h-4 w-4" /> {t('common.cancel')}</> : <><Plus className="mr-2 h-4 w-4" /> {t('warehouses.addWarehouse')}</>}
+          {(isAdding || editingWarehouse) ? <><X className="mr-2 h-4 w-4" /> {t('common.cancel')}</> : <><Plus className="mr-2 h-4 w-4" /> {t('warehouses.addWarehouse')}</>}
         </Button>
       </div>
 
-      {isAdding && (
+      {(isAdding || editingWarehouse) && (
         <div className="mb-6">
-          <ColdWarehouseForm onSuccess={refreshData} />
+          <ColdWarehouseForm 
+            onSuccess={refreshData} 
+            initialData={editingWarehouse} 
+            onCancel={() => { setIsAdding(false); setEditingWarehouse(null); }}
+          />
         </div>
       )}
 
@@ -86,6 +96,11 @@ export default function ColdWarehouseWrapper({ initialColdWarehouses, isAdmin }:
         warehouses={coldWarehouses} 
         onToggleStatus={handleToggleStatus}
         onDelete={handleDelete}
+        onEdit={(w) => {
+          setEditingWarehouse(w);
+          setIsAdding(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         isAdmin={isAdmin}
       />
     </div>
