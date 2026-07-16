@@ -32,6 +32,16 @@ export async function GET(request: NextRequest) {
         .populate('clientId', 'name address village')
         .populate('commodityId', 'name type')
         .populate('warehouseId');
+        
+      if (transaction && transaction.stackAllocations) {
+        transaction = JSON.parse(JSON.stringify(transaction));
+        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => ({
+          chamberNo: a.chamberNo,
+          floorNo: a.floorNo,
+          stackNo: a.stackNo,
+          quantityKg: a.allocatedWeight
+        }));
+      }
     } else {
       if (batchId) {
         transactions = await ColdOutward.find({ batchId, ...getTenantFilter(session) })

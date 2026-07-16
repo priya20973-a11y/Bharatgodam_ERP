@@ -27,8 +27,8 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     // Get all inwards for this floor
     const inwards = await ColdInward.find({
       warehouseId,
-      chamberNo,
-      floorNo,
+      'stackAllocations.chamberNo': chamberNo,
+      'stackAllocations.floorNo': floorNo,
       ...tenantFilter
     }).populate('commodityId', 'name type').lean();
 
@@ -55,22 +55,27 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
 
     // Process inwards
     inwards.forEach((inward: any) => {
-      const s = stacksMap.get(inward.stackNo);
-      if (s) {
-        s.usedCapacity += inward.quantityKg;
-        
-        if (inward.farmerName) s.clients.add(inward.farmerName);
-        else if (inward.referencePersons && inward.referencePersons.length > 0) {
-          inward.referencePersons.forEach((rp: any) => s.clients.add(rp.name));
+      if (!inward.stackAllocations) return;
+      inward.stackAllocations.forEach((alloc: any) => {
+        if (alloc.chamberNo === chamberNo && alloc.floorNo === floorNo) {
+          const s = stacksMap.get(alloc.stackNo);
+          if (s) {
+            s.usedCapacity += alloc.allocatedWeight;
+            
+            if (inward.farmerName) s.clients.add(inward.farmerName);
+            else if (inward.referencePersons && inward.referencePersons.length > 0) {
+              inward.referencePersons.forEach((rp: any) => s.clients.add(rp.name));
+            }
+
+            const type = inward.commodityId?.type ? ` (${inward.commodityId.type})` : '';
+            const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
+            const commodityDisplay = `${inward.commodityId?.name || 'Unknown'}${type}${gradeOrWet}`;
+
+            const currentQty = s.commodities.get(commodityDisplay) || 0;
+            s.commodities.set(commodityDisplay, currentQty + alloc.allocatedWeight);
+          }
         }
-
-        const type = inward.commodityId?.type ? ` (${inward.commodityId.type})` : '';
-        const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
-        const commodityDisplay = `${inward.commodityId?.name || 'Unknown'}${type}${gradeOrWet}`;
-
-        const currentQty = s.commodities.get(commodityDisplay) || 0;
-        s.commodities.set(commodityDisplay, currentQty + inward.quantityKg);
-      }
+      });
     });
 
     // Process outwards
@@ -153,7 +158,13 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
     const stack = floor?.stacks.find((s: any) => Number(s.stackNo) === Number(stackNo));
     if (!stack) throw new Error(`Stack ${stackNo} not found in Chamber ${chamberNo}, Floor ${floorNo}`);
 
-    const inwards = await ColdInward.find({ warehouseId, chamberNo, floorNo, stackNo, ...tenantFilter })
+    const inwards = await ColdInward.find({ 
+      warehouseId, 
+      'stackAllocations.chamberNo': chamberNo, 
+      'stackAllocations.floorNo': floorNo, 
+      'stackAllocations.stackNo': stackNo, 
+      ...tenantFilter 
+    })
       .populate('commodityId', 'name type')
       .populate('clientId', 'name')
       .lean();
@@ -170,7 +181,10 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
     const activeStocksMap = new Map<string, any>();
 
     inwards.forEach((inward: any) => {
-      usedCapacity += inward.quantityKg;
+      const alloc = inward.stackAllocations?.find((a: any) => a.chamberNo === chamberNo && a.floorNo === floorNo && a.stackNo === stackNo);
+      if (!alloc) return;
+
+      usedCapacity += alloc.allocatedWeight;
       
       const clientName = inward.clientId?.name;
       if (clientName) clients.add(clientName);
@@ -187,23 +201,23 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
       const commodityDisplay = `${inward.commodityId?.name || 'Unknown'}${type}${gradeOrWet}`;
 
       const currentQty = commodities.get(commodityDisplay) || 0;
-      commodities.set(commodityDisplay, currentQty + inward.quantityKg);
+      commodities.set(commodityDisplay, currentQty + alloc.allocatedWeight);
 
       activeStocksMap.set(inward._id.toString(), {
         id: inward._id.toString(),
         client: inward.clientId?.name || 'Unknown',
         farmer: inward.farmerName || '-',
         commodity: commodityDisplay,
-        quantity: inward.quantityKg,
+        quantity: alloc.allocatedWeight,
         truckNo: inward.truckNo || '-',
         date: inward.createdAt,
         referencePersons: inward.referencePersons && inward.referencePersons.length > 0 
           ? inward.referencePersons.map((rp: any) => rp.name).join(', ') 
           : '-',
-        largeBags: inward.bagsCount || 0,
+        largeBags: alloc.bagsCount || 0,
         smallBags: inward.jin || 0,
         mixedBags: inward.mixed || 0,
-        totalBags: inward.totalBags || ((inward.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0)),
+        totalBags: (alloc.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0),
       });
 
       transactions.push({
@@ -212,7 +226,7 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
         type: 'INWARD',
         receiptNo: inward.weighbridgeSlipNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`,
         commodity: commodityDisplay,
-        quantity: inward.quantityKg,
+        quantity: alloc.allocatedWeight,
         client: inward.clientId?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown'
       });
     });

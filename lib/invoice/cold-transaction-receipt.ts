@@ -58,7 +58,10 @@ export function generateColdTransactionReceiptHTML(
   const netWeight = formatNum(data.quantityKg || 0); // Net weight is stored as quantityKg
 
   // Format Kata Bharati safely
-  const kataBharatiRaw = data.kataBharati || 0;
+  let kataBharatiRaw = data.kataBharati || 0;
+  if (!kataBharatiRaw && data.totalBags > 0 && data.quantityKg) {
+    kataBharatiRaw = data.quantityKg / data.totalBags;
+  }
   const kataBharatiStr = Number.isInteger(kataBharatiRaw) ? kataBharatiRaw.toString() : kataBharatiRaw.toFixed(3);
   const kataBharati = formatNum(kataBharatiStr);
 
@@ -252,6 +255,21 @@ export function generateColdTransactionReceiptHTML(
       color: #333;
     }
     
+    .stack-table th {
+      border: 1px solid #8b5a2b;
+      padding: 6px;
+      font-size: 13px;
+      background: #fdfbf7;
+      color: #9e2a2b;
+      text-align: center;
+    }
+    
+    .stack-table td {
+      text-align: center !important;
+      color: #333 !important;
+      width: auto !important;
+    }
+    
     .footer-note {
       margin-top: 20px;
       font-size: 12px;
@@ -372,19 +390,30 @@ export function generateColdTransactionReceiptHTML(
           <div class="form-value">${wbSlip}</div>
         </div>
         
-        <table class="data-table" style="margin-top: 15px;">
+        <table class="data-table stack-table" style="margin-top: 15px;">
           <tr>
-            <td>${l.chamberNoLabel}</td>
-            <td>${chamber}</td>
+            <th>${l.chamberNoLabel}</th>
+            <th>${l.floorNoLabel}</th>
+            <th>${l.stackNoLabel}</th>
+            <th>${l.netWeightLabel}</th>
           </tr>
-          <tr>
-            <td>${l.floorNoLabel}</td>
-            <td>${floor}</td>
-          </tr>
-          <tr>
-            <td>${l.stackNoLabel}</td>
-            <td>${stack}</td>
-          </tr>
+          ${data.stacksInfo && data.stacksInfo.length > 0 ? 
+            data.stacksInfo.map((s: any) => `
+            <tr>
+              <td>${formatNum(s.chamberNo)}</td>
+              <td>${formatNum(s.floorNo)}</td>
+              <td>${formatNum(s.stackNo)}</td>
+              <td>${formatNum(s.quantityKg)}</td>
+            </tr>
+            `).join('')
+          : `
+            <tr>
+              <td>${chamber}</td>
+              <td>${floor}</td>
+              <td>${stack}</td>
+              <td>${netWeight}</td>
+            </tr>
+          `}
         </table>
       </div>
       

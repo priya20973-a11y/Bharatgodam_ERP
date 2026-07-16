@@ -4,6 +4,7 @@ import connectToDatabase from '@/lib/mongoose';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdOutward from '@/lib/models/ColdOutward';
+import ColdInwardDraft from '@/lib/models/ColdInwardDraft';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
@@ -42,12 +43,15 @@ export async function getStackAvailableCapacity(warehouseId: string, chamberNo: 
 
   const inwards = await ColdInward.aggregate([
     {
+      $unwind: '$stackAllocations'
+    },
+    {
       $match: {
         $and: [
           { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-          { chamberNo },
-          { floorNo },
-          { stackNo },
+          { 'stackAllocations.chamberNo': chamberNo },
+          { 'stackAllocations.floorNo': floorNo },
+          { 'stackAllocations.stackNo': stackNo },
           getTenantFilter(session)
         ]
       }
@@ -55,7 +59,7 @@ export async function getStackAvailableCapacity(warehouseId: string, chamberNo: 
     {
       $group: {
         _id: null,
-        totalInward: { $sum: '$quantityKg' }
+        totalInward: { $sum: '$stackAllocations.allocatedWeight' }
       }
     }
   ]);
@@ -114,6 +118,133 @@ export async function createColdInward(data: any) {
     
     revalidatePath('/cold/inward');
     return { success: true, data: JSON.parse(JSON.stringify(inward)) };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveColdInwardDraft(formData: any, draftId?: string) {
+  await connectToDatabase();
+  try {
+    const session = await requireSession();
+    if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
+
+    if (draftId) {
+      await ColdInwardDraft.findOneAndUpdate(
+        { _id: draftId, ...getTenantFilter(session) },
+        { formData, updatedAt: new Date() }
+      );
+      return { success: true, draftId };
+    } else {
+      const draft = await ColdInwardDraft.create(appendOwnership({
+        formData
+      }, session));
+      return { success: true, draftId: draft._id.toString() };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getColdInwardDrafts() {
+  await connectToDatabase();
+  const session = await requireSession();
+  
+  const drafts = await ColdInwardDraft.find(getTenantFilter(session))
+    .sort({ updatedAt: -1 });
+    
+  return JSON.parse(JSON.stringify(drafts));
+}
+
+export async function deleteColdInwardDraft(draftId: string) {
+  await connectToDatabase();
+  try {
+    const session = await requireSession();
+    if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
+
+    await ColdInwardDraft.findOneAndDelete({ _id: draftId, ...getTenantFilter(session) });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createColdInwardBulk(data: any, draftId?: string) {
+  await connectToDatabase();
+  try {
+    const session = await requireSession();
+    if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
+    
+    // We will start a MongoDB session for transaction if possible, but let's just do sequential for now as some MongoDB setups in this app might not use replica sets.
+    const createdInwards = [];
+    const clientReceiptMap: Record<string, string[]> = {};
+
+    // First validate ALL capacities
+    for (const client of data.clients) {
+      for (const stack of client.stacks) {
+        const capacityInfo = await getStackAvailableCapacity(data.warehouseId, parseInt(stack.chamberNo), parseInt(stack.floorNo), parseInt(stack.stackNo));
+        if (stack.allocatedWeight > capacityInfo.availableCapacity) {
+          throw new Error(`Quantity exceeds available stack capacity in Chamber ${stack.chamberNo}, Floor ${stack.floorNo}, Stack ${stack.stackNo}. Available: ${capacityInfo.availableCapacity} Kg`);
+        }
+      }
+    }
+
+    // Now insert
+    for (const client of data.clients) {
+      if (client.grade === '') {
+        delete client.grade;
+      }
+
+      const stackAllocations = client.stacks.map((s: any) => ({
+        chamberNo: parseInt(s.chamberNo),
+        floorNo: parseInt(s.floorNo),
+        stackNo: parseInt(s.stackNo),
+        allocatedWeight: Number(s.allocatedWeight) || 0,
+        bagsCount: Number(s.allocatedBags) || 0,
+      }));
+      
+      const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
+      const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + s.bagsCount, 0);
+
+      const inwardData = {
+        ...data.common,
+        clientId: client.clientId,
+        commodityId: client.commodityId,
+        grade: client.grade,
+        gradingType: client.gradingType,
+        stackAllocations,
+        quantityKg: totalQuantity,
+        bagsCount: totalAllocatedBags,
+        jin: client.jin || 0,
+        mixed: client.mixed || 0,
+        totalBags: totalAllocatedBags + (client.jin || 0) + (client.mixed || 0),
+        grossWeight: client.grossWeight || totalQuantity,
+        emptyWeight: client.emptyWeight || 0,
+        kataBharati: client.kataBharati,
+        marko: client.marko,
+        referencePersons: client.referencePersons,
+        warehouseId: data.warehouseId,
+      };
+      
+      const inward = await ColdInward.create(appendOwnership({
+        ...inwardData,
+        date: data.common.date ? new Date(data.common.date) : new Date(),
+      }, session));
+      
+      createdInwards.push(inward);
+      
+      if (!clientReceiptMap[client.clientId]) {
+        clientReceiptMap[client.clientId] = [];
+      }
+      clientReceiptMap[client.clientId].push(inward._id.toString());
+    }
+    
+    if (draftId) {
+      await ColdInwardDraft.findOneAndDelete({ _id: draftId, ...getTenantFilter(session) });
+    }
+
+    revalidatePath('/cold/inward');
+    return { success: true, createdIds: createdInwards.map(i => i._id.toString()), clientReceiptMap };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
