@@ -84,9 +84,10 @@ export async function generateColdClientInvoicePreview(
     if (days <= 0) continue; // No days to bill
 
     // Get pricing from commodity
-    const month = startCalcDate.getMonth() + 1; // 1-12
-    const seasonalPrice = commodity.seasonalPrices?.find((sp: any) => sp.fromMonth <= month && sp.toMonth >= month) 
-                          || commodity.seasonalPrices?.[0];
+    const startCalcTime = startCalcDate.getTime();
+    const seasonalPrice = commodity.seasonalPrices?.find((sp: any) => 
+      startCalcTime >= new Date(sp.fromDate).getTime() && startCalcTime <= new Date(sp.toDate).getTime()
+    ) || commodity.seasonalPrices?.[0];
 
     const pricePerKg = seasonalPrice?.pricePerKg || 0;
     let rent = 0;

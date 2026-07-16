@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ISeasonalPrice {
-  fromMonth: number; // 1-12
-  toMonth: number;   // 1-12
+  fromDate: Date;
+  toDate: Date;
   pricePerKg?: number;
   priceLarge?: number;
   priceSmall?: number;
@@ -24,8 +24,8 @@ export interface IColdCommodity extends Document {
 
 const SeasonalPriceSchema = new Schema<ISeasonalPrice>(
   {
-    fromMonth: { type: Number, required: true, min: 1, max: 12 },
-    toMonth: { type: Number, required: true, min: 1, max: 12 },
+    fromDate: { type: Date, required: true },
+    toDate: { type: Date, required: true },
     pricePerKg: { type: Number, required: false, min: 0.01 },
     priceLarge: { type: Number, required: false, min: 0.01 },
     priceSmall: { type: Number, required: false, min: 0.01 },
@@ -51,7 +51,11 @@ const ColdCommoditySchema: Schema = new Schema(
 // Ensure a user can't create two cold commodities with the exact same name AND type
 ColdCommoditySchema.index({ userId: 1, name: 1, type: 1 }, { unique: true });
 
+if (mongoose.models.ColdCommodity) {
+  delete mongoose.models.ColdCommodity;
+}
+
 const ColdCommodity: Model<IColdCommodity> =
-  mongoose.models.ColdCommodity || mongoose.model<IColdCommodity>('ColdCommodity', ColdCommoditySchema);
+  mongoose.model<IColdCommodity>('ColdCommodity', ColdCommoditySchema);
 
 export default ColdCommodity;

@@ -1,4 +1,4 @@
-import { getColdInwards } from '@/app/actions/cold-inward-actions';
+import { getColdInwards, getColdInwardDrafts } from '@/app/actions/cold-inward-actions';
 import { getColdWarehouses } from '@/app/actions/cold-warehouse-actions';
 import { getClients } from '@/app/actions/client-actions';
 import { fetchColdCommodities } from '@/app/actions/cold-commodities';
@@ -9,8 +9,9 @@ export const metadata = {
 };
 
 export default async function ColdInwardsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const [inwards, warehouses, clients, commodities] = await Promise.all([
+  const [inwards, drafts, warehouses, clients, commodities] = await Promise.all([
     getColdInwards(),
+    getColdInwardDrafts(),
     getColdWarehouses({ includeInactive: false }),
     getClients(),
     fetchColdCommodities()
@@ -20,6 +21,7 @@ export default async function ColdInwardsPage({ searchParams }: { searchParams: 
     <div className="space-y-6">
       <ColdInwardWrapper 
         initialInwards={inwards} 
+        initialDrafts={drafts}
         clients={clients} 
         commodities={commodities} 
         warehouses={warehouses} 

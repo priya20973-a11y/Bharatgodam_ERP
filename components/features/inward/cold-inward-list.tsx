@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import {
   Table,
   TableBody,
@@ -18,6 +19,8 @@ interface ColdInwardListProps {
 
 export default function ColdInwardList({ inwards }: ColdInwardListProps) {
   const { t, formatNumber } = useColdTranslation();
+
+  const groupedInwards = inwards;
 
   return (
     <div className="rounded-md border bg-white shadow-sm overflow-hidden">
@@ -38,14 +41,14 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {inwards.length === 0 ? (
+          {groupedInwards.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={11} className="h-24 text-center text-slate-500">
                 {t('inward.noInwardFound')}
               </TableCell>
             </TableRow>
           ) : (
-            inwards.map((w) => {
+            groupedInwards.map((w) => {
               const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
               return (
                 <TableRow key={w._id.toString()} className="hover:bg-slate-50/50 transition-colors">
@@ -58,9 +61,15 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   </TableCell>
                   <TableCell className="text-slate-700">{commodityDisplay}</TableCell>
                   <TableCell className="text-slate-700">{w.warehouseId?.name || '-'}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(w.chamberNo)}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(w.floorNo)}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(w.stackNo)}</TableCell>
+                  <TableCell className="text-right text-slate-700">
+                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.chamberNo)}</div>) || formatNumber(w.chamberNo)}
+                  </TableCell>
+                  <TableCell className="text-right text-slate-700">
+                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.floorNo)}</div>) || formatNumber(w.floorNo)}
+                  </TableCell>
+                  <TableCell className="text-right text-slate-700">
+                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.stackNo)}</div>) || formatNumber(w.stackNo)}
+                  </TableCell>
                   <TableCell className="text-slate-700">
                     {w.gradingType || '-'}
                   </TableCell>

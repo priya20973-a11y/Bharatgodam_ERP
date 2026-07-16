@@ -66,16 +66,26 @@ export async function GET(request: NextRequest) {
 
     // 4. Query Inwards & Outwards based on filters
     const filterQuery: any = { warehouseId: selectedWarehouse._id };
-    if (activeChamber) filterQuery.chamberNo = activeChamber.chamberNo;
-    if (activeFloor) filterQuery.floorNo = activeFloor.floorNo;
+    if (activeChamber) filterQuery['stackAllocations.chamberNo'] = activeChamber.chamberNo;
+    if (activeFloor) filterQuery['stackAllocations.floorNo'] = activeFloor.floorNo;
+
+    const outwardFilterQuery: any = { warehouseId: selectedWarehouse._id };
+    if (activeChamber) outwardFilterQuery.chamberNo = activeChamber.chamberNo;
+    if (activeFloor) outwardFilterQuery.floorNo = activeFloor.floorNo;
 
     const [inwards, outwards] = await Promise.all([
       ColdInward.aggregate([
+        { $unwind: '$stackAllocations' },
         { $match: filterQuery },
-        { $group: { _id: '$commodityId', totalKg: { $sum: '$quantityKg' }, count: { $sum: 1 } } }
+        { $group: { 
+            _id: '$commodityId', 
+            totalKg: { $sum: '$stackAllocations.allocatedWeight' }, 
+            uniqueInwards: { $addToSet: '$_id' } 
+        }},
+        { $addFields: { count: { $size: '$uniqueInwards' } } }
       ]),
       ColdOutward.aggregate([
-        { $match: filterQuery },
+        { $match: outwardFilterQuery },
         { $group: { _id: '$commodityId', totalKg: { $sum: '$quantityKg' }, totalPlusMinus: { $sum: '$plusMinus' } } }
       ])
     ]);
