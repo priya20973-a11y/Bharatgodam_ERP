@@ -68,9 +68,22 @@ export async function getStackAvailableClientStock(
     ]
   };
 
+  const inwardMatchCriteria = {
+    $and: [
+      { clientId: new mongoose.Types.ObjectId(clientId) },
+      { commodityId: new mongoose.Types.ObjectId(commodityId) },
+      { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
+      { 'stackAllocations.chamberNo': chamberNo },
+      { 'stackAllocations.floorNo': floorNo },
+      { 'stackAllocations.stackNo': stackNo },
+      getTenantFilter(session)
+    ]
+  };
+
   const inwards = await ColdInward.aggregate([
-    { $match: matchCriteria },
-    { $group: { _id: null, totalInward: { $sum: '$quantityKg' } } }
+    { $unwind: '$stackAllocations' },
+    { $match: inwardMatchCriteria },
+    { $group: { _id: null, totalInward: { $sum: '$stackAllocations.allocatedWeight' } } }
   ]);
   const totalInward = inwards.length > 0 ? inwards[0].totalInward : 0;
 
@@ -99,19 +112,44 @@ export async function getAvailableInwardsForClient(clientId: string) {
 
   const outwards = await ColdOutward.aggregate([
     { $match: { clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter } },
-    { $group: { _id: '$inwardId', totalOutward: { $sum: '$quantityKg' }, totalPlusMinus: { $sum: '$plusMinus' } } }
+    { $group: { 
+        _id: { inwardId: '$inwardId', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
+        totalOutward: { $sum: '$quantityKg' }, 
+        totalPlusMinus: { $sum: '$plusMinus' } 
+      } 
+    }
   ]);
 
   const outwardMap = new Map();
   outwards.forEach(o => {
-    if (o._id) outwardMap.set(o._id.toString(), { out: o.totalOutward, plusMinus: o.totalPlusMinus || 0 });
+    if (o._id.inwardId) {
+      const key = `${o._id.inwardId.toString()}_${o._id.chamberNo}_${o._id.floorNo}_${o._id.stackNo}`;
+      outwardMap.set(key, { out: o.totalOutward, plusMinus: o.totalPlusMinus || 0 });
+    }
   });
 
-  const availableInwards = inwards.map((inward: any) => {
-    const outData = outwardMap.get(inward._id.toString()) || { out: 0, plusMinus: 0 };
-    const availableQty = Math.max(0, inward.quantityKg + outData.plusMinus - outData.out);
-    return { ...inward, availableQty };
-  }).filter(inw => inw.availableQty > 0);
+  const availableInwards = inwards.flatMap((inward: any) => {
+    if (!inward.stackAllocations) return [];
+    
+    return inward.stackAllocations.map((alloc: any) => {
+      const key = `${inward._id.toString()}_${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      const outData = outwardMap.get(key) || { out: 0, plusMinus: 0 };
+      const availableQty = Math.max(0, alloc.allocatedWeight + outData.plusMinus - outData.out);
+      
+      // We return an object that looks exactly like a standard inward to the frontend
+      // but with the specific stack details from the allocation
+      return { 
+        ...inward,
+        uniqueKey: key,
+        chamberNo: alloc.chamberNo,
+        floorNo: alloc.floorNo,
+        stackNo: alloc.stackNo,
+        quantityKg: alloc.allocatedWeight,
+        bagsCount: alloc.bagsCount,
+        availableQty 
+      };
+    }).filter((inw: any) => inw.availableQty > 0);
+  });
 
   return JSON.parse(JSON.stringify(availableInwards));
 }
@@ -146,8 +184,8 @@ export async function createColdOutward(data: any) {
     const outDate = data.date ? new Date(data.date) : new Date();
     
     if (commodity && commodity.seasonalPrices && commodity.seasonalPrices.length > 0) {
-      const month = outDate.getMonth() + 1;
-      const season = commodity.seasonalPrices.find((s: any) => month >= s.fromMonth && month <= s.toMonth) || commodity.seasonalPrices[0];
+      const outTime = outDate.getTime();
+      const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
       
       if (season) {
         let currentPrice = 0;
@@ -217,8 +255,8 @@ export async function createBatchColdOutwards(payload: any) {
       const outDate = payload.date ? new Date(payload.date) : new Date();
       
       if (commodity && commodity.seasonalPrices && commodity.seasonalPrices.length > 0) {
-        const month = outDate.getMonth() + 1;
-        const season = commodity.seasonalPrices.find((s: any) => month >= s.fromMonth && month <= s.toMonth) || commodity.seasonalPrices[0];
+        const outTime = outDate.getTime();
+        const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
         
         if (season) {
           let currentPrice = 0;

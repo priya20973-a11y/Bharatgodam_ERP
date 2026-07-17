@@ -11,9 +11,13 @@ export interface IColdInward extends Document {
   clientId: mongoose.Types.ObjectId;
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
-  chamberNo: number;
-  floorNo: number;
-  stackNo: number;
+  stackAllocations: {
+    chamberNo: number;
+    floorNo: number;
+    stackNo: number;
+    allocatedWeight: number;
+    bagsCount?: number;
+  }[];
   quantityKg: number; // Net Weight
   bagsCount: number; // Bags
   grade?: string; // Large, Small, Mixed
@@ -34,6 +38,7 @@ export interface IColdInward extends Document {
   note?: string;
   referencePersons?: IReferencePerson[];
   date: Date;
+  batchId?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -52,9 +57,13 @@ const ColdInwardSchema: Schema = new Schema(
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
-    chamberNo: { type: Number, required: true, min: 1 },
-    floorNo: { type: Number, required: true, min: 1 },
-    stackNo: { type: Number, required: true, min: 1 },
+    stackAllocations: [{
+      chamberNo: { type: Number, required: true, min: 1 },
+      floorNo: { type: Number, required: true, min: 1 },
+      stackNo: { type: Number, required: true, min: 1 },
+      allocatedWeight: { type: Number, required: true, min: 0 },
+      bagsCount: { type: Number, required: false, min: 0 },
+    }],
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
@@ -75,13 +84,17 @@ const ColdInwardSchema: Schema = new Schema(
     note: { type: String, required: false },
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
+    batchId: { type: String, required: false },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },
   { timestamps: true }
 );
 
-const ColdInward: Model<IColdInward> =
-  mongoose.models.ColdInward || mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);
+if (mongoose.models.ColdInward) {
+  delete mongoose.models.ColdInward;
+}
+
+const ColdInward: Model<IColdInward> = mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);
 
 export default ColdInward;

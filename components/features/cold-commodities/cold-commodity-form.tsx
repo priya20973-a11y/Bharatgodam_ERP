@@ -15,20 +15,6 @@ type ModalProps = {
   onSuccessOptimistic?: (action: 'add' | 'edit', data: any) => void;
 };
 
-const MONTHS = [
-  { value: 1, label: 'January' },
-  { value: 2, label: 'February' },
-  { value: 3, label: 'March' },
-  { value: 4, label: 'April' },
-  { value: 5, label: 'May' },
-  { value: 6, label: 'June' },
-  { value: 7, label: 'July' },
-  { value: 8, label: 'August' },
-  { value: 9, label: 'September' },
-  { value: 10, label: 'October' },
-  { value: 11, label: 'November' },
-  { value: 12, label: 'December' },
-];
 
 export default function ColdCommodityForm({ isOpen, onClose, initialData, onSuccessOptimistic }: ModalProps) {
   const { t } = useColdTranslation();
@@ -47,20 +33,24 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
       setType(initialData.type || '');
       setGradingType(initialData.gradingType || '');
       setPriceType(initialData.priceType || '');
-      setSeasonalPrices(initialData.seasonalPrices || []);
+      setSeasonalPrices(initialData.seasonalPrices?.map((p: any) => ({
+        ...p,
+        fromDate: new Date(p.fromDate).toISOString().split('T')[0],
+        toDate: new Date(p.toDate).toISOString().split('T')[0]
+      })) || []);
     } else if (isOpen) {
       setName('');
       setType('');
       setGradingType('');
       setPriceType('Same Price');
-      setSeasonalPrices([{ fromMonth: 1, toMonth: 12, pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }]);
+      setSeasonalPrices([{ fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }] as any);
     }
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
   const handleAddPrice = () => {
-    setSeasonalPrices([...seasonalPrices, { fromMonth: 1, toMonth: 12, pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }]);
+    setSeasonalPrices([...seasonalPrices, { fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }] as any);
   };
 
   const handleRemovePrice = (index: number) => {
@@ -69,9 +59,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     setSeasonalPrices(newPrices);
   };
 
-  const handleChangePrice = (index: number, field: keyof ISeasonalPrice, value: number) => {
+  const handleChangePrice = (index: number, field: string, value: any) => {
     const newPrices = [...seasonalPrices];
-    newPrices[index] = { ...newPrices[index], [field]: value };
+    (newPrices[index] as any)[field] = value;
     setSeasonalPrices(newPrices);
   };
 
@@ -80,9 +70,12 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     if (!type.trim()) return t('common.error');
     if (seasonalPrices.length === 0) return t('common.error');
 
-    for (const p of seasonalPrices) {
-      if (p.fromMonth > p.toMonth) {
-        return t('commodities.invalidRange');
+    for (const p of seasonalPrices as any[]) {
+      if (!p.fromDate || !p.toDate) {
+        return t('common.error');
+      }
+      if (new Date(p.fromDate) > new Date(p.toDate)) {
+        return 'From Date cannot be after To Date';
       }
       if (priceType !== 'Different Price') {
         const pKg = Number(p.pricePerKg);
@@ -97,10 +90,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
       }
     }
 
-    const sorted = [...seasonalPrices].sort((a, b) => a.fromMonth - b.fromMonth);
+    const sorted = [...(seasonalPrices as any[])].sort((a, b) => new Date(a.fromDate).getTime() - new Date(b.fromDate).getTime());
     for (let i = 0; i < sorted.length - 1; i++) {
-      if (sorted[i].toMonth >= sorted[i+1].fromMonth) {
-        return t('commodities.invalidRange');
+      if (new Date(sorted[i].toDate) >= new Date(sorted[i+1].fromDate)) {
+        return 'Date ranges cannot overlap';
       }
     }
 
@@ -123,9 +116,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         unit: 'KG',
         gradingType: gradingType || undefined,
         priceType: priceType || undefined,
-        seasonalPrices: seasonalPrices.map(p => ({
-          fromMonth: Number(p.fromMonth),
-          toMonth: Number(p.toMonth),
+        seasonalPrices: (seasonalPrices as any[]).map(p => ({
+          fromDate: new Date(p.fromDate),
+          toDate: new Date(p.toDate),
           pricePerKg: priceType !== 'Different Price' ? (p.pricePerKg ? Number(p.pricePerKg) : undefined) : undefined,
           priceLarge: priceType === 'Different Price' ? (p.priceLarge ? Number(p.priceLarge) : undefined) : undefined,
           priceSmall: priceType === 'Different Price' ? (p.priceSmall ? Number(p.priceSmall) : undefined) : undefined,
@@ -251,7 +244,7 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
 
             <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 space-y-4">
               <p className="text-xs text-indigo-700 font-medium leading-relaxed">
-                {t('commodities.validMonthsDesc')}
+                Define the seasonal pricing block using specific date ranges.
               </p>
               
               <div className="space-y-3">
@@ -260,25 +253,23 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                     
                     <div className="flex-1 w-full grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">{t('commodities.from')}</label>
-                        <select
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">From Date</label>
+                        <input
+                          type="date"
                           className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          value={price.fromMonth}
-                          onChange={(e) => handleChangePrice(idx, 'fromMonth', parseInt(e.target.value))}
-                        >
-                          {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                        </select>
+                          value={(price as any).fromDate}
+                          onChange={(e) => handleChangePrice(idx, 'fromDate', e.target.value)}
+                        />
                       </div>
                       
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">{t('commodities.to')}</label>
-                        <select
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">To Date</label>
+                        <input
+                          type="date"
                           className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          value={price.toMonth}
-                          onChange={(e) => handleChangePrice(idx, 'toMonth', parseInt(e.target.value))}
-                        >
-                          {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                        </select>
+                          value={(price as any).toDate}
+                          onChange={(e) => handleChangePrice(idx, 'toDate', e.target.value)}
+                        />
                       </div>
                     </div>
 

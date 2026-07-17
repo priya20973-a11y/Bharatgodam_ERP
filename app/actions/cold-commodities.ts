@@ -48,11 +48,11 @@ function validateSeasonalPrices(prices: ISeasonalPrice[], priceType?: string): {
   }
 
   for (const p of prices) {
-    if (p.fromMonth < 1 || p.fromMonth > 12 || p.toMonth < 1 || p.toMonth > 12) {
-      return { valid: false, error: 'Months must be between 1 and 12.' };
+    if (!p.fromDate || !p.toDate) {
+      return { valid: false, error: 'Both fromDate and toDate are required.' };
     }
-    if (p.fromMonth > p.toMonth) {
-      return { valid: false, error: `Invalid range: fromMonth (${p.fromMonth}) cannot be greater than toMonth (${p.toMonth}). Wraparound ranges are not allowed.` };
+    if (new Date(p.fromDate) > new Date(p.toDate)) {
+      return { valid: false, error: 'Invalid range: fromDate cannot be greater than toDate.' };
     }
     
     if (priceType !== 'Different Price') {
@@ -73,10 +73,10 @@ function validateSeasonalPrices(prices: ISeasonalPrice[], priceType?: string): {
   }
 
   // Check for overlaps
-  const sorted = [...prices].sort((a, b) => a.fromMonth - b.fromMonth);
+  const sorted = [...prices].sort((a, b) => new Date(a.fromDate).getTime() - new Date(b.fromDate).getTime());
   for (let i = 0; i < sorted.length - 1; i++) {
-    if (sorted[i].toMonth >= sorted[i+1].fromMonth) {
-      return { valid: false, error: `Overlapping month ranges detected between month ${sorted[i].fromMonth}-${sorted[i].toMonth} and ${sorted[i+1].fromMonth}-${sorted[i+1].toMonth}.` };
+    if (new Date(sorted[i].toDate) >= new Date(sorted[i+1].fromDate)) {
+      return { valid: false, error: 'Overlapping date ranges detected.' };
     }
   }
 
@@ -233,11 +233,10 @@ export async function getColdStoragePriceForDate(commodity: any, date: Date | st
   const d = new Date(date);
   if (isNaN(d.getTime())) return null;
 
-  // Month is 1-indexed (1 = Jan, 12 = Dec)
-  const month = d.getMonth() + 1;
-
   for (const season of commodity.seasonalPrices) {
-    if (month >= season.fromMonth && month <= season.toMonth) {
+    const from = new Date(season.fromDate);
+    const to = new Date(season.toDate);
+    if (d >= from && d <= to) {
       return season.pricePerKg;
     }
   }

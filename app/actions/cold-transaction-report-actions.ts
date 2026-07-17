@@ -11,7 +11,7 @@ export async function getColdTransactions() {
   await connectToDatabase();
   const session = await requireSession();
   const tenantFilter = getTenantFilter(session);
-  
+
   const inwards = await ColdInward.find(tenantFilter)
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
@@ -34,9 +34,9 @@ export async function getColdTransactions() {
     client: { _id: t.clientId?._id?.toString(), name: t.clientId?.name },
     commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
     warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
-    chamberNo: t.chamberNo,
-    floorNo: t.floorNo,
-    stackNo: t.stackNo,
+    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberNo || '') : t.chamberNo,
+    floorNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.floorNo || '') : t.floorNo,
+    stackNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.stackNo || '') : t.stackNo,
     quantityKg: t.quantityKg,
     bagsCount: t.bagsCount,
     referencePersons: t.referencePersons,
@@ -57,23 +57,25 @@ export async function getColdTransactions() {
 export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWARD') {
   await connectToDatabase();
   const session = await requireSession();
-    if (!hasPermission(session, 'reports', 'delete')) throw new Error('Forbidden: Insufficient permissions');
+  if (!hasPermission(session, 'reports', 'delete')) throw new Error('Forbidden: Insufficient permissions');
   const tenantFilter = getTenantFilter(session);
 
   try {
     if (type === 'INWARD') {
       const inward = await ColdInward.findOne({ _id: id, ...tenantFilter });
       if (!inward) throw new Error('Transaction not found');
-      
+
       // Validation: Block edit/delete of Inward if Outward exists for that specific transaction.
       // We check if any outward exists for this client, commodity, and stack.
       const outwardExists = await ColdOutward.exists({
         clientId: inward.clientId,
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
-        chamberNo: inward.chamberNo,
-        floorNo: inward.floorNo,
-        stackNo: inward.stackNo,
+        $or: inward.stackAllocations.map((s: any) => ({
+          chamberNo: s.chamberNo,
+          floorNo: s.floorNo,
+          stackNo: s.stackNo
+        })),
         ...tenantFilter
       });
 
@@ -106,18 +108,20 @@ export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWA
   if (type === 'INWARD') {
     const inward = await ColdInward.findOne({ _id: id, ...tenantFilter }).lean();
     if (!inward) throw new Error('Inward transaction not found');
-    
+
     // Check if any outward exists for this inward stack
     const outwardExists = await ColdOutward.exists({
       clientId: inward.clientId,
       commodityId: inward.commodityId,
       warehouseId: inward.warehouseId,
-      chamberNo: inward.chamberNo,
-      floorNo: inward.floorNo,
-      stackNo: inward.stackNo,
+      $or: inward.stackAllocations.map((s: any) => ({
+        chamberNo: s.chamberNo,
+        floorNo: s.floorNo,
+        stackNo: s.stackNo
+      })),
       ...tenantFilter
     });
-    
+
     transaction = { ...inward, type: 'INWARD', hasOutward: !!outwardExists };
   } else {
     const outward = await ColdOutward.findOne({ _id: id, ...tenantFilter }).lean();
@@ -131,21 +135,23 @@ export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWA
 export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWARD', data: any) {
   await connectToDatabase();
   const session = await requireSession();
-    if (!hasPermission(session, 'reports', 'edit')) throw new Error('Forbidden: Insufficient permissions');
+  if (!hasPermission(session, 'reports', 'edit')) throw new Error('Forbidden: Insufficient permissions');
   const tenantFilter = getTenantFilter(session);
 
   try {
     if (type === 'INWARD') {
       const inward = await ColdInward.findOne({ _id: id, ...tenantFilter });
       if (!inward) throw new Error('Transaction not found');
-      
+
       const outwardExists = await ColdOutward.exists({
         clientId: inward.clientId,
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
-        chamberNo: inward.chamberNo,
-        floorNo: inward.floorNo,
-        stackNo: inward.stackNo,
+        $or: inward.stackAllocations.map((s: any) => ({
+          chamberNo: s.chamberNo,
+          floorNo: s.floorNo,
+          stackNo: s.stackNo
+        })),
         ...tenantFilter
       });
 
@@ -169,9 +175,9 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           clientId: outward.clientId,
           commodityId: outward.commodityId,
           warehouseId: outward.warehouseId,
-          chamberNo: outward.chamberNo,
-          floorNo: outward.floorNo,
-          stackNo: outward.stackNo,
+          'stackAllocations.chamberNo': outward.chamberNo,
+          'stackAllocations.floorNo': outward.floorNo,
+          'stackAllocations.stackNo': outward.stackNo,
           ...tenantFilter
         });
       }
@@ -189,9 +195,9 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         clientId: inward.clientId,
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
-        chamberNo: inward.chamberNo,
-        floorNo: inward.floorNo,
-        stackNo: inward.stackNo,
+        chamberNo: outward.chamberNo,
+        floorNo: outward.floorNo,
+        stackNo: outward.stackNo,
         _id: { $ne: outward._id },
         ...tenantFilter
       });

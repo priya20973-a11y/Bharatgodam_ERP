@@ -11,7 +11,7 @@ type Props = {
   initialCommodities: any[];
 };
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 
 export default function ColdCommodityListWrapper({ initialCommodities }: Props) {
   const { t } = useColdTranslation();
@@ -131,9 +131,7 @@ export default function ColdCommodityListWrapper({ initialCommodities }: Props) 
                 {commodity.seasonalPrices?.map((season: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-600">
-                      {season.fromMonth === 1 && season.toMonth === 12 
-                        ? t('commodities.activeAllYear') 
-                        : `${MONTHS[season.fromMonth - 1]} - ${MONTHS[season.toMonth - 1]}`}
+                      {new Date(season.fromDate).toLocaleDateString('en-GB')} - {new Date(season.toDate).toLocaleDateString('en-GB')}
                     </span>
                     <div className="flex flex-col items-end">
                       {commodity.priceType === 'Different Price' ? (

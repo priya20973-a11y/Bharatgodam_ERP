@@ -62,7 +62,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
   const handleAddInward = (inwardId: string) => {
     if (!inwardId) return;
-    const inward = availableInwards.find(i => i._id === inwardId);
+    const inward = availableInwards.find(i => i.uniqueKey === inwardId);
     if (!inward) return;
     
     // Check if already added
@@ -128,7 +128,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       const autoGradingType = commodities.find(c => c._id === (item.inward.commodityId?._id || item.inward.commodityId))?.gradingType || '';
 
       itemsPayload.push({
-        inwardId: item.inwardId,
+        inwardId: item.inward._id,
         commodityId: item.inward.commodityId._id || item.inward.commodityId,
         warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
         chamberNo: item.inward.chamberNo,
@@ -210,16 +210,16 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             {isDropdownOpen && availableInwards.length > 0 && (
               <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-md max-h-60 overflow-y-auto">
                 {availableInwards.map(inw => {
-                  const isSelected = selectedItems.some(item => item.inwardId === inw._id);
+                  const isSelected = selectedItems.some(item => item.inwardId === inw.uniqueKey);
                   return (
                     <div 
-                      key={inw._id} 
+                      key={inw.uniqueKey} 
                       className="flex items-center space-x-2 p-2 hover:bg-slate-100 cursor-pointer"
                       onClick={() => {
                         if (isSelected) {
-                          handleRemoveInward(inw._id);
+                          handleRemoveInward(inw.uniqueKey);
                         } else {
-                          handleAddInward(inw._id);
+                          handleAddInward(inw.uniqueKey);
                         }
                       }}
                     >
@@ -230,7 +230,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} (C{inw.chamberNo}/F{inw.floorNo}/S{inw.stackNo}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                       </span>
                     </div>
                   )
