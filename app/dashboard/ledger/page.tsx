@@ -401,7 +401,7 @@ export default function LedgerDashboard() {
                     );
                   });
 
-                  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+                  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
                   const url = URL.createObjectURL(blob);
                   const anchor = document.createElement('a');
                   anchor.href = url;

@@ -5,6 +5,7 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdInwardDraft from '@/lib/models/ColdInwardDraft';
+import Client from '@/lib/models/Client';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
@@ -179,13 +180,54 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
     const createdInwards = [];
     const clientReceiptMap: Record<string, string[]> = {};
 
-    // First validate ALL capacities
+    // Validate commodities assignment
     for (const client of data.clients) {
-      for (const stack of client.stacks) {
-        const capacityInfo = await getStackAvailableCapacity(data.warehouseId, parseInt(stack.chamberNo), parseInt(stack.floorNo), parseInt(stack.stackNo));
-        if (stack.allocatedWeight > capacityInfo.availableCapacity) {
-          throw new Error(`Quantity exceeds available stack capacity in Chamber ${stack.chamberNo}, Floor ${stack.floorNo}, Stack ${stack.stackNo}. Available: ${capacityInfo.availableCapacity} Kg`);
+      const dbClient = await Client.findOne({ _id: client.clientId, ...getTenantFilter(session) });
+      if (!dbClient) throw new Error(`Client not found`);
+      
+      const effectiveCommodityId = data.common?.sameCommodity ? data.common.commodityId : client.commodityId;
+      if (dbClient.commodityIds && dbClient.commodityIds.length > 0) {
+        const hasAccess = dbClient.commodityIds.some((id: any) => id.toString() === effectiveCommodityId);
+        if (!hasAccess) {
+          throw new Error(`Commodity is not assigned to client ${dbClient.name}`);
         }
+      }
+    }
+
+    // First validate ALL capacities
+    const clientUsedStacks = new Map<string, Set<string>>();
+    const stackAllocatedWeight = new Map<string, number>();
+    const stackCapacities = new Map<string, number>();
+
+    for (const client of data.clients) {
+      const clientId = client.clientId;
+      if (!clientUsedStacks.has(clientId)) {
+        clientUsedStacks.set(clientId, new Set<string>());
+      }
+      const usedStacks = clientUsedStacks.get(clientId)!;
+
+      for (const stack of client.stacks) {
+        const stackKey = `${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`;
+        
+        if (usedStacks.has(stackKey)) {
+          throw new Error(`Duplicate stack selected for same client: Chamber ${stack.chamberNo}, Floor ${stack.floorNo}, Stack ${stack.stackNo}`);
+        }
+        usedStacks.add(stackKey);
+
+        if (!stackCapacities.has(stackKey)) {
+          const capacityInfo = await getStackAvailableCapacity(data.warehouseId, parseInt(stack.chamberNo), parseInt(stack.floorNo), parseInt(stack.stackNo));
+          stackCapacities.set(stackKey, capacityInfo.availableCapacity);
+        }
+        
+        const availableCapacity = stackCapacities.get(stackKey)!;
+        const currentStackWeight = stackAllocatedWeight.get(stackKey) || 0;
+        const newTotalWeight = currentStackWeight + (Number(stack.allocatedWeight) || 0);
+        
+        if (newTotalWeight > availableCapacity) {
+          throw new Error(`Total quantity exceeds available stack capacity in Chamber ${stack.chamberNo}, Floor ${stack.floorNo}, Stack ${stack.stackNo}. Available: ${availableCapacity} Kg`);
+        }
+        
+        stackAllocatedWeight.set(stackKey, newTotalWeight);
       }
     }
 

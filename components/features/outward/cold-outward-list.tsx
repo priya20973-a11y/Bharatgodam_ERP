@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -18,6 +19,33 @@ interface ColdOutwardListProps {
 
 export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const { t, formatNumber } = useColdTranslation();
+
+  const groupedOutwards = useMemo(() => {
+    const groups: any[] = [];
+    outwards.forEach(w => {
+      // Find an existing group where the client is the same and the createdAt time is within 1 minute
+      const wTime = w.createdAt ? new Date(w.createdAt).getTime() : 0;
+      const existingGroup = wTime > 0 ? groups.find(g => {
+        const gClientId = g.clientId?._id?.toString() || g.clientId?.toString();
+        const wClientId = w.clientId?._id?.toString() || w.clientId?.toString();
+        if (gClientId !== wClientId) return false;
+        
+        const gTime = g.createdAt ? new Date(g.createdAt).getTime() : 0;
+        return Math.abs(gTime - wTime) <= 60000;
+      }) : null;
+
+      if (existingGroup && !w.batchId) {
+        existingGroup.items = existingGroup.items || [ { ...existingGroup } ];
+        existingGroup.items.push(...(w.items || [w]));
+        existingGroup.quantityKg += w.quantityKg || 0;
+        existingGroup.bagsCount += w.bagsCount || 0;
+        existingGroup.isBatch = true;
+      } else {
+        groups.push({ ...w, items: w.items ? [...w.items] : undefined });
+      }
+    });
+    return groups;
+  }, [outwards]);
 
   return (
     <div className="rounded-md border bg-white shadow-sm overflow-hidden">
@@ -38,38 +66,46 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {outwards.length === 0 ? (
+          {groupedOutwards.length === 0 ? (
             <TableRow>
               <TableCell colSpan={9} className="h-24 text-center text-slate-500">
                 {t('outward.noOutwardFound')}
               </TableCell>
             </TableRow>
           ) : (
-            outwards.map((w) => {
+            groupedOutwards.map((w) => {
               const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
               
-              const printUrl = w.isBatch 
+              const printUrl = (w.isBatch && w.batchId)
                 ? `/api/cold/receipt/html?batchId=${w.batchId}&type=outward`
                 : `/api/cold/receipt/html?id=${w._id}&type=outward`;
 
-              let sameChamber = true;
-              let sameFloor = true;
-              let sameStack = true;
               let sameGrade = true;
 
               if (w.isBatch && w.items && w.items.length > 0) {
                 const first = w.items[0];
                 for (const item of w.items) {
-                  if (item.chamberNo !== first.chamberNo) sameChamber = false;
-                  if (item.floorNo !== first.floorNo) sameFloor = false;
-                  if (item.stackNo !== first.stackNo) sameStack = false;
                   if (item.grade !== first.grade || item.gradingType !== first.gradingType) sameGrade = false;
                 }
               }
 
-              const displayChamber = (w.isBatch && !sameChamber) ? t('outward.multi') : formatNumber(w.chamberNo);
-              const displayFloor = (w.isBatch && !sameFloor) ? t('outward.multi') : formatNumber(w.floorNo);
-              const displayStack = (w.isBatch && !sameStack) ? t('outward.multi') : formatNumber(w.stackNo);
+              const displayChamber = w.isBatch && w.items && w.items.length > 1 ? (
+                <div className="flex flex-col gap-1">
+                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{formatNumber(item.chamberNo)}</div>)}
+                </div>
+              ) : formatNumber(w.chamberNo);
+
+              const displayFloor = w.isBatch && w.items && w.items.length > 1 ? (
+                <div className="flex flex-col gap-1">
+                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{formatNumber(item.floorNo)}</div>)}
+                </div>
+              ) : formatNumber(w.floorNo);
+
+              const displayStack = w.isBatch && w.items && w.items.length > 1 ? (
+                <div className="flex flex-col gap-1">
+                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{formatNumber(item.stackNo)}</div>)}
+                </div>
+              ) : formatNumber(w.stackNo);
               
               const displayGrade = (w.isBatch && !sameGrade) ? t('outward.mixedMulti') : (
                 <>

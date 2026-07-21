@@ -36,6 +36,7 @@ export interface IColdOutward extends Document {
   note?: string;
   referencePersons?: IReferencePerson[];
   rentRs?: number;
+  rentReason?: string;
   date: Date;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
@@ -80,6 +81,7 @@ const ColdOutwardSchema: Schema = new Schema(
     remarks: { type: String, required: false },
     note: { type: String, required: false },
     rentRs: { type: Number, required: false },
+    rentReason: { type: String, required: false },
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },

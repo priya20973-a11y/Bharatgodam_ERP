@@ -239,6 +239,42 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     }
   };
 
+  const getRemainingCapacity = (wId: string, cNo: string, fNo: string, sNo: string, skipClientIdx = -1, skipStackIdx = -1) => {
+    const key = `${wId}-${cNo}-${fNo}-${sNo}`;
+    const available = stackCapacities[key];
+    if (available === undefined || available === null) return null;
+    
+    let otherAllocations = 0;
+    clientSections.forEach((c, cIdx) => {
+      c.stacks.forEach((s: any, sIdx: number) => {
+        if (cIdx === skipClientIdx && sIdx === skipStackIdx) return;
+        if (s.chamberNo === cNo && s.floorNo === fNo && s.stackNo === sNo) {
+          otherAllocations += (Number(s.allocatedWeight) || 0);
+        }
+      });
+    });
+    return Math.max(0, available - otherAllocations);
+  };
+
+  const getClientCommodities = (clientId: string) => {
+    const client = clients.find(c => c._id === clientId);
+    if (!client) return [];
+    if (!client.commodityIds || client.commodityIds.length === 0) return commodities;
+    return commodities.filter(c => client.commodityIds.includes(c._id) || client.commodityIds.includes(c._id.toString()));
+  };
+
+  const getCommonCommodities = () => {
+    if (clientSections.length === 0) return commodities;
+    let common = getClientCommodities(clientSections[0].clientId);
+    for (let i = 1; i < clientSections.length; i++) {
+      const nextClientCommodities = getClientCommodities(clientSections[i].clientId);
+      common = common.filter(c => nextClientCommodities.some(nc => nc._id === c._id));
+    }
+    return common;
+  };
+
+  const commonCommodities = getCommonCommodities();
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Common Fields */}
@@ -333,9 +369,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               <Select value={common.commodityId} onValueChange={(v) => setCommon({ ...common, commodityId: v })} required>
                 <SelectTrigger className="bg-white"><SelectValue placeholder={t('inward.selectCommodity')} /></SelectTrigger>
                 <SelectContent>
-                  {commodities.map(c => (
-                    <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
-                  ))}
+                  {commonCommodities.length > 0 ? (
+                    commonCommodities.map(c => (
+                      <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>No common commodity available for the selected clients.</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -351,6 +391,8 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         const autoGradingType = selectedCommodity?.gradingType || '';
         
         const calcTotalBags = Number(client.bagsCount || 0) + Number(client.jin || 0) + Number(client.mixed || 0);
+
+        const clientAllowedCommodities = getClientCommodities(client.clientId);
 
         return (
           <div key={client.id} className="p-6 border rounded-lg bg-white shadow-sm space-y-4">
@@ -372,9 +414,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                   }} required>
                     <SelectTrigger className="bg-white"><SelectValue placeholder={t('inward.selectCommodity')} /></SelectTrigger>
                     <SelectContent>
-                      {commodities.map(c => (
-                        <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
-                      ))}
+                      {clientAllowedCommodities.length > 0 ? (
+                        clientAllowedCommodities.map(c => (
+                          <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>No commodities assigned to this client.</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -449,20 +495,35 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                       <Select value={stack.stackNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'stackNo', v)} disabled={!stack.floorNo}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Stack" /></SelectTrigger>
                         <SelectContent>
-                          {floor?.stacks?.map((s: any) => (
-                            <SelectItem key={s.stackNo} value={s.stackNo.toString()}>{s.stackNo}</SelectItem>
-                          ))}
+                          {floor?.stacks?.map((s: any) => {
+                            const clientSelectedStackKeys = client.stacks
+                              .filter((clientStack: any, idx: number) => idx !== sIdx && clientStack.chamberNo && clientStack.floorNo && clientStack.stackNo)
+                              .map((clientStack: any) => `${clientStack.chamberNo}-${clientStack.floorNo}-${clientStack.stackNo}`);
+                              
+                            const itemKey = `${stack.chamberNo}-${stack.floorNo}-${s.stackNo}`;
+                            const isSelectedByThisClient = clientSelectedStackKeys.includes(itemKey);
+                            const remaining = getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, s.stackNo.toString(), cIdx, sIdx);
+                            const isCurrentSelection = stack.stackNo === s.stackNo.toString();
+                            const noCapacity = remaining !== null && remaining <= 0;
+                            const isDisabled = isSelectedByThisClient || (!isCurrentSelection && noCapacity);
+                            
+                            return (
+                              <SelectItem key={s.stackNo} value={s.stackNo.toString()} disabled={isDisabled}>
+                                {s.stackNo} {isSelectedByThisClient ? '(Already Selected)' : ''}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       {stack.chamberNo && stack.floorNo && stack.stackNo && stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`] !== undefined && (
                         <div className="text-[10px] text-green-600 font-semibold leading-tight pt-1">
-                          Avail: {stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.toLocaleString()} Kg
+                          Avail: {getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, -1, -1)?.toLocaleString() ?? stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.toLocaleString()} Kg
                         </div>
                       )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-blue-600">Alloc. Weight</label>
-                      <ColdNumberInput className="h-8 text-xs" min="0" step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
+                      <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-blue-600">Alloc. Bags</label>

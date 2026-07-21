@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { Download, Trash2, Edit, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -93,12 +94,12 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       txn.client?.name || '',
       `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
       txn.warehouse?.name || '',
-      txn.grade ? `${txn.grade}${txn.gradingType ? ` (${txn.gradingType})` : ''}` : '-',
+      txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
       formatNumber(txn.chamberNo),
       formatNumber(txn.floorNo),
       formatNumber(txn.stackNo),
       formatNumber(txn.quantityKg),
-      formatNumber(txn.bagsCount)
+      formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))
     ]);
     
     const csvContent = [
@@ -106,7 +107,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `cold_transactions_${format(new Date(), 'yyyyMMdd')}.csv`;
@@ -200,15 +201,19 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                   </TableCell>
                   <TableCell className="text-slate-700">{txn.commodity?.name} ({txn.commodity?.type})</TableCell>
                   <TableCell className="text-slate-600 text-xs">
-                    {txn.warehouse?.name}<br/>
-                    C{formatNumber(txn.chamberNo)} • F{formatNumber(txn.floorNo)} • S{formatNumber(txn.stackNo)}
+                    <Link 
+                      href={`/cold/floor-mapping?warehouseId=${txn.warehouse?._id}&chamberNo=${txn.chamberNo}&floorNo=${txn.floorNo}&stackNo=${txn.stackNo}`}
+                      className="hover:text-blue-600 hover:underline transition-colors block"
+                    >
+                      {txn.warehouse?.name}<br/>
+                      C{formatNumber(txn.chamberNo)} • F{formatNumber(txn.floorNo)} • S{formatNumber(txn.stackNo)}
+                    </Link>
                   </TableCell>
                   <TableCell className="text-slate-700 text-sm">
-                    {txn.grade ? (t(`inward.grade${txn.grade}`) !== `inward.grade${txn.grade}` ? t(`inward.grade${txn.grade}`) : txn.grade) : '-'}
-                    {txn.gradingType ? ` (${txn.gradingType})` : ''}
+                    {txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(txn.quantityKg)}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(txn.bagsCount)}</TableCell>
+                  <TableCell className="text-right text-slate-700">{formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button 
                       variant="ghost" 

@@ -37,10 +37,23 @@ export function generateColdTransactionReceiptHTML(
   const tableLabel = data.tableLabel || '';
   const seed = data.seed || '';
 
-  const bags = formatNum(data.bagsCount || 0);
+  let actualLarge = data.bagsCount || 0;
+  let actualTotal = data.totalBags || 0;
+  
+  // Check if we are facing the backend bug where bagsCount holds Total Bags (e.g. 8)
+  // and totalBags was mistakenly saved as bagsCount + jin + mixed (e.g. 12).
+  if (data.totalBags === (data.bagsCount || 0) + (data.jin || 0) + (data.mixed || 0) && data.totalBags > (data.bagsCount || 0) && ((data.jin || 0) > 0 || (data.mixed || 0) > 0)) {
+    actualLarge = (data.bagsCount || 0) - (data.jin || 0) - (data.mixed || 0);
+    actualTotal = data.bagsCount || 0;
+  } else if (!data.totalBags) {
+    actualTotal = actualLarge + (data.jin || 0) + (data.mixed || 0);
+  }
+
+  // Fallback to actually stored 'large' field if the user provided one, else use our logic.
+  const bags = formatNum(data.large ?? data.largeBags ?? data.bagsLarge ?? actualLarge);
   const jin = formatNum(data.jin || 0);
   const mixed = formatNum(data.mixed || 0);
-  const totalBags = formatNum(data.totalBags || 0);
+  const totalBags = formatNum(actualTotal);
   const farmerName = data.farmerName || '';
 
   const marko = data.marko || '';

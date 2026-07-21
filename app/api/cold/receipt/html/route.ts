@@ -66,7 +66,21 @@ export async function GET(request: NextRequest) {
               .populate('commodityId', 'name type')
               .populate('warehouseId');
           } else {
-            transactions = [transaction];
+            // Group transactions created at the same time for the same client
+            const timeWindow = 60 * 1000; // 1 minute
+            const startTime = new Date(transaction.createdAt.getTime() - timeWindow);
+            const endTime = new Date(transaction.createdAt.getTime() + timeWindow);
+            
+            transactions = await ColdOutward.find({
+              clientId: transaction.clientId,
+              createdAt: { $gte: startTime, $lte: endTime },
+              ...getTenantFilter(session)
+            })
+              .populate('inwardId', 'receiptNo _id')
+              .populate('clientId', 'name address village')
+              .populate('commodityId', 'name type')
+              .populate('warehouseId')
+              .sort({ createdAt: 1 });
           }
         }
       }

@@ -106,7 +106,7 @@ export async function GET(request: Request) {
       String(invoice.warehouseId),
     ]);
 
-    const csvData = [header, ...rows].map(formatCsvRow).join('\r\n');
+    const csvData = '\uFEFF' + [header, ...rows].map(formatCsvRow).join('\r\n');
     const safeWarehouseName = warehouse?.name?.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') || warehouseId;
     const filename = `invoices-${month}-${safeWarehouseName}.csv`;
 

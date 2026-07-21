@@ -14,10 +14,10 @@ interface StackData {
   status: string; // 'Empty' | 'Partial' | 'Full' | 'Blocked'
 }
 
-export default function FloorGrid({ floorData }: { floorData: any }) {
+export default function FloorGrid({ floorData, highlightStackNo }: { floorData: any, highlightStackNo?: number | null }) {
   const { warehouseId, chamberNo, floorNo, stackLayout, gridRows, gridCols, customLayout, noOfStacks, stacks } = floorData;
 
-  const [selectedStackNo, setSelectedStackNo] = useState<number | null>(null);
+  const [selectedStackNo, setSelectedStackNo] = useState<number | null>(highlightStackNo || null);
 
   // Initialize a grid layout
   const rows = gridRows || Math.ceil(Math.sqrt(noOfStacks));

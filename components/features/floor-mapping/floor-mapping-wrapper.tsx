@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getFloorInventory } from '@/app/actions/floor-mapping-actions';
 import FloorGrid from './floor-grid';
@@ -8,10 +9,18 @@ import { useColdTranslation } from '@/components/providers/cold-language-provide
 
 export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] }) {
   const { t } = useColdTranslation();
-  
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
-  const [selectedChamberNo, setSelectedChamberNo] = useState<number | null>(null);
-  const [selectedFloorNo, setSelectedFloorNo] = useState<number | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const initWarehouseId = searchParams.get('warehouseId') || '';
+  const initChamberNo = searchParams.get('chamberNo') ? Number(searchParams.get('chamberNo')) : null;
+  const initFloorNo = searchParams.get('floorNo') ? Number(searchParams.get('floorNo')) : null;
+  const initStackNo = searchParams.get('stackNo') ? Number(searchParams.get('stackNo')) : null;
+
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initWarehouseId);
+  const [selectedChamberNo, setSelectedChamberNo] = useState<number | null>(initChamberNo);
+  const [selectedFloorNo, setSelectedFloorNo] = useState<number | null>(initFloorNo);
 
   const [loading, setLoading] = useState(false);
   const [floorData, setFloorData] = useState<any>(null);
@@ -20,14 +29,28 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
   const activeChamber = activeWarehouse?.chambers?.find((c: any) => c.chamberNo === selectedChamberNo);
   const availableFloors = activeChamber?.floors || [];
 
+  const initialMountWH = useRef(true);
+  const initialMountCh = useRef(true);
+
   useEffect(() => {
+    if (initialMountWH.current) {
+      initialMountWH.current = false;
+      return;
+    }
     // Reset selections on warehouse change
     setSelectedChamberNo(null);
     setSelectedFloorNo(null);
     setFloorData(null);
-  }, [selectedWarehouseId]);
+    
+    // Clear URL params if manually changing
+    router.replace(pathname, { scroll: false });
+  }, [selectedWarehouseId, router, pathname]);
 
   useEffect(() => {
+    if (initialMountCh.current) {
+      initialMountCh.current = false;
+      return;
+    }
     // Reset floor on chamber change
     setSelectedFloorNo(null);
     setFloorData(null);
@@ -111,7 +134,7 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
 
       {!loading && floorData && (
         <div className="bg-white p-6 rounded-lg shadow-sm border overflow-x-auto">
-          <FloorGrid floorData={floorData} />
+          <FloorGrid floorData={floorData} highlightStackNo={initStackNo} />
         </div>
       )}
       

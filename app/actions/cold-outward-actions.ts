@@ -131,13 +131,30 @@ export async function getAvailableInwardsForClient(clientId: string) {
   const availableInwards = inwards.flatMap((inward: any) => {
     if (!inward.stackAllocations) return [];
     
-    return inward.stackAllocations.map((alloc: any) => {
+    // Merge duplicate stack allocations to handle legacy data with duplicate stacks
+    const mergedAllocations = new Map();
+    inward.stackAllocations.forEach((alloc: any) => {
+      const k = `${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      if (mergedAllocations.has(k)) {
+         const existing = mergedAllocations.get(k);
+         existing.allocatedWeight += (alloc.allocatedWeight || 0);
+         existing.bagsCount += (alloc.bagsCount || 0);
+      } else {
+         mergedAllocations.set(k, {
+           chamberNo: alloc.chamberNo,
+           floorNo: alloc.floorNo,
+           stackNo: alloc.stackNo,
+           allocatedWeight: alloc.allocatedWeight || 0,
+           bagsCount: alloc.bagsCount || 0
+         });
+      }
+    });
+    
+    return Array.from(mergedAllocations.values()).map((alloc: any) => {
       const key = `${inward._id.toString()}_${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0, plusMinus: 0 };
       const availableQty = Math.max(0, alloc.allocatedWeight + outData.plusMinus - outData.out);
       
-      // We return an object that looks exactly like a standard inward to the frontend
-      // but with the specific stack details from the allocation
       return { 
         ...inward,
         uniqueKey: key,
@@ -175,11 +192,8 @@ export async function createColdOutward(data: any) {
       return { success: false, error: `Quantity exceeds available stock. Available: ${adjustedAvailableStock} Kg` };
     }
 
-    if (data.grade === '') {
-      delete data.grade;
-    }
-
     let rentRs = 0;
+    let rentReason = '';
     const commodity = await ColdCommodity.findById(data.commodityId);
     const outDate = data.date ? new Date(data.date) : new Date();
     
@@ -188,26 +202,59 @@ export async function createColdOutward(data: any) {
       const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
       
       if (season) {
-        let currentPrice = 0;
+        const bagsLarge = Number(data.bagsCount) || 0;
+        const bagsSmall = Number(data.jin) || 0;
+        const bagsMixed = Number(data.mixed) || 0;
+        const totalBags = bagsLarge + bagsSmall + bagsMixed;
+        const quantityKg = Number(data.quantityKg) || 0;
+
+        let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
+        if (totalBags > 0) {
+          largeWeight = (bagsLarge / totalBags) * quantityKg;
+          smallWeight = (bagsSmall / totalBags) * quantityKg;
+          mixedWeight = (bagsMixed / totalBags) * quantityKg;
+        } else {
+          largeWeight = quantityKg; // Fallback if bags are 0
+        }
+
+        let pLarge = 0, pSmall = 0, pMixed = 0;
+
         if (commodity.priceType === 'Different Price') {
-          if (data.grade === 'Large') currentPrice = season.priceLarge || 0;
-          else if (data.grade === 'Small') currentPrice = season.priceSmall || 0;
-          else if (data.grade === 'Mixed') currentPrice = season.priceMixed || 0;
+          pLarge = season.priceLarge || 0;
+          pSmall = season.priceSmall || 0;
+          pMixed = season.priceMixed || 0;
+          if (!pLarge && !pSmall && !pMixed) rentReason = 'Rates not found for any bag types';
         } else {
-          currentPrice = season.pricePerKg || 0;
+          // Same Price
+          pLarge = season.pricePerKg || 0;
+          pSmall = season.pricePerKg || 0;
+          pMixed = season.pricePerKg || 0;
+          if (!pLarge) rentReason = 'Price Per Kg not set';
         }
-        
+
         if (commodity.gradingType === 'Wet') {
-          rentRs = (data.quantityKg / 81) * currentPrice * 4;
+          const rateLarge = (largeWeight / 81) * pLarge * 4;
+          const rateSmall = (smallWeight / 81) * pSmall * 4;
+          const rateMixed = (mixedWeight / 81) * pMixed * 4;
+          rentRs = rateLarge + rateSmall + rateMixed;
         } else {
-          rentRs = data.quantityKg * currentPrice;
+          const rateLarge = largeWeight * pLarge;
+          const rateSmall = smallWeight * pSmall;
+          const rateMixed = mixedWeight * pMixed;
+          rentRs = rateLarge + rateSmall + rateMixed;
         }
+      } else {
+        rentReason = 'Seasonal price not found for date';
       }
+    } else {
+      rentReason = 'Commodity pricing not configured';
     }
 
     const outward = await ColdOutward.create(appendOwnership({
       ...data,
+      totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
       rentRs,
+      rentReason,
       date: outDate,
     }, session));
     
@@ -246,11 +293,8 @@ export async function createBatchColdOutwards(payload: any) {
         return { success: false, error: `Quantity exceeds available stock for one of the items. Available: ${adjustedAvailableStock} Kg` };
       }
 
-      if (item.grade === '') {
-        delete item.grade;
-      }
-
       let rentRs = 0;
+      let rentReason = '';
       const commodity = await ColdCommodity.findById(item.commodityId);
       const outDate = payload.date ? new Date(payload.date) : new Date();
       
@@ -259,32 +303,69 @@ export async function createBatchColdOutwards(payload: any) {
         const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
         
         if (season) {
-          let currentPrice = 0;
+          const bagsLarge = Number(item.bagsCount) || 0;
+          const bagsSmall = Number(item.jin) || 0;
+          const bagsMixed = Number(item.mixed) || 0;
+          const totalBags = bagsLarge + bagsSmall + bagsMixed;
+          const quantityKg = Number(item.quantityKg) || 0;
+
+          let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
+          if (totalBags > 0) {
+            largeWeight = (bagsLarge / totalBags) * quantityKg;
+            smallWeight = (bagsSmall / totalBags) * quantityKg;
+            mixedWeight = (bagsMixed / totalBags) * quantityKg;
+          } else {
+            largeWeight = quantityKg; // Fallback
+          }
+
+          let pLarge = 0, pSmall = 0, pMixed = 0;
+
           if (commodity.priceType === 'Different Price') {
-            if (item.grade === 'Large') currentPrice = season.priceLarge || 0;
-            else if (item.grade === 'Small') currentPrice = season.priceSmall || 0;
-            else if (item.grade === 'Mixed') currentPrice = season.priceMixed || 0;
+            pLarge = season.priceLarge || 0;
+            pSmall = season.priceSmall || 0;
+            pMixed = season.priceMixed || 0;
+            if (!pLarge && !pSmall && !pMixed) rentReason = 'Rates not found for any bag types';
           } else {
-            currentPrice = season.pricePerKg || 0;
+            pLarge = season.pricePerKg || 0;
+            pSmall = season.pricePerKg || 0;
+            pMixed = season.pricePerKg || 0;
+            if (!pLarge) rentReason = 'Price Per Kg not set';
           }
-          
+
           if (commodity.gradingType === 'Wet') {
-            rentRs = (item.quantityKg / 81) * currentPrice * 4;
+            const rateLarge = (largeWeight / 81) * pLarge * 4;
+            const rateSmall = (smallWeight / 81) * pSmall * 4;
+            const rateMixed = (mixedWeight / 81) * pMixed * 4;
+            rentRs = rateLarge + rateSmall + rateMixed;
           } else {
-            rentRs = item.quantityKg * currentPrice;
+            const rateLarge = largeWeight * pLarge;
+            const rateSmall = smallWeight * pSmall;
+            const rateMixed = mixedWeight * pMixed;
+            rentRs = rateLarge + rateSmall + rateMixed;
           }
+        } else {
+          rentReason = 'Seasonal price not found for date';
         }
+      } else {
+        rentReason = 'Commodity pricing not configured';
       }
 
       const outward = await ColdOutward.create(appendOwnership({
         ...item,
+        batchId: payload.batchId || payload.batchId,
+        date: outDate,
+        totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
+        rentRs,
+        rentReason,
         clientId: payload.clientId,
         truckNo: payload.truckNo,
+        weighbridgeSlipNo: payload.weighbridgeSlipNo,
+        grossWeight: payload.grossWeight,
+        emptyWeight: payload.emptyWeight,
+        kataBharati: payload.kataBharati,
+        referencePersons: payload.referencePersons,
         remarks: payload.remarks,
         note: payload.note,
-        rentRs,
-        date: outDate,
-        batchId
       }, session));
       createdOutwards.push(outward);
     }

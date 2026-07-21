@@ -48,6 +48,8 @@ export default function ColdEditTransactionModal({
   const [floorNo, setFloorNo] = useState('');
   const [stackNo, setStackNo] = useState('');
   
+  const [stackAllocations, setStackAllocations] = useState<any[]>([]);
+  const [referencePersons, setReferencePersons] = useState<any[]>([]);
   const [bagsCount, setBagsCount] = useState<number | null>(null);
   const [date, setDate] = useState('');
   
@@ -97,9 +99,14 @@ export default function ColdEditTransactionModal({
       setCommodityId(txn.commodityId || txn.commodity?._id || '');
       setGrade(txn.grade || '');
       setWarehouseId(txn.warehouseId || txn.warehouse?._id || '');
-      setChamberNo(txn.chamberNo?.toString() || '');
-      setFloorNo(txn.floorNo?.toString() || '');
-      setStackNo(txn.stackNo?.toString() || '');
+      if (transactionType === 'INWARD') {
+        setStackAllocations(txn.stackAllocations || []);
+        setReferencePersons(txn.referencePersons || []);
+      } else {
+        setChamberNo(txn.chamberNo?.toString() || '');
+        setFloorNo(txn.floorNo?.toString() || '');
+        setStackNo(txn.stackNo?.toString() || '');
+      }
       setBagsCount(txn.bagsCount);
       setSeed(txn.seed || '');
       setTableLabel(txn.tableLabel || '');
@@ -146,7 +153,11 @@ export default function ColdEditTransactionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId || !commodityId || !warehouseId || !chamberNo || !floorNo || !stackNo) {
+    if (!clientId || !commodityId || !warehouseId) {
+      toast.error(t('common.error') || 'Please fill required fields');
+      return;
+    }
+    if (transactionType === 'OUTWARD' && (!chamberNo || !floorNo || !stackNo)) {
       toast.error(t('common.error') || 'Please fill required fields');
       return;
     }
@@ -158,18 +169,21 @@ export default function ColdEditTransactionModal({
         clientId,
         commodityId,
         warehouseId,
-        chamberNo: parseInt(chamberNo),
-        floorNo: parseInt(floorNo),
-        stackNo: parseInt(stackNo),
+        ...(transactionType === 'INWARD' && { stackAllocations, referencePersons }),
+        ...(transactionType === 'OUTWARD' && {
+          chamberNo: parseInt(chamberNo),
+          floorNo: parseInt(floorNo),
+          stackNo: parseInt(stackNo),
+          plusMinus: Number(plusMinus) || 0,
+        }),
         quantityKg: calcNetWeight,
         bagsCount: Number(bagsCount) || 0,
-        grade: autoGradingType === 'Grading' ? grade : undefined,
+        grade: autoGradingType === 'Grading' ? (grade || undefined) : undefined,
         gradingType: autoGradingType || undefined,
         seed,
         tableLabel,
         jin: Number(jin) || 0,
         mixed: Number(mixed) || 0,
-        ...(transactionType === 'OUTWARD' && { plusMinus: Number(plusMinus) || 0 }),
         totalBags: calcTotalBags,
         truckNo,
         farmerName,
@@ -257,40 +271,88 @@ export default function ColdEditTransactionModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Chamber No.</label>
-                <Select value={chamberNo} onValueChange={setChamberNo} disabled required>
-                  <SelectTrigger><SelectValue placeholder="Chamber" /></SelectTrigger>
-                  <SelectContent>
-                    {selectedWarehouse?.chambers?.map((c: any) => (
-                      <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>{c.chamberNo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Floor No.</label>
-                <Select value={floorNo} onValueChange={setFloorNo} disabled required>
-                  <SelectTrigger><SelectValue placeholder="Floor" /></SelectTrigger>
-                  <SelectContent>
-                    {selectedChamber?.floors?.map((f: any) => (
-                      <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.floorNo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Stack No.</label>
-                <Select value={stackNo} onValueChange={setStackNo} disabled required>
-                  <SelectTrigger><SelectValue placeholder="Stack" /></SelectTrigger>
-                  <SelectContent>
-                    {selectedFloor?.stacks?.map((s: any) => (
-                      <SelectItem key={s.stackNo} value={s.stackNo.toString()}>{s.stackNo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {transactionType === 'OUTWARD' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Chamber No.</label>
+                    <Select value={chamberNo} onValueChange={setChamberNo} disabled required>
+                      <SelectTrigger><SelectValue placeholder="Chamber" /></SelectTrigger>
+                      <SelectContent>
+                        {selectedWarehouse?.chambers?.map((c: any) => (
+                          <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>{c.chamberNo}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Floor No.</label>
+                    <Select value={floorNo} onValueChange={setFloorNo} disabled required>
+                      <SelectTrigger><SelectValue placeholder="Floor" /></SelectTrigger>
+                      <SelectContent>
+                        {selectedChamber?.floors?.map((f: any) => (
+                          <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.floorNo}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Stack No.</label>
+                    <Select value={stackNo} onValueChange={setStackNo} disabled required>
+                      <SelectTrigger><SelectValue placeholder="Stack" /></SelectTrigger>
+                      <SelectContent>
+                        {selectedFloor?.stacks?.map((s: any) => (
+                          <SelectItem key={s.stackNo} value={s.stackNo.toString()}>{s.stackNo}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
+
+            {transactionType === 'INWARD' && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">Stack Allocations</h4>
+                {stackAllocations.map((stack, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50 p-4 rounded border items-center">
+                    <div>
+                      <span className="text-xs text-slate-500 block">Chamber</span>
+                      <span className="font-medium">{stack.chamberNo}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 block">Floor</span>
+                      <span className="font-medium">{stack.floorNo}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500 block">Stack</span>
+                      <span className="font-medium">{stack.stackNo}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-blue-600">Alloc. Weight (Kg)</label>
+                      <ColdNumberInput 
+                        value={stack.allocatedWeight ?? ''} 
+                        onChange={(val) => {
+                          const newAlloc = [...stackAllocations];
+                          newAlloc[idx].allocatedWeight = val ? Number(val) : 0;
+                          setStackAllocations(newAlloc);
+                        }} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-blue-600">Alloc. Bags</label>
+                      <ColdNumberInput 
+                        value={stack.bagsCount ?? ''} 
+                        onChange={(val) => {
+                          const newAlloc = [...stackAllocations];
+                          newAlloc[idx].bagsCount = val ? Number(val) : 0;
+                          setStackAllocations(newAlloc);
+                        }} 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">

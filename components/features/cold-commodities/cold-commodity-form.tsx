@@ -35,8 +35,8 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
       setPriceType(initialData.priceType || '');
       setSeasonalPrices(initialData.seasonalPrices?.map((p: any) => ({
         ...p,
-        fromDate: new Date(p.fromDate).toISOString().split('T')[0],
-        toDate: new Date(p.toDate).toISOString().split('T')[0]
+        fromDate: p.fromDate && !isNaN(new Date(p.fromDate).getTime()) ? new Date(p.fromDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        toDate: p.toDate && !isNaN(new Date(p.toDate).getTime()) ? new Date(p.toDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       })) || []);
     } else if (isOpen) {
       setName('');

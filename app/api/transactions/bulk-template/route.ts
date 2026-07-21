@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     // Create CSV header only
-    const csvContent = `Type,ClientName,CommodityName,WarehouseName,QuantityMT,BagsCount,StackNo,LotNo,GatePass,Date`;
+    const csvContent = `\uFEFFType,ClientName,CommodityName,WarehouseName,QuantityMT,BagsCount,StackNo,LotNo,GatePass,Date`;
 
     // Create response with CSV content
     return new NextResponse(csvContent, {

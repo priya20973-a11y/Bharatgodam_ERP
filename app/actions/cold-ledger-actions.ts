@@ -24,18 +24,27 @@ export async function getColdClientLedger(clientId: string) {
   const combined = [
     ...inwards.map(i => ({ ...i, type: 'INWARD' })),
     ...outwards.map(o => ({ ...o, type: 'OUTWARD' }))
-  ].map((t: any) => ({
-    _id: t._id.toString(),
-    type: t.type,
-    date: t.date,
-    commodity: t.commodityId?.name,
-    warehouse: t.warehouseId?.name,
-    location: `C-${t.chamberNo} / F-${t.floorNo} / S-${t.stackNo}`,
-    quantityKg: t.quantityKg,
-    plusMinus: t.type === 'OUTWARD' ? (t.plusMinus || 0) : null,
-    totalBags: t.totalBags || t.bagsCount,
-    createdAt: t.createdAt
-  }));
+  ].map((t: any) => {
+    let locationStr = '';
+    if (t.type === 'INWARD' && t.stackAllocations && t.stackAllocations.length > 0) {
+      locationStr = t.stackAllocations.map((a: any) => `C-${a.chamberNo ?? '-'} / F-${a.floorNo ?? '-'} / S-${a.stackNo ?? '-'}`).join(', ');
+    } else {
+      locationStr = `C-${t.chamberNo ?? '-'} / F-${t.floorNo ?? '-'} / S-${t.stackNo ?? '-'}`;
+    }
+
+    return {
+      _id: t._id.toString(),
+      type: t.type,
+      date: t.date,
+      commodity: t.commodityId?.name,
+      warehouse: t.warehouseId?.name,
+      location: locationStr,
+      quantityKg: t.quantityKg,
+      plusMinus: t.type === 'OUTWARD' ? (t.plusMinus || 0) : null,
+      totalBags: t.totalBags || t.bagsCount,
+      createdAt: t.createdAt
+    };
+  });
 
   // Sort by date ASCENDING for ledger
   combined.sort((a, b) => {

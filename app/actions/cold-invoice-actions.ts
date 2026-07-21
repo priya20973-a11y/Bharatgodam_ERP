@@ -98,29 +98,47 @@ export async function generateColdClientInvoicePreview(
     const bagsSmall = inw.jin || 0;
     const bagsMixed = inw.mixed || 0;
     const totalBags = inw.totalBags || (bagsLarge + bagsSmall + bagsMixed);
-    
+    const quantityKg = inw.quantityKg || 0;
+
+    let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
+    if (totalBags > 0) {
+      largeWeight = (bagsLarge / totalBags) * quantityKg;
+      smallWeight = (bagsSmall / totalBags) * quantityKg;
+      mixedWeight = (bagsMixed / totalBags) * quantityKg;
+    } else {
+      largeWeight = quantityKg; // Fallback
+    }
+
     // Check grading type and price type
-    if (commodity.gradingType === 'Wet') {
-      rent = ((inw.quantityKg || 0) / 81) * pricePerKg * days * 4;
-      calculationPath = `(${(inw.quantityKg || 0).toFixed(2)} Kg ÷ 81) × ₹${pricePerKg} × ${days} Days × 4 (Wet)`;
-    } else if (commodity.priceType === 'Different Price') {
+    if (commodity.priceType === 'Different Price') {
       const pLarge = seasonalPrice?.priceLarge || 0;
       const pSmall = seasonalPrice?.priceSmall || 0;
       const pMixed = seasonalPrice?.priceMixed || 0;
       
-      const rentLarge = bagsLarge * pLarge * days;
-      const rentSmall = bagsSmall * pSmall * days;
-      const rentMixed = bagsMixed * pMixed * days;
+      let rentLarge = 0, rentSmall = 0, rentMixed = 0;
+      if (commodity.gradingType === 'Wet') {
+        rentLarge = (largeWeight / 81) * pLarge * 4 * days;
+        rentSmall = (smallWeight / 81) * pSmall * 4 * days;
+        rentMixed = (mixedWeight / 81) * pMixed * 4 * days;
+        calculationPath = `${days} Days × [(L: ${(largeWeight/81).toFixed(2)}×₹${pLarge}×4) + (S: ${(smallWeight/81).toFixed(2)}×₹${pSmall}×4) + (M: ${(mixedWeight/81).toFixed(2)}×₹${pMixed}×4)] (Wet)`;
+      } else {
+        rentLarge = largeWeight * pLarge * days;
+        rentSmall = smallWeight * pSmall * days;
+        rentMixed = mixedWeight * pMixed * days;
+        calculationPath = `${days} Days × [(L: ${largeWeight.toFixed(2)}kg×₹${pLarge}) + (S: ${smallWeight.toFixed(2)}kg×₹${pSmall}) + (M: ${mixedWeight.toFixed(2)}kg×₹${pMixed})]`;
+      }
       
       rent = rentLarge + rentSmall + rentMixed;
       rateApplied = 0; // Mixed rates
-      calculationPath = `${days} Days × [(L: ${bagsLarge}×₹${pLarge}) + (S: ${bagsSmall}×₹${pSmall}) + (M: ${bagsMixed}×₹${pMixed})]`;
     } else {
       // Same Price formula: Weight × Price × Days
-      // Inward uses full weight or balance? Standard practice often bills the full inward weight 
-      // or we must bill weight balance. For simplicity and per formula: Weight × Price × Days
-      rent = (inw.quantityKg || 0) * pricePerKg * days;
-      calculationPath = `${(inw.quantityKg || 0).toFixed(2)} Kg × ₹${pricePerKg} × ${days} Days`;
+      if (commodity.gradingType === 'Wet') {
+        rent = (quantityKg / 81) * pricePerKg * 4 * days;
+        calculationPath = `(${quantityKg.toFixed(2)} Kg ÷ 81) × ₹${pricePerKg} × ${days} Days × 4 (Wet)`;
+      } else {
+        rent = quantityKg * pricePerKg * days;
+        calculationPath = `${quantityKg.toFixed(2)} Kg × ₹${pricePerKg} × ${days} Days`;
+      }
     }
 
     items.push({
