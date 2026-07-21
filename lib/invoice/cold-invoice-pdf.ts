@@ -30,12 +30,9 @@ export function generateColdInvoiceHTML(
       <tr>
         <td>${fNum(index + 1)}</td>
         <td>${item.commodityName}</td>
-        <td>${fNum(item.quantityKg.toFixed(2))}</td>
+        <td>${fNum(item.totalBags || 0)}</td>
         <td>${fNum(item.outwardKg.toFixed(2))}</td>
-        <td>${fNum(item.balanceKg.toFixed(2))}</td>
-        <td>${fDate(item.inwardDate)}</td>
         <td>${item.outwardDate ? fDate(item.outwardDate) : '-'}</td>
-        <td>${fNum(item.days)}</td>
         <td style="text-align: right; font-weight: bold;">₹${fNum(item.subtotal.toFixed(2))}</td>
       </tr>
     `;
@@ -137,14 +134,11 @@ export function generateColdInvoiceHTML(
       <thead>
         <tr>
           <th width="5%">${isGu ? 'ક્રમ' : 'No.'}</th>
-          <th width="15%">${isGu ? 'માલ' : 'Commodity'}</th>
-          <th width="10%">${isGu ? 'આવક' : 'Inward'}<br/><small>(Kg)</small></th>
-          <th width="10%">${isGu ? 'જાવક' : 'Outward'}<br/><small>(Kg)</small></th>
-          <th width="10%">${isGu ? 'બેલેન્સ' : 'Balance'}<br/><small>(Kg)</small></th>
-          <th width="12%">${isGu ? 'આવક તારીખ' : 'Inward Date'}</th>
-          <th width="12%">${isGu ? 'જાવક તારીખ' : 'Outward Date'}</th>
-          <th width="8%">${isGu ? 'દિવસ' : 'Days'}</th>
-          <th width="10%" style="text-align: right;">${isGu ? 'રકમ' : 'Amount'}</th>
+          <th width="25%">${isGu ? 'માલ' : 'Commodity'}</th>
+          <th width="15%">${isGu ? 'કુલ બેગ્સ' : 'Total Bags'}</th>
+          <th width="15%">${isGu ? 'નેટ વજન' : 'Net Wgt'}<br/><small>(Kg)</small></th>
+          <th width="20%">${isGu ? 'તારીખ' : 'Date'}</th>
+          <th width="20%" style="text-align: right;">${isGu ? 'રકમ' : 'Amount'}</th>
         </tr>
       </thead>
       <tbody>

@@ -1,8 +1,9 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IColdInvoiceItem {
-  inwardId: mongoose.Types.ObjectId;
-  inwardDate: Date;
+  inwardId?: mongoose.Types.ObjectId;
+  outwardId?: mongoose.Types.ObjectId;
+  inwardDate?: Date;
   outwardDate?: Date;
   commodityId: mongoose.Types.ObjectId;
   commodityName: string;
@@ -46,6 +47,7 @@ const ColdInvoiceSchema: Schema = new Schema(
     items: [
       {
         inwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward' },
+        outwardId: { type: Schema.Types.ObjectId, ref: 'ColdOutward' },
         inwardDate: Date,
         outwardDate: Date,
         commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity' },

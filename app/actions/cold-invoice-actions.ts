@@ -31,115 +31,61 @@ export async function generateColdClientInvoicePreview(
     ...tenantFilter,
   };
 
-  const inwards = await ColdInward.find({
-    ...matchCriteria,
-    date: { $lte: toDate } // Include anything that arrived before or on the toDate
-  }).populate('commodityId').lean();
-
+  // Fetch outwards
   const outwards = await ColdOutward.find({
     ...matchCriteria,
-    date: { $lte: toDate }
-  }).lean();
+    date: { $gte: fromDate, $lte: toDate }
+  }).populate('commodityId').lean();
+
+  // Fetch existing invoices to exclude already billed outwards
+  const existingInvoices = await ColdInvoice.find(matchCriteria).lean();
+  const billedOutwardIds = new Set<string>();
+  
+  for (const inv of existingInvoices) {
+    for (const item of (inv.items || [])) {
+      if (item.outwardId) {
+        billedOutwardIds.add(item.outwardId.toString());
+      }
+    }
+  }
 
   const items = [];
   let totalAmount = 0;
 
-  for (const inward of inwards) {
-    const inw = inward as any;
-    const commodity = inw.commodityId;
+  for (const outw of outwards) {
+    const out = outw as any;
     
-    if (!commodity) continue; // Skip if commodity is deleted or missing
-    if (!commodity) continue;
-
-    // Filter outwards that belong to this inward
-    const relatedOutwards = outwards.filter(o => o.inwardId?.toString() === inw._id.toString());
-    const totalOutwardKg = relatedOutwards.reduce((sum, o) => sum + (o.quantityKg || 0), 0);
-    const balanceKg = Math.max(0, (inw.quantityKg || 0) - totalOutwardKg);
-
-    // Safe date parsing to prevent date-fns crash if missing
-    const inwDate = inw.date ? new Date(inw.date) : new Date();
-
-    // If completely outbound before fromDate, skip
-    // Or if balance is 0 and it went out before fromDate, skip
-    let latestOutwardDate = new Date(inwDate);
-    for (const ro of relatedOutwards) {
-      const roDate = ro.date ? new Date(ro.date) : new Date();
-      if (isAfter(roDate, latestOutwardDate)) {
-        latestOutwardDate = roDate;
-      }
-    }
-    
-    if (balanceKg <= 0 && isBefore(latestOutwardDate, fromDate)) {
+    if (billedOutwardIds.has(out._id.toString())) {
       continue;
     }
-
-    // Determine calculation dates
-    // Valid duration is intersection of [inwardDate, latestOutward/toDate] and [fromDate, toDate]
-    const startCalcDate = isAfter(inwDate, fromDate) ? inwDate : fromDate;
     
-    // If balance is 0, the billing stops at latestOutwardDate, else up to toDate
-    const endCalcDate = balanceKg <= 0 && isBefore(latestOutwardDate, toDate) ? latestOutwardDate : toDate;
-    
-    const days = Math.max(0, differenceInDays(endCalcDate, startCalcDate) + 1);
-    if (days <= 0) continue; // No days to bill
+    const commodity = out.commodityId;
+    if (!commodity) continue;
 
-    // Get pricing from commodity
-    const startCalcTime = startCalcDate.getTime();
-    const seasonalPrice = commodity.seasonalPrices?.find((sp: any) => 
-      startCalcTime >= new Date(sp.fromDate).getTime() && startCalcTime <= new Date(sp.toDate).getTime()
-    ) || commodity.seasonalPrices?.[0];
-
-    const pricePerKg = seasonalPrice?.pricePerKg || 0;
-    let rent = 0;
-    let calculationPath = '';
-    let rateApplied = pricePerKg;
-
-    const bagsLarge = inw.bagsCount || 0;
-    const bagsSmall = inw.jin || 0;
-    const bagsMixed = inw.mixed || 0;
-    const totalBags = inw.totalBags || (bagsLarge + bagsSmall + bagsMixed);
-    
-    // Check grading type and price type
-    if (commodity.gradingType === 'Wet') {
-      rent = ((inw.quantityKg || 0) / 81) * pricePerKg * days * 4;
-      calculationPath = `(${(inw.quantityKg || 0).toFixed(2)} Kg ÷ 81) × ₹${pricePerKg} × ${days} Days × 4 (Wet)`;
-    } else if (commodity.priceType === 'Different Price') {
-      const pLarge = seasonalPrice?.priceLarge || 0;
-      const pSmall = seasonalPrice?.priceSmall || 0;
-      const pMixed = seasonalPrice?.priceMixed || 0;
-      
-      const rentLarge = bagsLarge * pLarge * days;
-      const rentSmall = bagsSmall * pSmall * days;
-      const rentMixed = bagsMixed * pMixed * days;
-      
-      rent = rentLarge + rentSmall + rentMixed;
-      rateApplied = 0; // Mixed rates
-      calculationPath = `${days} Days × [(L: ${bagsLarge}×₹${pLarge}) + (S: ${bagsSmall}×₹${pSmall}) + (M: ${bagsMixed}×₹${pMixed})]`;
-    } else {
-      // Same Price formula: Weight × Price × Days
-      // Inward uses full weight or balance? Standard practice often bills the full inward weight 
-      // or we must bill weight balance. For simplicity and per formula: Weight × Price × Days
-      rent = (inw.quantityKg || 0) * pricePerKg * days;
-      calculationPath = `${(inw.quantityKg || 0).toFixed(2)} Kg × ₹${pricePerKg} × ${days} Days`;
-    }
+    const rent = out.rentRs || 0;
+    const bagsLarge = out.bagsCount || 0;
+    const bagsSmall = out.jin || 0;
+    const bagsMixed = out.mixed || 0;
+    const totalBags = out.totalBags || (bagsLarge + bagsSmall + bagsMixed);
+    const outDate = out.date ? new Date(out.date) : new Date();
 
     items.push({
-      inwardId: inw._id.toString(),
-      inwardDate: inwDate.toISOString(),
-      outwardDate: (totalOutwardKg > 0 && latestOutwardDate) ? new Date(latestOutwardDate).toISOString() : null,
+      outwardId: out._id.toString(),
+      inwardId: out.inwardId ? out.inwardId.toString() : undefined,
+      outwardDate: outDate.toISOString(),
       commodityId: commodity._id.toString(),
       commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : ''),
-      quantityKg: inw.quantityKg || 0,
-      outwardKg: totalOutwardKg,
-      balanceKg: balanceKg,
+      quantityKg: out.quantityKg || 0,
+      outwardKg: out.quantityKg || 0,
+      balanceKg: 0,
       bagsLarge,
       bagsSmall,
       bagsMixed,
       totalBags,
-      days,
-      rateApplied,
+      days: 0,
+      rateApplied: 0,
       subtotal: rent,
-      calculationPath
+      calculationPath: 'Outward Gatepass Rent'
     });
 
     totalAmount += rent;

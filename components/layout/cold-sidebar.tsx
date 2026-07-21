@@ -28,6 +28,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
+  { name: 'Invoices', translationKey: 'sidebar.invoices', href: '/cold/invoices', icon: Receipt, module: 'invoice' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
   { name: 'Language', translationKey: 'sidebar.language', href: '/cold/language', icon: Globe },
 ];

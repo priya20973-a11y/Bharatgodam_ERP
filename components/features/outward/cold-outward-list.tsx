@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -18,39 +19,52 @@ interface ColdOutwardListProps {
 
 export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const { t, formatNumber } = useColdTranslation();
+  const [showRent, setShowRent] = useState(true);
 
   return (
-    <div className="rounded-md border bg-white shadow-sm overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-slate-50">
-            <TableHead className="font-semibold">{t('outward.dateHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('outward.clientNameHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('outward.commodityHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('outward.warehouseHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.chamberHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.floorHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.stackHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.quantityHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.bagsHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {outwards.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center text-slate-500">
-                {t('outward.noOutwardFound')}
-              </TableCell>
+    <div className="space-y-4">
+      <div className="flex justify-end items-center px-2">
+        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={showRent} 
+            onChange={(e) => setShowRent(e.target.checked)}
+            className="rounded border-slate-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+          />
+          <span>Show Rent in Gatepass</span>
+        </label>
+      </div>
+      <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50">
+              <TableHead className="font-semibold">{t('outward.dateHeader')}</TableHead>
+              <TableHead className="font-semibold">{t('outward.clientNameHeader')}</TableHead>
+              <TableHead className="font-semibold">{t('outward.commodityHeader')}</TableHead>
+              <TableHead className="font-semibold">{t('outward.warehouseHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.chamberHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.floorHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.stackHeader')}</TableHead>
+              <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.quantityHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.bagsHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('outward.actions')}</TableHead>
             </TableRow>
-          ) : (
-            outwards.map((w) => {
-              const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
-              
-              const printUrl = w.isBatch 
-                ? `/api/cold/receipt/html?batchId=${w.batchId}&type=outward`
-                : `/api/cold/receipt/html?id=${w._id}&type=outward`;
+          </TableHeader>
+          <TableBody>
+            {outwards.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-24 text-center text-slate-500">
+                  {t('outward.noOutwardFound')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              outwards.map((w) => {
+                const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
+                
+                const printUrl = w.isBatch 
+                  ? `/api/cold/receipt/html?batchId=${w.batchId}&type=outward&showRent=${showRent}`
+                  : `/api/cold/receipt/html?id=${w._id}&type=outward&showRent=${showRent}`;
 
               let sameChamber = true;
               let sameFloor = true;
@@ -114,6 +128,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
           )}
         </TableBody>
       </Table>
+    </div>
     </div>
   );
 }

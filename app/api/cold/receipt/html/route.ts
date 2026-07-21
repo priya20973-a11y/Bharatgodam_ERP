@@ -94,10 +94,12 @@ export async function GET(request: NextRequest) {
     };
     
     const language = (session.user as any).coldLanguage || 'en';
+    const showRentStr = request.nextUrl.searchParams.get('showRent');
+    const showRent = showRentStr !== 'false';
     
     let html = '';
     if (type === 'outward') {
-      html = generateColdOutwardReceiptHTML(batchData, userDetails, language);
+      html = generateColdOutwardReceiptHTML(batchData, userDetails, language, showRent);
     } else {
       html = generateColdTransactionReceiptHTML(data, type, userDetails, language);
     }

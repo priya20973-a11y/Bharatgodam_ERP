@@ -154,12 +154,9 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               <thead className="bg-slate-100 text-slate-700">
                 <tr>
                   <th className="p-3 border">Commodity</th>
-                  <th className="p-3 border">Inward (Kg)</th>
-                  <th className="p-3 border">Outward (Kg)</th>
-                  <th className="p-3 border">Balance (Kg)</th>
-                  <th className="p-3 border">Inward Date</th>
-                  <th className="p-3 border">Outward Date</th>
-                  <th className="p-3 border">Days</th>
+                  <th className="p-3 border">Total Bags</th>
+                  <th className="p-3 border">Net Weight (Kg)</th>
+                  <th className="p-3 border">Date</th>
                   <th className="p-3 border text-right">Rent (₹)</th>
                 </tr>
               </thead>
@@ -167,12 +164,9 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                 {preview.items.map((item: any, idx: number) => (
                   <tr key={idx} className="border-b hover:bg-slate-50">
                     <td className="p-3 border">{item.commodityName}</td>
-                    <td className="p-3 border font-medium">{item.quantityKg.toFixed(2)}</td>
-                    <td className="p-3 border text-rose-600">{item.outwardKg.toFixed(2)}</td>
-                    <td className="p-3 border font-bold text-emerald-600">{item.balanceKg.toFixed(2)}</td>
-                    <td className="p-3 border">{new Date(item.inwardDate).toLocaleDateString('en-GB')}</td>
+                    <td className="p-3 border">{item.totalBags}</td>
+                    <td className="p-3 border">{item.outwardKg.toFixed(2)}</td>
                     <td className="p-3 border">{item.outwardDate ? new Date(item.outwardDate).toLocaleDateString('en-GB') : '-'}</td>
-                    <td className="p-3 border">{item.days}</td>
                     <td className="p-3 border text-right font-bold">₹{item.subtotal.toFixed(2)}</td>
                   </tr>
                 ))}

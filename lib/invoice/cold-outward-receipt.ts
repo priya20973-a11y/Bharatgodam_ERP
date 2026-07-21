@@ -6,7 +6,8 @@ import { gu } from '@/lib/i18n/cold/gu';
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
   userDetails?: { companyLogo: string, phoneNumber: string },
-  lang: string = 'en'
+  lang: string = 'en',
+  showRent: boolean = true
 ): string {
   const formatNum = (num: number | string) => lang === 'gu' ? toGujaratiDigits(num) : String(num);
 
@@ -432,10 +433,12 @@ export function generateColdOutwardReceiptHTML(
           <div class="label">${t.remarkLabel}</div>
           <div class="value" style="color:#333;">${remarks}</div>
         </div>
+        ${showRent ? `
         <div class="receipt-line">
           <div class="label">${t.rentLabel}</div>
           <div class="value" style="color:#333;">${rentRsDisplay}</div>
         </div>
+        ` : ''}
         <div class="receipt-line" style="align-items: flex-start;">
           <div class="label" style="padding-top: 2px;">${t.noteLabel}</div>
           <div class="value" style="color:#333; white-space: normal; overflow: visible; word-wrap: break-word; line-height: 1.4;">${note}</div>
