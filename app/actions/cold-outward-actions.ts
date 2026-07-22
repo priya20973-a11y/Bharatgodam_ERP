@@ -89,14 +89,13 @@ export async function getStackAvailableClientStock(
 
   const outwards = await ColdOutward.aggregate([
     { $match: matchCriteria },
-    { $group: { _id: null, totalOutward: { $sum: '$quantityKg' }, totalPlusMinus: { $sum: '$plusMinus' } } }
+    { $group: { _id: null, totalOutward: { $sum: '$quantityKg' } } }
   ]);
   const totalOutward = outwards.length > 0 ? outwards[0].totalOutward : 0;
-  const totalPlusMinus = outwards.length > 0 ? (outwards[0].totalPlusMinus || 0) : 0;
 
-  const availableStock = Math.max(0, totalInward + totalPlusMinus - totalOutward);
+  const availableStock = Math.max(0, totalInward - totalOutward);
   
-  return { availableStock, totalInward, totalOutward, totalPlusMinus };
+  return { availableStock, totalInward, totalOutward };
 }
 
 export async function getAvailableInwardsForClient(clientId: string) {
@@ -114,8 +113,7 @@ export async function getAvailableInwardsForClient(clientId: string) {
     { $match: { clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter } },
     { $group: { 
         _id: { inwardId: '$inwardId', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
-        totalOutward: { $sum: '$quantityKg' }, 
-        totalPlusMinus: { $sum: '$plusMinus' } 
+        totalOutward: { $sum: '$quantityKg' }
       } 
     }
   ]);
@@ -124,7 +122,7 @@ export async function getAvailableInwardsForClient(clientId: string) {
   outwards.forEach(o => {
     if (o._id.inwardId) {
       const key = `${o._id.inwardId.toString()}_${o._id.chamberNo}_${o._id.floorNo}_${o._id.stackNo}`;
-      outwardMap.set(key, { out: o.totalOutward, plusMinus: o.totalPlusMinus || 0 });
+      outwardMap.set(key, { out: o.totalOutward });
     }
   });
 
@@ -152,8 +150,8 @@ export async function getAvailableInwardsForClient(clientId: string) {
     
     return Array.from(mergedAllocations.values()).map((alloc: any) => {
       const key = `${inward._id.toString()}_${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
-      const outData = outwardMap.get(key) || { out: 0, plusMinus: 0 };
-      const availableQty = Math.max(0, alloc.allocatedWeight + outData.plusMinus - outData.out);
+      const outData = outwardMap.get(key) || { out: 0 };
+      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out);
       
       return { 
         ...inward,
@@ -187,7 +185,7 @@ export async function createColdOutward(data: any) {
       data.stackNo
     );
     
-    const adjustedAvailableStock = stockInfo.availableStock + (Number(data.plusMinus) || 0);
+    const adjustedAvailableStock = stockInfo.availableStock;
     if (data.quantityKg > adjustedAvailableStock) {
       return { success: false, error: `Quantity exceeds available stock. Available: ${adjustedAvailableStock} Kg` };
     }
@@ -250,6 +248,8 @@ export async function createColdOutward(data: any) {
       rentReason = 'Commodity pricing not configured';
     }
 
+    if (data.grade === '') delete data.grade;
+
     const outward = await ColdOutward.create(appendOwnership({
       ...data,
       totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
@@ -288,7 +288,7 @@ export async function createBatchColdOutwards(payload: any) {
         item.stackNo
       );
       
-      const adjustedAvailableStock = stockInfo.availableStock + (Number(item.plusMinus) || 0);
+      const adjustedAvailableStock = stockInfo.availableStock;
       if (item.quantityKg > adjustedAvailableStock) {
         return { success: false, error: `Quantity exceeds available stock for one of the items. Available: ${adjustedAvailableStock} Kg` };
       }
@@ -349,6 +349,8 @@ export async function createBatchColdOutwards(payload: any) {
       } else {
         rentReason = 'Commodity pricing not configured';
       }
+
+      if (item.grade === '') delete item.grade;
 
       const outward = await ColdOutward.create(appendOwnership({
         ...item,

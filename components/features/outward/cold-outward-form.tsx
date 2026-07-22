@@ -119,7 +119,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         return;
       }
       
-      const adjustedAvailableQty = item.inward.availableQty + Number(item.plusMinus || 0);
+      const adjustedAvailableQty = item.inward.availableQty;
       if (calcNetWeight > adjustedAvailableQty) {
         toast.error(`Quantity exceeds capacity for inward ${item.inwardId.slice(-4)}`);
         return;
@@ -285,8 +285,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             
             <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - C{item.inward.chamberNo}/F{item.inward.floorNo}/S{item.inward.stackNo} (Available: {(() => {
               const baseQty = Number(item.inward?.availableQty) || 0;
-              const pm = (item.plusMinus === '-' || item.plusMinus === '+') ? 0 : Number(item.plusMinus || 0);
-              const finalQty = baseQty + (isNaN(pm) ? 0 : pm);
+              const finalQty = baseQty;
               return finalQty.toFixed(2);
             })()} Kg)</h4>
             
@@ -338,7 +337,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       })}
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" disabled={loading || selectedItems.length === 0}>
+        <Button type="submit" variant="destructive" disabled={loading || selectedItems.length === 0}>
           {loading ? t('outward.saving') : t('outward.saveOutward')}
         </Button>
       </div>

@@ -80,16 +80,14 @@ export async function getStackAvailableCapacity(warehouseId: string, chamberNo: 
     {
       $group: {
         _id: null,
-        totalOutward: { $sum: '$quantityKg' },
-        totalPlusMinus: { $sum: '$plusMinus' }
+        totalOutward: { $sum: '$quantityKg' }
       }
     }
   ]);
 
   const totalInward = inwards.length > 0 ? inwards[0].totalInward : 0;
   const totalOutward = outwards.length > 0 ? outwards[0].totalOutward : 0;
-  const totalPlusMinus = outwards.length > 0 ? (outwards[0].totalPlusMinus || 0) : 0;
-  const occupied = Math.max(0, totalInward + totalPlusMinus - totalOutward);
+  const occupied = Math.max(0, totalInward - totalOutward);
   
   return { availableCapacity: Math.max(0, totalCapacity - occupied), totalCapacity, occupied };
 }
@@ -264,6 +262,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         emptyWeight: client.emptyWeight || 0,
         kataBharati: client.kataBharati,
         marko: client.marko,
+        farmerName: client.farmerName,
         referencePersons: client.referencePersons,
         warehouseId: data.warehouseId,
       };
