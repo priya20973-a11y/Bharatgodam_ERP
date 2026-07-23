@@ -237,8 +237,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
       });
 
       const totalOtherOutwardQty = otherOutwards.reduce((sum, o) => sum + o.quantityKg, 0);
-      const totalOtherPlusMinus = otherOutwards.reduce((sum, o) => sum + (o.plusMinus || 0), 0);
-      const availableQtyForThisEdit = inward.quantityKg + totalOtherPlusMinus + (Number(data.plusMinus) || 0) - totalOtherOutwardQty;
+      const availableQtyForThisEdit = inward.quantityKg - totalOtherOutwardQty;
 
       if (data.quantityKg > availableQtyForThisEdit) {
         return { success: false, error: `Quantity exceeds available balance (${availableQtyForThisEdit} Kg).` };

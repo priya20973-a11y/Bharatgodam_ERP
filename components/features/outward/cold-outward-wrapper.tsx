@@ -45,7 +45,7 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
         <h2 className="text-xl font-semibold">{t('outward.pageTitle')}</h2>
         <Button 
           onClick={() => setIsAdding(!isAdding)}
-          variant={isAdding ? "outline" : "default"}
+          variant={isAdding ? "outline" : "destructive"}
         >
           {isAdding ? <><X className="mr-2 h-4 w-4" /> {t('common.cancel')}</> : <><Plus className="mr-2 h-4 w-4" /> {t('outward.addOutward')}</>}
         </Button>

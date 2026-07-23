@@ -119,7 +119,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         return;
       }
       
-      const adjustedAvailableQty = item.inward.availableQty + Number(item.plusMinus || 0);
+      const adjustedAvailableQty = item.inward.availableQty;
       if (calcNetWeight > adjustedAvailableQty) {
         toast.error(`Quantity exceeds capacity for inward ${item.inwardId.slice(-4)}`);
         return;
@@ -127,30 +127,60 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
       const autoGradingType = commodities.find(c => c._id === (item.inward.commodityId?._id || item.inward.commodityId))?.gradingType || '';
 
-      itemsPayload.push({
-        inwardId: item.inward._id,
-        commodityId: item.inward.commodityId._id || item.inward.commodityId,
-        warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
-        chamberNo: item.inward.chamberNo,
-        floorNo: item.inward.floorNo,
-        stackNo: item.inward.stackNo,
-        quantityKg: calcNetWeight,
-        bagsCount: Number(item.bagsCount) || 0,
-        grade: autoGradingType === 'Grading' ? item.grade : undefined,
-        gradingType: autoGradingType || undefined,
-        seed: item.inward.seed,
-        tableLabel: item.inward.tableLabel,
-        jin: Number(item.jin) || 0,
-        mixed: Number(item.mixed) || 0,
-        plusMinus: Number(item.plusMinus) || 0,
-        totalBags: calcTotalBags,
-        weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
-        grossWeight: Number(item.grossWeight) || 0,
-        emptyWeight: Number(item.emptyWeight) || 0,
-        kataBharati: calcKataBharati,
-        marko: item.inward.marko,
-        referencePersons: item.inward.referencePersons,
-      });
+      const allocations = item.inward.availableAllocations || [item.inward];
+      
+      let remainingNetWeight = calcNetWeight;
+      let remainingLargeBags = Number(item.bagsCount) || 0;
+      let remainingSmallBags = Number(item.jin) || 0;
+      let remainingMixedBags = Number(item.mixed) || 0;
+      
+      for (let i = 0; i < allocations.length; i++) {
+        const alloc = allocations[i];
+        if (remainingNetWeight <= 0) break;
+        
+        const isLastAlloc = i === allocations.length - 1 || remainingNetWeight <= alloc.availableQty;
+        const deductNetWeight = Math.min(remainingNetWeight, alloc.availableQty);
+        
+        const ratio = deductNetWeight / calcNetWeight;
+        
+        const deductLargeBags = isLastAlloc ? remainingLargeBags : Math.round(Number(item.bagsCount || 0) * ratio);
+        const deductSmallBags = isLastAlloc ? remainingSmallBags : Math.round(Number(item.jin || 0) * ratio);
+        const deductMixedBags = isLastAlloc ? remainingMixedBags : Math.round(Number(item.mixed || 0) * ratio);
+        
+        remainingNetWeight -= deductNetWeight;
+        remainingLargeBags -= deductLargeBags;
+        remainingSmallBags -= deductSmallBags;
+        remainingMixedBags -= deductMixedBags;
+        
+        const grossWeightPart = Number(item.grossWeight || 0) * ratio;
+        const emptyWeightPart = Number(item.emptyWeight || 0) * ratio;
+        const deductTotalBags = deductLargeBags + deductSmallBags + deductMixedBags;
+
+        itemsPayload.push({
+          inwardId: item.inward._id,
+          commodityId: item.inward.commodityId._id || item.inward.commodityId,
+          warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
+          chamberNo: alloc.chamberNo,
+          floorNo: alloc.floorNo,
+          stackNo: alloc.stackNo,
+          quantityKg: deductNetWeight,
+          bagsCount: deductLargeBags,
+          grade: autoGradingType === 'Grading' ? item.grade : undefined,
+          gradingType: autoGradingType || undefined,
+          seed: item.inward.seed,
+          tableLabel: item.inward.tableLabel,
+          jin: deductSmallBags,
+          mixed: deductMixedBags,
+          plusMinus: Number(item.plusMinus) || 0,
+          totalBags: deductTotalBags,
+          weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
+          grossWeight: grossWeightPart,
+          emptyWeight: emptyWeightPart,
+          kataBharati: deductTotalBags > 0 ? deductNetWeight / deductTotalBags : 0,
+          marko: item.inward.marko,
+          referencePersons: item.inward.referencePersons,
+        });
+      }
     }
 
     setLoading(true);
@@ -230,7 +260,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} (C{inw.chamberNo}/F{inw.floorNo}/S{inw.stackNo}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                       </span>
                     </div>
                   )
@@ -283,10 +313,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
             
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - C{item.inward.chamberNo}/F{item.inward.floorNo}/S{item.inward.stackNo} (Available: {(() => {
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')} (Available: {(() => {
               const baseQty = Number(item.inward?.availableQty) || 0;
-              const pm = (item.plusMinus === '-' || item.plusMinus === '+') ? 0 : Number(item.plusMinus || 0);
-              const finalQty = baseQty + (isNaN(pm) ? 0 : pm);
+              const finalQty = baseQty;
               return finalQty.toFixed(2);
             })()} Kg)</h4>
             
@@ -338,7 +367,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       })}
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" disabled={loading || selectedItems.length === 0}>
+        <Button type="submit" variant="destructive" disabled={loading || selectedItems.length === 0}>
           {loading ? t('outward.saving') : t('outward.saveOutward')}
         </Button>
       </div>

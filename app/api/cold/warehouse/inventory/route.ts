@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       ]),
       ColdOutward.aggregate([
         { $match: outwardFilterQuery },
-        { $group: { _id: '$commodityId', totalKg: { $sum: '$quantityKg' }, totalPlusMinus: { $sum: '$plusMinus' } } }
+        { $group: { _id: '$commodityId', totalKg: { $sum: '$quantityKg' } } }
       ])
     ]);
 
@@ -108,7 +108,6 @@ export async function GET(request: NextRequest) {
       if (commodityMap.has(idStr)) {
         const existing = commodityMap.get(idStr);
         existing.totalWeight -= outward.totalKg;
-        existing.totalWeight += (outward.totalPlusMinus || 0);
       }
     });
 

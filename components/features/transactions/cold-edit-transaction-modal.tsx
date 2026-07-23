@@ -433,7 +433,7 @@ export default function ColdEditTransactionModal({
 
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} variant={transactionType === 'OUTWARD' ? 'destructive' : 'default'}>
                 {loading ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>

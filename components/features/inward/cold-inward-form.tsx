@@ -91,6 +91,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       jin: null,
       mixed: null,
       marko: '',
+      farmerName: '',
       kataBharati: 0,
       stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null }],
       referencePersons: []
@@ -432,7 +433,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-blue-600">Large Bag</label>
                 <ColdNumberInput min="0" value={client.bagsCount ?? ''} onChange={(v) => updateClient(cIdx, 'bagsCount', v ? Number(v) : null)} />
@@ -452,6 +453,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               <div className="space-y-2">
                 <label className="text-sm font-medium">Marko</label>
                 <Input value={client.marko} onChange={(e) => updateClient(cIdx, 'marko', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('inward.farmerName') || 'Farmer Name'}</label>
+                <Input value={client.farmerName || ''} onChange={(e) => updateClient(cIdx, 'farmerName', e.target.value)} />
               </div>
             </div>
 
