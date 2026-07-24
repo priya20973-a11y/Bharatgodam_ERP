@@ -23,6 +23,7 @@ const wspNavItems: NavItem[] = [
   { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2, moduleId: 'transactionReport' },
   { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt, moduleId: 'invoice' },
   { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText, moduleId: 'ledger' },
+  { name: 'Comprehensive Accounting', href: '/dashboard/accounting', icon: DollarSign, moduleId: 'accounting' },
   { name: 'Revenue split for Storage Charges', href: '/dashboard/revenue', icon: DollarSign, moduleId: 'revenueSplit' },
 ];
 

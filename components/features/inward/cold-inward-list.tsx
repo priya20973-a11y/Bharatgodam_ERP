@@ -10,8 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Printer } from "lucide-react";
+import { Download, Printer, QrCode } from "lucide-react";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { Badge } from '@/components/ui/badge';
 
 interface ColdInwardListProps {
   inwards: any[];
@@ -76,16 +77,39 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)}</TableCell>
                   <TableCell className="text-right text-slate-700">{formatNumber(w.bagsCount)}</TableCell>
                   <TableCell className="text-right">
-                    <a 
-                      href={`/api/cold/receipt/html?id=${w._id}&type=inward`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-8 w-8 text-slate-600 hover:text-indigo-600"
-                      title={t('inward.print')}
-                    >
-                      <Printer className="h-4 w-4" />
-                      <span className="sr-only">{t('inward.print')}</span>
-                    </a>
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
+                      <a 
+                        href={`/api/cold/qr?inwardId=${w._id}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 hover:text-indigo-900"
+                        title="View QR"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        <span>QR</span>
+                      </a>
+                      <a 
+                        href={`/api/cold/qr?inwardId=${w._id}&download=1`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-8 w-8 text-slate-600 hover:text-indigo-600"
+                        title="Download QR"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="sr-only">Download QR</span>
+                      </a>
+                      <Badge variant="success" className="text-[10px] px-2 py-1">QR generated</Badge>
+                      <a 
+                        href={`/api/cold/receipt/html?id=${w._id}&type=inward`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-8 w-8 text-slate-600 hover:text-indigo-600"
+                        title={t('inward.print')}
+                      >
+                        <Printer className="h-4 w-4" />
+                        <span className="sr-only">{t('inward.print')}</span>
+                      </a>
+                    </div>
                   </TableCell>
                 </TableRow>
               );

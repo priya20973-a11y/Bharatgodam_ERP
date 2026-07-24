@@ -12,7 +12,8 @@ export type WspModuleId =
   | 'bulkUpload'
   | 'invoice'
   | 'revenueSplit'
-  | 'ledger'; // We'll keep ledger for completeness
+  | 'ledger'
+  | 'accounting';
 
 export const WSP_MODULE_NAMES: Record<WspModuleId, string> = {
   dashboard: 'Dashboard',
@@ -26,7 +27,8 @@ export const WSP_MODULE_NAMES: Record<WspModuleId, string> = {
   bulkUpload: 'Bulk Upload',
   invoice: 'Client Invoices',
   revenueSplit: 'Revenue split for Storage Charges',
-  ledger: 'Client Ledger'
+  ledger: 'Client Ledger',
+  accounting: 'Comprehensive Accounting'
 };
 
 /**

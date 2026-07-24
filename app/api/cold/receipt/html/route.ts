@@ -108,12 +108,32 @@ export async function GET(request: NextRequest) {
     };
     
     const language = (session.user as any).coldLanguage || 'en';
+    const originHeader = request.headers.get('origin');
+    const refererHeader = request.headers.get('referer');
+    const forwardedProto = request.headers.get('x-forwarded-proto') || request.headers.get('x-forwarded-protocol');
+    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const resolvedOrigin = (() => {
+      try {
+        if (originHeader) return new URL(originHeader).origin;
+        if (refererHeader) return new URL(refererHeader).origin;
+      } catch {
+        // fall through to derived host-based origin
+      }
+
+      if (forwardedHost) {
+        const protocol = forwardedProto || 'https';
+        return `${protocol}://${forwardedHost}`;
+      }
+
+      return request.nextUrl.origin;
+    })();
+    const publicBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || resolvedOrigin || process.env.NEXTAUTH_URL;
     
     let html = '';
     if (type === 'outward') {
       html = generateColdOutwardReceiptHTML(batchData, userDetails, language);
     } else {
-      html = generateColdTransactionReceiptHTML(data, type, userDetails, language);
+      html = await generateColdTransactionReceiptHTML(data, type, userDetails, language, publicBaseUrl);
     }
     
     return new NextResponse(html, {

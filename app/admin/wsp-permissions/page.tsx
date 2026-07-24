@@ -2,6 +2,8 @@ import { getDryStorageWsps } from '@/app/actions/wsp-permission-actions';
 import WspPermissionsClient from '@/components/features/admin/wsp-permissions-client';
 import { Shield } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'WSP Permissions | Admin',
 };

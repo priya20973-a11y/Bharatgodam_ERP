@@ -17,7 +17,8 @@ const WSP_MODULE_PATHS: Record<WspModuleId, string> = {
   bulkUpload: '/dashboard/bulk-transactions',
   invoice: '/dashboard/client-invoices',
   revenueSplit: '/dashboard/revenue',
-  ledger: '/dashboard/ledger'
+  ledger: '/dashboard/ledger',
+  accounting: '/dashboard/accounting'
 };
 
 export async function requireWspPagePermission(moduleId: WspModuleId) {

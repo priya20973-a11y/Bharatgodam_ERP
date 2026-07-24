@@ -2,13 +2,15 @@ import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
 import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
+import QRCode from 'qrcode';
 
-export function generateColdTransactionReceiptHTML(
+export async function generateColdTransactionReceiptHTML(
   data: any,
   type: 'inward' | 'outward',
   userDetails?: { companyLogo: string, phoneNumber: string },
-  lang: string = 'en'
-): string {
+  lang: string = 'en',
+  scanBaseUrl?: string
+): Promise<string> {
   const l = (lang === 'gu' ? gu.receipt : en.receipt) as any;
   const formatNum = (num: number | string) => lang === 'gu' ? toGujaratiDigits(num) : String(num);
 
@@ -82,6 +84,12 @@ export function generateColdTransactionReceiptHTML(
   const warehouseAddress = data.warehouseId?.address || (lang === 'gu' ? 'મુ.ખેંટવા, ડીસા-ભીલડી હાઇવે, તા.ડીસા-૩૮૫૫૩૫, જિ.બનાસકાંઠા' : 'Deesa-Bhildi Highway, Deesa - 385535, Banaskantha');
   const mobile = userDetails?.phoneNumber ? formatNum(userDetails.phoneNumber) : '96240 39195';
   const logoUrl = userDetails?.companyLogo || '';
+
+  const inwardId = String(data._id || data.id || '');
+  const qrTarget = scanBaseUrl && inwardId
+    ? `${scanBaseUrl}/api/cold/qr?inwardId=${encodeURIComponent(inwardId)}`
+    : '';
+  const qrDataUrl = qrTarget ? await QRCode.toDataURL(qrTarget) : '';
 
   const title = type === 'inward'
     ? (lang === 'gu' ? 'ભાડા પાવતી' : 'RENT RECEIPT')
@@ -457,6 +465,16 @@ export function generateColdTransactionReceiptHTML(
       </div>
     </div>
     
+    ${type === 'inward' && qrDataUrl ? `
+    <div style="margin-top: 16px; display: flex; align-items: center; gap: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px;">
+      <img src="${qrDataUrl}" alt="QR Code" style="width: 120px; height: 120px; border: 1px solid #cbd5e1; background: white; padding: 6px; border-radius: 8px;" />
+      <div>
+        <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;">Scan QR to view live stock status</div>
+        <div style="font-size: 12px; color: #0f172a; margin-top: 4px;">Same QR stays with the inward. The content updates as outward stock is consumed.</div>
+      </div>
+    </div>
+    ` : ''}
+
     <div class="conditions-box">
       ${l.conditionsBox}
     </div>

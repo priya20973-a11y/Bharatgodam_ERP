@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Receipt } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Calculator, Thermometer } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -28,6 +28,8 @@ const coldNavItems: NavItem[] = [
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
+  { name: 'Cold Storage Accounting', translationKey: 'sidebar.accounting', href: '/cold/accounting', icon: Calculator, module: 'accounting' },
+  { name: 'Environment Records', translationKey: 'sidebar.environmentRecords', href: '/cold/environment', icon: Thermometer, module: 'environment' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
   { name: 'Language', translationKey: 'sidebar.language', href: '/cold/language', icon: Globe },
 ];
@@ -83,6 +85,8 @@ export default function ColdSidebar({ session }: SidebarProps) {
               .map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
+              const translatedLabel = item.translationKey ? t(item.translationKey) : item.name;
+              const displayLabel = translatedLabel === item.translationKey ? item.name : translatedLabel;
               
               return (
                 <Link
@@ -100,7 +104,7 @@ export default function ColdSidebar({ session }: SidebarProps) {
                       isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                     }`}
                   />
-                  {t(item.translationKey)}
+                  {displayLabel}
                 </Link>
               );
             })}

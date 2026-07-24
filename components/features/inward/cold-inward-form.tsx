@@ -228,7 +228,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     try {
       const res = await createColdInwardBulk({ common, warehouseId: common.warehouseId, clients: clientSections }, draftId);
       if (res.success) {
-        toast.success('Inwards created successfully');
+        toast.success(`Inward(s) created successfully. QR status and receipt are now available from the inward list.`);
         onSuccess();
       } else {
         toast.error(res.error || 'Failed to create inwards');
