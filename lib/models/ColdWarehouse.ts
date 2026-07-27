@@ -21,7 +21,7 @@ export interface IColdFloor {
 
 export interface IColdChamber {
   name: string;
-  chamberNo: number;
+  chamberNo?: number;
   floors: IColdFloor[];
 }
 
@@ -39,7 +39,19 @@ export interface IColdWarehouse extends Document {
   noOfFloors: number;
   noOfStacks: number;
   stackCapacity: number; // in Kg
+  bufferCapacity: number; // buffer allowed in Kg
   totalCapacity: number; // calculated total in Kg
+
+  aadhaarNo?: string;
+  panNo?: string;
+  gstin?: string;
+  bankDetails?: {
+    bankName: string;
+    accountNo: string;
+    ifsc: string;
+    branch: string;
+  };
+  warehouseLogo?: string;
   
   // Layout Configuration
   stackLayout: 'ROW_WISE' | 'COLUMN_WISE' | 'REVERSE_ROW_WISE' | 'REVERSE_COLUMN_WISE' | 'CUSTOM';
@@ -77,7 +89,7 @@ const FloorSchema = new Schema({
 
 const ChamberSchema = new Schema({
   name: { type: String, required: true },
-  chamberNo: { type: Number, required: true },
+  chamberNo: { type: Number, required: false },
   floors: [FloorSchema]
 });
 
@@ -96,7 +108,19 @@ const ColdWarehouseSchema: Schema = new Schema(
     noOfFloors: { type: Number, required: true, min: 1 },
     noOfStacks: { type: Number, required: true, min: 1 },
     stackCapacity: { type: Number, required: true, min: 0 },
+    bufferCapacity: { type: Number, required: true, default: 0, min: 0 },
     totalCapacity: { type: Number, required: true, min: 0 },
+    
+    aadhaarNo: { type: String, required: false },
+    panNo: { type: String, required: false },
+    gstin: { type: String, required: false },
+    bankDetails: {
+      bankName: { type: String, required: false },
+      accountNo: { type: String, required: false },
+      ifsc: { type: String, required: false },
+      branch: { type: String, required: false }
+    },
+    warehouseLogo: { type: String, required: false },
     
     stackLayout: { 
       type: String, 
@@ -122,7 +146,10 @@ const ColdWarehouseSchema: Schema = new Schema(
 
 ColdWarehouseSchema.index({ userId: 1, name: 1 }, { unique: true });
 
-const ColdWarehouse: Model<IColdWarehouse> =
-  mongoose.models.ColdWarehouse || mongoose.model<IColdWarehouse>('ColdWarehouse', ColdWarehouseSchema);
+if (mongoose.models.ColdWarehouse) {
+  delete mongoose.models.ColdWarehouse;
+}
+
+const ColdWarehouse: Model<IColdWarehouse> = mongoose.model<IColdWarehouse>('ColdWarehouse', ColdWarehouseSchema);
 
 export default ColdWarehouse;

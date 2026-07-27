@@ -12,7 +12,8 @@ export interface IColdOutward extends Document {
   clientId: mongoose.Types.ObjectId;
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
-  chamberNo: number;
+  chamberName: string;
+  chamberNo?: number;
   floorNo: number;
   stackNo: number;
   quantityKg: number; // Net Weight
@@ -27,6 +28,7 @@ export interface IColdOutward extends Document {
   totalBags?: number;
   truckNo?: string;
   farmerName?: string;
+  farmerId?: string;
   weighbridgeSlipNo?: string;
   grossWeight?: number;
   emptyWeight?: number;
@@ -58,7 +60,8 @@ const ColdOutwardSchema: Schema = new Schema(
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
-    chamberNo: { type: Number, required: true, min: 1 },
+    chamberName: { type: String, required: true },
+    chamberNo: { type: Number, required: false },
     floorNo: { type: Number, required: true, min: 1 },
     stackNo: { type: Number, required: true, min: 1 },
     quantityKg: { type: Number, required: true, min: 0 },
@@ -73,6 +76,7 @@ const ColdOutwardSchema: Schema = new Schema(
     totalBags: { type: Number, required: false },
     truckNo: { type: String, required: false },
     farmerName: { type: String, required: false },
+    farmerId: { type: String, required: false },
     weighbridgeSlipNo: { type: String, required: false },
     grossWeight: { type: Number, required: false },
     emptyWeight: { type: Number, required: false },

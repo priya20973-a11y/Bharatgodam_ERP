@@ -166,6 +166,20 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
       },
     },
     {
+      accessorKey: 'farmerName',
+      header: 'Farmer',
+      cell: ({ row }) => {
+        const farmerName = row.original.farmerName;
+        const farmerId = row.original.farmerId;
+        if (!farmerName) return <span className="text-slate-400">—</span>;
+        return (
+          <span className="font-medium text-slate-700">
+            {farmerName} {farmerId ? `- ${farmerId}` : ''}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: 'commodityName',
       header: 'Commodity',
       cell: ({ row }) => {

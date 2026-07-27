@@ -6,14 +6,14 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
-import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
+import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 
 export async function getColdOutwards() {
   await connectToDatabase();
   const session = await requireSession();
   
-  const outwards = await ColdOutward.find(getTenantFilter(session))
+  const outwards = await ColdOutward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name warehouseId')
@@ -49,19 +49,27 @@ export async function getStackAvailableClientStock(
   clientId: string,
   commodityId: string,
   warehouseId: string,
-  chamberNo: number,
+  chamberName: string,
   floorNo: number,
   stackNo: number
 ) {
   await connectToDatabase();
   const session = await requireSession();
 
+  const warehouse = await connectToDatabase().then(() => mongoose.model('ColdWarehouse').findOne({ _id: warehouseId, ...getTenantFilter(session) }));
+  const chamber = warehouse?.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
+
   const matchCriteria = {
     $and: [
       { clientId: new mongoose.Types.ObjectId(clientId) },
       { commodityId: new mongoose.Types.ObjectId(commodityId) },
       { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-      { chamberNo },
+      { 
+        $or: [
+          { chamberName: chamberName },
+          ...(chamber?.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
+        ]
+      },
       { floorNo },
       { stackNo },
       getTenantFilter(session)
@@ -73,7 +81,12 @@ export async function getStackAvailableClientStock(
       { clientId: new mongoose.Types.ObjectId(clientId) },
       { commodityId: new mongoose.Types.ObjectId(commodityId) },
       { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-      { 'stackAllocations.chamberNo': chamberNo },
+      { 
+        $or: [
+          { 'stackAllocations.chamberName': chamberName },
+          ...(chamber?.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
+        ]
+      },
       { 'stackAllocations.floorNo': floorNo },
       { 'stackAllocations.stackNo': stackNo },
       getTenantFilter(session)
@@ -112,7 +125,7 @@ export async function getAvailableInwardsForClient(clientId: string) {
   const outwards = await ColdOutward.aggregate([
     { $match: { clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter } },
     { $group: { 
-        _id: { inwardId: '$inwardId', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
+        _id: { inwardId: '$inwardId', chamberName: '$chamberName', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
         totalOutward: { $sum: '$quantityKg' }
       } 
     }
@@ -121,7 +134,8 @@ export async function getAvailableInwardsForClient(clientId: string) {
   const outwardMap = new Map();
   outwards.forEach(o => {
     if (o._id.inwardId) {
-      const key = `${o._id.inwardId.toString()}_${o._id.chamberNo}_${o._id.floorNo}_${o._id.stackNo}`;
+      const chamberKey = o._id.chamberName || o._id.chamberNo;
+      const key = `${o._id.inwardId.toString()}_${chamberKey}_${o._id.floorNo}_${o._id.stackNo}`;
       outwardMap.set(key, { out: o.totalOutward });
     }
   });
@@ -132,13 +146,15 @@ export async function getAvailableInwardsForClient(clientId: string) {
     // Merge duplicate stack allocations to handle legacy data with duplicate stacks
     const mergedAllocations = new Map();
     inward.stackAllocations.forEach((alloc: any) => {
-      const k = `${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const k = `${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       if (mergedAllocations.has(k)) {
          const existing = mergedAllocations.get(k);
          existing.allocatedWeight += (alloc.allocatedWeight || 0);
          existing.bagsCount += (alloc.bagsCount || 0);
       } else {
          mergedAllocations.set(k, {
+           chamberName: alloc.chamberName,
            chamberNo: alloc.chamberNo,
            floorNo: alloc.floorNo,
            stackNo: alloc.stackNo,
@@ -152,13 +168,15 @@ export async function getAvailableInwardsForClient(clientId: string) {
     const availableAllocations: any[] = [];
     
     Array.from(mergedAllocations.values()).forEach((alloc: any) => {
-      const key = `${inward._id.toString()}_${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0 };
       const availableQty = Math.max(0, alloc.allocatedWeight - outData.out);
       
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
         availableAllocations.push({
+          chamberName: alloc.chamberName,
           chamberNo: alloc.chamberNo,
           floorNo: alloc.floorNo,
           stackNo: alloc.stackNo,
@@ -195,7 +213,7 @@ export async function createColdOutward(data: any) {
       data.clientId,
       data.commodityId,
       data.warehouseId,
-      data.chamberNo,
+      data.chamberName || data.chamberNo?.toString(),
       data.floorNo,
       data.stackNo
     );
@@ -298,7 +316,7 @@ export async function createBatchColdOutwards(payload: any) {
         payload.clientId,
         item.commodityId,
         item.warehouseId,
-        item.chamberNo,
+        item.chamberName || item.chamberNo?.toString(),
         item.floorNo,
         item.stackNo
       );

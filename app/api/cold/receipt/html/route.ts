@@ -8,6 +8,8 @@ import '@/lib/models/ColdCommodity';
 import '@/lib/models/ColdWarehouse';
 import { generateColdTransactionReceiptHTML } from '@/lib/invoice/cold-transaction-receipt';
 import { generateColdOutwardReceiptHTML } from '@/lib/invoice/cold-outward-receipt';
+import { generateColdTransferReceiptHTML } from '@/lib/invoice/cold-transfer-receipt';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -18,9 +20,9 @@ export async function GET(request: NextRequest) {
     
     const id = request.nextUrl.searchParams.get('id');
     const batchId = request.nextUrl.searchParams.get('batchId');
-    const type = request.nextUrl.searchParams.get('type') as 'inward' | 'outward';
+    const type = request.nextUrl.searchParams.get('type') as 'inward' | 'outward' | 'transfer';
     
-    if ((!id && !batchId) || (type !== 'inward' && type !== 'outward')) {
+    if ((!id && !batchId) || (type !== 'inward' && type !== 'outward' && type !== 'transfer')) {
       return new NextResponse('Invalid parameters', { status: 400 });
     }
     
@@ -35,14 +37,22 @@ export async function GET(request: NextRequest) {
         
       if (transaction && transaction.stackAllocations) {
         transaction = JSON.parse(JSON.stringify(transaction));
-        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => ({
-          chamberNo: a.chamberNo,
-          floorNo: a.floorNo,
-          stackNo: a.stackNo,
-          quantityKg: a.allocatedWeight
-        }));
+        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => {
+          let floorName = a.floorNo;
+          if (transaction.warehouseId?.chambers) {
+            const chamber = transaction.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(a.chamberNo || '1') || c.name === a.chamberName);
+            const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(a.floorNo));
+            if (floor?.name) floorName = floor.name;
+          }
+          return {
+            chamberNo: a.chamberName || a.chamberNo,
+            floorNo: floorName,
+            stackNo: a.stackNo,
+            quantityKg: a.allocatedWeight
+          };
+        });
       }
-    } else {
+    } else if (type === 'outward') {
       if (batchId) {
         transactions = await ColdOutward.find({ batchId, ...getTenantFilter(session) })
           .populate('inwardId', 'receiptNo _id')
@@ -84,9 +94,24 @@ export async function GET(request: NextRequest) {
           }
         }
       }
+
+      transactions = JSON.parse(JSON.stringify(transactions));
+      transactions.forEach((tx: any) => {
+        if (tx.warehouseId?.chambers) {
+          const chamber = tx.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(tx.chamberNo || '1') || c.name === tx.chamberName);
+          const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(tx.floorNo));
+          if (floor?.name) tx.floorNo = floor.name;
+        }
+      });
+    } else if (type === 'transfer') {
+      transaction = await ColdTransfer.findOne({ _id: id, ...getTenantFilter(session) })
+        .populate('fromClientId', 'name address village')
+        .populate('toClientId', 'name address village')
+        .populate('commodityId', 'name type')
+        .populate('warehouseId');
     }
     
-    if (!transaction) {
+    if (!transaction && transactions.length === 0) {
       return new NextResponse('Transaction not found', { status: 404 });
     }
     
@@ -102,18 +127,29 @@ export async function GET(request: NextRequest) {
     const data = JSON.parse(JSON.stringify(transaction));
     const batchData = JSON.parse(JSON.stringify(transactions));
     
+    const warehouseData = type === 'inward' ? data?.warehouseId : (batchData.length > 0 ? batchData[0].warehouseId : data?.warehouseId);
+    
+    let userLogo = '';
+    if (warehouseData?.logoUrl) {
+      userLogo = warehouseData.logoUrl;
+    } else if (dbUser?.companyLogo?.data) {
+      userLogo = `data:${dbUser.companyLogo.contentType};base64,${dbUser.companyLogo.data.toString('base64')}`;
+    }
+
     const userDetails = {
-      companyLogo: dbUser?.companyLogo || '',
+      companyLogo: userLogo,
       phoneNumber: dbUser?.phoneNumber || session.user.phoneNumber || '',
     };
     
-    const language = (session.user as any).coldLanguage || 'en';
+    const lang = (session.user as any)?.coldLanguage === 'gu' ? 'gu' : 'en';
     
     let html = '';
-    if (type === 'outward') {
-      html = generateColdOutwardReceiptHTML(batchData, userDetails, language);
-    } else {
-      html = generateColdTransactionReceiptHTML(data, type, userDetails, language);
+    if (type === 'inward') {
+      html = generateColdTransactionReceiptHTML(data, type, userDetails, lang);
+    } else if (type === 'outward') {
+      html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
+    } else if (type === 'transfer') {
+      html = generateColdTransferReceiptHTML(data, userDetails, lang);
     }
     
     return new NextResponse(html, {

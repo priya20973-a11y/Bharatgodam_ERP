@@ -3,9 +3,8 @@ import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
 
-export function generateColdTransactionReceiptHTML(
+export function generateColdTransferReceiptHTML(
   data: any,
-  type: 'inward' | 'outward',
   userDetails?: { companyLogo: string, phoneNumber: string },
   lang: string = 'en'
 ): string {
@@ -16,12 +15,13 @@ export function generateColdTransactionReceiptHTML(
   const dateStr = data.date ? format(new Date(data.date), 'dd/MM/yyyy') : '';
   const dateFormatted = formatNum(dateStr);
 
-  // Use sequential inward number if available, else fallback to slice of ID
-  const receiptNo = data.receiptNo ? data.receiptNo.toString() : data._id.toString().slice(-4).toUpperCase();
+  const receiptNo = data.receiptNo ? data.receiptNo.toString() : (data._id ? data._id.toString().slice(-4).toUpperCase() : '');
   const receiptNoFormatted = formatNum(receiptNo);
 
-  const clientName = data.clientId?.name || '';
-  const clientVillage = data.clientId?.address || data.clientId?.village || '';
+  const fromClientName = data.fromClientId?.name || '';
+  const toClientName = data.toClientId?.name || '';
+  const clientVillage = data.fromClientId?.address || data.fromClientId?.village || '';
+  
   const commodityNameBase = data.commodityId?.name || '';
   const commodityType = data.commodityId?.type || '';
   
@@ -30,69 +30,42 @@ export function generateColdTransactionReceiptHTML(
     commodityDisplay += ` (${commodityType})`;
   }
 
-  if (data.gradingType && !commodityDisplay.includes(data.gradingType)) {
-    commodityDisplay += ` (${data.gradingType})`;
-  }
-
   const tableLabel = data.tableLabel || '';
   const seed = data.seed || '';
 
-  let actualLarge = data.bagsCount || 0;
-  let actualTotal = data.totalBags || 0;
-  
-  // Check if we are facing the backend bug where bagsCount holds Total Bags (e.g. 8)
-  // and totalBags was mistakenly saved as bagsCount + jin + mixed (e.g. 12).
-  if (data.totalBags === (data.bagsCount || 0) + (data.jin || 0) + (data.mixed || 0) && data.totalBags > (data.bagsCount || 0) && ((data.jin || 0) > 0 || (data.mixed || 0) > 0)) {
-    actualLarge = (data.bagsCount || 0) - (data.jin || 0) - (data.mixed || 0);
-    actualTotal = data.bagsCount || 0;
-  } else if (!data.totalBags) {
-    actualTotal = actualLarge + (data.jin || 0) + (data.mixed || 0);
-  }
-
-  // Fallback to actually stored 'large' field if the user provided one, else use our logic.
-  const bags = formatNum(data.large ?? data.largeBags ?? data.bagsLarge ?? actualLarge);
+  const bags = formatNum(data.bagsCount || 0);
   const jin = formatNum(data.jin || 0);
   const mixed = formatNum(data.mixed || 0);
-  const totalBags = formatNum(actualTotal);
+  const totalBags = formatNum(data.bagsCount || 0);
+  
   const farmerName = data.farmerName ? (data.farmerId ? `${data.farmerName} - ${data.farmerId}` : data.farmerName) : '';
-
   const marko = data.marko || '';
   const truckNo = data.truckNo || '';
   const remarks = data.remarks || '';
   const note = data.note || '';
   const wbSlip = formatNum(data.weighbridgeSlipNo || '');
 
-  const chamber = formatNum(data.chamberName || data.chamberNo || '');
-  const floor = formatNum(data.floorNo || '');
-  const stack = formatNum(data.stackNo || '');
-
   const grossWeight = formatNum(data.grossWeight || 0);
   const emptyWeight = formatNum(data.emptyWeight || 0);
   const netWeight = formatNum(data.quantityKg || 0); // Net weight is stored as quantityKg
 
-  // Format Kata Bharati safely
-  let kataBharatiRaw = data.kataBharati || 0;
-  if (!kataBharatiRaw && data.totalBags > 0 && data.quantityKg) {
-    kataBharatiRaw = data.quantityKg / data.totalBags;
-  }
-  const kataBharatiStr = Number.isInteger(kataBharatiRaw) ? kataBharatiRaw.toString() : kataBharatiRaw.toFixed(3);
-  const kataBharati = formatNum(kataBharatiStr);
+  const kataBharati = formatNum('0'); // Typically not available in transfer
 
   const warehouseName = data.warehouseId?.name || (lang === 'gu' ? 'સ્વાગત કોલ્ડ સ્ટોરેજ' : 'Swagat Cold Storage');
   const warehouseAddress = data.warehouseId?.address || (lang === 'gu' ? 'મુ.ખેંટવા, ડીસા-ભીલડી હાઇવે, તા.ડીસા-૩૮૫૫૩૫, જિ.બનાસકાંઠા' : 'Deesa-Bhildi Highway, Deesa - 385535, Banaskantha');
   const mobile = userDetails?.phoneNumber ? formatNum(userDetails.phoneNumber) : '96240 39195';
   const logoUrl = userDetails?.companyLogo || '';
 
-  const title = type === 'inward'
-    ? (lang === 'gu' ? 'ભાડા પાવતી' : 'RENT RECEIPT')
-    : (lang === 'gu' ? 'જાવક પાવતી' : 'OUTWARD RECEIPT');
+  const title = lang === 'gu' ? 'માલિકી બદલી પાવતી' : 'OWNERSHIP TRANSFER RECEIPT';
+  
+  const stackInfoData = data.stackAllocations || [];
 
   return `
 <!DOCTYPE html>
 <html lang="gu">
 <head>
   <meta charset="UTF-8">
-  <title>Cold Storage Receipt</title>
+  <title>Ownership Transfer Receipt</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Mukta+Vaani:wght@400;600;700&display=swap');
     
@@ -353,15 +326,15 @@ export function generateColdTransactionReceiptHTML(
     </div>
     
     <div class="form-row">
-      <div class="form-label">${l.nameShree}</div>
-      <div class="form-value">${clientName}</div>
+      <div class="form-label">${lang === 'gu' ? 'આપનાર શ્રી,' : 'Previous Owner:'}</div>
+      <div class="form-value" style="flex: 2;">${fromClientName}</div>
+      <div class="form-label">${l.addressLabel}</div>
+      <div class="form-value">${clientVillage}</div>
     </div>
     
     <div class="form-row">
-      <div class="form-label">${l.farmerNameLabel}</div>
-      <div class="form-value" style="flex: 2;">${farmerName}</div>
-      <div class="form-label">${l.addressLabel}</div>
-      <div class="form-value">${clientVillage}</div>
+      <div class="form-label">${lang === 'gu' ? 'લેનાર શ્રી,' : 'New Owner:'}</div>
+      <div class="form-value">${toClientName}</div>
     </div>
     
     <div class="form-row">
@@ -410,20 +383,20 @@ export function generateColdTransactionReceiptHTML(
             <th>${l.stackNoLabel}</th>
             <th>${l.netWeightLabel}</th>
           </tr>
-          ${data.stacksInfo && data.stacksInfo.length > 0 ? 
-            data.stacksInfo.map((s: any) => `
+          ${stackInfoData && stackInfoData.length > 0 ? 
+            stackInfoData.map((s: any) => `
             <tr>
-              <td>${formatNum(s.chamberNo)}</td>
+              <td>${formatNum(s.chamberName || s.chamberNo)}</td>
               <td>${formatNum(s.floorNo)}</td>
               <td>${formatNum(s.stackNo)}</td>
-              <td>${formatNum(s.quantityKg)}</td>
+              <td>${formatNum(s.allocatedWeight)}</td>
             </tr>
             `).join('')
           : `
             <tr>
-              <td>${chamber}</td>
-              <td>${floor}</td>
-              <td>${stack}</td>
+              <td></td>
+              <td></td>
+              <td></td>
               <td>${netWeight}</td>
             </tr>
           `}

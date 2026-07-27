@@ -6,7 +6,7 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { hasPermission } from '@/lib/permissions';
-import { requireSession, getTenantFilter, appendOwnership } from '@/lib/ownership';
+import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { differenceInDays, parseISO, isAfter, isBefore, max, min } from 'date-fns';
 
@@ -190,7 +190,7 @@ export async function saveColdClientInvoice(data: any) {
 export async function getColdInvoices() {
   await connectToDatabase();
   const session = await requireSession();
-  const filter = getTenantFilter(session);
+  const filter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
   
   const invoices = await ColdInvoice.find(filter)
     .populate('clientId', 'name mobile')

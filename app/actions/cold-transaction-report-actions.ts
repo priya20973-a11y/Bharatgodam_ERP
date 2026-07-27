@@ -6,13 +6,13 @@ import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
-import { getTenantFilter, requireSession } from '@/lib/ownership';
+import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import { getStackAvailableCapacity } from './cold-inward-actions';
 
 export async function getColdTransactions() {
   await connectToDatabase();
   const session = await requireSession();
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   const inwards = await ColdInward.find(tenantFilter)
     .populate('clientId', 'name')
@@ -36,7 +36,7 @@ export async function getColdTransactions() {
     client: { _id: t.clientId?._id?.toString(), name: t.clientId?.name },
     commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
     warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
-    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberNo || '') : t.chamberNo,
+    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberName || t.stackAllocations?.[0]?.chamberNo || '') : (t.chamberName || t.chamberNo),
     floorNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.floorNo || '') : t.floorNo,
     stackNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.stackNo || '') : t.stackNo,
     quantityKg: t.quantityKg,
@@ -62,7 +62,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
   await connectToDatabase();
   const session = await requireSession();
   if (!hasPermission(session, 'reports', 'delete')) throw new Error('Forbidden: Insufficient permissions');
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   try {
     if (type === 'INWARD') {
@@ -76,7 +76,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
         $or: inward.stackAllocations.map((s: any) => ({
-          chamberNo: s.chamberNo,
+          $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
           floorNo: s.floorNo,
           stackNo: s.stackNo
         })),
@@ -106,7 +106,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
 export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWARD') {
   await connectToDatabase();
   const session = await requireSession();
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   let transaction;
   if (type === 'INWARD') {
@@ -119,7 +119,7 @@ export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWA
       commodityId: inward.commodityId,
       warehouseId: inward.warehouseId,
       $or: inward.stackAllocations.map((s: any) => ({
-        chamberNo: s.chamberNo,
+        $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
         floorNo: s.floorNo,
         stackNo: s.stackNo
       })),
@@ -140,7 +140,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
   await connectToDatabase();
   const session = await requireSession();
   if (!hasPermission(session, 'reports', 'edit')) throw new Error('Forbidden: Insufficient permissions');
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   try {
     if (data && data.grade === '') {
@@ -156,7 +156,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
         $or: inward.stackAllocations.map((s: any) => ({
-          chamberNo: s.chamberNo,
+          $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
           floorNo: s.floorNo,
           stackNo: s.stackNo
         })),
@@ -172,7 +172,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           const capacityInfo = await getStackAvailableCapacity(inward.warehouseId.toString(), stack.chamberNo, stack.floorNo, stack.stackNo);
           
           const currentAllocation = inward.stackAllocations.find((s: any) => 
-            s.chamberNo === stack.chamberNo && 
+            (s.chamberName === stack.chamberName || s.chamberNo === stack.chamberNo) && 
             s.floorNo === stack.floorNo && 
             s.stackNo === stack.stackNo
           );
@@ -209,7 +209,10 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           clientId: outward.clientId,
           commodityId: outward.commodityId,
           warehouseId: outward.warehouseId,
-          'stackAllocations.chamberNo': outward.chamberNo,
+          $or: [
+            { 'stackAllocations.chamberName': outward.chamberName || outward.chamberNo?.toString() },
+            ...(outward.chamberNo ? [{ 'stackAllocations.chamberNo': outward.chamberNo }] : [])
+          ],
           'stackAllocations.floorNo': outward.floorNo,
           'stackAllocations.stackNo': outward.stackNo,
           ...tenantFilter
@@ -229,7 +232,10 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         clientId: inward.clientId,
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
-        chamberNo: outward.chamberNo,
+        $or: [
+          { chamberName: outward.chamberName || outward.chamberNo?.toString() },
+          ...(outward.chamberNo ? [{ chamberNo: outward.chamberNo }] : [])
+        ],
         floorNo: outward.floorNo,
         stackNo: outward.stackNo,
         _id: { $ne: outward._id },

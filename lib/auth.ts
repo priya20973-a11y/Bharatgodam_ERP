@@ -79,6 +79,7 @@ export const authOptions: NextAuthOptions = {
             staffId: user._id.toString(),
             isStaff: true,
             permissions: user.permissions || {},
+            assignedWarehouseIds: user.assignedWarehouseIds || [],
           } : {}),
           
           // WSP specific permissions for Dry Storage
@@ -122,6 +123,7 @@ export const authOptions: NextAuthOptions = {
           token.staffId = (user as any).staffId;
           token.isStaff = true;
           token.permissions = (user as any).permissions;
+          token.assignedWarehouseIds = (user as any).assignedWarehouseIds;
         }
         
         if ((user as any).role === 'WSP' && (user as any).storagePlan !== 'COLD') {
@@ -154,6 +156,7 @@ export const authOptions: NextAuthOptions = {
           (session.user as any).staffId = token.staffId;
           (session.user as any).isStaff = true;
           (session.user as any).permissions = token.permissions;
+          (session.user as any).assignedWarehouseIds = token.assignedWarehouseIds;
         }
         
         if (token.role === 'WSP' && token.storagePlan !== 'COLD') {

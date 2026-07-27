@@ -4,12 +4,12 @@ import connectToDatabase from '@/lib/mongoose';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import { hasPermission } from '@/lib/permissions';
-import { getTenantFilter, requireSession } from '@/lib/ownership';
+import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 
 export async function getColdClientLedger(clientId: string) {
   await connectToDatabase();
   const session = await requireSession();
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
   
   const inwards = await ColdInward.find({ clientId, ...tenantFilter })
     .populate('commodityId', 'name type')

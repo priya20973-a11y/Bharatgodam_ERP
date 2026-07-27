@@ -128,12 +128,31 @@ export default async function ColdTransactionsReportWrapper() {
       warehouseId: t.warehouseId?.toString() || t.warehouse?._id?.toString() || '',
       quantityKg: t.quantityKg || 0,
       bagsCount: t.bagsCount || 0,
-      chamberNo: t.chamberNo || '',
-      floorNo: t.floorNo || '',
+      chamberNo: (() => {
+        if (!t.chamberNo && !t.chamberName) return '';
+        if (t.isBatch && t.items) {
+          return t.items.map((item: any) => item.chamberName || item.chamberNo).join(', ');
+        }
+        return t.chamberName || t.chamberNo || '';
+      })(),
+      floorNo: (() => {
+        if (!t.floorNo) {
+          if (t.isBatch && t.items) {
+            return t.items.map((item: any) => item.floorName || item.floorNo).join(', ');
+          }
+          return '';
+        }
+        if (!t.warehouse?.chambers) return t.floorNo;
+        const chamber = t.warehouse.chambers.find((c: any) => c.chamberNo === parseInt(t.chamberNo || '1') || c.name === t.chamberName);
+        const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(t.floorNo));
+        return floor?.name || t.floorNo;
+      })(),
       stackNo: t.stackNo || '',
       lotNo: t.lotNo || '',
       gatePass: t.gatePass || '',
       status: t.status || 'COMPLETED',
+      farmerName: t.farmerName || '',
+      farmerId: t.farmerId || '',
       createdAt: t.createdAt || t.updatedAt || t.date,
     }));
 

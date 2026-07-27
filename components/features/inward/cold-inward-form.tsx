@@ -40,7 +40,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
   });
 
   const [clientSections, setClientSections] = useState<any[]>(prefillData?.clients || []);
-  const [stackCapacities, setStackCapacities] = useState<Record<string, number | null>>({});
+  const [stackCapacities, setStackCapacities] = useState<Record<string, { availableCapacity: number, bufferCapacity: number } | null>>({});
 
   const selectedWarehouse = warehouses.find(w => w._id === common.warehouseId);
 
@@ -59,8 +59,8 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         if (newCaps[key] === undefined) {
           const [wId, cNo, fNo, sNo] = key.split('-');
           try {
-            const res = await getStackAvailableCapacity(wId, parseInt(cNo), parseInt(fNo), parseInt(sNo));
-            newCaps[key] = res.availableCapacity;
+            const res = await getStackAvailableCapacity(wId, cNo, parseInt(fNo), parseInt(sNo));
+            newCaps[key] = { availableCapacity: res.availableCapacity, bufferCapacity: res.bufferCapacity || 0 };
             changed = true;
           } catch {
             newCaps[key] = null;
@@ -92,6 +92,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       mixed: null,
       marko: '',
       farmerName: '',
+      farmerId: '',
       kataBharati: 0,
       stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null }],
       referencePersons: []
@@ -224,26 +225,52 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       }
     }
 
-    setLoading(true);
-    try {
-      const res = await createColdInwardBulk({ common, warehouseId: common.warehouseId, clients: clientSections }, draftId);
-      if (res.success) {
-        toast.success('Inwards created successfully');
-        onSuccess();
-      } else {
-        toast.error(res.error || 'Failed to create inwards');
+    const submitData = async (isConfirmed = false) => {
+      setLoading(true);
+      try {
+        const res = await createColdInwardBulk({ common, warehouseId: common.warehouseId, clients: clientSections, confirmed: isConfirmed }, draftId);
+        if (res.success) {
+          toast.success('Inwards created successfully');
+          if (res.warning) {
+            toast.custom((t) => (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-md">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">{res.warning}</p>
+                  </div>
+                </div>
+              </div>
+            ), { duration: 6000 });
+          }
+          onSuccess();
+        } else if (res.requireConfirmation) {
+          if (window.confirm(res.error || 'Stack capacity exceeded. Use buffer capacity?')) {
+            submitData(true);
+          } else {
+            setLoading(false);
+          }
+        } else {
+          toast.error(res.error || 'Failed to create inwards');
+          setLoading(false);
+        }
+      } catch (err) {
+        toast.error('Something went wrong');
+        setLoading(false);
       }
-    } catch (err) {
-      toast.error('Something went wrong');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    submitData(false);
   };
 
-  const getRemainingCapacity = (wId: string, cNo: string, fNo: string, sNo: string, skipClientIdx = -1, skipStackIdx = -1) => {
+  const getRemainingCapacity = (wId: string, cNo: string, fNo: string, sNo: string, skipClientIdx = -1, skipStackIdx = -1, includeBuffer = false) => {
     const key = `${wId}-${cNo}-${fNo}-${sNo}`;
-    const available = stackCapacities[key];
-    if (available === undefined || available === null) return null;
+    const capInfo = stackCapacities[key];
+    if (capInfo === undefined || capInfo === null) return null;
     
     let otherAllocations = 0;
     clientSections.forEach((c, cIdx) => {
@@ -254,7 +281,8 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         }
       });
     });
-    return Math.max(0, available - otherAllocations);
+    const maxCapacity = includeBuffer ? capInfo.availableCapacity + capInfo.bufferCapacity : capInfo.availableCapacity;
+    return Math.max(0, maxCapacity - otherAllocations);
   };
 
   const getClientCommodities = (clientId: string) => {
@@ -275,6 +303,15 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
   };
 
   const commonCommodities = getCommonCommodities();
+
+  const commonNetWeight = (Number(common.grossWeight) || 0) - (Number(common.emptyWeight) || 0);
+  const grandTotalAllocatedWeight = clientSections.reduce((sum, client) => {
+    return sum + client.stacks.reduce((sSum: number, stack: any) => sSum + (Number(stack.allocatedWeight) || 0), 0);
+  }, 0);
+
+  const remainingNetWeight = commonNetWeight - grandTotalAllocatedWeight;
+  const isRemainingZero = Math.abs(remainingNetWeight) <= 0.01;
+  const isRemainingNegative = remainingNetWeight < -0.01;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -404,8 +441,8 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 rounded-md">
-              {!common.sameCommodity && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-md mb-4">
+              {!common.sameCommodity ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">{t('inward.commodityVariety')} *</label>
                   <Select value={client.commodityId} onValueChange={(v) => {
@@ -425,12 +462,20 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              {common.sameCommodity && (
+              ) : (
                 <div className="text-sm text-slate-500 italic flex items-center h-full">
                   Using common commodity details.
                 </div>
               )}
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('inward.farmerName') || 'Farmer Name'}</label>
+                <Input value={client.farmerName || ''} onChange={(e) => updateClient(cIdx, 'farmerName', e.target.value)} className="bg-white" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Farmer ID</label>
+                <Input value={client.farmerId || ''} onChange={(e) => updateClient(cIdx, 'farmerId', e.target.value)} className="bg-white" />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -454,10 +499,6 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                 <label className="text-sm font-medium">Marko</label>
                 <Input value={client.marko} onChange={(e) => updateClient(cIdx, 'marko', e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">{t('inward.farmerName') || 'Farmer Name'}</label>
-                <Input value={client.farmerName || ''} onChange={(e) => updateClient(cIdx, 'farmerName', e.target.value)} />
-              </div>
             </div>
 
             {/* Stacks Section */}
@@ -469,8 +510,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                 </Button>
               </div>
               {client.stacks.map((stack: any, sIdx: number) => {
-                const chamber = selectedWarehouse?.chambers?.find((c: any) => c.chamberNo === parseInt(stack.chamberNo));
+                const chamber = selectedWarehouse?.chambers?.find((c: any) => (c.name || c.chamberNo.toString()) === stack.chamberNo);
                 const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(stack.floorNo));
+                const floorName = floor?.name || `Floor ${stack.floorNo}`;
+                
                 return (
                   <div key={stack.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 mb-2 items-start">
                     <div className="space-y-1">
@@ -478,19 +521,20 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                       <Select value={stack.chamberNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'chamberNo', v)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Chamber" /></SelectTrigger>
                         <SelectContent>
-                          {selectedWarehouse?.chambers?.map((c: any) => (
-                            <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>{c.chamberNo}</SelectItem>
-                          ))}
+                          {selectedWarehouse?.chambers?.map((c: any) => {
+                            const val = (c.name || c.chamberNo).toString();
+                            return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+                          })}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs">Floor</label>
                       <Select value={stack.floorNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'floorNo', v)} disabled={!stack.chamberNo}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Floor" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-300 shadow-sm"><SelectValue placeholder="Floor" /></SelectTrigger>
                         <SelectContent>
                           {chamber?.floors?.map((f: any) => (
-                            <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.floorNo}</SelectItem>
+                            <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -522,13 +566,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                       </Select>
                       {stack.chamberNo && stack.floorNo && stack.stackNo && stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`] !== undefined && (
                         <div className="text-[10px] text-green-600 font-semibold leading-tight pt-1">
-                          Avail: {getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, -1, -1)?.toLocaleString() ?? stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.toLocaleString()} Kg
+                          Avail: {getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, -1, -1, false)?.toLocaleString() ?? (stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.availableCapacity || 0)?.toLocaleString()} Kg
                         </div>
                       )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-blue-600">Alloc. Weight</label>
-                      <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
+                      <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx, true) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-blue-600">Alloc. Bags</label>
@@ -587,11 +631,23 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         );
       })}
 
+      <div className={`p-4 border rounded-lg flex items-center justify-between shadow-sm sticky bottom-4 z-10 transition-colors ${isRemainingZero ? 'bg-green-50 border-green-300' : isRemainingNegative ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'}`}>
+        <div>
+          <h4 className={`font-semibold ${isRemainingZero ? 'text-green-800' : isRemainingNegative ? 'text-red-800' : 'text-amber-800'}`}>Remaining Net Weight to Allocate</h4>
+          <p className={`text-sm ${isRemainingZero ? 'text-green-700' : isRemainingNegative ? 'text-red-700' : 'text-amber-700'}`}>
+            Total Net Weight: {commonNetWeight.toFixed(2)} Kg | Allocated: {grandTotalAllocatedWeight.toFixed(2)} Kg
+          </p>
+        </div>
+        <div className={`text-2xl font-bold tracking-tight ${isRemainingZero ? 'text-green-700' : isRemainingNegative ? 'text-red-700' : 'text-amber-700'}`}>
+          {remainingNetWeight.toFixed(2)} Kg
+        </div>
+      </div>
+
       <div className="flex justify-end gap-4 pt-4 border-t">
         <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={loading || clientSections.length === 0}>
           Save Draft
         </Button>
-        <Button type="submit" disabled={loading || clientSections.length === 0}>
+        <Button type="submit" disabled={loading || clientSections.length === 0 || !isRemainingZero}>
           {loading ? t('inward.saving') : t('inward.saveInward')}
         </Button>
       </div>

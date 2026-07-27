@@ -211,6 +211,19 @@ export async function createClient(data: {
       if (existingClientByMobile) {
         return { success: false, error: 'Mobile number already exists for another client' };
       }
+
+      if (data.aadharNumber && !isNAValue(data.aadharNumber)) {
+        const existingAadhar = await Client.findOne({ $and: [ownerFilter, { aadharNumber: data.aadharNumber.trim() }] });
+        if (existingAadhar) return { success: false, error: 'Aadhaar No. already exists.' };
+      }
+      if (data.panNumber && !isNAValue(data.panNumber)) {
+        const existingPan = await Client.findOne({ $and: [ownerFilter, { panNumber: data.panNumber.trim() }] });
+        if (existingPan) return { success: false, error: 'PAN No. already exists.' };
+      }
+      if (data.gstNumber && !isNAValue(data.gstNumber)) {
+        const existingGst = await Client.findOne({ $and: [ownerFilter, { gstNumber: data.gstNumber.trim() }] });
+        if (existingGst) return { success: false, error: 'GSTIN already exists.' };
+      }
     } else {
       const existingClient = await Client.findOne({
         $and: [
@@ -325,6 +338,19 @@ export async function updateClient(id: string, data: Partial<{
           if (existingClientByMobile) {
             return { success: false, error: 'Mobile number already exists for another client' };
           }
+        }
+
+        if (data.aadharNumber && !isNAValue(data.aadharNumber)) {
+          const existingAadhar = await Client.findOne({ _id: { $ne: id }, $and: [ownerFilter, { aadharNumber: data.aadharNumber.trim() }] });
+          if (existingAadhar) return { success: false, error: 'Aadhaar No. already exists.' };
+        }
+        if (data.panNumber && !isNAValue(data.panNumber)) {
+          const existingPan = await Client.findOne({ _id: { $ne: id }, $and: [ownerFilter, { panNumber: data.panNumber.trim() }] });
+          if (existingPan) return { success: false, error: 'PAN No. already exists.' };
+        }
+        if (data.gstNumber && !isNAValue(data.gstNumber)) {
+          const existingGst = await Client.findOne({ _id: { $ne: id }, $and: [ownerFilter, { gstNumber: data.gstNumber.trim() }] });
+          if (existingGst) return { success: false, error: 'GSTIN already exists.' };
         }
       } else {
         const existingClient = await Client.findOne({

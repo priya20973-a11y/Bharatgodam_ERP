@@ -160,6 +160,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           inwardId: item.inward._id,
           commodityId: item.inward.commodityId._id || item.inward.commodityId,
           warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
+          chamberName: alloc.chamberName || alloc.chamberNo?.toString(),
           chamberNo: alloc.chamberNo,
           floorNo: alloc.floorNo,
           stackNo: alloc.stackNo,
@@ -260,7 +261,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberName: inw.chamberName, chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => {
+                          const chamber = inw.warehouseId?.chambers?.find((c: any) => c.chamberNo === a.chamberNo || c.name === a.chamberName);
+                          const floor = chamber?.floors?.find((f: any) => f.floorNo === a.floorNo);
+                          const floorName = floor?.name || `F${a.floorNo}`;
+                          return `${a.chamberName || a.chamberNo}/${floorName}/S${a.stackNo}`;
+                        }).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                       </span>
                     </div>
                   )
@@ -313,7 +319,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
             
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')} (Available: {(() => {
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => {
+              const chamber = item.inward.warehouseId?.chambers?.find((c: any) => c.chamberNo === a.chamberNo || c.name === a.chamberName);
+              const floor = chamber?.floors?.find((f: any) => f.floorNo === a.floorNo);
+              const floorName = floor?.name || `F${a.floorNo}`;
+              return `${a.chamberName || a.chamberNo}/${floorName}/S${a.stackNo}`;
+            }).join(', ')} (Available: {(() => {
               const baseQty = Number(item.inward?.availableQty) || 0;
               const finalQty = baseQty;
               return finalQty.toFixed(2);

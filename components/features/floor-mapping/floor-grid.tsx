@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Package, Users, Info } from 'lucide-react';
+import { Package, Users, Info, Download } from 'lucide-react';
 import StackDetailsModal from './stack-details-modal';
 
 interface StackData {
@@ -15,7 +15,8 @@ interface StackData {
 }
 
 export default function FloorGrid({ floorData, highlightStackNo }: { floorData: any, highlightStackNo?: number | null }) {
-  const { warehouseId, chamberNo, floorNo, stackLayout, gridRows, gridCols, customLayout, noOfStacks, stacks } = floorData;
+  const { warehouseId, chamberNo, chamberName, floorNo, stackLayout, gridRows, gridCols, customLayout, noOfStacks, stacks } = floorData;
+  const actualChamberNo = chamberNo || chamberName;
 
   const [selectedStackNo, setSelectedStackNo] = useState<number | null>(highlightStackNo || null);
 
@@ -147,6 +148,17 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                 onClick={() => setSelectedStackNo(cell.stackNo)}
                 className={`flex flex-col p-2 rounded-xl border-2 transition-all hover:shadow-md cursor-pointer ${getStatusColor(cell.status)} aspect-square justify-center items-center relative`}
               >
+                <div 
+                  className="absolute top-2 left-2 text-slate-400 hover:text-blue-600 transition-colors z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(`/api/cold/stack-receipt/html?warehouseId=${warehouseId}&chamberNo=${actualChamberNo}&floorNo=${floorNo}&stackNo=${cell.stackNo}`, '_blank');
+                  }}
+                  title="Download A3 PDF"
+                >
+                  <Download className="w-4 h-4" />
+                </div>
+
                 <div className="absolute top-2 right-2 text-slate-400 hover:text-blue-600 transition-colors">
                   <Info className="w-4 h-4" />
                 </div>
@@ -170,7 +182,7 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
           isOpen={true}
           onClose={() => setSelectedStackNo(null)}
           warehouseId={warehouseId}
-          chamberNo={chamberNo}
+          chamberNo={actualChamberNo}
           floorNo={floorNo}
           stackNo={selectedStackNo}
         />

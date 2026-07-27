@@ -60,6 +60,7 @@ export function generateColdOutwardReceiptHTML(
   const truckNo = formatNum(firstData.truckNo || '');
   const remarks = firstData.remarks || '';
   const note = firstData.note || '';
+  const farmerName = firstData.farmerName ? (firstData.farmerId ? `${firstData.farmerName} - ${firstData.farmerId}` : firstData.farmerName) : '';
 
   const warehouseName = firstData.warehouseId?.name || (lang === 'gu' ? 'સ્વાગત કોલ્ડ સ્ટોરેજ' : 'Swagat Cold Storage');
   const warehouseAddress = firstData.warehouseId?.address || (lang === 'gu' ? 'મુ.ખેંટવા, ડીસા-ભીલડી હાઇવે, તા.ડીસા, જિ.બનાસકાંઠા' : 'Deesa-Bhildi Highway, Deesa, Banaskantha');
@@ -92,7 +93,8 @@ export function generateColdOutwardReceiptHTML(
     qtyTotal: lang === 'gu' ? '(૫) કુલ...' : '(5) Total...',
     qtyOther: lang === 'gu' ? '(૬) અન્ય વિગત' : '(6) Other Details',
     managerSign: lang === 'gu' ? 'મેનેજર' : 'Manager',
-    receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign'
+    receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign',
+    farmerNameLabel: lang === 'gu' ? 'ખેડૂતનું નામ' : 'Farmer Name'
   };
 
   return `
@@ -389,6 +391,11 @@ export function generateColdOutwardReceiptHTML(
       <div class="form-value">${clientName}</div>
       <div class="form-label">${t.addressLabel}</div>
       <div class="form-value" style="flex: 0.5;">${clientVillage}</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">${t.farmerNameLabel}</div>
+      <div class="form-value">${farmerName}</div>
     </div>
     
     <div class="col-header">

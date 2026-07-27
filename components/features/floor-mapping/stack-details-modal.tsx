@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getStackDetails } from '@/app/actions/floor-mapping-actions';
-import { Package, Users, Contact2, History, ArrowDownToLine, ArrowUpFromLine, Plus, Minus } from 'lucide-react';
+import { Package, Users, Contact2, History, ArrowDownToLine, ArrowUpFromLine, Plus, Minus, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
@@ -12,7 +12,7 @@ interface StackDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   warehouseId: string;
-  chamberNo: number;
+  chamberNo: string;
   floorNo: number;
   stackNo: number;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createColdWarehouse, updateColdWarehouse } from '@/app/actions/cold-warehouse-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     noOfFloors: initialData?.noOfFloors || 1,
     noOfStacks: initialData?.noOfStacks || 1,
     stackCapacity: initialData?.stackCapacity || 0,
+    bufferCapacity: initialData?.bufferCapacity || 0,
     stackLayout: initialData?.stackLayout || 'ROW_WISE',
     gridRows: initialData?.gridRows || 0,
     gridCols: initialData?.gridCols || 0,
@@ -41,6 +42,48 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
       : [{ name: '', mobile: '', email: '', designation: '' }]
   );
 
+  const [aadhaarNo, setAadhaarNo] = useState(initialData?.aadhaarNo || '');
+  const [panNo, setPanNo] = useState(initialData?.panNo || '');
+  const [gstin, setGstin] = useState(initialData?.gstin || '');
+  const [warehouseLogo, setWarehouseLogo] = useState(initialData?.warehouseLogo || '');
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.warehouseLogo || null);
+  const [bankDetails, setBankDetails] = useState({
+    bankName: initialData?.bankDetails?.bankName || '',
+    accountNo: initialData?.bankDetails?.accountNo || '',
+    ifsc: initialData?.bankDetails?.ifsc || '',
+    branch: initialData?.bankDetails?.branch || '',
+  });
+
+  const initialChamberNames = initialData?.chambers?.map((c: any) => c.name) || Array(initialData?.noOfChambers || 1).fill('');
+  const [chamberNames, setChamberNames] = useState<string[]>(initialChamberNames);
+
+  // Initialize floor names from the first chamber since they are applied globally
+  const initialFloorNames = initialData?.chambers?.[0]?.floors?.map((f: any) => f.name) || Array(initialData?.noOfFloors || 1).fill('');
+  const [floorNames, setFloorNames] = useState<string[]>(initialFloorNames);
+
+  useEffect(() => {
+    if (!isEdit) {
+      setChamberNames((prev) => {
+        const next = [...prev];
+        if (formData.noOfChambers > next.length) {
+          next.push(...Array(formData.noOfChambers - next.length).fill(''));
+        } else if (formData.noOfChambers < next.length) {
+          next.length = formData.noOfChambers;
+        }
+        return next;
+      });
+      setFloorNames((prev) => {
+        const next = [...prev];
+        if (formData.noOfFloors > next.length) {
+          next.push(...Array(formData.noOfFloors - next.length).fill(''));
+        } else if (formData.noOfFloors < next.length) {
+          next.length = formData.noOfFloors;
+        }
+        return next;
+      });
+    }
+  }, [formData.noOfChambers, formData.noOfFloors, isEdit]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -49,7 +92,15 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
       const payload = {
         ...formData,
         customLayout: formData.stackLayout === 'CUSTOM' ? customLayout : undefined,
-        referencePersons: referencePersons.filter((rp: any) => rp.name.trim() !== '')
+        referencePersons: referencePersons.filter((rp: any) => rp.name.trim() !== ''),
+        aadhaarNo,
+        panNo,
+        gstin,
+        bankDetails,
+        warehouseLogo,
+        chamberNames,
+        floorNames,
+        chambers: isEdit ? initialData.chambers.map((c: any, i: number) => ({ ...c, name: chamberNames[i] })) : undefined,
       };
       
       if (formData.stackLayout === 'CUSTOM' && customLayout.length !== formData.noOfStacks) {
@@ -171,7 +222,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('warehouses.warehouseName')}</label>
           <Input 
@@ -189,6 +240,103 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
             placeholder={t('warehouses.fullAddress')}
           />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Warehouse Logo</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (!file.type.startsWith('image/')) {
+                toast.error('Please upload a valid image file.');
+                return;
+              }
+              if (file.size > 500 * 1024) {
+                toast.error('Logo file size must be 500KB or smaller.');
+                return;
+              }
+
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result;
+                if (typeof result === 'string') {
+                  setWarehouseLogo(result);
+                  setLogoPreview(result);
+                }
+              };
+              reader.readAsDataURL(file);
+            }}
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
+          />
+          {logoPreview && (
+            <div className="mt-2 h-16 w-32 overflow-hidden rounded-md border bg-slate-50">
+              <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain" />
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Aadhaar Card No.</label>
+          <Input 
+            value={aadhaarNo} 
+            onChange={(e) => setAadhaarNo(e.target.value)} 
+            placeholder="Aadhaar Number"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">PAN No.</label>
+          <Input 
+            value={panNo} 
+            onChange={(e) => setPanNo(e.target.value)} 
+            placeholder="PAN Number"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">GSTIN</label>
+          <Input 
+            value={gstin} 
+            onChange={(e) => setGstin(e.target.value)} 
+            placeholder="GSTIN"
+          />
+        </div>
+      </div>
+
+      <div className="border-b pb-6">
+        <h4 className="font-medium text-sm mb-4 text-slate-700">Bank Details</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Bank Name</label>
+            <Input 
+              value={bankDetails.bankName} 
+              onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })} 
+              placeholder="Bank Name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Account No.</label>
+            <Input 
+              value={bankDetails.accountNo} 
+              onChange={(e) => setBankDetails({ ...bankDetails, accountNo: e.target.value })} 
+              placeholder="Account Number"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">IFSC Code</label>
+            <Input 
+              value={bankDetails.ifsc} 
+              onChange={(e) => setBankDetails({ ...bankDetails, ifsc: e.target.value })} 
+              placeholder="IFSC Code"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Branch</label>
+            <Input 
+              value={bankDetails.branch} 
+              onChange={(e) => setBankDetails({ ...bankDetails, branch: e.target.value })} 
+              placeholder="Branch Name"
+            />
+          </div>
         </div>
       </div>
 
@@ -232,6 +380,53 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             value={formData.stackCapacity} 
             onChange={(val) => setFormData({ ...formData, stackCapacity: parseInt(val) || 0 })} 
           />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Buffer Capacity (Kg)</label>
+          <ColdNumberInput 
+            required 
+            min="0"
+            value={formData.bufferCapacity} 
+            onChange={(val) => setFormData({ ...formData, bufferCapacity: parseInt(val) || 0 })} 
+          />
+        </div>
+      </div>
+      <div className="border-t pt-4">
+        <h4 className="font-medium text-sm mb-4 text-slate-700">Chamber Names</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: formData.noOfChambers }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <label className="text-sm font-medium">Chamber {i + 1} Name</label>
+              <Input 
+                value={chamberNames[i] || ''} 
+                onChange={(e) => {
+                  const newNames = [...chamberNames];
+                  newNames[i] = e.target.value;
+                  setChamberNames(newNames);
+                }} 
+                placeholder={`e.g. Chamber ${i + 1} or Main Chamber`}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="border-t pt-4">
+        <h4 className="font-medium text-sm mb-4 text-slate-700">Floor Names</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: formData.noOfFloors }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <label className="text-sm font-medium">Floor {i + 1} Name</label>
+              <Input 
+                value={floorNames[i] || ''} 
+                onChange={(e) => {
+                  const newNames = [...floorNames];
+                  newNames[i] = e.target.value;
+                  setFloorNames(newNames);
+                }} 
+                placeholder={`e.g. Ground, F1, Basement`}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
