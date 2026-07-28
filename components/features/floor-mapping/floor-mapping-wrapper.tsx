@@ -14,19 +14,19 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
   const pathname = usePathname();
 
   const initWarehouseId = searchParams.get('warehouseId') || '';
-  const initChamberNo = searchParams.get('chamberNo') ? Number(searchParams.get('chamberNo')) : null;
+  const initChamberNo = searchParams.get('chamberNo') || null;
   const initFloorNo = searchParams.get('floorNo') ? Number(searchParams.get('floorNo')) : null;
   const initStackNo = searchParams.get('stackNo') ? Number(searchParams.get('stackNo')) : null;
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initWarehouseId);
-  const [selectedChamberNo, setSelectedChamberNo] = useState<number | null>(initChamberNo);
+  const [selectedChamberNo, setSelectedChamberNo] = useState<string | null>(initChamberNo);
   const [selectedFloorNo, setSelectedFloorNo] = useState<number | null>(initFloorNo);
 
   const [loading, setLoading] = useState(false);
   const [floorData, setFloorData] = useState<any>(null);
 
   const activeWarehouse = warehouses.find(w => w._id === selectedWarehouseId);
-  const activeChamber = activeWarehouse?.chambers?.find((c: any) => c.chamberNo === selectedChamberNo);
+  const activeChamber = activeWarehouse?.chambers?.find((c: any) => (c.name || c.chamberNo.toString()) === selectedChamberNo);
   const availableFloors = activeChamber?.floors || [];
 
   const initialMountWH = useRef(true);
@@ -96,15 +96,16 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
         <div className="space-y-2 flex-1">
           <label className="text-sm font-medium text-slate-700">{t('inward.chamberNo') || 'Chamber No.'}</label>
           <Select 
-            value={selectedChamberNo?.toString() || ''} 
-            onValueChange={(val) => setSelectedChamberNo(Number(val))}
+            value={selectedChamberNo || ''} 
+            onValueChange={(val) => setSelectedChamberNo(val)}
             disabled={!selectedWarehouseId}
           >
             <SelectTrigger><SelectValue placeholder="Select Chamber" /></SelectTrigger>
             <SelectContent>
-              {activeWarehouse?.chambers?.map((c: any) => (
-                <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>Chamber {c.chamberNo}</SelectItem>
-              ))}
+              {activeWarehouse?.chambers?.map((c: any) => {
+                const val = (c.name || c.chamberNo).toString();
+                return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -119,7 +120,7 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
             <SelectTrigger><SelectValue placeholder="Select Floor" /></SelectTrigger>
             <SelectContent>
               {availableFloors.map((f: any) => (
-                <SelectItem key={f.floorNo} value={f.floorNo.toString()}>Floor {f.floorNo}</SelectItem>
+                <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
               ))}
             </SelectContent>
           </Select>

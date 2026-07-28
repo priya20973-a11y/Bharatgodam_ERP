@@ -82,7 +82,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         mixed: inward.mixed || null,
         plusMinus: '-',
         grossWeight: null,
-        emptyWeight: null
+        emptyWeight: null,
+        serviceType: 'None',
+        serviceChargeType: '',
+        serviceRate: '',
+        serviceAmount: ''
       }
     ]);
   };
@@ -160,6 +164,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           inwardId: item.inward._id,
           commodityId: item.inward.commodityId._id || item.inward.commodityId,
           warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
+          chamberName: alloc.chamberName || alloc.chamberNo?.toString(),
           chamberNo: alloc.chamberNo,
           floorNo: alloc.floorNo,
           stackNo: alloc.stackNo,
@@ -179,6 +184,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           kataBharati: deductTotalBags > 0 ? deductNetWeight / deductTotalBags : 0,
           marko: item.inward.marko,
           referencePersons: item.inward.referencePersons,
+          serviceType: item.serviceType,
+          serviceChargeType: item.serviceType === 'Grading' ? item.serviceChargeType : undefined,
+          serviceRate: item.serviceType === 'Grading' ? (Number(item.serviceRate) || 0) : undefined,
+          serviceAmount: isLastAlloc ? (Number(item.serviceAmount) || 0) : Math.round((Number(item.serviceAmount) || 0) * ratio), // prorate if multiple stacks
         });
       }
     }
@@ -260,7 +269,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberName: inw.chamberName, chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => {
+                          const chamber = inw.warehouseId?.chambers?.find((c: any) => c.chamberNo === a.chamberNo || c.name === a.chamberName);
+                          const floor = chamber?.floors?.find((f: any) => f.floorNo === a.floorNo);
+                          const floorName = floor?.name || `F${a.floorNo}`;
+                          return `${a.chamberName || a.chamberNo}/${floorName}/S${a.stackNo}`;
+                        }).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                       </span>
                     </div>
                   )
@@ -313,7 +327,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
             
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')} (Available: {(() => {
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => {
+              const chamber = item.inward.warehouseId?.chambers?.find((c: any) => c.chamberNo === a.chamberNo || c.name === a.chamberName);
+              const floor = chamber?.floors?.find((f: any) => f.floorNo === a.floorNo);
+              const floorName = floor?.name || `F${a.floorNo}`;
+              return `${a.chamberName || a.chamberNo}/${floorName}/S${a.stackNo}`;
+            }).join(', ')} (Available: {(() => {
               const baseQty = Number(item.inward?.availableQty) || 0;
               const finalQty = baseQty;
               return finalQty.toFixed(2);
@@ -359,9 +378,100 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                 <label className="text-sm font-medium">{t('outward.kataBharati')}</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcKataBharati.toFixed(2)}</div>
               </div>
-              
-
             </div>
+
+            <div className="mt-4 pt-4 border-t">
+              <h4 className="font-semibold text-sm text-slate-700 mb-4">Value Added Services</h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Service Type</label>
+                  <Select 
+                    value={item.serviceType} 
+                    onValueChange={(val) => {
+                      let nextAmount = '';
+                      let nextRate = '';
+                      let nextChargeType = '';
+                      
+                      if (val === 'Grading') {
+                        const comm = commodities.find(c => c._id === (item.inward.commodityId?._id || item.inward.commodityId));
+                        if (comm?.gradingCharge) {
+                          nextChargeType = comm.gradingCharge.type || '';
+                          nextRate = comm.gradingCharge.defaultRate || '';
+                          if (nextChargeType === 'Per Bag') {
+                            nextAmount = (calcTotalBags * Number(nextRate)).toString();
+                          } else if (nextChargeType === 'Per Kg') {
+                            nextAmount = (calcNetWeight * Number(nextRate)).toString();
+                          }
+                        }
+                      }
+                      
+                      setSelectedItems(selectedItems.map(si => si.inwardId === item.inwardId ? { 
+                        ...si, 
+                        serviceType: val,
+                        serviceChargeType: nextChargeType,
+                        serviceRate: nextRate,
+                        serviceAmount: nextAmount
+                      } : si));
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select Service" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="None">None</SelectItem>
+                      <SelectItem value="Grading">Grading</SelectItem>
+                      <SelectItem value="Wet">Wet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {item.serviceType === 'Grading' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-500">Charge Type</label>
+                      <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold text-sm h-10 flex items-center">
+                        {item.serviceChargeType || 'Not set'}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Rate</label>
+                      <ColdNumberInput 
+                        value={item.serviceRate ?? ''} 
+                        onChange={(val) => {
+                          const rateNum = Number(val) || 0;
+                          let newAmount = 0;
+                          if (item.serviceChargeType === 'Per Bag') {
+                            newAmount = calcTotalBags * rateNum;
+                          } else if (item.serviceChargeType === 'Per Kg') {
+                            newAmount = calcNetWeight * rateNum;
+                          }
+                          setSelectedItems(selectedItems.map(si => si.inwardId === item.inwardId ? { 
+                            ...si, 
+                            serviceRate: val,
+                            serviceAmount: newAmount.toString()
+                          } : si));
+                        }} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Total Amount</label>
+                      <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold text-sm h-10 flex items-center">
+                        ₹{Number(item.serviceAmount || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                {item.serviceType === 'Wet' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-indigo-700">Wet Charge Amount (₹)</label>
+                    <ColdNumberInput 
+                      value={item.serviceAmount ?? ''} 
+                      onChange={(val) => handleItemChange(item.inwardId, 'serviceAmount', val)} 
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            
           </div>
         );
       })}

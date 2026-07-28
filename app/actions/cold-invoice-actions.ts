@@ -6,7 +6,7 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { hasPermission } from '@/lib/permissions';
-import { requireSession, getTenantFilter, appendOwnership } from '@/lib/ownership';
+import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { differenceInDays, parseISO, isAfter, isBefore, max, min } from 'date-fns';
 
@@ -163,9 +163,29 @@ export async function generateColdClientInvoicePreview(
     totalAmount += rent;
   }
 
+  let gradingAmount = 0;
+  let wetAmount = 0;
+  
+  for (const o of outwards) {
+    const oDate = o.date ? new Date(o.date) : new Date();
+    if (oDate.getTime() >= fromDate.getTime() && oDate.getTime() <= toDate.getTime()) {
+      if (o.serviceType === 'Grading' && o.serviceAmount > 0) gradingAmount += o.serviceAmount;
+      if (o.serviceType === 'Wet' && o.serviceAmount > 0) wetAmount += o.serviceAmount;
+    }
+  }
+
+  const autoCharges = [];
+  if (gradingAmount > 0) {
+    autoCharges.push({ name: 'Grading Charges', amount: gradingAmount });
+  }
+  if (wetAmount > 0) {
+    autoCharges.push({ name: 'Wet Charges', amount: wetAmount });
+  }
+
   return {
     items,
-    totalAmount
+    totalAmount,
+    autoCharges
   };
 }
 
@@ -190,7 +210,7 @@ export async function saveColdClientInvoice(data: any) {
 export async function getColdInvoices() {
   await connectToDatabase();
   const session = await requireSession();
-  const filter = getTenantFilter(session);
+  const filter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
   
   const invoices = await ColdInvoice.find(filter)
     .populate('clientId', 'name mobile')

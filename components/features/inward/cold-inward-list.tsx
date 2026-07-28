@@ -10,7 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 interface ColdInwardListProps {
@@ -22,8 +23,55 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
 
   const groupedInwards = inwards;
 
+  const exportCsv = () => {
+    const headers = [
+      t('inward.dateHeader') || 'Date',
+      t('inward.clientNameHeader') || 'Client Name',
+      'Farmer Name',
+      t('inward.commodityHeader') || 'Commodity',
+      t('inward.warehouseHeader') || 'Warehouse',
+      t('inward.chamberHeader') || 'Chamber',
+      t('inward.floorHeader') || 'Floor',
+      t('inward.stackHeader') || 'Stack',
+      'Grade',
+      t('inward.quantityHeader') || 'Net Weight (kg)',
+      t('inward.bagsHeader') || 'Bags'
+    ];
+    
+    const rows = groupedInwards.map(w => {
+      const date = w.date ? format(new Date(w.date), 'dd MMM yyyy') : '-';
+      const client = w.clientId?.name || '-';
+      const farmer = w.farmerName || '-';
+      const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
+      const warehouse = w.warehouseId?.name || '-';
+      const chamber = w.stackAllocations?.map((s: any) => String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')).join('; ') || String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
+      const floor = w.stackAllocations?.map((s: any) => s.floorNo).join('; ') || w.floorNo || '-';
+      const stack = w.stackAllocations?.map((s: any) => s.stackNo).join('; ') || w.stackNo || '-';
+      const grade = w.gradingType || '-';
+      const qty = w.quantityKg || 0;
+      const bags = w.bagsCount || 0;
+      return [date, client, farmer, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
+        .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Inward_Export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={exportCsv} variant="outline" size="sm">
+          <Download className="mr-2 h-4 w-4" /> Export CSV
+        </Button>
+      </div>
+      <div className="rounded-md border bg-white shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">
@@ -62,7 +110,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="text-slate-700">{commodityDisplay}</TableCell>
                   <TableCell className="text-slate-700">{w.warehouseId?.name || '-'}</TableCell>
                   <TableCell className="text-right text-slate-700">
-                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.chamberNo)}</div>) || formatNumber(w.chamberNo)}
+                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{String(s.chamberName || formatNumber(s.chamberNo)).replace(/^Chamber\s+/i, '')}</div>) || String(w.chamberName || formatNumber(w.chamberNo)).replace(/^Chamber\s+/i, '')}
                   </TableCell>
                   <TableCell className="text-right text-slate-700">
                     {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.floorNo)}</div>) || formatNumber(w.floorNo)}
@@ -93,6 +141,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

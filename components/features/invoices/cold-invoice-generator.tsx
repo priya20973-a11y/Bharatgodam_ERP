@@ -36,6 +36,11 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     try {
       const data = await generateColdClientInvoicePreview(warehouseId, clientId, fromDate, toDate);
       setPreview(data);
+      if (data.autoCharges && data.autoCharges.length > 0) {
+        setAdditionalCharges(data.autoCharges);
+      } else {
+        setAdditionalCharges([]);
+      }
       if (data.items.length === 0) {
         toast.error('No valid transactions found for the selected period.');
       } else {

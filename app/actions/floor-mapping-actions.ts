@@ -5,20 +5,20 @@ import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import { hasPermission } from '@/lib/permissions';
-import { requireSession, getTenantFilter } from '@/lib/ownership';
+import { requireSession, getTenantFilter, getWarehouseFilter } from '@/lib/ownership';
 import { Types } from 'mongoose';
 
-export async function getFloorInventory(warehouseId: string, chamberNo: number, floorNo: number) {
+export async function getFloorInventory(warehouseId: string, chamberName: string, floorNo: number) {
   try {
     await connectToDatabase();
     const session = await requireSession();
     const tenantFilter = getTenantFilter(session);
 
     // Get the warehouse layout details
-    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter }).lean();
+    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter, ...getWarehouseFilter(session, '_id') }).lean();
     if (!warehouse) throw new Error('Warehouse not found');
 
-    const chamber = warehouse.chambers.find((c: any) => c.chamberNo === chamberNo);
+    const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
     if (!chamber) throw new Error('Chamber not found');
 
     const floor = chamber.floors.find((f: any) => f.floorNo === floorNo);
@@ -27,7 +27,10 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     // Get all inwards for this floor
     const inwards = await ColdInward.find({
       warehouseId,
-      'stackAllocations.chamberNo': chamberNo,
+      $or: [
+        { 'stackAllocations.chamberName': chamberName },
+        ...(chamber?.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
+      ],
       'stackAllocations.floorNo': floorNo,
       ...tenantFilter
     }).populate('commodityId', 'name type').lean();
@@ -35,7 +38,10 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     // Get all outwards for this floor
     const outwards = await ColdOutward.find({
       warehouseId,
-      chamberNo,
+      $or: [
+        { chamberName: chamberName },
+        ...(chamber?.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
+      ],
       floorNo,
       ...tenantFilter
     }).lean();
@@ -57,7 +63,7 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     inwards.forEach((inward: any) => {
       if (!inward.stackAllocations) return;
       inward.stackAllocations.forEach((alloc: any) => {
-        if (alloc.chamberNo === chamberNo && alloc.floorNo === floorNo) {
+        if ((alloc.chamberName === chamberName || alloc.chamberNo === chamber?.chamberNo) && alloc.floorNo === floorNo) {
           const s = stacksMap.get(alloc.stackNo);
           if (s) {
             s.usedCapacity += alloc.allocatedWeight;
@@ -127,7 +133,7 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
       success: true,
       data: {
         warehouseId,
-        chamberNo,
+        chamberName,
         floorNo,
         stackLayout: warehouse.stackLayout,
         gridRows: warehouse.gridRows,
@@ -144,23 +150,26 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
   }
 }
 
-export async function getStackDetails(warehouseId: string, chamberNo: number, floorNo: number, stackNo: number) {
+export async function getStackDetails(warehouseId: string, chamberName: string, floorNo: number, stackNo: number) {
   try {
     await connectToDatabase();
     const session = await requireSession();
     const tenantFilter = getTenantFilter(session);
 
-    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter }).lean();
+    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter, ...getWarehouseFilter(session, '_id') }).lean();
     if (!warehouse) throw new Error('Warehouse not found');
 
-    const chamber = warehouse.chambers.find((c: any) => Number(c.chamberNo) === Number(chamberNo));
+    const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
     const floor = chamber?.floors.find((f: any) => Number(f.floorNo) === Number(floorNo));
     const stack = floor?.stacks.find((s: any) => Number(s.stackNo) === Number(stackNo));
-    if (!stack) throw new Error(`Stack ${stackNo} not found in Chamber ${chamberNo}, Floor ${floorNo}`);
+    if (!stack) throw new Error(`Stack ${stackNo} not found in Chamber ${chamberName}, Floor ${floorNo}`);
 
     const inwards = await ColdInward.find({ 
       warehouseId, 
-      'stackAllocations.chamberNo': chamberNo, 
+      $or: [
+        { 'stackAllocations.chamberName': chamberName },
+        ...(chamber?.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
+      ], 
       'stackAllocations.floorNo': floorNo, 
       'stackAllocations.stackNo': stackNo, 
       ...tenantFilter 
@@ -169,7 +178,16 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
       .populate('clientId', 'name')
       .lean();
 
-    const outwards = await ColdOutward.find({ warehouseId, chamberNo, floorNo, stackNo, ...tenantFilter })
+    const outwards = await ColdOutward.find({ 
+      warehouseId, 
+      $or: [
+        { chamberName: chamberName },
+        ...(chamber?.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
+      ], 
+      floorNo, 
+      stackNo, 
+      ...tenantFilter 
+    })
       .lean();
 
     let usedCapacity = 0;
@@ -181,7 +199,7 @@ export async function getStackDetails(warehouseId: string, chamberNo: number, fl
     const activeStocksMap = new Map<string, any>();
 
     inwards.forEach((inward: any) => {
-      const alloc = inward.stackAllocations?.find((a: any) => a.chamberNo === chamberNo && a.floorNo === floorNo && a.stackNo === stackNo);
+      const alloc = inward.stackAllocations?.find((a: any) => (a.chamberName === chamberName || a.chamberNo === chamber?.chamberNo) && a.floorNo === floorNo && a.stackNo === stackNo);
       if (!alloc) return;
 
       usedCapacity += alloc.allocatedWeight;

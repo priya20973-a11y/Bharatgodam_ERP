@@ -30,7 +30,8 @@ export async function fetchColdCommodities() {
       name: item.name,
       type: item.type,
       unit: item.unit,
-      gradingType: item.gradingType,
+      qualityParameters: item.qualityParameters,
+      gradingCharge: item.gradingCharge,
       priceType: item.priceType,
       seasonalPrices: item.seasonalPrices,
       updatedAt: item.updatedAt,
@@ -83,7 +84,7 @@ function validateSeasonalPrices(prices: ISeasonalPrice[], priceType?: string): {
   return { valid: true };
 }
 
-export async function addColdCommodity(data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+export async function addColdCommodity(data: { name: string; type: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
   await connectToDatabase();
   try {
     console.log('addColdCommodity received:', JSON.stringify(data, null, 2));
@@ -121,7 +122,8 @@ export async function addColdCommodity(data: { name: string; type: string; gradi
       name: nameVal,
       type: data.type.trim(),
       unit: 'KG',
-      gradingType: data.gradingType,
+      qualityParameters: data.qualityParameters || [],
+      gradingCharge: data.gradingCharge,
       priceType: data.priceType,
       seasonalPrices: data.seasonalPrices
     }, session));
@@ -138,7 +140,7 @@ export async function addColdCommodity(data: { name: string; type: string; gradi
   }
 }
 
-export async function updateColdCommodity(id: string, data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+export async function updateColdCommodity(id: string, data: { name: string; type: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -176,7 +178,8 @@ export async function updateColdCommodity(id: string, data: { name: string; type
       { 
         name: nameVal,
         type: data.type.trim(),
-        gradingType: data.gradingType,
+        qualityParameters: data.qualityParameters || [],
+        gradingCharge: data.gradingCharge,
         priceType: data.priceType,
         seasonalPrices: data.seasonalPrices
       },

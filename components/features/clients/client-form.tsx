@@ -104,6 +104,10 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
       validationErrors.state = 'State is required';
     }
 
+    if (isColdStorage && formData.commodityIds.length === 0) {
+      validationErrors.commodityIds = 'Please assign at least one commodity to the client.';
+    }
+
     setErrors(validationErrors);
     return validationErrors;
   };
@@ -282,6 +286,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
           )}
         </div>
         <p className="text-xs text-slate-500 mt-1">{t('clients.commodityHint')}</p>
+        {errors.commodityIds && <p className="mt-1 text-sm text-red-600">{errors.commodityIds}</p>}
       </div>
       <div className="flex justify-between items-center gap-2 pt-2">
         <p className="text-sm text-slate-500">{formData.commodityIds.length} {t('clients.commoditiesAssigned')}</p>

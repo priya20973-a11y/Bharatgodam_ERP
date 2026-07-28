@@ -23,7 +23,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
 
   const [name, setName] = useState('');
   const [type, setType] = useState('');
-  const [gradingType, setGradingType] = useState<'Grading' | 'Wet' | ''>('');
+  const [qualityParameters, setQualityParameters] = useState<{name: string, lowerLimit: number, upperLimit: number}[]>([]);
+  const [gradingChargeType, setGradingChargeType] = useState<'Per Bag' | 'Per Kg' | ''>('');
+  const [gradingChargeRate, setGradingChargeRate] = useState<number | ''>('');
   const [priceType, setPriceType] = useState<'Same Price' | 'Different Price' | ''>('');
   const [seasonalPrices, setSeasonalPrices] = useState<ISeasonalPrice[]>([]);
 
@@ -31,7 +33,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     if (initialData && isOpen) {
       setName(initialData.name || '');
       setType(initialData.type || '');
-      setGradingType(initialData.gradingType || '');
+      setQualityParameters(initialData.qualityParameters || []);
+      setGradingChargeType(initialData.gradingCharge?.type || '');
+      setGradingChargeRate(initialData.gradingCharge?.defaultRate ?? '');
       setPriceType(initialData.priceType || '');
       setSeasonalPrices(initialData.seasonalPrices?.map((p: any) => ({
         ...p,
@@ -41,7 +45,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     } else if (isOpen) {
       setName('');
       setType('');
-      setGradingType('');
+      setQualityParameters([]);
+      setGradingChargeType('');
+      setGradingChargeRate('');
       setPriceType('Same Price');
       setSeasonalPrices([{ fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }] as any);
     }
@@ -68,7 +74,13 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
   const validate = () => {
     if (!name.trim()) return t('common.error');
     if (!type.trim()) return t('common.error');
+    if (gradingChargeType && gradingChargeRate === '') return 'Please enter a valid grading charge rate.';
     if (seasonalPrices.length === 0) return t('common.error');
+
+    for (const qp of qualityParameters) {
+      if (!qp.name.trim()) return 'Quality parameter name is required.';
+      if (qp.lowerLimit > qp.upperLimit) return 'Lower limit cannot be greater than upper limit.';
+    }
 
     for (const p of seasonalPrices as any[]) {
       if (!p.fromDate || !p.toDate) {
@@ -114,7 +126,8 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         name: name.trim().toUpperCase(),
         type: type.trim(),
         unit: 'KG',
-        gradingType: gradingType || undefined,
+        qualityParameters,
+        gradingCharge: gradingChargeType ? { type: gradingChargeType, defaultRate: Number(gradingChargeRate) || 0 } : undefined,
         priceType: priceType || undefined,
         seasonalPrices: (seasonalPrices as any[]).map(p => ({
           fromDate: new Date(p.fromDate),
@@ -206,19 +219,6 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">Grading Type</label>
-                <select
-                  value={gradingType}
-                  onChange={(e) => setGradingType(e.target.value as any)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-                >
-                  <option value="">Select Grading Type (Optional)</option>
-                  <option value="Grading">Grading</option>
-                  <option value="Wet">Wet</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Price Type</label>
                 <select
                   value={priceType}
@@ -230,6 +230,116 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                   <option value="Different Price">Different Price</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div className="flex items-center pb-2 border-b border-slate-100">
+              <div className="h-6 w-1 bg-indigo-500 rounded-full mr-3" />
+              <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Grading Configuration</h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Grading Charge Type</label>
+                <select
+                  value={gradingChargeType}
+                  onChange={(e) => setGradingChargeType(e.target.value as any)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                >
+                  <option value="">None</option>
+                  <option value="Per Bag">Per Bag</option>
+                  <option value="Per Kg">Per Kg</option>
+                </select>
+              </div>
+              {gradingChargeType && (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Default Rate</label>
+                  <ColdNumberInput
+                    value={gradingChargeRate}
+                    onChange={(val) => setGradingChargeRate(Number(val) || 0)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div className="flex items-center pb-2 border-b border-slate-100">
+              <div className="h-6 w-1 bg-indigo-500 rounded-full mr-3" />
+              <div className="flex flex-col">
+                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Quality Parameters</h4>
+                <p className="text-xs text-slate-500 font-medium">Define parameters to monitor during inward operations.</p>
+              </div>
+            </div>
+            
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 space-y-4">
+              <div className="space-y-3">
+                {qualityParameters.map((qp, idx) => (
+                  <div key={idx} className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-lg border border-indigo-100 shadow-sm relative group transition-all hover:border-indigo-300">
+                    <div className="flex-1 w-full grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Parameter Name</label>
+                        <input
+                          type="text"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                          value={qp.name}
+                          onChange={(e) => {
+                            const newQp = [...qualityParameters];
+                            newQp[idx].name = e.target.value;
+                            setQualityParameters(newQp);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Lower Limit</label>
+                        <ColdNumberInput
+                          className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                          value={qp.lowerLimit}
+                          onChange={(val) => {
+                            const newQp = [...qualityParameters];
+                            newQp[idx].lowerLimit = Number(val) || 0;
+                            setQualityParameters(newQp);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Upper Limit</label>
+                        <ColdNumberInput
+                          className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                          value={qp.upperLimit}
+                          onChange={(val) => {
+                            const newQp = [...qualityParameters];
+                            newQp[idx].upperLimit = Number(val) || 0;
+                            setQualityParameters(newQp);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-end h-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQp = [...qualityParameters];
+                          newQp.splice(idx, 1);
+                          setQualityParameters(newQp);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setQualityParameters([...qualityParameters, { name: '', lowerLimit: 0, upperLimit: 0 }])}
+                className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 mt-2 px-2 py-1 rounded hover:bg-indigo-100/50 transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Quality Parameter
+              </button>
             </div>
           </div>
 
