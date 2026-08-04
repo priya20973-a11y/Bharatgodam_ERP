@@ -8,7 +8,10 @@ import { ColdNumberInput } from '@/components/ui/cold-number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
-import { Trash2, ChevronDown } from 'lucide-react';
+import { Trash2, ChevronDown, QrCode } from 'lucide-react';
+import { getDynamicUnitLabel } from '@/lib/utils';
+import { getColdInwardByQrId } from '@/app/actions/cold-inward-actions';
+import QRScannerModal from './qr-scanner-modal';
 
 interface ColdOutwardFormProps {
   clients: any[];
@@ -21,6 +24,7 @@ interface ColdOutwardFormProps {
 export default function ColdOutwardForm({ clients, commodities, warehouses, onSuccess, prefillData }: ColdOutwardFormProps) {
   const { t } = useColdTranslation();
   const [loading, setLoading] = useState(false);
+  const isQrShortcut = !!prefillData?.scanQrId;
   
   const [clientId, setClientId] = useState('');
   const [availableInwards, setAvailableInwards] = useState<any[]>([]);
@@ -35,6 +39,8 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -52,13 +58,62 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     if (clientId) {
       getAvailableInwardsForClient(clientId).then(res => {
         setAvailableInwards(res || []);
-        setSelectedItems([]);
+        if (!prefillData?.scanQrId) {
+          setSelectedItems([]);
+        }
       });
     } else {
       setAvailableInwards([]);
       setSelectedItems([]);
     }
   }, [clientId]);
+
+  useEffect(() => {
+    const initScan = async () => {
+      if (prefillData?.scanQrId) {
+        setLoading(true);
+        try {
+          const res = await getColdInwardByQrId(prefillData.scanQrId);
+          if (res.success && res.data) {
+            const inwardData = res.data;
+            const cid = typeof inwardData.clientId === 'object' ? inwardData.clientId._id : inwardData.clientId;
+            setClientId(cid);
+            
+            const availableRes = await getAvailableInwardsForClient(cid);
+            setAvailableInwards(availableRes || []);
+            const inward = (availableRes || []).find((i: any) => i.uniqueKey === inwardData._id.toString());
+            
+            if (inward) {
+              if (inward.status === 'Completed' || inward.availableQty <= 0) {
+                toast.error('Cannot create outward: Inward is already completed or has no remaining stock.');
+              } else {
+                setSelectedItems([{
+                  inwardId: inward.uniqueKey,
+                  inward,
+                  grade: inward.grade || '',
+                  bagsCount: inward.bagsCount || null,
+                  jin: inward.jin || null,
+                  mixed: inward.mixed || null,
+                  plusMinus: '-',
+                  grossWeight: inward.availableQty || null,
+                  emptyWeight: inward.emptyWeight || null
+                }]);
+              }
+            } else {
+              toast.error('Scanned inward has no available stock.');
+            }
+          } else {
+            toast.error(res.error || 'Invalid QR Code or Inward not found.');
+          }
+        } catch (err) {
+          toast.error('Failed to fetch inward from QR.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    initScan();
+  }, []);
 
   const handleAddInward = (inwardId: string) => {
     if (!inwardId) return;
@@ -160,8 +215,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           inwardId: item.inward._id,
           commodityId: item.inward.commodityId._id || item.inward.commodityId,
           warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
+          chamberName: alloc.chamberName,
           chamberNo: alloc.chamberNo,
+          floorName: alloc.floorName,
           floorNo: alloc.floorNo,
+          stackName: alloc.stackName,
           stackNo: alloc.stackNo,
           quantityKg: deductNetWeight,
           bagsCount: deductLargeBags,
@@ -209,8 +267,39 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-6 border rounded-lg bg-slate-50">
-      <h3 className="font-semibold text-lg border-b pb-2">{t('outward.newTransaction')}</h3>
+      <div className="flex justify-between items-center border-b pb-2">
+        <h3 className="font-semibold text-lg">{isQrShortcut ? 'Create Outward from QR' : t('outward.newTransaction')}</h3>
+        {selectedItems.length === 0 && !isQrShortcut && (
+          <Button type="button" variant="outline" onClick={() => setIsScannerOpen(true)}>
+            <QrCode className="mr-2 h-4 w-4" /> Scan QR
+          </Button>
+        )}
+      </div>
+      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScanSuccess={(data) => {
+        setIsScannerOpen(false);
+        const cid = typeof data.clientId === 'object' ? data.clientId._id : data.clientId;
+        setClientId(cid);
+        
+        getAvailableInwardsForClient(cid).then(res => {
+          setAvailableInwards(res || []);
+          const inward = (res || []).find((i: any) => i.uniqueKey === data._id.toString());
+          if (inward) {
+            setSelectedItems([{
+              inwardId: inward.uniqueKey,
+              inward,
+              grade: inward.grade || '',
+              bagsCount: inward.bagsCount || null,
+              jin: inward.jin || null,
+              mixed: inward.mixed || null,
+              plusMinus: '-',
+              grossWeight: inward.availableQty || null,
+              emptyWeight: inward.emptyWeight || null
+            }]);
+          }
+        });
+      }} />
       
+      {!isQrShortcut && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('outward.clientName')}</label>
@@ -260,7 +349,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')}) - {inw.availableQty.toFixed(2)} Kg {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                        {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberNo: inw.chamberNo, floorNo: inw.floorNo, stackNo: inw.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')}) - {inw.availableQty.toFixed(2)} {inw.unit || inw.commodityId?.unit || 'KG'} {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                       </span>
                     </div>
                   )
@@ -275,6 +364,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           </div>
         </div>
       </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded border">
         <div className="space-y-2">
@@ -303,6 +393,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
         return (
           <div key={item.inwardId} className="bg-white p-4 rounded border border-slate-200 relative mt-4 shadow-sm">
+            {!isQrShortcut && (
             <Button 
               type="button" 
               variant="destructive" 
@@ -312,51 +403,64 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            )}
             
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberNo: item.inward.chamberNo, floorNo: item.inward.floorNo, stackNo: item.inward.stackNo }]).map((a: any) => `C${a.chamberNo}/F${a.floorNo}/S${a.stackNo}`).join(', ')} (Available: {(() => {
-              const baseQty = Number(item.inward?.availableQty) || 0;
-              const finalQty = baseQty;
-              return finalQty.toFixed(2);
-            })()} Kg)</h4>
+            {isQrShortcut ? (
+              <div className="mb-4 p-4 bg-slate-50 border rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div><span className="text-slate-500 block">Client</span><span className="font-semibold">{clients.find(c => c._id === clientId)?.name || '-'}</span></div>
+                <div><span className="text-slate-500 block">Commodity</span><span className="font-semibold">{item.inward.commodityId?.name || '-'}</span></div>
+                <div><span className="text-slate-500 block">Warehouse</span><span className="font-semibold">{item.inward.warehouseId?.name || '-'}</span></div>
+                <div><span className="text-slate-500 block">Receipt No.</span><span className="font-semibold">{item.inward.receiptNo || '-'}</span></div>
+                <div className="col-span-2 md:col-span-4"><span className="text-slate-500 block">Location (Chamber/Floor/Stack)</span><span className="font-semibold">{(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => `${a.chamberName || 'C' + a.chamberNo}/${a.floorName || 'F' + a.floorNo}/${a.stackName || 'S' + a.stackNo}`).join(', ')}</span></div>
+                <div><span className="text-slate-500 block">Available Weight</span><span className="font-semibold text-green-700">{item.inward.availableQty?.toFixed(2)} KG</span></div>
+                <div className="col-span-3"><span className="text-slate-500 block">Remaining Bags</span><span className="font-semibold text-blue-700">{item.inward.bagsCount || 0} Large, {item.inward.jin || 0} Small, {item.inward.mixed || 0} Mixed</span></div>
+              </div>
+            ) : (
+              <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => `${a.chamberName || 'C' + a.chamberNo}/${a.floorName || 'F' + a.floorNo}/${a.stackName || 'S' + a.stackNo}`).join(', ')} (Available Weight: {(() => {
+                const baseQty = Number(item.inward?.availableQty) || 0;
+                const finalQty = baseQty;
+                return finalQty.toFixed(2);
+              })()} KG)</h4>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Net Weight Loss(Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Net Loss (KG)</label>
                 <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">{t('outward.quantityKg')} (Gross)</label>
+                <label className="text-sm font-medium text-blue-600">Gross Qty (KG)</label>
                 <ColdNumberInput required min="0" step="0.01" value={item.grossWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'grossWeight', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-orange-600">{t('outward.emptyWeight')}</label>
+                <label className="text-sm font-medium text-orange-600">Empty Qty (KG)</label>
                 <ColdNumberInput min="0" step="0.01" value={item.emptyWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'emptyWeight', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-700">Final Net Weight</label>
+                <label className="text-sm font-medium text-green-700">Final Net Qty (KG)</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcNetWeight.toFixed(2)}</div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Large Bags</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'large')}</label>
                 <ColdNumberInput required min="0" value={item.bagsCount ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'bagsCount', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Small Bags</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'small')}</label>
                 <ColdNumberInput min="0" value={item.jin ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'jin', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Mixed Bags</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'mixed')}</label>
                 <ColdNumberInput min="0" value={item.mixed ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'mixed', val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-700">Total Bags</label>
+                <label className="text-sm font-medium text-green-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'total')}</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcTotalBags.toFixed(2)}</div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t('outward.kataBharati')}</label>
+                <label className="text-sm font-medium">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'weight')}</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcKataBharati.toFixed(2)}</div>
               </div>
               

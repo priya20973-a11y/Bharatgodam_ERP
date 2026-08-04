@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Receipt } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -15,6 +15,7 @@ type NavItem = {
   href: string;
   icon: any;
   module?: PermissionModule;
+  adminOnly?: boolean;
 };
 
 const coldNavItems: NavItem[] = [
@@ -23,9 +24,11 @@ const coldNavItems: NavItem[] = [
   { name: 'Warehouse Master', translationKey: 'sidebar.warehouse', href: '/cold/warehouses', icon: Box, module: 'warehouse' },
   { name: 'Floor Mapping', translationKey: 'floorMapping.title', href: '/cold/floor-mapping', icon: Grid, module: 'floorMapping' },
   { name: 'Commodity Master', translationKey: 'sidebar.commodities', href: '/cold/commodities', icon: Package, module: 'commodity' },
+  { name: 'Unit Master', translationKey: 'sidebar.unitMaster', href: '/cold/units', icon: Layers, adminOnly: true },
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
+  { name: 'Ownership Transfer', translationKey: 'sidebar.transferOwnership', href: '/cold/transfers', icon: ArrowRightLeft, module: 'inward' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
@@ -79,7 +82,10 @@ export default function ColdSidebar({ session }: SidebarProps) {
           {/* Navigation Links */}
           <nav className="flex-1 space-y-1 px-4 py-8 overflow-y-auto no-scrollbar">
             {coldNavItems
-              .filter(item => !item.module || canViewMenu(session, item.module))
+              .filter(item => {
+                if (item.adminOnly && !isAdmin) return false;
+                return !item.module || canViewMenu(session, item.module);
+              })
               .map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;

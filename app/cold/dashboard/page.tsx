@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { Box, Layers, Clock3, Building2, Users, Receipt, BookOpen, ArrowRight } from 'lucide-react';
+import { Box, Layers, Clock3, Building2, Users, Receipt, BookOpen, ArrowRight, TrendingDown } from 'lucide-react';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getTenantFilterForMongo, isAdmin, isWsp } from '@/lib/ownership';
@@ -113,6 +113,7 @@ export default async function DashboardPage() {
             $project: {
               direction: { $literal: 'OUTWARD' },
               quantityMT: { $divide: [{ $ifNull: ['$quantityKg', 0] }, 1000] },
+              plusMinus: { $ifNull: ['$plusMinus', 0] },
               date: 1,
               dateString: {
                 $cond: [
@@ -158,6 +159,22 @@ export default async function DashboardPage() {
           {
             $project: {
               netInventory: { $subtract: ['$totalInward', '$totalOutward'] }
+            }
+          }
+        ],
+        totalNetWeightLoss: [
+          {
+            $group: {
+              _id: null,
+              totalLoss: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$direction', 'OUTWARD'] },
+                    { $ifNull: ['$plusMinus', 0] },
+                    0
+                  ]
+                }
+              }
             }
           }
         ],
@@ -311,6 +328,7 @@ export default async function DashboardPage() {
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
   const inwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'INWARD')?.count ?? 0;
   const outwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'OUTWARD')?.count ?? 0;
+  const totalNetWeightLoss = transactionAnalytics?.totalNetWeightLoss?.[0]?.totalLoss ?? 0;
 
 
   const masterLinks = [
@@ -334,6 +352,13 @@ export default async function DashboardPage() {
       icon: Layers,
       color: 'text-sky-600',
       bg: 'bg-sky-50',
+    },
+    {
+      name: 'Total Net Weight Loss (kg)',
+      value: formatNumber(totalNetWeightLoss, langStr),
+      icon: TrendingDown,
+      color: 'text-red-600',
+      bg: 'bg-red-50',
     },
   ];
 
@@ -376,7 +401,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {stats.map((stat: any) => {
           const Icon = stat.icon;
           const cardContent = (

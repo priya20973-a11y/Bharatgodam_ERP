@@ -12,7 +12,8 @@ export interface IColdInward extends Document {
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   stackAllocations: {
-    chamberNo: number;
+    chamberName: string;
+    chamberNo?: number;
     floorNo: number;
     stackNo: number;
     allocatedWeight: number;
@@ -20,6 +21,11 @@ export interface IColdInward extends Document {
   }[];
   quantityKg: number; // Net Weight
   bagsCount: number; // Bags
+  status?: string;
+  unit?: string;
+  remainingQuantityKg?: number;
+  remainingBagsCount?: number;
+  qrId?: string;
   grade?: string; // Large, Small, Mixed
   gradingType?: string; // Grading, Wet
   seed?: string;
@@ -29,6 +35,7 @@ export interface IColdInward extends Document {
   totalBags?: number;
   truckNo?: string;
   farmerName?: string;
+  farmerId?: string;
   weighbridgeSlipNo?: string;
   grossWeight?: number;
   emptyWeight?: number;
@@ -36,6 +43,12 @@ export interface IColdInward extends Document {
   marko?: string;
   remarks?: string;
   note?: string;
+  qualityEntries?: {
+    parameterName: string;
+    value: number;
+    status: string;
+    remark?: string;
+  }[];
   referencePersons?: IReferencePerson[];
   date: Date;
   batchId?: string;
@@ -58,7 +71,8 @@ const ColdInwardSchema: Schema = new Schema(
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     stackAllocations: [{
-      chamberNo: { type: Number, required: true, min: 1 },
+      chamberName: { type: String, required: true },
+      chamberNo: { type: Number, required: false },
       floorNo: { type: Number, required: true, min: 1 },
       stackNo: { type: Number, required: true, min: 1 },
       allocatedWeight: { type: Number, required: true, min: 0 },
@@ -66,6 +80,11 @@ const ColdInwardSchema: Schema = new Schema(
     }],
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
+    unit: { type: String, default: 'KG' },
+    status: { type: String, enum: ['Active', 'Partial', 'Completed'], default: 'Active' },
+    remainingQuantityKg: { type: Number, required: false },
+    remainingBagsCount: { type: Number, required: false },
+    qrId: { type: String, unique: true, sparse: true },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
     gradingType: { type: String, required: false },
     seed: { type: String, required: false },
@@ -75,6 +94,7 @@ const ColdInwardSchema: Schema = new Schema(
     totalBags: { type: Number, required: false },
     truckNo: { type: String, required: false },
     farmerName: { type: String, required: false },
+    farmerId: { type: String, required: false },
     weighbridgeSlipNo: { type: String, required: false },
     grossWeight: { type: Number, required: false },
     emptyWeight: { type: Number, required: false },
@@ -82,6 +102,12 @@ const ColdInwardSchema: Schema = new Schema(
     marko: { type: String, required: false },
     remarks: { type: String, required: false },
     note: { type: String, required: false },
+    qualityEntries: [{
+      parameterName: { type: String, required: true },
+      value: { type: Number, required: true },
+      status: { type: String, required: true },
+      remark: { type: String, required: false },
+    }],
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
     batchId: { type: String, required: false },

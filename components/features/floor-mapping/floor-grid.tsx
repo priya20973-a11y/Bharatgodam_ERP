@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Package, Users, Info } from 'lucide-react';
+import { Package, Users, Info, Download } from 'lucide-react';
 import StackDetailsModal from './stack-details-modal';
 
 interface StackData {
@@ -15,7 +15,8 @@ interface StackData {
 }
 
 export default function FloorGrid({ floorData, highlightStackNo }: { floorData: any, highlightStackNo?: number | null }) {
-  const { warehouseId, chamberNo, floorNo, stackLayout, gridRows, gridCols, customLayout, noOfStacks, stacks } = floorData;
+  const { warehouseId, chamberNo, chamberName, floorNo, stackLayout, gridRows, gridCols, customLayout, noOfStacks, stacks } = floorData;
+  const actualChamberNo = chamberNo || chamberName;
 
   const [selectedStackNo, setSelectedStackNo] = useState<number | null>(highlightStackNo || null);
 
@@ -119,10 +120,20 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
 
   return (
     <div className="w-full">
-      <div className="flex gap-4 mb-6 text-sm justify-end">
-        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-slate-100 border border-slate-300"></div> Empty</div>
-        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-amber-50 border border-amber-300"></div> Partial</div>
-        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-50 border border-red-300"></div> Full</div>
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={() => window.open(`/cold/floor-mapping/print?warehouseId=${warehouseId}&chamberNo=${actualChamberNo}&floorNo=${floorNo}`, '_blank')}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+        >
+          <Download className="w-4 h-4" />
+          Download Floor Layout
+        </button>
+
+        <div className="flex gap-4 text-sm justify-end">
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-slate-100 border border-slate-300"></div> Empty</div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-amber-50 border border-amber-300"></div> Partial</div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-50 border border-red-300"></div> Full</div>
+        </div>
       </div>
 
       <div
@@ -147,6 +158,17 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                 onClick={() => setSelectedStackNo(cell.stackNo)}
                 className={`flex flex-col p-2 rounded-xl border-2 transition-all hover:shadow-md cursor-pointer ${getStatusColor(cell.status)} aspect-square justify-center items-center relative`}
               >
+                <div 
+                  className="absolute top-2 left-2 text-slate-400 hover:text-blue-600 transition-colors z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(`/api/cold/stack-receipt/html?warehouseId=${warehouseId}&chamberNo=${actualChamberNo}&floorNo=${floorNo}&stackNo=${cell.stackNo}`, '_blank');
+                  }}
+                  title="Download A3 PDF"
+                >
+                  <Download className="w-4 h-4" />
+                </div>
+
                 <div className="absolute top-2 right-2 text-slate-400 hover:text-blue-600 transition-colors">
                   <Info className="w-4 h-4" />
                 </div>
@@ -170,7 +192,7 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
           isOpen={true}
           onClose={() => setSelectedStackNo(null)}
           warehouseId={warehouseId}
-          chamberNo={chamberNo}
+          chamberNo={actualChamberNo}
           floorNo={floorNo}
           stackNo={selectedStackNo}
         />

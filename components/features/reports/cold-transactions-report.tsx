@@ -39,6 +39,7 @@ interface TransactionRecord {
   warehouseName: string;
   warehouseId: string;
   quantityKg: number;
+  unit?: string;
   bagsCount?: number;
   chamberNo?: string;
   floorNo?: string;
@@ -166,6 +167,20 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
       },
     },
     {
+      accessorKey: 'farmerName',
+      header: 'Farmer',
+      cell: ({ row }) => {
+        const farmerName = (row.original as any).farmerName;
+        const farmerId = (row.original as any).farmerId;
+        if (!farmerName) return <span className="text-slate-400">—</span>;
+        return (
+          <span className="font-medium text-slate-700">
+            {farmerName} {farmerId ? `- ${farmerId}` : ''}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: 'commodityName',
       header: 'Commodity',
       cell: ({ row }) => {
@@ -183,11 +198,12 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
     },
     {
       accessorKey: 'quantityKg',
-      header: 'Qty (Kg)',
+      header: 'Qty',
       cell: ({ row }) => {
         const value = row.getValue('quantityKg');
+        const unit = row.original.unit || 'KG';
         if (typeof value !== 'number') return null;
-        return <span className="font-bold">{value.toFixed(2)}</span>;
+        return <span className="font-bold">{value.toFixed(2)} {unit}</span>;
       },
     },
     {
@@ -276,7 +292,7 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
         'Client': item.clientName,
         'Commodity': item.commodityName,
         'Warehouse': item.warehouseName,
-        'Qty (Kg)': item.quantityKg,
+        'Qty': `${item.quantityKg} ${item.unit || 'KG'}`,
         'Chamber No': item.chamberNo || '',
         'Floor No': item.floorNo || '',
         'Stack No': item.stackNo || '',

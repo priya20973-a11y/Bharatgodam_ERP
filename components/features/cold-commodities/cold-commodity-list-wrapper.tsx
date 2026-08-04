@@ -136,11 +136,11 @@ export default function ColdCommodityListWrapper({ initialCommodities }: Props) 
                     <div className="flex flex-col items-end">
                       {commodity.priceType === 'Different Price' ? (
                         <span className="font-bold text-green-700 text-xs">
-                          L: ₹{(season.priceLarge || 0).toFixed(2)} | S: ₹{(season.priceSmall || 0).toFixed(2)} | M: ₹{(season.priceMixed || 0).toFixed(2)} /{t('commodities.perKg')}
+                          L: ₹{(season.priceLarge || 0).toFixed(2)} | S: ₹{(season.priceSmall || 0).toFixed(2)} | M: ₹{(season.priceMixed || 0).toFixed(2)} / {commodity.unit || 'KG'}
                         </span>
                       ) : (
                         <span className="font-bold text-green-700">
-                          ₹{(season.pricePerKg || 0).toFixed(2)}/{t('commodities.perKg')}
+                          ₹{(season.pricePerKg || 0).toFixed(2)} / {commodity.unit || 'KG'}
                         </span>
                       )}
                     </div>

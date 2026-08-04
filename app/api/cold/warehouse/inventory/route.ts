@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const requestedWarehouseId = searchParams.get('warehouseId');
-    const requestedChamberNo = searchParams.get('chamberNo') ? parseInt(searchParams.get('chamberNo') as string) : null;
+    const requestedChamberNo = searchParams.get('chamberNo') || null;
     const requestedFloorNo = searchParams.get('floorNo') ? parseInt(searchParams.get('floorNo') as string) : null;
 
     const tenantFilter = getTenantFilter(session);
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     let chambers = selectedWarehouse.chambers.map((c: any) => ({ chamberNo: c.chamberNo, name: c.name }));
     let floors: any[] = [];
     
-    let activeChamber = requestedChamberNo ? selectedWarehouse.chambers.find((c: any) => c.chamberNo === requestedChamberNo) : null;
+    let activeChamber = requestedChamberNo ? selectedWarehouse.chambers.find((c: any) => (c.name || c.chamberNo.toString()) === requestedChamberNo) : null;
     let activeFloor = requestedFloorNo && activeChamber ? activeChamber.floors.find((f: any) => f.floorNo === requestedFloorNo) : null;
 
     if (activeFloor) {
@@ -66,11 +66,21 @@ export async function GET(request: NextRequest) {
 
     // 4. Query Inwards & Outwards based on filters
     const filterQuery: any = { warehouseId: selectedWarehouse._id };
-    if (activeChamber) filterQuery['stackAllocations.chamberNo'] = activeChamber.chamberNo;
+    if (activeChamber) {
+      filterQuery.$or = [
+        { 'stackAllocations.chamberName': activeChamber.name || activeChamber.chamberNo?.toString() },
+        { 'stackAllocations.chamberNo': activeChamber.chamberNo }
+      ];
+    }
     if (activeFloor) filterQuery['stackAllocations.floorNo'] = activeFloor.floorNo;
 
     const outwardFilterQuery: any = { warehouseId: selectedWarehouse._id };
-    if (activeChamber) outwardFilterQuery.chamberNo = activeChamber.chamberNo;
+    if (activeChamber) {
+      outwardFilterQuery.$or = [
+        { chamberName: activeChamber.name || activeChamber.chamberNo?.toString() },
+        { chamberNo: activeChamber.chamberNo }
+      ];
+    }
     if (activeFloor) outwardFilterQuery.floorNo = activeFloor.floorNo;
 
     const [inwards, outwards] = await Promise.all([
@@ -121,13 +131,17 @@ export async function GET(request: NextRequest) {
     // 6. Fetch Commodity Names
     const validCommodityIds = Array.from(commodityMap.values()).map(c => c.commodityId);
     const commoditiesData = await ColdCommodity.find({ _id: { $in: validCommodityIds } }).lean();
-    const commodityNameMap = new Map(commoditiesData.map((c: any) => [c._id.toString(), c.name]));
+    const commodityInfoMap = new Map(commoditiesData.map((c: any) => [c._id.toString(), { name: c.name, unit: c.unit || 'KG' }]));
 
-    const finalCommodities = Array.from(commodityMap.values()).map((c) => ({
-      commodityName: commodityNameMap.get(c.commodityId.toString()) || 'Unknown Commodity',
-      totalWeight: c.totalWeight,
-      bookingCount: c.bookingCount
-    }));
+    const finalCommodities = Array.from(commodityMap.values()).map((c) => {
+      const info = commodityInfoMap.get(c.commodityId.toString()) || { name: 'Unknown Commodity', unit: 'KG' };
+      return {
+        commodityName: info.name,
+        unit: info.unit,
+        totalWeight: c.totalWeight,
+        bookingCount: c.bookingCount
+      };
+    });
 
     // 7. Compute Totals
     const usedCapacity = finalCommodities.reduce((acc, curr) => acc + curr.totalWeight, 0);

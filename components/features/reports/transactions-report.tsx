@@ -80,6 +80,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
   });
   const [liveTransactions, setLiveTransactions] = useState<TransactionRecord[]>(transactions);
   const [isDailyReport, setIsDailyReport] = useState(false);
+  const [reportType, setReportType] = useState<'transaction' | 'statement'>('transaction');
   const [fromDateFilter, setFromDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
   const [toDateFilter, setToDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
 
@@ -309,6 +310,83 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     return hasAll ? warehouseOptions : [{ label: 'All Warehouses', value: 'ALL' }, ...warehouseOptions];
   }, [warehouseOptions]);
 
+  const statementData = useMemo(() => {
+    if (reportType !== 'statement') return null;
+
+    let maxDateStr = '9999-12-31';
+    if (isDailyReport) {
+      maxDateStr = toDateFilter;
+    } else if (monthFilter !== 'ALL') {
+      const year = parseInt(monthFilter.split('-')[0]);
+      const month = parseInt(monthFilter.split('-')[1]);
+      const lastDay = new Date(year, month, 0).getDate();
+      maxDateStr = `${monthFilter}-${lastDay}`;
+    }
+
+    const relevantTransactions = liveTransactions.filter((item) => {
+      const itemDate = item.date ? new Date(item.date).toISOString().split('T')[0] : '';
+      return itemDate <= maxDateStr;
+    }).filter(item => {
+      const matchesClient = clientFilter === 'ALL' || item.clientId === clientFilter || item.clientName === clientFilter;
+      const matchesWarehouse = warehouseFilter === 'ALL' || item.warehouseId === warehouseFilter || item.warehouseName === warehouseFilter;
+      
+      if (globalFilter) {
+        const lowerSearch = globalFilter.toLowerCase();
+        const matchesGlobal = (item.clientName || '').toLowerCase().includes(lowerSearch) ||
+                              (item.commodityName || '').toLowerCase().includes(lowerSearch) ||
+                              (item.warehouseName || '').toLowerCase().includes(lowerSearch);
+        if (!matchesGlobal) return false;
+      }
+      return matchesClient && matchesWarehouse;
+    });
+
+    const commoditiesMap = new Map<string, Map<string, number>>();
+    const allClientsSet = new Set<string>();
+
+    relevantTransactions.forEach(item => {
+      if (!item.commodityName || !item.clientName || item.direction === 'No Data Found') return;
+      const commodity = item.commodityName;
+      const client = item.clientName;
+      
+      if (!commoditiesMap.has(commodity)) {
+        commoditiesMap.set(commodity, new Map());
+      }
+      
+      const clientMap = commoditiesMap.get(commodity)!;
+      const currentQty = clientMap.get(client) || 0;
+      
+      allClientsSet.add(client);
+      
+      if (item.direction === 'INWARD') {
+        clientMap.set(client, currentQty + (item.quantityMT || 0));
+      } else if (item.direction === 'OUTWARD') {
+        clientMap.set(client, currentQty - (item.quantityMT || 0));
+      }
+    });
+
+    const clientsList = Array.from(allClientsSet).sort();
+    const rows = Array.from(commoditiesMap.entries()).map(([commodity, clientMap]) => {
+      let rowTotal = 0;
+      const clientData: Record<string, number> = {};
+      clientsList.forEach(c => {
+        const qty = clientMap.get(c) || 0;
+        clientData[c] = qty;
+        rowTotal += qty;
+      });
+      return { commodity, clientData, rowTotal };
+    }).sort((a, b) => a.commodity.localeCompare(b.commodity));
+
+    const colTotals: Record<string, number> = {};
+    let grandTotal = 0;
+    clientsList.forEach(c => {
+      const totalForClient = rows.reduce((sum, r) => sum + r.clientData[c], 0);
+      colTotals[c] = totalForClient;
+      grandTotal += totalForClient;
+    });
+
+    return { clientsList, rows, colTotals, grandTotal };
+  }, [liveTransactions, reportType, isDailyReport, toDateFilter, monthFilter, clientFilter, warehouseFilter, globalFilter]);
+
   const columns = useMemo<ColumnDef<TransactionRecord>[]>(() => [
     {
       accessorKey: 'direction',
@@ -470,6 +548,40 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
   const exportToCSV = () => {
     try {
+      if (reportType === 'statement' && statementData) {
+        const exportData = statementData.rows.map(row => {
+          const rowData: Record<string, any> = { 'Commodity': row.commodity };
+          statementData.clientsList.forEach(c => {
+            rowData[c] = Number(row.clientData[c].toFixed(2));
+          });
+          rowData['Total'] = Number(row.rowTotal.toFixed(2));
+          return rowData;
+        });
+
+        const totalsRow: Record<string, any> = { 'Commodity': 'Total' };
+        statementData.clientsList.forEach(c => {
+          totalsRow[c] = Number(statementData.colTotals[c].toFixed(2));
+        });
+        totalsRow['Total'] = Number(statementData.grandTotal.toFixed(2));
+        exportData.push(totalsRow);
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Statement');
+        
+        const maxWidths = exportData.reduce((acc: number[], row) => {
+          Object.entries(row).forEach(([key, val], idx) => {
+            const length = Math.max(key.length, String(val).length);
+            acc[idx] = Math.max(acc[idx] || 0, length);
+          });
+          return acc;
+        }, [] as number[]);
+        worksheet['!cols'] = maxWidths.map((w: number) => ({ wch: w + 2 }));
+
+        XLSX.writeFile(workbook, `Statement_${new Date().toISOString().split('T')[0]}.csv`);
+        toast.success('CSV exported successfully');
+        return;
+      }
       const exportData = filteredTransactions.map((item) => ({
         'Direction': item.direction,
         'Date': item.date ? new Date(item.date).toLocaleDateString('en-IN') : '-',
@@ -517,7 +629,21 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
           <h2 className="text-2xl font-bold text-slate-900">Transactions Report</h2>
           <p className="text-slate-500 font-medium">All inward and outward transactions</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setReportType('transaction')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${reportType === 'transaction' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Transaction View
+            </button>
+            <button
+              onClick={() => setReportType('statement')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${reportType === 'statement' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Statement View
+            </button>
+          </div>
           <Button
             onClick={() => setIsDailyReport(!isDailyReport)}
             variant={isDailyReport ? "default" : "outline"}
@@ -622,9 +748,77 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      {reportType === 'statement' && statementData ? (
+        <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto print:overflow-visible">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 print:hidden">
+            <p className="text-sm font-bold text-slate-500">
+              Daily Statement as of <span className="text-slate-900">{isDailyReport ? toDateFilter : (monthFilter !== 'ALL' ? monthFilter : 'All Time')}</span>
+            </p>
+            <Button
+              onClick={() => window.print()}
+              variant="outline"
+              size="sm"
+              className="font-bold flex items-center gap-2"
+            >
+              Print / PDF
+            </Button>
+          </div>
+          
+          <div className="print:block" id="print-area">
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                body * { visibility: hidden; }
+                #print-area, #print-area * { visibility: visible; }
+                #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+                @page { size: landscape; margin: 10mm; }
+              }
+            `}} />
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 font-bold text-slate-700">Commodity</th>
+                  {statementData.clientsList.map(client => (
+                    <th key={client} className="px-4 py-3 font-bold text-slate-700 text-right">{client}</th>
+                  ))}
+                  <th className="px-4 py-3 font-black text-indigo-700 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {statementData.rows.length > 0 ? statementData.rows.map(row => (
+                  <tr key={row.commodity} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{row.commodity}</td>
+                    {statementData.clientsList.map(client => (
+                      <td key={client} className="px-4 py-3 text-right text-slate-600">
+                        {row.clientData[client] ? row.clientData[client].toFixed(2) : '-'}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-right font-bold text-indigo-700">{row.rowTotal.toFixed(2)}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={statementData.clientsList.length + 2} className="px-4 py-8 text-center text-slate-500">
+                      No stock data found for selected filters
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                <tr>
+                  <td className="px-4 py-3 font-black text-slate-900">Total</td>
+                  {statementData.clientsList.map(client => (
+                    <td key={client} className="px-4 py-3 text-right font-black text-slate-900">
+                      {statementData.colTotals[client] ? statementData.colTotals[client].toFixed(2) : '-'}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-right font-black text-indigo-700">{statementData.grandTotal.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <p className="text-sm font-bold text-slate-500">
             Showing <span className="text-slate-900">{table.getRowModel().rows.length}</span> of{' '}
             <span className="text-slate-900">{transactions.length}</span> transactions
@@ -691,6 +885,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
           </TableBody>
         </Table>
       </div>
+      )}
     </div>
   );
 }

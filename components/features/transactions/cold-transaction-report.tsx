@@ -170,8 +170,8 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
               <TableHead className="font-semibold">{t('transactions.commodityHeader')}</TableHead>
               <TableHead className="font-semibold">{t('transactions.locationHeader')}</TableHead>
               <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
-              <TableHead className="text-right font-semibold">{t('transactions.qtyHeader')}</TableHead>
-              <TableHead className="text-right font-semibold">{t('transactions.bagsHeader')}</TableHead>
+              <TableHead className="text-right font-semibold">{t('transactions.qtyHeader')} (KG)</TableHead>
+              <TableHead className="text-right font-semibold">Units</TableHead>
               <TableHead className="text-right font-semibold">{t('transactions.actionsHeader')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -213,7 +213,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                     {txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(txn.quantityKg)}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))}</TableCell>
+                  <TableCell className="text-right text-slate-700">{formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))} {txn.commodity?.unit ? txn.commodity.unit : ''}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button 
                       variant="ghost" 

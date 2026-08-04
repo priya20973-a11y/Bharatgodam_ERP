@@ -12,13 +12,20 @@ export interface IColdOutward extends Document {
   clientId: mongoose.Types.ObjectId;
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
-  chamberNo: number;
+  chamberName: string;
+  chamberNo?: number;
+  floorName?: string;
   floorNo: number;
+  stackName?: string;
   stackNo: number;
   quantityKg: number; // Net Weight
   bagsCount: number; // Bags
+  unit?: string;
   grade?: string; // Large, Small, Mixed
-  gradingType?: string; // Grading, Wet
+  serviceType?: string; // None, Grading, Wet
+  serviceChargeType?: string; // Per Bag, Per Kg
+  serviceRate?: number;
+  serviceAmount?: number;
   seed?: string;
   tableLabel?: string;
   jin?: number;
@@ -27,6 +34,7 @@ export interface IColdOutward extends Document {
   totalBags?: number;
   truckNo?: string;
   farmerName?: string;
+  farmerId?: string;
   weighbridgeSlipNo?: string;
   grossWeight?: number;
   emptyWeight?: number;
@@ -58,13 +66,20 @@ const ColdOutwardSchema: Schema = new Schema(
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
-    chamberNo: { type: Number, required: true, min: 1 },
+    chamberName: { type: String, required: true },
+    chamberNo: { type: Number, required: false },
+    floorName: { type: String, required: false },
     floorNo: { type: Number, required: true, min: 1 },
+    stackName: { type: String, required: false },
     stackNo: { type: Number, required: true, min: 1 },
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
+    unit: { type: String, default: 'KG' },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
-    gradingType: { type: String, required: false },
+    serviceType: { type: String, enum: ['None', 'Grading', 'Wet'], required: false, default: 'None' },
+    serviceChargeType: { type: String, enum: ['Per Bag', 'Per Kg'], required: false },
+    serviceRate: { type: Number, required: false },
+    serviceAmount: { type: Number, required: false },
     seed: { type: String, required: false },
     tableLabel: { type: String, required: false },
     jin: { type: Number, required: false, default: 0 },
@@ -73,6 +88,7 @@ const ColdOutwardSchema: Schema = new Schema(
     totalBags: { type: Number, required: false },
     truckNo: { type: String, required: false },
     farmerName: { type: String, required: false },
+    farmerId: { type: String, required: false },
     weighbridgeSlipNo: { type: String, required: false },
     grossWeight: { type: Number, required: false },
     emptyWeight: { type: Number, required: false },

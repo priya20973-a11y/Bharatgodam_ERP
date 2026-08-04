@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { getDynamicUnitLabel } from '@/lib/utils';
 
 interface ColdEditTransactionModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export default function ColdEditTransactionModal({
   
   const [clientId, setClientId] = useState('');
   const [farmerName, setFarmerName] = useState('');
+  const [farmerId, setFarmerId] = useState('');
   const [commodityId, setCommodityId] = useState('');
   const [grade, setGrade] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -96,6 +98,7 @@ export default function ColdEditTransactionModal({
       setDate(txn.date ? new Date(txn.date).toISOString().split('T')[0] : '');
       setClientId(txn.clientId || txn.client?._id || '');
       setFarmerName(txn.farmerName || '');
+      setFarmerId(txn.farmerId || '');
       setCommodityId(txn.commodityId || txn.commodity?._id || '');
       setGrade(txn.grade || '');
       setWarehouseId(txn.warehouseId || txn.warehouse?._id || '');
@@ -135,14 +138,14 @@ export default function ColdEditTransactionModal({
   const autoGradingType = selectedCommodity?.gradingType || '';
 
   const selectedWarehouse = warehouses.find(w => w._id === warehouseId);
-  const selectedChamber = selectedWarehouse?.chambers?.find((c: any) => c.chamberNo === parseInt(chamberNo));
+  const selectedChamber = selectedWarehouse?.chambers?.find((c: any) => (c.name || c.chamberNo.toString()) === chamberNo);
   const selectedFloor = selectedChamber?.floors?.find((f: any) => f.floorNo === parseInt(floorNo));
   const selectedStack = selectedFloor?.stacks?.find((s: any) => s.stackNo === parseInt(stackNo));
 
   useEffect(() => {
     if (!fetching && warehouseId && chamberNo && floorNo && stackNo) {
       if (transactionType === 'INWARD') {
-        getStackAvailableCapacity(warehouseId, parseInt(chamberNo), parseInt(floorNo), parseInt(stackNo))
+        getStackAvailableCapacity(warehouseId, chamberNo, parseInt(floorNo), parseInt(stackNo))
           .then(res => setAvailableCapacity(res.availableCapacity))
           .catch(() => setAvailableCapacity(null));
       }
@@ -169,9 +172,12 @@ export default function ColdEditTransactionModal({
         clientId,
         commodityId,
         warehouseId,
+        farmerName,
+        farmerId,
         ...(transactionType === 'INWARD' && { stackAllocations, referencePersons }),
         ...(transactionType === 'OUTWARD' && {
-          chamberNo: parseInt(chamberNo),
+          chamberName: chamberNo,
+          chamberNo: isNaN(parseInt(chamberNo)) ? undefined : parseInt(chamberNo),
           floorNo: parseInt(floorNo),
           stackNo: parseInt(stackNo),
           plusMinus: Number(plusMinus) || 0,
@@ -186,7 +192,6 @@ export default function ColdEditTransactionModal({
         mixed: Number(mixed) || 0,
         totalBags: calcTotalBags,
         truckNo,
-        farmerName,
         weighbridgeSlipNo,
         grossWeight: Number(grossWeight) || 0,
         emptyWeight: Number(emptyWeight) || 0,
@@ -244,11 +249,6 @@ export default function ColdEditTransactionModal({
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t('inward.farmerName') || 'Farmer Name'}</label>
-                <Input value={farmerName} onChange={(e) => setFarmerName(e.target.value)} />
-              </div>
-              
-              <div className="space-y-2">
                 <label className="text-sm font-medium">Commodity</label>
                 <Select value={commodityId} onValueChange={setCommodityId} required disabled>
                   <SelectTrigger><SelectValue placeholder="Select Commodity" /></SelectTrigger>
@@ -278,19 +278,20 @@ export default function ColdEditTransactionModal({
                     <Select value={chamberNo} onValueChange={setChamberNo} disabled required>
                       <SelectTrigger><SelectValue placeholder="Chamber" /></SelectTrigger>
                       <SelectContent>
-                        {selectedWarehouse?.chambers?.map((c: any) => (
-                          <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>{c.chamberNo}</SelectItem>
-                        ))}
+                        {selectedWarehouse?.chambers?.map((c: any) => {
+                          const val = (c.name || c.chamberNo).toString();
+                          return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Floor No.</label>
+                    <label className="text-sm font-medium">Floor Name/No.</label>
                     <Select value={floorNo} onValueChange={setFloorNo} disabled required>
                       <SelectTrigger><SelectValue placeholder="Floor" /></SelectTrigger>
                       <SelectContent>
                         {selectedChamber?.floors?.map((f: any) => (
-                          <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.floorNo}</SelectItem>
+                          <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -321,14 +322,14 @@ export default function ColdEditTransactionModal({
                     </div>
                     <div>
                       <span className="text-xs text-slate-500 block">Floor</span>
-                      <span className="font-medium">{stack.floorNo}</span>
+                      <span className="font-medium">{stack.floorName || stack.floorNo}</span>
                     </div>
                     <div>
                       <span className="text-xs text-slate-500 block">Stack</span>
                       <span className="font-medium">{stack.stackNo}</span>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs text-blue-600">Alloc. Weight (Kg)</label>
+                      <label className="text-xs text-blue-600">Alloc. Qty (KG)</label>
                       <ColdNumberInput 
                         value={stack.allocatedWeight ?? ''} 
                         onChange={(val) => {
@@ -339,7 +340,7 @@ export default function ColdEditTransactionModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs text-blue-600">Alloc. Bags</label>
+                      <label className="text-xs text-blue-600">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'alloc')}</label>
                       <ColdNumberInput 
                         value={stack.bagsCount ?? ''} 
                         onChange={(val) => {
@@ -372,16 +373,27 @@ export default function ColdEditTransactionModal({
                 <Input value={tableLabel} onChange={(e) => setTableLabel(e.target.value)} />
               </div>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('inward.farmerName') || 'Farmer Name'}</label>
+                <Input value={farmerName} onChange={(e) => setFarmerName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Farmer ID</label>
+                <Input value={farmerId} onChange={(e) => setFarmerId(e.target.value)} />
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {transactionType === 'OUTWARD' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-blue-600">Net Weight Loss(Kg)</label>
+                  <label className="text-sm font-medium text-blue-600">Net Weight Loss({commodities.find(c => c._id === commodityId)?.unit || 'KG'})</label>
                   <ColdNumberInput value={plusMinus ?? ''} onChange={(val) => setPlusMinus(val)} />
                 </div>
               )}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Gross Weight (Kg)</label>
+                <label className="text-sm font-medium text-blue-600">Gross Weight ({commodities.find(c => c._id === commodityId)?.unit || 'KG'})</label>
                 <ColdNumberInput required min="0" step="0.01" value={grossWeight ?? ''} onChange={(val) => setGrossWeight(val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
@@ -393,7 +405,7 @@ export default function ColdEditTransactionModal({
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcNetWeight.toFixed(2)}</div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Kata Bharati</label>
+                <label className="text-sm font-medium">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'weight')}</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcKataBharati.toFixed(2)}</div>
               </div>
               <div className="space-y-2">
@@ -404,19 +416,19 @@ export default function ColdEditTransactionModal({
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Bags Count (Large)</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'large')}</label>
                 <ColdNumberInput required min="0" value={bagsCount ?? ''} onChange={(val) => setBagsCount(val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">Jin (Small)</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'small')}</label>
                 <ColdNumberInput min="0" value={jin ?? ''} onChange={(val) => setJin(val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-blue-600">{t('inward.mixed') || 'Mixed'}</label>
+                <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'mixed')}</label>
                 <ColdNumberInput min="0" value={mixed ?? ''} onChange={(val) => setMixed(val ? Number(val) : null)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-green-700">Total Bags</label>
+                <label className="text-sm font-medium text-green-700">{getDynamicUnitLabel(commodities.find(c => c._id === commodityId)?.unit || 'KG', 'total')}</label>
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcTotalBags}</div>
               </div>
             </div>

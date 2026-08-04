@@ -4,7 +4,7 @@ import connectToDatabase from '@/lib/mongoose';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
-import { appendOwnership, getTenantFilter, requireSession, isAdmin } from '@/lib/ownership';
+import { appendOwnership, getTenantFilter, requireSession, isAdmin, getWarehouseFilter } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import mongoose from 'mongoose';
 
@@ -16,7 +16,7 @@ export async function getColdWarehouses(options?: { includeInactive?: boolean })
     allowedStatuses.push('INACTIVE');
   }
   
-  const warehouses = await ColdWarehouse.find({ status: { $in: allowedStatuses }, ...getTenantFilter(session) }).sort({ name: 1 });
+  const warehouses = await ColdWarehouse.find({ status: { $in: allowedStatuses }, ...getTenantFilter(session), ...getWarehouseFilter(session, '_id') }).sort({ name: 1 });
   
   const db = await getDb();
   const uniqueUserIds = [...new Set(warehouses.map(w => w.userId?.toString()).filter(Boolean))];
@@ -60,11 +60,19 @@ export async function createColdWarehouse(data: {
   noOfFloors: number;
   noOfStacks: number;
   stackCapacity: number;
-  referencePersons: any[];
-  stackLayout?: string;
+  bufferCapacity?: number;
+  stackLayout: string;
   gridRows?: number;
   gridCols?: number;
   customLayout?: any[];
+  referencePersons?: any[];
+  aadhaarNo?: string;
+  panNo?: string;
+  gstin?: string;
+  bankDetails?: any;
+  warehouseLogo?: string;
+  chamberNames?: string[];
+  floorNames?: string[];
 }) {
   await connectToDatabase();
   try {
@@ -93,7 +101,7 @@ export async function createColdWarehouse(data: {
     for (let c = 1; c <= data.noOfChambers; c++) {
       const floors = [];
       for (let f = 1; f <= data.noOfFloors; f++) {
-        const stacks = [];
+        let stacks = [];
         for (let s = 1; s <= data.noOfStacks; s++) {
           stacks.push({
             name: `Stack ${s}`,
@@ -102,13 +110,13 @@ export async function createColdWarehouse(data: {
           });
         }
         floors.push({
-          name: `Floor ${f}`,
+          name: data.floorNames && data.floorNames[f - 1] ? data.floorNames[f - 1] : `Floor ${f}`,
           floorNo: f,
           stacks
         });
       }
       chambers.push({
-        name: `Chamber ${c}`,
+        name: data.chamberNames && data.chamberNames[c - 1] ? data.chamberNames[c - 1] : `Chamber ${c}`,
         chamberNo: c,
         floors
       });
@@ -136,8 +144,17 @@ export async function createColdWarehouse(data: {
 
 export async function updateColdWarehouse(id: string, data: Partial<{
   name: string;
+  warehouseId?: string;
   address: string;
   referencePersons: any[];
+  aadhaarNo: string;
+  panNo: string;
+  gstin: string;
+  bankDetails: any;
+  warehouseLogo: string;
+  chambers: any[];
+  floorNames: string[];
+  bufferCapacity?: number;
 }>) {
   await connectToDatabase();
   try {
@@ -145,7 +162,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     if (!hasPermission(session, 'warehouse', 'edit')) throw new Error('Forbidden: Insufficient permissions');
     
     // Fetch warehouse first
-    const warehouse = await ColdWarehouse.findOne({ _id: id, ...getTenantFilter(session) });
+    const warehouse = await ColdWarehouse.findOne({ _id: id, ...getTenantFilter(session), ...getWarehouseFilter(session, '_id') });
     if (!warehouse) {
       throw new Error('Cold Warehouse not found');
     }
@@ -169,10 +186,54 @@ export async function updateColdWarehouse(id: string, data: Partial<{
       }
     }
 
+    if (data.warehouseId !== undefined && data.warehouseId.trim() !== '') {
+      const email = session.user.email?.trim().toLowerCase() || null;
+      const ownerFilter: any = {
+        $or: [
+          { userId: session.user.id },
+          ...(email ? [{ userEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } } ] : [])
+        ]
+      };
+      const duplicateId = await ColdWarehouse.findOne({
+        ...ownerFilter,
+        warehouseId: data.warehouseId.trim(),
+        _id: { $ne: id }
+      });
+      if (duplicateId) {
+        return { success: false, error: 'Warehouse ID already exists.' };
+      }
+      warehouse.warehouseId = data.warehouseId.trim();
+    }
+
     // Only allow specific updates to avoid corrupting stack layouts/hierarchy
     if (data.name) warehouse.name = data.name;
     if (data.address) warehouse.address = data.address;
     if (data.referencePersons) warehouse.referencePersons = data.referencePersons as any;
+    if (data.aadhaarNo !== undefined) warehouse.aadhaarNo = data.aadhaarNo;
+    if (data.panNo !== undefined) warehouse.panNo = data.panNo;
+    if (data.gstin !== undefined) warehouse.gstin = data.gstin;
+    if (data.bankDetails !== undefined) {
+      warehouse.bankDetails = data.bankDetails;
+      warehouse.markModified('bankDetails');
+    }
+    if (data.warehouseLogo && data.warehouseLogo.trim() !== '') {
+      warehouse.warehouseLogo = data.warehouseLogo;
+    }
+    if (data.bufferCapacity !== undefined) warehouse.bufferCapacity = data.bufferCapacity;
+    if (data.chambers && Array.isArray(data.chambers)) {
+      warehouse.chambers.forEach((chamber: any, index: number) => {
+        if (data.chambers?.[index]?.name) {
+          chamber.name = data.chambers[index].name;
+        }
+        if (data.floorNames && Array.isArray(data.floorNames)) {
+          chamber.floors.forEach((floor: any, fIndex: number) => {
+            if (data.floorNames?.[fIndex]) {
+              floor.name = data.floorNames[fIndex];
+            }
+          });
+        }
+      });
+    }
 
     await warehouse.save();
     revalidatePath('/cold/dashboard/warehouses');
@@ -188,7 +249,7 @@ export async function toggleColdWarehouseStatus(id: string) {
     const session = await requireSession();
     if (!hasPermission(session, 'warehouse', 'edit')) throw new Error('Forbidden: Insufficient permissions');
     
-    const warehouse = await ColdWarehouse.findOne({ _id: id, ...getTenantFilter(session) });
+    const warehouse = await ColdWarehouse.findOne({ _id: id, ...getTenantFilter(session), ...getWarehouseFilter(session, '_id') });
     if (!warehouse) {
       throw new Error('Cold Warehouse not found');
     }

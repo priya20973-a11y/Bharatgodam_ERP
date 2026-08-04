@@ -27,6 +27,7 @@ export async function getStaffList() {
     phoneNumber: staff.phoneNumber || '',
     status: staff.status || 'ACTIVE',
     permissions: staff.permissions || {},
+    assignedWarehouseIds: staff.assignedWarehouseIds || [],
   }));
 }
 
@@ -57,6 +58,7 @@ export async function createStaff(data: any) {
     phoneNumber: data.phoneNumber,
     status: 'ACTIVE',
     permissions: data.permissions || {},
+    assignedWarehouseIds: data.assignedWarehouseIds || [],
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -83,6 +85,7 @@ export async function updateStaff(id: string, data: any) {
     fullName: data.fullName,
     phoneNumber: data.phoneNumber,
     permissions: data.permissions || {},
+    assignedWarehouseIds: data.assignedWarehouseIds || [],
     updatedAt: new Date()
   };
 

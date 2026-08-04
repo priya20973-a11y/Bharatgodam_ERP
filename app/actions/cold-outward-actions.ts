@@ -6,14 +6,14 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
-import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
+import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 
 export async function getColdOutwards() {
   await connectToDatabase();
   const session = await requireSession();
   
-  const outwards = await ColdOutward.find(getTenantFilter(session))
+  const outwards = await ColdOutward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name warehouseId')
@@ -49,19 +49,27 @@ export async function getStackAvailableClientStock(
   clientId: string,
   commodityId: string,
   warehouseId: string,
-  chamberNo: number,
+  chamberName: string,
   floorNo: number,
   stackNo: number
 ) {
   await connectToDatabase();
   const session = await requireSession();
 
+  const warehouse = await connectToDatabase().then(() => mongoose.model('ColdWarehouse').findOne({ _id: warehouseId, ...getTenantFilter(session) }));
+  const chamber = warehouse?.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
+
   const matchCriteria = {
     $and: [
       { clientId: new mongoose.Types.ObjectId(clientId) },
       { commodityId: new mongoose.Types.ObjectId(commodityId) },
       { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-      { chamberNo },
+      { 
+        $or: [
+          { chamberName: chamberName },
+          ...(chamber?.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
+        ]
+      },
       { floorNo },
       { stackNo },
       getTenantFilter(session)
@@ -73,7 +81,12 @@ export async function getStackAvailableClientStock(
       { clientId: new mongoose.Types.ObjectId(clientId) },
       { commodityId: new mongoose.Types.ObjectId(commodityId) },
       { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-      { 'stackAllocations.chamberNo': chamberNo },
+      { 
+        $or: [
+          { 'stackAllocations.chamberName': chamberName },
+          ...(chamber?.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
+        ]
+      },
       { 'stackAllocations.floorNo': floorNo },
       { 'stackAllocations.stackNo': stackNo },
       getTenantFilter(session)
@@ -104,15 +117,15 @@ export async function getAvailableInwardsForClient(clientId: string) {
   const tenantFilter = getTenantFilter(session);
 
   const inwards = await ColdInward.find({ clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter })
-    .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name')
+    .populate('commodityId', 'name type unit')
+    .populate('warehouseId')
     .sort({ date: -1, createdAt: -1 })
     .lean();
 
   const outwards = await ColdOutward.aggregate([
     { $match: { clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter } },
     { $group: { 
-        _id: { inwardId: '$inwardId', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
+        _id: { inwardId: '$inwardId', chamberName: '$chamberName', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
         totalOutward: { $sum: '$quantityKg' }
       } 
     }
@@ -121,7 +134,8 @@ export async function getAvailableInwardsForClient(clientId: string) {
   const outwardMap = new Map();
   outwards.forEach(o => {
     if (o._id.inwardId) {
-      const key = `${o._id.inwardId.toString()}_${o._id.chamberNo}_${o._id.floorNo}_${o._id.stackNo}`;
+      const chamberKey = o._id.chamberName || o._id.chamberNo;
+      const key = `${o._id.inwardId.toString()}_${chamberKey}_${o._id.floorNo}_${o._id.stackNo}`;
       outwardMap.set(key, { out: o.totalOutward });
     }
   });
@@ -132,13 +146,15 @@ export async function getAvailableInwardsForClient(clientId: string) {
     // Merge duplicate stack allocations to handle legacy data with duplicate stacks
     const mergedAllocations = new Map();
     inward.stackAllocations.forEach((alloc: any) => {
-      const k = `${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const k = `${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       if (mergedAllocations.has(k)) {
          const existing = mergedAllocations.get(k);
          existing.allocatedWeight += (alloc.allocatedWeight || 0);
          existing.bagsCount += (alloc.bagsCount || 0);
       } else {
          mergedAllocations.set(k, {
+           chamberName: alloc.chamberName,
            chamberNo: alloc.chamberNo,
            floorNo: alloc.floorNo,
            stackNo: alloc.stackNo,
@@ -152,15 +168,38 @@ export async function getAvailableInwardsForClient(clientId: string) {
     const availableAllocations: any[] = [];
     
     Array.from(mergedAllocations.values()).forEach((alloc: any) => {
-      const key = `${inward._id.toString()}_${alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0 };
       const availableQty = Math.max(0, alloc.allocatedWeight - outData.out);
       
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
+        let finalChamberName = alloc.chamberName;
+        let finalFloorName = `Floor ${alloc.floorNo}`;
+        let finalStackName = `Stack ${alloc.stackNo}`;
+        
+        if (inward.warehouseId && inward.warehouseId.chambers) {
+          const chamber = inward.warehouseId.chambers.find((c: any) => (c.name || c.chamberNo?.toString()) === (alloc.chamberName || alloc.chamberNo?.toString()));
+          if (chamber) {
+            finalChamberName = chamber.name || finalChamberName;
+            const floor = chamber.floors?.find((f: any) => f.floorNo === alloc.floorNo);
+            if (floor) {
+              finalFloorName = floor.name || finalFloorName;
+              const stack = floor.stacks?.find((s: any) => s.stackNo === alloc.stackNo);
+              if (stack) {
+                finalStackName = stack.name || finalStackName;
+              }
+            }
+          }
+        }
+
         availableAllocations.push({
+          chamberName: finalChamberName,
           chamberNo: alloc.chamberNo,
+          floorName: finalFloorName,
           floorNo: alloc.floorNo,
+          stackName: finalStackName,
           stackNo: alloc.stackNo,
           allocatedWeight: alloc.allocatedWeight,
           bagsCount: alloc.bagsCount,
@@ -190,19 +229,45 @@ export async function createColdOutward(data: any) {
     const session = await requireSession();
     if (!hasPermission(session, 'outward', 'create')) throw new Error('Forbidden: Insufficient permissions');
     
-    // Check available stock first
-    const stockInfo = await getStackAvailableClientStock(
-      data.clientId,
-      data.commodityId,
-      data.warehouseId,
-      data.chamberNo,
-      data.floorNo,
-      data.stackNo
-    );
-    
-    const adjustedAvailableStock = stockInfo.availableStock;
-    if (data.quantityKg > adjustedAvailableStock) {
-      return { success: false, error: `Quantity exceeds available stock. Available: ${adjustedAvailableStock} Kg` };
+    if (!data.inwardId) {
+      return { success: false, error: 'Cannot create outward: Inward ID is required.' };
+    }
+
+    if (data.inwardId) {
+      const inward = await ColdInward.findById(data.inwardId);
+      if (!inward) {
+        return { success: false, error: 'Cannot create outward: Inward not found.' };
+      }
+      
+      const outwards = await ColdOutward.aggregate([
+        { $match: { inwardId: inward._id } },
+        { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
+      ]);
+      const totalOutward = outwards[0]?.totalOut || 0;
+      const totalOutwardBags = outwards[0]?.totalBags || 0;
+      
+      const currentRemaining = inward.quantityKg - totalOutward;
+      
+      if (currentRemaining <= 0) {
+        if (inward.status !== 'Completed') {
+          inward.status = 'Completed';
+          inward.remainingQuantityKg = 0;
+          await inward.save();
+        }
+        return { success: false, error: 'Cannot create outward: Inward is already completed.' };
+      }
+      
+      if (data.quantityKg > currentRemaining) {
+        return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
+      }
+      
+      const remainingKg = currentRemaining - data.quantityKg;
+      const remainingBags = (inward.bagsCount - totalOutwardBags) - data.bagsCount;
+      
+      inward.remainingQuantityKg = Math.max(0, remainingKg);
+      inward.remainingBagsCount = Math.max(0, remainingBags);
+      inward.status = inward.remainingQuantityKg <= 0 ? 'Completed' : 'Partial';
+      await inward.save();
     }
 
     let rentRs = 0;
@@ -268,9 +333,14 @@ export async function createColdOutward(data: any) {
     const outward = await ColdOutward.create(appendOwnership({
       ...data,
       totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+      serviceType: data.serviceType,
+      serviceChargeType: data.serviceChargeType,
+      serviceRate: data.serviceRate,
+      serviceAmount: data.serviceAmount,
       rentRs,
       rentReason,
       date: outDate,
+      unit: commodity?.unit || 'KG',
     }, session));
     
     revalidatePath('/cold/outward');
@@ -293,19 +363,45 @@ export async function createBatchColdOutwards(payload: any) {
     const createdOutwards = [];
 
     for (const item of payload.items) {
-      // Check available stock first
-      const stockInfo = await getStackAvailableClientStock(
-        payload.clientId,
-        item.commodityId,
-        item.warehouseId,
-        item.chamberNo,
-        item.floorNo,
-        item.stackNo
-      );
-      
-      const adjustedAvailableStock = stockInfo.availableStock;
-      if (item.quantityKg > adjustedAvailableStock) {
-        return { success: false, error: `Quantity exceeds available stock for one of the items. Available: ${adjustedAvailableStock} Kg` };
+      if (!item.inwardId) {
+        return { success: false, error: 'Cannot create outward: Inward ID is required for all items.' };
+      }
+
+      if (item.inwardId) {
+        const inward = await ColdInward.findById(item.inwardId);
+        if (!inward) {
+          return { success: false, error: 'Cannot create outward: Inward not found.' };
+        }
+        
+        const outwards = await ColdOutward.aggregate([
+          { $match: { inwardId: inward._id } },
+          { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
+        ]);
+        const totalOutward = outwards[0]?.totalOut || 0;
+        const totalOutwardBags = outwards[0]?.totalBags || 0;
+        
+        const currentRemaining = inward.quantityKg - totalOutward;
+        
+        if (currentRemaining <= 0) {
+          if (inward.status !== 'Completed') {
+            inward.status = 'Completed';
+            inward.remainingQuantityKg = 0;
+            await inward.save();
+          }
+          return { success: false, error: 'Cannot create outward: Inward is already completed.' };
+        }
+        
+        if (item.quantityKg > currentRemaining) {
+          return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
+        }
+        
+        const remainingKg = currentRemaining - item.quantityKg;
+        const remainingBags = (inward.bagsCount - totalOutwardBags) - item.bagsCount;
+        
+        inward.remainingQuantityKg = Math.max(0, remainingKg);
+        inward.remainingBagsCount = Math.max(0, remainingBags);
+        inward.status = inward.remainingQuantityKg <= 0 ? 'Completed' : 'Partial';
+        await inward.save();
       }
 
       let rentRs = 0;
@@ -383,6 +479,11 @@ export async function createBatchColdOutwards(payload: any) {
         referencePersons: payload.referencePersons,
         remarks: payload.remarks,
         note: payload.note,
+        serviceType: item.serviceType,
+        serviceChargeType: item.serviceChargeType,
+        serviceRate: item.serviceRate,
+        serviceAmount: item.serviceAmount,
+        unit: commodity?.unit || 'KG',
       }, session));
       createdOutwards.push(outward);
     }
