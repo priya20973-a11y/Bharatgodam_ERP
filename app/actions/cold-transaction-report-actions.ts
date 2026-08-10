@@ -6,13 +6,13 @@ import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
-import { getTenantFilter, requireSession } from '@/lib/ownership';
+import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import { getStackAvailableCapacity } from './cold-inward-actions';
 
 export async function getColdTransactions() {
   await connectToDatabase();
   const session = await requireSession();
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   const inwards = await ColdInward.find(tenantFilter)
     .populate('clientId', 'name')
@@ -36,7 +36,7 @@ export async function getColdTransactions() {
     client: { _id: t.clientId?._id?.toString(), name: t.clientId?.name },
     commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
     warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
-    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberNo || '') : t.chamberNo,
+    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberName || t.stackAllocations?.[0]?.chamberNo || '') : (t.chamberName || t.chamberNo),
     floorNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.floorNo || '') : t.floorNo,
     stackNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.stackNo || '') : t.stackNo,
     quantityKg: t.quantityKg,
@@ -44,7 +44,10 @@ export async function getColdTransactions() {
     grade: t.grade,
     gradingType: t.gradingType || t.commodityId?.gradingType,
     referencePersons: t.referencePersons,
-    createdAt: t.createdAt
+    createdAt: t.createdAt,
+    stockType: t.stockType,
+    purchaseQuantityKg: t.purchaseQuantityKg,
+    selfQuantityKg: t.selfQuantityKg
   }));
 
   // Sort by date DESC, then createdAt DESC
@@ -62,7 +65,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
   await connectToDatabase();
   const session = await requireSession();
   if (!hasPermission(session, 'reports', 'delete')) throw new Error('Forbidden: Insufficient permissions');
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   try {
     if (type === 'INWARD') {
@@ -76,7 +79,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
         $or: inward.stackAllocations.map((s: any) => ({
-          chamberNo: s.chamberNo,
+          $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
           floorNo: s.floorNo,
           stackNo: s.stackNo
         })),
@@ -106,7 +109,7 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
 export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWARD') {
   await connectToDatabase();
   const session = await requireSession();
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   let transaction;
   if (type === 'INWARD') {
@@ -119,7 +122,7 @@ export async function getColdTransactionById(id: string, type: 'INWARD' | 'OUTWA
       commodityId: inward.commodityId,
       warehouseId: inward.warehouseId,
       $or: inward.stackAllocations.map((s: any) => ({
-        chamberNo: s.chamberNo,
+        $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
         floorNo: s.floorNo,
         stackNo: s.stackNo
       })),
@@ -140,7 +143,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
   await connectToDatabase();
   const session = await requireSession();
   if (!hasPermission(session, 'reports', 'edit')) throw new Error('Forbidden: Insufficient permissions');
-  const tenantFilter = getTenantFilter(session);
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   try {
     if (data && data.grade === '') {
@@ -156,7 +159,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
         $or: inward.stackAllocations.map((s: any) => ({
-          chamberNo: s.chamberNo,
+          $or: [ { chamberName: s.chamberName || s.chamberNo?.toString() }, ...(s.chamberNo ? [{ chamberNo: s.chamberNo }] : []) ],
           floorNo: s.floorNo,
           stackNo: s.stackNo
         })),
@@ -172,7 +175,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           const capacityInfo = await getStackAvailableCapacity(inward.warehouseId.toString(), stack.chamberNo, stack.floorNo, stack.stackNo);
           
           const currentAllocation = inward.stackAllocations.find((s: any) => 
-            s.chamberNo === stack.chamberNo && 
+            (s.chamberName === stack.chamberName || s.chamberNo === stack.chamberNo) && 
             s.floorNo === stack.floorNo && 
             s.stackNo === stack.stackNo
           );
@@ -209,7 +212,10 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           clientId: outward.clientId,
           commodityId: outward.commodityId,
           warehouseId: outward.warehouseId,
-          'stackAllocations.chamberNo': outward.chamberNo,
+          $or: [
+            { 'stackAllocations.chamberName': outward.chamberName || outward.chamberNo?.toString() },
+            ...(outward.chamberNo ? [{ 'stackAllocations.chamberNo': outward.chamberNo }] : [])
+          ],
           'stackAllocations.floorNo': outward.floorNo,
           'stackAllocations.stackNo': outward.stackNo,
           ...tenantFilter
@@ -229,7 +235,10 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         clientId: inward.clientId,
         commodityId: inward.commodityId,
         warehouseId: inward.warehouseId,
-        chamberNo: outward.chamberNo,
+        $or: [
+          { chamberName: outward.chamberName || outward.chamberNo?.toString() },
+          ...(outward.chamberNo ? [{ chamberNo: outward.chamberNo }] : [])
+        ],
         floorNo: outward.floorNo,
         stackNo: outward.stackNo,
         _id: { $ne: outward._id },
@@ -258,39 +267,55 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           const totalBags = bagsLarge + bagsSmall + bagsMixed;
           const quantityKg = Number(data.quantityKg) || 0;
 
-          let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-          if (totalBags > 0) {
-            largeWeight = (bagsLarge / totalBags) * quantityKg;
-            smallWeight = (bagsSmall / totalBags) * quantityKg;
-            mixedWeight = (bagsMixed / totalBags) * quantityKg;
-          } else {
-            largeWeight = quantityKg; // Fallback
-          }
-
           let pLarge = 0, pSmall = 0, pMixed = 0;
+          let baseUnitRate = 0;
 
           if (commodity.priceType === 'Different Price') {
             pLarge = season.priceLarge || 0;
             pSmall = season.priceSmall || 0;
             pMixed = season.priceMixed || 0;
+            baseUnitRate = pLarge;
             if (!pLarge && !pSmall && !pMixed) rentReason = 'Rates not found for any bag types';
           } else {
-            pLarge = season.pricePerKg || 0;
-            pSmall = season.pricePerKg || 0;
-            pMixed = season.pricePerKg || 0;
-            if (!pLarge) rentReason = 'Price Per Kg not set';
+            baseUnitRate = season.pricePerKg || 0;
+            if (!baseUnitRate) rentReason = 'Price Per Unit not set';
           }
 
-          if (commodity.gradingType === 'Wet') {
-            const rateLarge = (largeWeight / 81) * pLarge * 4;
-            const rateSmall = (smallWeight / 81) * pSmall * 4;
-            const rateMixed = (mixedWeight / 81) * pMixed * 4;
-            rentRs = rateLarge + rateSmall + rateMixed;
+          const unit = (commodity.unit || 'KG').toUpperCase();
+          const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+
+          if (isKg) {
+            let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
+            if (totalBags > 0) {
+              largeWeight = (bagsLarge / totalBags) * quantityKg;
+              smallWeight = (bagsSmall / totalBags) * quantityKg;
+              mixedWeight = (bagsMixed / totalBags) * quantityKg;
+            } else {
+              largeWeight = quantityKg; // Fallback
+            }
+
+            if (commodity.priceType === 'Different Price') {
+              if (commodity.gradingType === 'Wet') {
+                const rateLarge = (largeWeight / 81) * pLarge * 4;
+                const rateSmall = (smallWeight / 81) * pSmall * 4;
+                const rateMixed = (mixedWeight / 81) * pMixed * 4;
+                rentRs = rateLarge + rateSmall + rateMixed;
+              } else {
+                const rateLarge = largeWeight * pLarge;
+                const rateSmall = smallWeight * pSmall;
+                const rateMixed = mixedWeight * pMixed;
+                rentRs = rateLarge + rateSmall + rateMixed;
+              }
+            } else {
+              rentRs = quantityKg * baseUnitRate;
+            }
           } else {
-            const rateLarge = largeWeight * pLarge;
-            const rateSmall = smallWeight * pSmall;
-            const rateMixed = mixedWeight * pMixed;
-            rentRs = rateLarge + rateSmall + rateMixed;
+            // Storage Unit != KG
+            if (commodity.priceType === 'Different Price') {
+              rentRs = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
+            } else {
+              rentRs = totalBags * baseUnitRate;
+            }
           }
         } else {
           rentReason = 'Seasonal price not found for date';

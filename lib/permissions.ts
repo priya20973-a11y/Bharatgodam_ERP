@@ -12,7 +12,9 @@ export type PermissionModule =
   | 'reports'
   | 'staff' // For WSP only, hidden for staff
   | 'clientMaster'
-  | 'floorMapping';
+  | 'floorMapping'
+  | 'ownershipTransfer'
+  | 'environmentRecords';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'print' | 'approve';
 

@@ -50,45 +50,27 @@ export interface RentBreakdown {
  * @param outwardDate  - Date cargo was (or will be) removed
  */
 export function calculateRent(
-  weightMT:     number,
-  ratePerMonth: number,
-  inwardDate:   string | Date,
-  outwardDate:  string | Date,
+  quantity:     number,
+  unitRate:     number,
+  inwardDate?:  string | Date,
+  outwardDate?: string | Date,
 ): RentBreakdown {
-  // ── 1. Calendar Day Normalization ────────────────────────────────────────
-  const start = toCalendarDay(inwardDate);
-  const end   = toCalendarDay(outwardDate);
-
-  // Same-day pickup = 1 day minimum billed (protects against 0)
-  const rawDays  = differenceInDays(end, start);
-  const totalDays = Math.max(1, rawDays);
-
-  // ── 2. Paise-Level Integer Math ──────────────────────────────────────────
-  // Scale all money values by 100 before multiplication to avoid JS
-  // floating-point accumulation. Final step divides back to rupees.
-
-  // monthlyRent in paise: weight × rate × 100
-  // (kept as rupees here for readability — actual paise conversion is below)
-  const monthlyRent = (Math.round(weightMT * 100) / 100) *
-                      (Math.round(ratePerMonth * 100) / 100);
-
-  // Work entirely in paise from here
-  const monthlyPaise  = Math.round(monthlyRent * 100);
-  const dailyPaise    = monthlyPaise / DAYS_PER_MONTH;           // exact division
-  const rentPaise     = Math.round(dailyPaise * totalDays);      // rounded integer
-  const totalPaise    = rentPaise; // No GST - total equals storage rent
-
-  // ── 3. Convert Back to Rupees ────────────────────────────────────────────
-  const storageRent = rentPaise / 100;
-  const totalAmount = totalPaise / 100;
-  const dailyRate   = Math.round(dailyPaise) / 100;
+  // Rent = Transaction Quantity × Current Unit Rate
+  // Bypassing all weight and time (days) multipliers.
+  
+  const totalDays = 1; // Retained as 1 to prevent division-by-zero in legacy UI components.
+  
+  // Calculate exactly: quantity * rate (rounded to 2 decimal places to avoid float issues)
+  const exactRent = (Math.round(quantity * 100) / 100) * (Math.round(unitRate * 100) / 100);
+  const storageRent = Math.round(exactRent * 100) / 100;
+  const totalAmount = storageRent;
 
   return {
     totalDays,
-    weightMT,
-    appliedRate: ratePerMonth,
-    monthlyRent: Math.round(monthlyRent * 100) / 100,
-    dailyRate,
+    weightMT: quantity, // Still named weightMT in the interface, but stores quantity
+    appliedRate: unitRate,
+    monthlyRent: storageRent,
+    dailyRate: storageRent, // Not mathematically divided by days anymore
     storageRent,
     totalAmount, // No gstAmount field
   };

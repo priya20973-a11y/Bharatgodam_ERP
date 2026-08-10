@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Receipt } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -15,17 +15,21 @@ type NavItem = {
   href: string;
   icon: any;
   module?: PermissionModule;
+  adminOnly?: boolean;
 };
 
 const coldNavItems: NavItem[] = [
   { name: 'Dashboard', translationKey: 'sidebar.dashboard', href: '/cold/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { name: 'Profile', translationKey: 'sidebar.profile', href: '/cold/profile', icon: Settings },
   { name: 'Warehouse Master', translationKey: 'sidebar.warehouse', href: '/cold/warehouses', icon: Box, module: 'warehouse' },
+  { name: 'Environment Records', translationKey: 'sidebar.environmentRecords', href: '/cold/environment-records', icon: Box, module: 'environmentRecords' },
   { name: 'Floor Mapping', translationKey: 'floorMapping.title', href: '/cold/floor-mapping', icon: Grid, module: 'floorMapping' },
   { name: 'Commodity Master', translationKey: 'sidebar.commodities', href: '/cold/commodities', icon: Package, module: 'commodity' },
+  { name: 'Unit Master', translationKey: 'sidebar.unitMaster', href: '/cold/units', icon: Layers, adminOnly: true },
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
+  { name: 'Ownership Transfer', translationKey: 'sidebar.transferOwnership', href: '/cold/transfers', icon: ArrowRightLeft, module: 'ownershipTransfer' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
@@ -55,9 +59,8 @@ export default function ColdSidebar({ session }: SidebarProps) {
 
       {/* Sidebar Container */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 h-full transform bg-slate-900 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 w-64 h-full transform bg-slate-900 text-white transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo Setup */}
@@ -79,32 +82,33 @@ export default function ColdSidebar({ session }: SidebarProps) {
           {/* Navigation Links */}
           <nav className="flex-1 space-y-1 px-4 py-8 overflow-y-auto no-scrollbar">
             {coldNavItems
-              .filter(item => !item.module || canViewMenu(session, item.module))
+              .filter(item => {
+                if (item.adminOnly && !isAdmin) return false;
+                return !item.module || canViewMenu(session, item.module);
+              })
               .map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`group flex items-center rounded-md px-3 py-3 text-sm font-medium transition-colors ${
-                    isActive
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`group flex items-center rounded-md px-3 py-3 text-sm font-medium transition-colors ${isActive
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon
-                    className={`mr-3 h-5 w-5 shrink-0 ${
-                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
-                    }`}
-                  />
-                  {t(item.translationKey)}
-                </Link>
-              );
-            })}
-            
+                      }`}
+                  >
+                    <Icon
+                      className={`mr-3 h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                        }`}
+                    />
+                    {t(item.translationKey)}
+                  </Link>
+                );
+              })}
+
             {isAdmin && (
               <div className="mt-8 pt-4 border-t border-slate-800">
                 <Link

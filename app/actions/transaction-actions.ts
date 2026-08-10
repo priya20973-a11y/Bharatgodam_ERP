@@ -543,8 +543,11 @@ export async function processOutward(data: {
       throw new Error('Warehouse is deactivated and cannot be used for new transactions');
     }
 
+    const c = commodity as any;
     const outwardPayload = appendOwnershipForMongo({
       ...data,
+      unit: c.unit || 'MT',
+      unitRate: c.ratePerMtPerDay || (c.ratePerMtMonth ? c.ratePerMtMonth / 30 : 10),
       date: outwardDate,
     }, authSession);
 

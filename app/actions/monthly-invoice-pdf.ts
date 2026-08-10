@@ -366,14 +366,11 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       const dateRange = row.startDate && row.endDate
         ? `${row.startDate} to ${row.endDate}`
         : row.date || `${row.startDate || ''}`;
-      const bagsValue = row.bags !== undefined && row.bags !== ''
-        ? (typeof row.bags === 'number' ? row.bags.toLocaleString('en-IN') : row.bags)
-        : '-';
-      const daysValue = row.daysTotal !== undefined && row.daysTotal !== null
-        ? row.daysTotal
-        : '-';
-      const rateValue = row.ratePerMTPerDay
-        ? `₹${formatAmount(row.ratePerMTPerDay)}`
+      const r = row as any;
+      const qtyValue = formatQty(r.quantityMT || r.bags || r.bagsCount || 0);
+      const unitValue = r.unit || 'MT'; // Fallback for legacy
+      const rateValue = r.ratePerMTPerDay || r.rate || r.unitRate
+        ? `₹${formatAmount(r.ratePerMTPerDay || r.rate || r.unitRate)}`
         : '-';
       const commodityLabel = row.commodityName || 'Unknown';
       const warehouseCell = showWarehouseColumn 
@@ -386,9 +383,8 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           <td>${row.direction}</td>
           <td>${commodityLabel}</td>
           ${warehouseCell}
-          <td class="text-right">${bagsValue}</td>
-          <td class="text-right">${formatQty(row.quantityMT)}</td>
-          <td class="text-right">${daysValue}</td>
+          <td class="text-right">${qtyValue}</td>
+          <td class="text-center">${unitValue}</td>
           <td class="text-right">${rateValue}</td>
           <td class="text-right font-medium text-dark">₹${formatAmount(row.rentTotal)}</td>
         </tr>
@@ -907,17 +903,16 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                       <th>Direction</th>
                       <th>Commodity</th>
                       ${showWarehouseColumn ? '<th>Warehouse</th>' : ''}
-                      <th class="text-right">No. of Bags</th>
-                      <th class="text-right">Qty (MT)</th>
-                      <th class="text-right">Days</th>
-                      <th class="text-right">Rate (₹)</th>
+                      <th class="text-right">Quantity</th>
+                      <th class="text-center">Unit</th>
+                      <th class="text-right">Unit Rate (₹)</th>
                       <th class="text-right">Rent (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${invoiceRowsList}
                     <tr style="border-top: 1px solid #D9DDE3; background-color: #F8FAFC;">
-                      <td colspan="${showWarehouseColumn ? 7 : 6}" style="font-weight: 700; text-align: right;">
+                      <td colspan="${showWarehouseColumn ? 6 : 5}" style="font-weight: 700; text-align: right;">
                         Monthly Storage Rent${totalTaxAmount > 0 ? ` (SAC: ${storageChargeSacCode || '-'})` : ''}
                       </td>
                       <td class="text-right font-medium text-dark" style="font-weight: 700; font-size: 9px;">

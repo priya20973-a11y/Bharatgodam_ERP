@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSession, getTenantFilter } from '@/lib/ownership';
+import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 import connectToDatabase from '@/lib/mongoose';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
@@ -8,8 +8,13 @@ import '@/lib/models/ColdCommodity';
 import '@/lib/models/ColdWarehouse';
 import { generateColdTransactionReceiptHTML } from '@/lib/invoice/cold-transaction-receipt';
 import { generateColdOutwardReceiptHTML } from '@/lib/invoice/cold-outward-receipt';
+import { generateColdTransferReceiptHTML } from '@/lib/invoice/cold-transfer-receipt';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import crypto from 'crypto';
+
+import { hasPermission } from '@/lib/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,52 +23,65 @@ export async function GET(request: NextRequest) {
     
     const id = request.nextUrl.searchParams.get('id');
     const batchId = request.nextUrl.searchParams.get('batchId');
-    const type = request.nextUrl.searchParams.get('type') as 'inward' | 'outward';
+    const type = request.nextUrl.searchParams.get('type') as 'inward' | 'outward' | 'transfer';
     
-    if ((!id && !batchId) || (type !== 'inward' && type !== 'outward')) {
+    if ((!id && !batchId) || (type !== 'inward' && type !== 'outward' && type !== 'transfer')) {
       return new NextResponse('Invalid parameters', { status: 400 });
     }
     
-    let transaction;
+    if (type === 'transfer' && !hasPermission(session, 'ownershipTransfer', 'print')) {
+      return new NextResponse('Forbidden: No print permission for ownership transfer', { status: 403 });
+    }
+    
+    let transaction: any;
     let transactions: any[] = [];
     
     if (type === 'inward') {
-      transaction = await ColdInward.findOne({ _id: id, ...getTenantFilter(session) })
+      transaction = await ColdInward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
         .populate('clientId', 'name address village')
-        .populate('commodityId', 'name type')
+        .populate('commodityId', 'name type seasonalPrices')
         .populate('warehouseId');
         
       if (transaction && transaction.stackAllocations) {
         transaction = JSON.parse(JSON.stringify(transaction));
-        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => ({
-          chamberNo: a.chamberNo,
-          floorNo: a.floorNo,
-          stackNo: a.stackNo,
-          quantityKg: a.allocatedWeight
-        }));
+        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => {
+          let floorName = a.floorNo;
+          if (transaction.warehouseId?.chambers) {
+            const chamber = transaction.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(a.chamberNo || '1') || c.name === a.chamberName);
+            const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(a.floorNo));
+            if (floor?.name) floorName = floor.name;
+          }
+          return {
+            chamberNo: a.chamberName || a.chamberNo,
+            floorNo: floorName,
+            stackNo: a.stackNo,
+            quantityKg: a.allocatedWeight,
+            stockType: a.stockType || 'Self'
+          };
+        });
       }
-    } else {
+    } else if (type === 'outward') {
       if (batchId) {
-        transactions = await ColdOutward.find({ batchId, ...getTenantFilter(session) })
+        transactions = await ColdOutward.find({ batchId, ...getTenantFilterForMongo(session) })
           .populate('inwardId', 'receiptNo _id')
           .populate('clientId', 'name address village')
-          .populate('commodityId', 'name type')
+          .populate('commodityId', 'name type unit seasonalPrices priceType')
           .populate('warehouseId');
         if (transactions.length > 0) {
           transaction = transactions[0]; // For common fields
         }
       } else {
-        transaction = await ColdOutward.findOne({ _id: id, ...getTenantFilter(session) })
+        transaction = await ColdOutward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
           .populate('inwardId', 'receiptNo _id')
           .populate('clientId', 'name address village')
-          .populate('commodityId', 'name type')
+          .populate('commodityId', 'name type unit seasonalPrices priceType')
           .populate('warehouseId');
         if (transaction) {
           if (transaction.batchId) {
-            transactions = await ColdOutward.find({ batchId: transaction.batchId, ...getTenantFilter(session) })
+            transactions = await ColdOutward.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
               .populate('inwardId', 'receiptNo _id')
               .populate('clientId', 'name address village')
-              .populate('commodityId', 'name type')
+              .populate('commodityId', 'name type unit seasonalPrices priceType')
               .populate('warehouseId');
           } else {
             // Group transactions created at the same time for the same client
@@ -74,19 +92,35 @@ export async function GET(request: NextRequest) {
             transactions = await ColdOutward.find({
               clientId: transaction.clientId,
               createdAt: { $gte: startTime, $lte: endTime },
-              ...getTenantFilter(session)
+              ...getTenantFilterForMongo(session)
             })
               .populate('inwardId', 'receiptNo _id')
               .populate('clientId', 'name address village')
-              .populate('commodityId', 'name type')
+              .populate('commodityId', 'name type unit seasonalPrices priceType')
               .populate('warehouseId')
               .sort({ createdAt: 1 });
           }
         }
       }
+
+      transactions = JSON.parse(JSON.stringify(transactions));
+      transactions.forEach((tx: any) => {
+        if (tx.warehouseId?.chambers) {
+          const chamber = tx.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(tx.chamberNo || '1') || c.name === tx.chamberName);
+          const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(tx.floorNo));
+          if (floor?.name) tx.floorNo = floor.name;
+        }
+      });
+    } else if (type === 'transfer') {
+      transaction = await ColdTransfer.findOne({ _id: id, ...getTenantFilterForMongo(session) })
+        .populate('fromClientId', 'name address village')
+        .populate('toClientId', 'name address village')
+        .populate('commodityId', 'name type unit seasonalPrices priceType')
+        .populate('warehouseId')
+        .populate('originalInwardId', 'farmerName farmerId');
     }
     
-    if (!transaction) {
+    if (!transaction && transactions.length === 0) {
       return new NextResponse('Transaction not found', { status: 404 });
     }
     
@@ -102,18 +136,44 @@ export async function GET(request: NextRequest) {
     const data = JSON.parse(JSON.stringify(transaction));
     const batchData = JSON.parse(JSON.stringify(transactions));
     
+    if (type === 'transfer' && data?.originalInwardId) {
+      data.farmerName = data.originalInwardId.farmerName || '';
+      data.farmerId = data.originalInwardId.farmerId || '';
+    }
+    
+    const warehouseData = type === 'inward' ? data?.warehouseId : (batchData.length > 0 ? batchData[0].warehouseId : data?.warehouseId);
+    
+    let userLogo = '';
+    if (warehouseData?.logoUrl) {
+      userLogo = warehouseData.logoUrl;
+    } else if (dbUser?.companyLogo?.data) {
+      userLogo = `data:${dbUser.companyLogo.contentType};base64,${dbUser.companyLogo.data.toString('base64')}`;
+    }
+
     const userDetails = {
-      companyLogo: dbUser?.companyLogo || '',
+      companyLogo: userLogo,
       phoneNumber: dbUser?.phoneNumber || session.user.phoneNumber || '',
     };
     
-    const language = (session.user as any).coldLanguage || 'en';
+    const lang = (session.user as any)?.coldLanguage === 'gu' ? 'gu' : 'en';
     
     let html = '';
-    if (type === 'outward') {
-      html = generateColdOutwardReceiptHTML(batchData, userDetails, language);
-    } else {
-      html = generateColdTransactionReceiptHTML(data, type, userDetails, language);
+    if (type === 'inward') {
+      let qrDataUrl = '';
+      if (!transaction.qrId) {
+        const newQrId = crypto.randomUUID();
+        await ColdInward.updateOne({ _id: transaction._id }, { $set: { qrId: newQrId } });
+        data.qrId = newQrId;
+        transaction.qrId = newQrId;
+      }
+      const QRCode = require('qrcode');
+      const scanUrl = `${request.nextUrl.origin}/qr/inward/${data.qrId}`;
+      qrDataUrl = await QRCode.toDataURL(scanUrl);
+      html = generateColdTransactionReceiptHTML(data, type, userDetails, lang, qrDataUrl);
+    } else if (type === 'outward') {
+      html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
+    } else if (type === 'transfer') {
+      html = generateColdTransferReceiptHTML(data, userDetails, lang);
     }
     
     return new NextResponse(html, {

@@ -2,12 +2,14 @@ import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
 import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
+import { getDynamicUnitLabel } from '@/lib/utils';
 
 export function generateColdTransactionReceiptHTML(
   data: any,
   type: 'inward' | 'outward',
   userDetails?: { companyLogo: string, phoneNumber: string },
-  lang: string = 'en'
+  lang: string = 'en',
+  qrDataUrl?: string
 ): string {
   const l = (lang === 'gu' ? gu.receipt : en.receipt) as any;
   const formatNum = (num: number | string) => lang === 'gu' ? toGujaratiDigits(num) : String(num);
@@ -54,21 +56,25 @@ export function generateColdTransactionReceiptHTML(
   const jin = formatNum(data.jin || 0);
   const mixed = formatNum(data.mixed || 0);
   const totalBags = formatNum(actualTotal);
-  const farmerName = data.farmerName || '';
+  const farmerName = data.farmerName ? (data.farmerId ? `${data.farmerName} - ${data.farmerId}` : data.farmerName) : '';
 
   const marko = data.marko || '';
-  const truckNo = formatNum(data.truckNo || '');
+  const truckNo = data.truckNo || '';
   const remarks = data.remarks || '';
   const note = data.note || '';
   const wbSlip = formatNum(data.weighbridgeSlipNo || '');
 
-  const chamber = formatNum(data.chamberNo || '');
+  const chamber = formatNum(data.chamberName || data.chamberNo || '');
   const floor = formatNum(data.floorNo || '');
   const stack = formatNum(data.stackNo || '');
 
-  const grossWeight = formatNum(data.grossWeight || 0);
-  const emptyWeight = formatNum(data.emptyWeight || 0);
-  const netWeight = formatNum(data.quantityKg || 0); // Net weight is stored as quantityKg
+  const unitStr = data.unit || data.commodityId?.unit || 'KG';
+  const grossWeight = formatNum(data.grossWeight || 0) + ' KG';
+  const emptyWeight = formatNum(data.emptyWeight || 0) + ' KG';
+  const netWeight = formatNum(data.quantityKg || 0) + ' KG'; // Net weight is stored as quantityKg
+  const stockType = data.stockType || 'Self';
+  const selfQuantityKg = formatNum(data.selfQuantityKg || 0) + ' KG';
+  const purchaseQuantityKg = formatNum(data.purchaseQuantityKg || 0) + ' KG';
 
   // Format Kata Bharati safely
   let kataBharatiRaw = data.kataBharati || 0;
@@ -341,6 +347,7 @@ export function generateColdTransactionReceiptHTML(
         <div class="main-title">${warehouseName}</div>
         <div class="sub-title">${warehouseAddress}</div>
       </div>
+      ${qrDataUrl ? `<div style="width: 60px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto;" alt="QR Code" /></div>` : ''}
     </div>
     
     <div class="badge-container">
@@ -374,13 +381,13 @@ export function generateColdTransactionReceiptHTML(
     </div>
     
     <div class="form-row">
-      <div class="form-label">${l.qtyLargeLabel}</div>
+      <div class="form-label">${getDynamicUnitLabel(unitStr, 'large')}</div>
       <div class="form-value">${bags}</div>
-      <div class="form-label">${l.qtySmallLabel}</div>
+      <div class="form-label">${getDynamicUnitLabel(unitStr, 'small')}</div>
       <div class="form-value">${jin}</div>
-      <div class="form-label">${l.mixed || 'Mixed'}</div>
+      <div class="form-label">${getDynamicUnitLabel(unitStr, 'mixed')}</div>
       <div class="form-value">${mixed}</div>
-      <div class="form-label">${l.qtyTotalLabel}</div>
+      <div class="form-label">${getDynamicUnitLabel(unitStr, 'total')}</div>
       <div class="form-value">${totalBags}</div>
     </div>
     
@@ -405,6 +412,7 @@ export function generateColdTransactionReceiptHTML(
         
         <table class="data-table stack-table" style="margin-top: 15px;">
           <tr>
+            <th>Type</th>
             <th>${l.chamberNoLabel}</th>
             <th>${l.floorNoLabel}</th>
             <th>${l.stackNoLabel}</th>
@@ -413,14 +421,16 @@ export function generateColdTransactionReceiptHTML(
           ${data.stacksInfo && data.stacksInfo.length > 0 ? 
             data.stacksInfo.map((s: any) => `
             <tr>
+              <td>${s.stockType || 'Self'}</td>
               <td>${formatNum(s.chamberNo)}</td>
               <td>${formatNum(s.floorNo)}</td>
               <td>${formatNum(s.stackNo)}</td>
-              <td>${formatNum(s.quantityKg)}</td>
+              <td>${formatNum(s.quantityKg)} ${unitStr}</td>
             </tr>
             `).join('')
           : `
             <tr>
+              <td>${stockType}</td>
               <td>${chamber}</td>
               <td>${floor}</td>
               <td>${stack}</td>
@@ -432,6 +442,22 @@ export function generateColdTransactionReceiptHTML(
       
       <div class="right-grid">
         <table class="data-table">
+          <tr>
+            <td>Stock Type</td>
+            <td>${stockType}</td>
+          </tr>
+          ${stockType === 'Both' || stockType === 'Purchase' ? `
+          <tr>
+            <td>Purchase Qty</td>
+            <td>${purchaseQuantityKg}</td>
+          </tr>
+          ` : ''}
+          ${stockType === 'Both' || stockType === 'Self' ? `
+          <tr>
+            <td>Self Qty</td>
+            <td>${selfQuantityKg}</td>
+          </tr>
+          ` : ''}
           <tr>
             <td>${l.grossWeightLabel}</td>
             <td>${grossWeight}</td>
@@ -447,7 +473,7 @@ export function generateColdTransactionReceiptHTML(
         </table>
         
         <div style="padding-left: 5px; margin-bottom: 10px;">
-          <span style="color: #9e2a2b; font-weight: bold; font-size: 13px;">${l.kataBharatiLabel}</span>
+          <span style="color: #9e2a2b; font-weight: bold; font-size: 13px;">${getDynamicUnitLabel(unitStr, 'weight')}</span>
           <span style="font-weight: bold; font-size: 13px; margin-left: 10px;">${kataBharati}</span>
         </div>
         

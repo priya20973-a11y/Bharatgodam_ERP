@@ -10,7 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, Search, Download, Calendar as CalendarIcon, ChevronDown, Check } from 'lucide-react';
+import { getDynamicUnitLabel } from '@/lib/utils';
+import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 interface ColdOutwardListProps {
@@ -47,8 +49,69 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
     return groups;
   }, [outwards]);
 
+  const exportCsv = () => {
+    const headers = [
+      t('outward.dateHeader') || 'Date',
+      t('outward.clientNameHeader') || 'Client Name',
+      'Farmer Name',
+      t('outward.commodityHeader') || 'Commodity',
+      t('outward.warehouseHeader') || 'Warehouse',
+      t('outward.chamberHeader') || 'Chamber',
+      t('outward.floorHeader') || 'Floor',
+      t('outward.stackHeader') || 'Stack',
+      t('inward.grade') || 'Grade',
+      t('outward.quantityHeader') || 'Net Weight (kg)',
+      t('outward.bagsHeader') || 'Bags'
+    ];
+    
+    const rows = groupedOutwards.map(w => {
+      const date = w.date ? format(new Date(w.date), 'dd MMM yyyy') : '-';
+      const client = w.clientId?.name || '-';
+      const farmer = w.farmerName || '-';
+      const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
+      const warehouse = w.warehouseId?.name || '-';
+      const chamber = w.isBatch && w.items && w.items.length > 1
+        ? w.items.map((item: any) => String(item.chamberName || item.chamberNo).replace(/^Chamber\s+/i, '')).join('; ')
+        : String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
+      const floor = w.isBatch && w.items && w.items.length > 1
+        ? w.items.map((item: any) => item.floorName || item.floorNo).join('; ')
+        : (w.floorName || w.floorNo || '-');
+      const stack = w.isBatch && w.items && w.items.length > 1
+        ? w.items.map((item: any) => item.stackNo).join('; ')
+        : (w.stackNo || '-');
+
+      let sameGrade = true;
+      if (w.isBatch && w.items && w.items.length > 0) {
+        const first = w.items[0];
+        for (const item of w.items) {
+          if (item.grade !== first.grade || item.gradingType !== first.gradingType) sameGrade = false;
+        }
+      }
+      const grade = (w.isBatch && !sameGrade) ? (t('outward.mixedMulti') || 'Mixed') : (w.gradingType || '-');
+      const qty = w.quantityKg || 0;
+      const bags = w.bagsCount || 0;
+      return [date, client, farmer, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
+        .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Outward_Export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={exportCsv} variant="outline" size="sm">
+          <Download className="mr-2 h-4 w-4" /> Export CSV
+        </Button>
+      </div>
+      <div className="rounded-md border bg-white shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">
@@ -60,8 +123,8 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
             <TableHead className="text-right font-semibold">{t('outward.floorHeader')}</TableHead>
             <TableHead className="text-right font-semibold">{t('outward.stackHeader')}</TableHead>
             <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.quantityHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('outward.bagsHeader')}</TableHead>
+            <TableHead className="text-right font-semibold">Qty (KG)</TableHead>
+            <TableHead className="text-right font-semibold">Units</TableHead>
             <TableHead className="text-right font-semibold">{t('outward.actions')}</TableHead>
           </TableRow>
         </TableHeader>
@@ -91,15 +154,15 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
 
               const displayChamber = w.isBatch && w.items && w.items.length > 1 ? (
                 <div className="flex flex-col gap-1">
-                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{formatNumber(item.chamberNo)}</div>)}
+                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{String(item.chamberName || formatNumber(item.chamberNo)).replace(/^Chamber\s+/i, '')}</div>)}
                 </div>
-              ) : formatNumber(w.chamberNo);
+              ) : String(w.chamberName || formatNumber(w.chamberNo)).replace(/^Chamber\s+/i, '');
 
               const displayFloor = w.isBatch && w.items && w.items.length > 1 ? (
                 <div className="flex flex-col gap-1">
-                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{formatNumber(item.floorNo)}</div>)}
+                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{item.floorName || formatNumber(item.floorNo)}</div>)}
                 </div>
-              ) : formatNumber(w.floorNo);
+              ) : (w.floorName || formatNumber(w.floorNo));
 
               const displayStack = w.isBatch && w.items && w.items.length > 1 ? (
                 <div className="flex flex-col gap-1">
@@ -130,8 +193,8 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
                   <TableCell className="text-slate-700">
                     {displayGrade}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(w.bagsCount)}</TableCell>
+                  <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)} KG</TableCell>
+                  <TableCell className="text-right text-slate-700">{formatNumber(w.bagsCount)} {getDynamicUnitLabel(w.unit || w.commodityId?.unit || 'KG', 'plural')}</TableCell>
                   <TableCell className="text-right">
                     <a 
                       href={printUrl} 
@@ -150,6 +213,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

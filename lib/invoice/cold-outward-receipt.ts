@@ -2,6 +2,7 @@ import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
 import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
+import { getDynamicUnitLabel } from '@/lib/utils';
 
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
@@ -12,6 +13,7 @@ export function generateColdOutwardReceiptHTML(
 
   const outwards = Array.isArray(batchData) ? batchData : [batchData];
   const firstData = outwards[0] || {};
+  const unitStr = firstData.commodityId?.unit || firstData.unit || 'KG';
 
   const dateStr = firstData.date ? format(new Date(firstData.date), 'dd-MM-yyyy') : '';
   const dateFormatted = formatNum(dateStr);
@@ -38,8 +40,37 @@ export function generateColdOutwardReceiptHTML(
   const rawPlusMinus = outwards.reduce((acc, curr) => acc + (curr.plusMinus || 0), 0);
   const rawTotalBags = outwards.reduce((acc, curr) => acc + (curr.totalBags || 0), 0);
   const rawNetWeight = outwards.reduce((acc, curr) => acc + (curr.quantityKg || 0), 0);
-  const rawRentRs = outwards.reduce((acc, curr) => acc + (curr.rentRs || 0), 0);
+  
+  // Recalculate rent dynamically using Seasonal Unit Rate from Commodity Master if available
+  let activeUnitRateUsed = 0;
+  const rawRentRs = outwards.reduce((acc, curr) => {
+    let activeUnitRate = curr.unitRate || 0;
+    const commodity = firstData.commodityId;
+    
+    // Dynamically fetch from Commodity Master's Seasonal Rate
+    if (commodity && commodity.seasonalPrices && commodity.seasonalPrices.length > 0) {
+      const outDate = curr.date ? new Date(curr.date) : new Date();
+      const outTime = outDate.getTime();
+      const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
+      if (commodity.priceType === 'Different Price') {
+        activeUnitRate = season.priceLarge || activeUnitRate;
+      } else {
+        activeUnitRate = season.pricePerKg || activeUnitRate;
+      }
+    }
 
+    if (activeUnitRate > 0) {
+      activeUnitRateUsed = activeUnitRate;
+      const unit = (unitStr || 'KG').toUpperCase();
+      const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+      if (isKg) {
+        return acc + ((curr.quantityKg || 0) * activeUnitRate);
+      } else {
+        return acc + ((curr.totalBags || 0) * activeUnitRate);
+      }
+    }
+    return acc + (curr.rentRs || 0);
+  }, 0);
   const bags = formatNum(rawBags);
   const jin = formatNum(rawJin);
   const mixed = formatNum(rawMixed);
@@ -55,17 +86,25 @@ export function generateColdOutwardReceiptHTML(
 
   const totalBags = formatNum(rawTotalBags);
   const netWeight = formatNum(rawNetWeight.toFixed(2));
+  const rawUnitRate = firstData.unitRate || 0;
+  const unitRateDisplay = rawUnitRate > 0 ? formatNum(rawUnitRate.toFixed(2)) : '';
   const rentRsDisplay = rawRentRs > 0 ? formatNum(rawRentRs.toFixed(2)) : '';
 
   const truckNo = formatNum(firstData.truckNo || '');
   const remarks = firstData.remarks || '';
   const note = firstData.note || '';
+  const farmerName = firstData.farmerName ? (firstData.farmerId ? `${firstData.farmerName} - ${firstData.farmerId}` : firstData.farmerName) : '';
 
   const warehouseName = firstData.warehouseId?.name || (lang === 'gu' ? 'સ્વાગત કોલ્ડ સ્ટોરેજ' : 'Swagat Cold Storage');
   const warehouseAddress = firstData.warehouseId?.address || (lang === 'gu' ? 'મુ.ખેંટવા, ડીસા-ભીલડી હાઇવે, તા.ડીસા, જિ.બનાસકાંઠા' : 'Deesa-Bhildi Highway, Deesa, Banaskantha');
   const mobile = userDetails?.phoneNumber ? formatNum(userDetails.phoneNumber) : '96240 39195';
 
-
+  const rawGradingCharge = outwards.reduce((acc, curr) => acc + (curr.gradingCharge || 0), 0);
+  const gradingChargeDisplay = rawGradingCharge > 0 ? formatNum(rawGradingCharge.toFixed(2)) : '';
+  const hasGrading = outwards.some(o => o.gradingApplied);
+  const gradingRate = outwards.find(o => o.gradingApplied)?.gradingRate || 0;
+  const gradingChargeType = outwards.find(o => o.gradingApplied)?.gradingChargeType || '';
+  
   // Custom strings based on language to match the image exactly
   const t = {
     jurisdiction: lang === 'gu' ? 'Subject To DEESA Jurisdiction' : 'Subject To DEESA Jurisdiction',
@@ -78,21 +117,24 @@ export function generateColdOutwardReceiptHTML(
     nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name,',
     addressLabel: lang === 'gu' ? 'સરનામું' : 'Address',
     detailsHeader: lang === 'gu' ? 'બહાર કાઢેલ માલની વિગત' : 'Details of Outward Goods',
-    bagsHeader: lang === 'gu' ? 'થોરી (કટ્ટા)' : 'Bags (Sacks)',
-    weightHeader: lang === 'gu' ? 'વજન (નેટ)' : 'Weight (Net)',
+    bagsHeader: lang === 'gu' ? 'થોરી (કટ્ટા)' : getDynamicUnitLabel(unitStr, 'storage'),
+    weightHeader: lang === 'gu' ? 'વજન (નેટ)' : 'Weight (Net KG)',
     totalLabel: lang === 'gu' ? 'કુલ' : 'Total',
     truckNoLabel: lang === 'gu' ? 'ગાડી નં.' : 'Vehicle No.',
     remarkLabel: lang === 'gu' ? 'રીમાર્ક' : 'Remark',
+    unitRateLabel: lang === 'gu' ? 'યુનિટ રેટ રૂા.' : 'Unit Rate Rs.',
     rentLabel: lang === 'gu' ? 'ભાડુ રૂા.' : 'Rent Rs.',
+    gradingChargeLabel: lang === 'gu' ? 'ગ્રેડિંગ ચાર્જ રૂા.' : 'Grading Charge Rs.',
     noteLabel: lang === 'gu' ? 'નોંધ :' : 'Note :',
-    qtyLarge: lang === 'gu' ? '(૧) સારા' : '(1) Good/Large',
-    qtySmall: lang === 'gu' ? '(૨) જીણ' : '(2) Small',
-    qtyMixed: lang === 'gu' ? '(૩) છોલાટ' : '(3) Mixed',
-    qtyPlusMinus: lang === 'gu' ? '(૪) વધ/ઘટ' : '(4) Plus/Minus',
-    qtyTotal: lang === 'gu' ? '(૫) કુલ...' : '(5) Total...',
+    qtyLarge: lang === 'gu' ? '(૧) સારા' : `(1) ${getDynamicUnitLabel(unitStr, 'large')}`,
+    qtySmall: lang === 'gu' ? '(૨) જીણ' : `(2) ${getDynamicUnitLabel(unitStr, 'small')}`,
+    qtyMixed: lang === 'gu' ? '(૩) છોલાટ' : `(3) ${getDynamicUnitLabel(unitStr, 'mixed')}`,
+    qtyPlusMinus: lang === 'gu' ? '(૪) વધ/ઘટ' : '(4) Plus/Minus Weight (KG)',
+    qtyTotal: lang === 'gu' ? '(૫) કુલ...' : `(5) ${getDynamicUnitLabel(unitStr, 'total')}`,
     qtyOther: lang === 'gu' ? '(૬) અન્ય વિગત' : '(6) Other Details',
     managerSign: lang === 'gu' ? 'મેનેજર' : 'Manager',
-    receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign'
+    receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign',
+    farmerNameLabel: lang === 'gu' ? 'ખેડૂતનું નામ' : 'Farmer Name'
   };
 
   return `
@@ -391,6 +433,11 @@ export function generateColdOutwardReceiptHTML(
       <div class="form-value" style="flex: 0.5;">${clientVillage}</div>
     </div>
     
+    <div class="form-row">
+      <div class="form-label">${t.farmerNameLabel}</div>
+      <div class="form-value">${farmerName}</div>
+    </div>
+    
     <div class="col-header">
       <div style="width: 48%; display: flex; justify-content: space-between;">
         <span style="width: 50%;">${t.detailsHeader}</span>
@@ -436,6 +483,13 @@ export function generateColdOutwardReceiptHTML(
           <div class="label">${t.rentLabel}</div>
           <div class="value" style="color:#333;">${rentRsDisplay}</div>
         </div>
+        ${hasGrading ? `
+        <div class="receipt-line">
+          <div class="label">${t.gradingChargeLabel} <br/><small>(${gradingChargeType} @ ${gradingRate})</small></div>
+          <div class="value" style="color:#333; font-weight:bold;">${gradingChargeDisplay}</div>
+        </div>
+        ` : ''}
+
         <div class="receipt-line" style="align-items: flex-start;">
           <div class="label" style="padding-top: 2px;">${t.noteLabel}</div>
           <div class="value" style="color:#333; white-space: normal; overflow: visible; word-wrap: break-word; line-height: 1.4;">${note}</div>
@@ -446,27 +500,27 @@ export function generateColdOutwardReceiptHTML(
         <div class="qty-line">
           <div class="label">${t.qtyLarge}</div>
           <div class="value">${bags}</div>
-          <div class="unit">Kg.</div>
+          <div class="unit">${unitStr}</div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtySmall}</div>
           <div class="value">${jin}</div>
-          <div class="unit">Kg.</div>
+          <div class="unit">${unitStr}</div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyMixed}</div>
           <div class="value">${mixed}</div>
-          <div class="unit">Kg.</div>
+          <div class="unit">${unitStr}</div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyPlusMinus}</div>
           <div class="value">${plusMinusStr}</div>
-          <div class="unit">Kg.</div>
+          <div class="unit">${unitStr}</div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyTotal}</div>
           <div class="value">${totalBags}</div>
-          <div class="unit">Kg.</div>
+          <div class="unit">${unitStr}</div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyOther}</div>

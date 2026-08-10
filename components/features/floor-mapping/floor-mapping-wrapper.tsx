@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { getFloorInventory } from '@/app/actions/floor-mapping-actions';
 import FloorGrid from './floor-grid';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { QrCodeIcon } from 'lucide-react';
 
 export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] }) {
   const { t } = useColdTranslation();
@@ -14,19 +16,19 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
   const pathname = usePathname();
 
   const initWarehouseId = searchParams.get('warehouseId') || '';
-  const initChamberNo = searchParams.get('chamberNo') ? Number(searchParams.get('chamberNo')) : null;
+  const initChamberNo = searchParams.get('chamberNo') || null;
   const initFloorNo = searchParams.get('floorNo') ? Number(searchParams.get('floorNo')) : null;
   const initStackNo = searchParams.get('stackNo') ? Number(searchParams.get('stackNo')) : null;
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(initWarehouseId);
-  const [selectedChamberNo, setSelectedChamberNo] = useState<number | null>(initChamberNo);
+  const [selectedChamberNo, setSelectedChamberNo] = useState<string | null>(initChamberNo);
   const [selectedFloorNo, setSelectedFloorNo] = useState<number | null>(initFloorNo);
 
   const [loading, setLoading] = useState(false);
   const [floorData, setFloorData] = useState<any>(null);
 
   const activeWarehouse = warehouses.find(w => w._id === selectedWarehouseId);
-  const activeChamber = activeWarehouse?.chambers?.find((c: any) => c.chamberNo === selectedChamberNo);
+  const activeChamber = activeWarehouse?.chambers?.find((c: any) => (c.name || c.chamberNo.toString()) === selectedChamberNo);
   const availableFloors = activeChamber?.floors || [];
 
   const initialMountWH = useRef(true);
@@ -78,6 +80,30 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
     setLoading(false);
   };
 
+  const handlePrintQRs = () => {
+    if (!selectedWarehouseId || !selectedChamberNo || !selectedFloorNo || !floorData?.stacks) return;
+    
+    const warehouseName = activeWarehouse?.name || '';
+    
+    // Extract stacks
+    const stacks = floorData.stacks.map((stack: any) => ({
+      stackNo: stack.stackNo,
+      name: stack.name
+    }));
+    
+    if (stacks.length === 0) return;
+    
+    const params = new URLSearchParams();
+    params.set('warehouseId', selectedWarehouseId);
+    params.set('warehouseName', warehouseName);
+    params.set('chamberName', selectedChamberNo);
+    params.set('floorNo', selectedFloorNo.toString());
+    params.set('stacks', JSON.stringify(stacks));
+    params.set('autoAction', 'print');
+    
+    window.open(`/print/stack-qr?${params.toString()}`, '_blank');
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border flex flex-col md:flex-row gap-4 items-end">
@@ -96,35 +122,47 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
         <div className="space-y-2 flex-1">
           <label className="text-sm font-medium text-slate-700">{t('inward.chamberNo') || 'Chamber No.'}</label>
           <Select 
-            value={selectedChamberNo?.toString() || ''} 
-            onValueChange={(val) => setSelectedChamberNo(Number(val))}
+            value={selectedChamberNo || ''} 
+            onValueChange={(val) => setSelectedChamberNo(val)}
             disabled={!selectedWarehouseId}
           >
             <SelectTrigger><SelectValue placeholder="Select Chamber" /></SelectTrigger>
             <SelectContent>
-              {activeWarehouse?.chambers?.map((c: any) => (
-                <SelectItem key={c.chamberNo} value={c.chamberNo.toString()}>Chamber {c.chamberNo}</SelectItem>
-              ))}
+              {activeWarehouse?.chambers?.map((c: any) => {
+                const val = (c.name || c.chamberNo).toString();
+                return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+              })}
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2 flex-1">
           <label className="text-sm font-medium text-slate-700">{t('inward.floorNo') || 'Floor No.'}</label>
-          <Select 
-            value={selectedFloorNo?.toString() || ''} 
-            onValueChange={(val) => setSelectedFloorNo(Number(val))}
-            disabled={!selectedChamberNo}
-          >
-            <SelectTrigger><SelectValue placeholder="Select Floor" /></SelectTrigger>
-            <SelectContent>
-              {availableFloors.map((f: any) => (
-                <SelectItem key={f.floorNo} value={f.floorNo.toString()}>Floor {f.floorNo}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex space-x-2">
+            <Select 
+              value={selectedFloorNo?.toString() || ''} 
+              onValueChange={(val) => setSelectedFloorNo(Number(val))}
+              disabled={!selectedChamberNo}
+            >
+              <SelectTrigger className="flex-1"><SelectValue placeholder="Select Floor" /></SelectTrigger>
+              <SelectContent>
+                {availableFloors.map((f: any) => (
+                  <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+          </div>
         </div>
       </div>
+
+      {selectedFloorNo && floorData && (
+        <div className="flex justify-end -mt-2 mb-4">
+          <Button onClick={() => handlePrintQRs()} className="bg-indigo-600 hover:bg-indigo-700">
+            <QrCodeIcon className="w-4 h-4 mr-2" /> Print All QRs
+          </Button>
+        </div>
+      )}
 
       {loading && (
         <div className="flex justify-center p-12">

@@ -53,10 +53,10 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <TableHead>Type</TableHead>
                 <TableHead>Commodity</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead className="text-right">Inward (Kg)</TableHead>
-                <TableHead className="text-right">Outward (Kg)</TableHead>
+                <TableHead className="text-right">Inward</TableHead>
+                <TableHead className="text-right">Outward</TableHead>
                 <TableHead className="text-right">Net Wt. Change</TableHead>
-                <TableHead className="text-right">Balance (Kg)</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
                 <TableHead className="text-right">Bags Balance</TableHead>
               </TableRow>
             </TableHeader>
@@ -138,7 +138,7 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500 font-medium">Total Inward</p>
-                    <p className="text-2xl font-bold text-emerald-600 mt-1">{formatNumber(totalInwardQty.toFixed(2))} Kg</p>
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">{formatNumber(totalInwardQty.toFixed(2))}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
                     <ArrowDownToLine className="w-5 h-5 text-emerald-600" />
@@ -149,7 +149,7 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500 font-medium">Total Outward</p>
-                    <p className="text-2xl font-bold text-rose-600 mt-1">{formatNumber(totalOutwardQty.toFixed(2))} Kg</p>
+                    <p className="text-2xl font-bold text-rose-600 mt-1">{formatNumber(totalOutwardQty.toFixed(2))}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
                     <ArrowUpFromLine className="w-5 h-5 text-rose-600" />
@@ -160,7 +160,7 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-400 font-medium">Net Balance</p>
-                    <p className="text-2xl font-bold text-white mt-1">{formatNumber(runningBalance.toFixed(2))} Kg</p>
+                    <p className="text-2xl font-bold text-white mt-1">{formatNumber(runningBalance.toFixed(2))}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
                     <span className="text-lg font-bold text-white">∑</span>

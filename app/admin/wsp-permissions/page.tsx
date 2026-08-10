@@ -6,6 +6,8 @@ export const metadata = {
   title: 'WSP Permissions | Admin',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function WspPermissionsPage() {
   const result = await getDryStorageWsps();
   

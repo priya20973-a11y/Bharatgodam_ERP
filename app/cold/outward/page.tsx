@@ -8,7 +8,8 @@ export const metadata = {
   title: 'Outward Transactions (Cold Storage) | ERP',
 };
 
-export default async function ColdOutwardPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function ColdOutwardPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams;
   const [clients, commodities, warehouses, outwards] = await Promise.all([
     getClients(),
     fetchColdCommodities(),
@@ -23,7 +24,7 @@ export default async function ColdOutwardPage({ searchParams }: { searchParams: 
         clients={clients}
         commodities={commodities}
         warehouses={warehouses}
-        searchParams={searchParams}
+        searchParams={resolvedSearchParams}
       />
     </div>
   );

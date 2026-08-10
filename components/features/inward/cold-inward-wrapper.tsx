@@ -25,6 +25,29 @@ export default function ColdInwardWrapper({ initialInwards, initialDrafts = [], 
   const [isAdding, setIsAdding] = useState(searchParams?.action === 'add');
   const [editingDraft, setEditingDraft] = useState<any>(null);
 
+  // Convert searchParams to proper prefillData format for the form if coming from Stack Details
+  const initialPrefill = searchParams?.warehouseId ? {
+    common: {
+      warehouseId: searchParams.warehouseId,
+    },
+    clients: [{
+      id: Date.now().toString(),
+      clientId: '',
+      commodityId: '',
+      gradingApplied: false,
+      gradingRate: 0,
+      gradingChargeType: 'Per Bag',
+      stockType: 'Self',
+      stacks: [{
+        id: Date.now().toString(),
+        chamberNo: searchParams.chamberName,
+        floorNo: searchParams.floorNo,
+        stackNo: searchParams.stackNo,
+        stockType: 'Self'
+      }]
+    }]
+  } : searchParams;
+
   const refreshData = async () => {
     try {
       const [data, draftsData] = await Promise.all([getColdInwards(), getColdInwardDrafts()]);
@@ -90,7 +113,7 @@ export default function ColdInwardWrapper({ initialInwards, initialDrafts = [], 
             commodities={commodities} 
             warehouses={warehouses} 
             onSuccess={refreshData} 
-            prefillData={editingDraft ? editingDraft.formData : searchParams}
+            prefillData={editingDraft ? editingDraft.formData : initialPrefill}
             draftId={editingDraft ? editingDraft._id : undefined}
           />
         </div>

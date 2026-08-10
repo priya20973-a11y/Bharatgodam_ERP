@@ -5,20 +5,20 @@ import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import { hasPermission } from '@/lib/permissions';
-import { requireSession, getTenantFilter } from '@/lib/ownership';
+import { requireSession, getTenantFilter, getWarehouseFilter } from '@/lib/ownership';
 import { Types } from 'mongoose';
 
-export async function getFloorInventory(warehouseId: string, chamberNo: number, floorNo: number) {
+export async function getFloorInventory(warehouseId: string, chamberName: string, floorNo: number) {
   try {
     await connectToDatabase();
     const session = await requireSession();
     const tenantFilter = getTenantFilter(session);
 
     // Get the warehouse layout details
-    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter }).lean();
+    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter, ...getWarehouseFilter(session, '_id') }).lean();
     if (!warehouse) throw new Error('Warehouse not found');
 
-    const chamber = warehouse.chambers.find((c: any) => c.chamberNo === chamberNo);
+    const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
     if (!chamber) throw new Error('Chamber not found');
 
     const floor = chamber.floors.find((f: any) => f.floorNo === floorNo);
@@ -27,7 +27,10 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     // Get all inwards for this floor
     const inwards = await ColdInward.find({
       warehouseId,
-      'stackAllocations.chamberNo': chamberNo,
+      $or: [
+        { 'stackAllocations.chamberName': chamberName },
+        ...(chamber?.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
+      ],
       'stackAllocations.floorNo': floorNo,
       ...tenantFilter
     }).populate('commodityId', 'name type').lean();
@@ -35,7 +38,10 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     // Get all outwards for this floor
     const outwards = await ColdOutward.find({
       warehouseId,
-      chamberNo,
+      $or: [
+        { chamberName: chamberName },
+        ...(chamber?.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
+      ],
       floorNo,
       ...tenantFilter
     }).lean();
@@ -50,6 +56,8 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
         usedCapacity: 0,
         clients: new Set(),
         commodities: new Map(), // map commodity display string to qty
+        totalBags: 0,
+        receiptNos: new Set(),
       });
     });
 
@@ -57,10 +65,14 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
     inwards.forEach((inward: any) => {
       if (!inward.stackAllocations) return;
       inward.stackAllocations.forEach((alloc: any) => {
-        if (alloc.chamberNo === chamberNo && alloc.floorNo === floorNo) {
+        if ((alloc.chamberName === chamberName || alloc.chamberNo === chamber?.chamberNo) && alloc.floorNo === floorNo) {
           const s = stacksMap.get(alloc.stackNo);
           if (s) {
             s.usedCapacity += alloc.allocatedWeight;
+            s.totalBags += (alloc.bagsCount || 0);
+            
+            const receiptNo = inward.weighbridgeSlipNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`;
+            s.receiptNos.add(receiptNo);
             
             if (inward.farmerName) s.clients.add(inward.farmerName);
             else if (inward.referencePersons && inward.referencePersons.length > 0) {
@@ -83,6 +95,8 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
       const s = stacksMap.get(outward.stackNo);
       if (s) {
         s.usedCapacity -= outward.quantityKg;
+        const outBags = outward.totalBags || ((outward.bagsCount || 0) + (outward.jin || 0) + (outward.mixed || 0));
+        s.totalBags -= outBags;
       }
     });
     
@@ -119,6 +133,8 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
         availableCapacity: Math.max(0, s.capacity - s.usedCapacity),
         clients: Array.from(s.clients),
         commodities: activeCommodities,
+        bags: Math.max(0, s.totalBags),
+        receiptNos: Array.from(s.receiptNos),
         status
       };
     });
@@ -127,7 +143,7 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
       success: true,
       data: {
         warehouseId,
-        chamberNo,
+        chamberName,
         floorNo,
         stackLayout: warehouse.stackLayout,
         gridRows: warehouse.gridRows,
@@ -144,164 +160,4 @@ export async function getFloorInventory(warehouseId: string, chamberNo: number, 
   }
 }
 
-export async function getStackDetails(warehouseId: string, chamberNo: number, floorNo: number, stackNo: number) {
-  try {
-    await connectToDatabase();
-    const session = await requireSession();
-    const tenantFilter = getTenantFilter(session);
 
-    const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...tenantFilter }).lean();
-    if (!warehouse) throw new Error('Warehouse not found');
-
-    const chamber = warehouse.chambers.find((c: any) => Number(c.chamberNo) === Number(chamberNo));
-    const floor = chamber?.floors.find((f: any) => Number(f.floorNo) === Number(floorNo));
-    const stack = floor?.stacks.find((s: any) => Number(s.stackNo) === Number(stackNo));
-    if (!stack) throw new Error(`Stack ${stackNo} not found in Chamber ${chamberNo}, Floor ${floorNo}`);
-
-    const inwards = await ColdInward.find({ 
-      warehouseId, 
-      'stackAllocations.chamberNo': chamberNo, 
-      'stackAllocations.floorNo': floorNo, 
-      'stackAllocations.stackNo': stackNo, 
-      ...tenantFilter 
-    })
-      .populate('commodityId', 'name type')
-      .populate('clientId', 'name')
-      .lean();
-
-    const outwards = await ColdOutward.find({ warehouseId, chamberNo, floorNo, stackNo, ...tenantFilter })
-      .lean();
-
-    let usedCapacity = 0;
-    const clients = new Set<string>();
-    const referencePersons = new Set<string>();
-    const commodities = new Map<string, number>();
-
-    const transactions: any[] = [];
-    const activeStocksMap = new Map<string, any>();
-
-    inwards.forEach((inward: any) => {
-      const alloc = inward.stackAllocations?.find((a: any) => a.chamberNo === chamberNo && a.floorNo === floorNo && a.stackNo === stackNo);
-      if (!alloc) return;
-
-      usedCapacity += alloc.allocatedWeight;
-      
-      const clientName = inward.clientId?.name;
-      if (clientName) clients.add(clientName);
-      if (inward.farmerName) clients.add(inward.farmerName);
-      if (inward.referencePersons) {
-        inward.referencePersons.forEach((rp: any) => {
-          if (rp.name) referencePersons.add(rp.name);
-          if (!clientName && !inward.farmerName) clients.add(rp.name); // Fallback
-        });
-      }
-
-      const type = inward.commodityId?.type ? ` (${inward.commodityId.type})` : '';
-      const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
-      const commodityDisplay = `${inward.commodityId?.name || 'Unknown'}${type}${gradeOrWet}`;
-
-      const currentQty = commodities.get(commodityDisplay) || 0;
-      commodities.set(commodityDisplay, currentQty + alloc.allocatedWeight);
-
-      activeStocksMap.set(inward._id.toString(), {
-        id: inward._id.toString(),
-        client: inward.clientId?.name || 'Unknown',
-        farmer: inward.farmerName || '-',
-        commodity: commodityDisplay,
-        quantity: alloc.allocatedWeight,
-        truckNo: inward.truckNo || '-',
-        date: inward.createdAt,
-        referencePersons: inward.referencePersons && inward.referencePersons.length > 0 
-          ? inward.referencePersons.map((rp: any) => rp.name).join(', ') 
-          : '-',
-        largeBags: alloc.bagsCount || 0,
-        smallBags: inward.jin || 0,
-        mixedBags: inward.mixed || 0,
-        totalBags: (alloc.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0),
-      });
-
-      transactions.push({
-        id: inward._id.toString(),
-        date: inward.createdAt,
-        type: 'INWARD',
-        receiptNo: inward.weighbridgeSlipNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`,
-        commodity: commodityDisplay,
-        quantity: alloc.allocatedWeight,
-        client: inward.clientId?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown'
-      });
-    });
-
-    outwards.forEach((outward: any) => {
-      usedCapacity -= outward.quantityKg;
-
-      if (outward.inwardId) {
-        const matchingInward: any = inwards.find((i: any) => i._id.toString() === outward.inwardId.toString());
-        if (matchingInward) {
-          const type = matchingInward.commodityId?.type ? ` (${matchingInward.commodityId.type})` : '';
-          const gradeOrWet = matchingInward.grade ? `(${matchingInward.grade})` : (matchingInward.gradingType && matchingInward.gradingType !== 'Grading' ? `(${matchingInward.gradingType})` : '');
-          const commodityDisplay = `${matchingInward.commodityId?.name || 'Unknown'}${type}${gradeOrWet}`;
-          
-          const currentQty = commodities.get(commodityDisplay) || 0;
-          commodities.set(commodityDisplay, Math.max(0, currentQty - outward.quantityKg));
-          
-          const idStr = outward.inwardId.toString();
-          if (activeStocksMap.has(idStr)) {
-            const stock = activeStocksMap.get(idStr);
-            stock.quantity -= outward.quantityKg;
-            stock.largeBags -= outward.bagsCount || 0;
-            stock.smallBags -= outward.jin || 0;
-            stock.mixedBags -= outward.mixed || 0;
-            stock.totalBags -= outward.totalBags || ((outward.bagsCount || 0) + (outward.jin || 0) + (outward.mixed || 0));
-          }
-          
-          transactions.push({
-            id: outward._id.toString(),
-            date: outward.createdAt,
-            type: 'OUTWARD',
-            receiptNo: outward.weighbridgeSlipNo || `OUT-${outward._id.toString().slice(-6).toUpperCase()}`,
-            commodity: commodityDisplay,
-            quantity: outward.quantityKg,
-            client: matchingInward.clientId?.name || matchingInward.farmerName || matchingInward.referencePersons?.[0]?.name || 'Unknown'
-          });
-        } else {
-          transactions.push({
-            id: outward._id.toString(),
-            date: outward.createdAt,
-            type: 'OUTWARD',
-            receiptNo: outward.weighbridgeSlipNo || `OUT-${outward._id.toString().slice(-6).toUpperCase()}`,
-            commodity: 'Unknown',
-            quantity: outward.quantityKg,
-            client: 'Unknown'
-          });
-        }
-      }
-    });
-
-    transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    let status = 'Empty';
-    if (usedCapacity > 0) {
-      status = usedCapacity >= stack.capacity ? 'Full' : 'Partial';
-    }
-
-    return {
-      success: true,
-      data: {
-        stackNo,
-        capacity: stack.capacity,
-        usedCapacity,
-        availableCapacity: Math.max(0, stack.capacity - usedCapacity),
-        commodities: Array.from(commodities.entries()).filter(([_, q]) => q > 0).map(([c, _]) => c),
-        clients: Array.from(clients),
-        referencePersons: Array.from(referencePersons),
-        activeStocks: Array.from(activeStocksMap.values()).filter(s => s.quantity > 0),
-        status,
-        transactions
-      }
-    };
-
-  } catch (error: any) {
-    console.error('getStackDetails Error:', error);
-    return { success: false, error: error.message };
-  }
-}

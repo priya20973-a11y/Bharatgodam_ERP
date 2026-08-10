@@ -9,6 +9,8 @@ export interface IOutward extends Document {
   stackNo?: string;
   lotNo?: string;
   gatePass?: string;
+  unit?: string;
+  unitRate?: number;
   date: Date;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
@@ -26,6 +28,8 @@ const OutwardSchema: Schema = new Schema(
     stackNo: { type: String, trim: true },
     lotNo: { type: String, trim: true },
     gatePass: { type: String, trim: true },
+    unit: { type: String, default: 'MT' },
+    unitRate: { type: Number, required: false },
     date: { type: Date, default: Date.now },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },

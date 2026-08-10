@@ -84,3 +84,33 @@ export async function requireSession() {
   }
   return session;
 }
+
+export function getWarehouseFilter(session: Session | null, fieldName = 'warehouseId') {
+  if (session?.user && (session.user as any).isStaff) {
+     const assignedIds = (session.user as any).assignedWarehouseIds || [];
+     if (assignedIds.length > 0) {
+         return { [fieldName]: { $in: assignedIds } };
+     } else {
+         return { [fieldName]: { $in: [] } };
+     }
+  }
+  return {};
+}
+
+export function getWarehouseFilterForMongo(session: Session | null, fieldName = 'warehouseId') {
+  if (session?.user && (session.user as any).isStaff) {
+     const assignedIds = (session.user as any).assignedWarehouseIds || [];
+     if (assignedIds.length > 0) {
+         return { [fieldName]: { $in: assignedIds.map((id: string) => {
+           try {
+             return new ObjectId(id);
+           } catch (e) {
+             return id;
+           }
+         }) } };
+     } else {
+         return { [fieldName]: { $in: [] } };
+     }
+  }
+  return {};
+}

@@ -327,7 +327,12 @@ export async function GET(request: Request) {
             }
 
             const rate = Number(entry.ratePerMTPerDay ?? 10);
-            const rent = days * entry.quantityMT * rate;
+            
+            // Use stored rent if available (ignoring days per new flat rent rule), else fallback to generic calculation for legacy
+            let rent = entry.rentCalculated;
+            if (rent === undefined || rent === null) {
+              rent = entry.quantityMT * rate;
+            }
 
             if (Number.isNaN(rent) || rent <= 0) {
               return null;
@@ -363,7 +368,12 @@ export async function GET(request: Request) {
             }
 
             const rate = Number(entry.ratePerMTPerDay ?? 10);
-            const rent = days * entry.quantityMT * rate;
+
+            // Use stored rent if available (ignoring days per new flat rent rule), else fallback to generic calculation for legacy
+            let rent = entry.rentCalculated;
+            if (rent === undefined || rent === null) {
+              rent = entry.quantityMT * rate;
+            }
 
             if (Number.isNaN(rent) || rent <= 0) {
               return null;

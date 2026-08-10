@@ -36,6 +36,11 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     try {
       const data = await generateColdClientInvoicePreview(warehouseId, clientId, fromDate, toDate);
       setPreview(data);
+      if (data.autoCharges && data.autoCharges.length > 0) {
+        setAdditionalCharges(data.autoCharges);
+      } else {
+        setAdditionalCharges([]);
+      }
       if (data.items.length === 0) {
         toast.error('No valid transactions found for the selected period.');
       } else {
@@ -154,9 +159,9 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               <thead className="bg-slate-100 text-slate-700">
                 <tr>
                   <th className="p-3 border">Commodity</th>
-                  <th className="p-3 border">Inward (Kg)</th>
-                  <th className="p-3 border">Outward (Kg)</th>
-                  <th className="p-3 border">Balance (Kg)</th>
+                  <th className="p-3 border">Inward</th>
+                  <th className="p-3 border">Outward</th>
+                  <th className="p-3 border">Balance</th>
                   <th className="p-3 border">Inward Date</th>
                   <th className="p-3 border">Outward Date</th>
                   <th className="p-3 border">Days</th>
@@ -167,9 +172,9 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                 {preview.items.map((item: any, idx: number) => (
                   <tr key={idx} className="border-b hover:bg-slate-50">
                     <td className="p-3 border">{item.commodityName}</td>
-                    <td className="p-3 border font-medium">{item.quantityKg.toFixed(2)}</td>
-                    <td className="p-3 border text-rose-600">{item.outwardKg.toFixed(2)}</td>
-                    <td className="p-3 border font-bold text-emerald-600">{item.balanceKg.toFixed(2)}</td>
+                    <td className="p-3 border font-medium">{item.quantityKg.toFixed(2)} {item.unit || 'KG'}</td>
+                    <td className="p-3 border text-rose-600">{item.outwardKg.toFixed(2)} {item.unit || 'KG'}</td>
+                    <td className="p-3 border font-bold text-emerald-600">{item.balanceKg.toFixed(2)} {item.unit || 'KG'}</td>
                     <td className="p-3 border">{new Date(item.inwardDate).toLocaleDateString('en-GB')}</td>
                     <td className="p-3 border">{item.outwardDate ? new Date(item.outwardDate).toLocaleDateString('en-GB') : '-'}</td>
                     <td className="p-3 border">{item.days}</td>

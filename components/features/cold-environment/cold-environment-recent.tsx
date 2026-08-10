@@ -1,0 +1,64 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+
+export default function ColdEnvironmentRecent({ records }: { records: any[] }) {
+  const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const handleRefresh = () => {
+    router.refresh();
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleString('en-GB', { 
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).replace(',', '');
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-lg border shadow-sm h-full flex flex-col">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Recent Records</h2>
+          <p className="text-sm text-slate-500">Latest temperature and moisture entries.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-3">
+        {records.length === 0 ? (
+          <div className="text-center text-slate-500 py-8">No recent records</div>
+        ) : (
+          records.map((record) => (
+            <div key={record._id} className="bg-slate-50 p-4 rounded-lg border flex justify-between items-center">
+              <div>
+                <div className="text-sm font-medium text-slate-700">
+                  {record.chamberName} / Floor {record.floorNo}
+                </div>
+                <div className="text-xs font-bold text-slate-900 mt-1">
+                  {isMounted ? formatDate(record.date) : ''}
+                </div>
+              </div>
+              <div className="text-right text-sm text-slate-600">
+                <span className="mr-4">Temp: {record.temperature}°C</span>
+                <span>Moisture: {record.moisture}%</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

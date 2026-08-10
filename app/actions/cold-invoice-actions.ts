@@ -6,7 +6,7 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { hasPermission } from '@/lib/permissions';
-import { requireSession, getTenantFilter, appendOwnership } from '@/lib/ownership';
+import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { differenceInDays, parseISO, isAfter, isBefore, max, min } from 'date-fns';
 
@@ -100,44 +100,62 @@ export async function generateColdClientInvoicePreview(
     const totalBags = inw.totalBags || (bagsLarge + bagsSmall + bagsMixed);
     const quantityKg = inw.quantityKg || 0;
 
-    let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-    if (totalBags > 0) {
-      largeWeight = (bagsLarge / totalBags) * quantityKg;
-      smallWeight = (bagsSmall / totalBags) * quantityKg;
-      mixedWeight = (bagsMixed / totalBags) * quantityKg;
-    } else {
-      largeWeight = quantityKg; // Fallback
-    }
+    const unit = (commodity.unit || 'KG').toUpperCase();
+    const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
 
-    // Check grading type and price type
-    if (commodity.priceType === 'Different Price') {
-      const pLarge = seasonalPrice?.priceLarge || 0;
-      const pSmall = seasonalPrice?.priceSmall || 0;
-      const pMixed = seasonalPrice?.priceMixed || 0;
-      
-      let rentLarge = 0, rentSmall = 0, rentMixed = 0;
-      if (commodity.gradingType === 'Wet') {
-        rentLarge = (largeWeight / 81) * pLarge * 4 * days;
-        rentSmall = (smallWeight / 81) * pSmall * 4 * days;
-        rentMixed = (mixedWeight / 81) * pMixed * 4 * days;
-        calculationPath = `${days} Days × [(L: ${(largeWeight/81).toFixed(2)}×₹${pLarge}×4) + (S: ${(smallWeight/81).toFixed(2)}×₹${pSmall}×4) + (M: ${(mixedWeight/81).toFixed(2)}×₹${pMixed}×4)] (Wet)`;
+    if (isKg) {
+      let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
+      if (totalBags > 0) {
+        largeWeight = (bagsLarge / totalBags) * quantityKg;
+        smallWeight = (bagsSmall / totalBags) * quantityKg;
+        mixedWeight = (bagsMixed / totalBags) * quantityKg;
       } else {
-        rentLarge = largeWeight * pLarge * days;
-        rentSmall = smallWeight * pSmall * days;
-        rentMixed = mixedWeight * pMixed * days;
-        calculationPath = `${days} Days × [(L: ${largeWeight.toFixed(2)}kg×₹${pLarge}) + (S: ${smallWeight.toFixed(2)}kg×₹${pSmall}) + (M: ${mixedWeight.toFixed(2)}kg×₹${pMixed})]`;
+        largeWeight = quantityKg; // Fallback
       }
-      
-      rent = rentLarge + rentSmall + rentMixed;
-      rateApplied = 0; // Mixed rates
-    } else {
-      // Same Price formula: Weight × Price × Days
-      if (commodity.gradingType === 'Wet') {
-        rent = (quantityKg / 81) * pricePerKg * 4 * days;
-        calculationPath = `(${quantityKg.toFixed(2)} Kg ÷ 81) × ₹${pricePerKg} × ${days} Days × 4 (Wet)`;
+
+      // Check grading type and price type
+      if (commodity.priceType === 'Different Price') {
+        const pLarge = seasonalPrice?.priceLarge || 0;
+        const pSmall = seasonalPrice?.priceSmall || 0;
+        const pMixed = seasonalPrice?.priceMixed || 0;
+        
+        let rentLarge = 0, rentSmall = 0, rentMixed = 0;
+        if (commodity.gradingType === 'Wet') {
+          rentLarge = (largeWeight / 81) * pLarge * 4 * days;
+          rentSmall = (smallWeight / 81) * pSmall * 4 * days;
+          rentMixed = (mixedWeight / 81) * pMixed * 4 * days;
+          calculationPath = `${days} Days × [(L: ${(largeWeight/81).toFixed(2)}×₹${pLarge}×4) + (S: ${(smallWeight/81).toFixed(2)}×₹${pSmall}×4) + (M: ${(mixedWeight/81).toFixed(2)}×₹${pMixed}×4)] (Wet)`;
+        } else {
+          rentLarge = largeWeight * pLarge * days;
+          rentSmall = smallWeight * pSmall * days;
+          rentMixed = mixedWeight * pMixed * days;
+          calculationPath = `${days} Days × [(L: ${largeWeight.toFixed(2)}kg×₹${pLarge}) + (S: ${smallWeight.toFixed(2)}kg×₹${pSmall}) + (M: ${mixedWeight.toFixed(2)}kg×₹${pMixed})]`;
+        }
+        
+        rent = rentLarge + rentSmall + rentMixed;
+        rateApplied = 0; // Mixed rates
       } else {
-        rent = quantityKg * pricePerKg * days;
-        calculationPath = `${quantityKg.toFixed(2)} Kg × ₹${pricePerKg} × ${days} Days`;
+        // Same Price formula: Weight × Price × Days
+        if (commodity.gradingType === 'Wet') {
+          rent = (quantityKg / 81) * pricePerKg * 4 * days;
+          calculationPath = `(${quantityKg.toFixed(2)} Kg ÷ 81) × ₹${pricePerKg} × ${days} Days × 4 (Wet)`;
+        } else {
+          rent = quantityKg * pricePerKg * days;
+          calculationPath = `${quantityKg.toFixed(2)} Kg × ₹${pricePerKg} × ${days} Days`;
+        }
+      }
+    } else {
+      // Storage Unit != KG
+      if (commodity.priceType === 'Different Price') {
+        const pLarge = seasonalPrice?.priceLarge || 0;
+        const pSmall = seasonalPrice?.priceSmall || 0;
+        const pMixed = seasonalPrice?.priceMixed || 0;
+        rent = ((bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed)) * days;
+        calculationPath = `${days} Days × [(L: ${bagsLarge}×₹${pLarge}) + (S: ${bagsSmall}×₹${pSmall}) + (M: ${bagsMixed}×₹${pMixed})]`;
+        rateApplied = 0;
+      } else {
+        rent = totalBags * pricePerKg * days;
+        calculationPath = `${totalBags} ${unit} × ₹${pricePerKg} × ${days} Days`;
       }
     }
 
@@ -163,9 +181,34 @@ export async function generateColdClientInvoicePreview(
     totalAmount += rent;
   }
 
+  let gradingAmount = 0;
+  let wetAmount = 0;
+  
+  for (const o of outwards) {
+    const oDate = o.date ? new Date(o.date) : new Date();
+    if (oDate.getTime() >= fromDate.getTime() && oDate.getTime() <= toDate.getTime()) {
+      if (o.serviceType === 'Grading' && (o.serviceAmount || 0) > 0) gradingAmount += (o.serviceAmount || 0);
+      if (o.serviceType === 'Wet' && (o.serviceAmount || 0) > 0) wetAmount += (o.serviceAmount || 0);
+      
+      // New grading logic
+      if (o.gradingApplied && (o.gradingCharge || 0) > 0) {
+        gradingAmount += (o.gradingCharge || 0);
+      }
+    }
+  }
+
+  const autoCharges = [];
+  if (gradingAmount > 0) {
+    autoCharges.push({ name: 'Grading Charges', amount: gradingAmount });
+  }
+  if (wetAmount > 0) {
+    autoCharges.push({ name: 'Wet Charges', amount: wetAmount });
+  }
+
   return {
     items,
-    totalAmount
+    totalAmount,
+    autoCharges
   };
 }
 
@@ -190,7 +233,7 @@ export async function saveColdClientInvoice(data: any) {
 export async function getColdInvoices() {
   await connectToDatabase();
   const session = await requireSession();
-  const filter = getTenantFilter(session);
+  const filter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
   
   const invoices = await ColdInvoice.find(filter)
     .populate('clientId', 'name mobile')

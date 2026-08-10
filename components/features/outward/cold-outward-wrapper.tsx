@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import ColdOutwardList from './cold-outward-list';
 import ColdOutwardForm from './cold-outward-form';
 import { Button } from '@/components/ui/button';
@@ -18,9 +19,12 @@ interface ColdOutwardWrapperProps {
 }
 
 export default function ColdOutwardWrapper({ initialOutwards, clients, commodities, warehouses, searchParams }: ColdOutwardWrapperProps) {
+  const router = useRouter();
   const { t } = useColdTranslation();
   const [outwards, setOutwards] = useState(initialOutwards);
-  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add');
+  const qrId = searchParams?.qrId || searchParams?.scanQrId;
+  const isQrShortcut = !!qrId;
+  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || isQrShortcut);
 
   const refreshData = async () => {
     try {
@@ -30,6 +34,16 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
       toast.error(err.message || t('outward.refreshFailed'));
     }
     setIsAdding(false);
+    if (isQrShortcut || searchParams?.action) {
+      router.replace('/cold/outward');
+    }
+  };
+
+  const handleToggleAdding = () => {
+    if (isAdding && (isQrShortcut || searchParams?.action)) {
+      router.replace('/cold/outward');
+    }
+    setIsAdding(!isAdding);
   };
 
   return (
@@ -44,7 +58,7 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
       <div className="flex justify-between items-center border-b pb-2">
         <h2 className="text-xl font-semibold">{t('outward.pageTitle')}</h2>
         <Button 
-          onClick={() => setIsAdding(!isAdding)}
+          onClick={handleToggleAdding}
           variant={isAdding ? "outline" : "destructive"}
         >
           {isAdding ? <><X className="mr-2 h-4 w-4" /> {t('common.cancel')}</> : <><Plus className="mr-2 h-4 w-4" /> {t('outward.addOutward')}</>}
@@ -58,7 +72,7 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
             commodities={commodities} 
             warehouses={warehouses} 
             onSuccess={refreshData} 
-            prefillData={searchParams}
+            prefillData={qrId ? { scanQrId: qrId, ...searchParams } : searchParams}
           />
         </div>
       )}

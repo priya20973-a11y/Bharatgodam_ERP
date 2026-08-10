@@ -11,6 +11,7 @@ export interface IInward extends Document {
   gatePass?: string;
   date: Date;
   outwardDate?: Date;
+  qrId?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -29,6 +30,7 @@ const InwardSchema: Schema = new Schema(
     gatePass: { type: String, trim: true },
     date: { type: Date, default: Date.now },
     outwardDate: { type: Date },
+    qrId: { type: String, unique: true, sparse: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },

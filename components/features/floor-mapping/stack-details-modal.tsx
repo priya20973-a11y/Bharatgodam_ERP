@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getStackDetails } from '@/app/actions/floor-mapping-actions';
-import { Package, Users, Contact2, History, ArrowDownToLine, ArrowUpFromLine, Plus, Minus } from 'lucide-react';
+import { getStackDetails } from '@/app/actions/cold-stack-actions';
+import { Package, Users, Contact2, History, ArrowDownToLine, ArrowUpFromLine, Plus, Minus, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
@@ -12,7 +12,7 @@ interface StackDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   warehouseId: string;
-  chamberNo: number;
+  chamberNo: string;
   floorNo: number;
   stackNo: number;
 }
@@ -128,6 +128,48 @@ export default function StackDetailsModal({ isOpen, onClose, warehouseId, chambe
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Fill Rate</span>
                 <div className="font-semibold text-slate-900">{Math.round((data.usedCapacity / data.capacity) * 100)}%</div>
               </div>
+            </div>
+
+            {/* Current Stock Distribution */}
+            <div className="space-y-3 pt-2">
+              <h4 className="flex items-center text-sm font-bold text-slate-900">
+                <Package className="w-4 h-4 mr-2" /> Current Stock Distribution
+              </h4>
+              
+              {data.currentStock && data.currentStock.length > 0 ? (
+                <div className="rounded-md border border-slate-300 overflow-hidden">
+                  <table className="min-w-full divide-y divide-slate-300">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Client / Owner</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Commodity</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Stock Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider text-right">Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-200 text-sm text-slate-800 font-medium">
+                      {data.currentStock.map((stock: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 whitespace-nowrap">{stock.clientName}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{stock.commodityName}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${stock.stockType === 'Purchase' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>
+                              {stock.stockType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right font-bold text-slate-700">
+                            {stock.quantity.toLocaleString()} {stock.unit}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-slate-600 font-medium">
+                  No stock currently available in this stack.
+                </div>
+              )}
             </div>
 
             {/* Active Stocks / Inward Transactions */}

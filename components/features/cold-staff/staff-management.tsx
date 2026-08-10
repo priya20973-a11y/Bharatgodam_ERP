@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getStaffList, createStaff, updateStaff, deleteStaff, toggleStaffStatus, resetStaffPassword } from '@/app/actions/cold-staff-actions';
+import { getColdWarehouses } from '@/app/actions/cold-warehouse-actions';
 import { Plus, Edit, Trash2, Key, UserCheck, UserX } from 'lucide-react';
 import { PermissionModule } from '@/lib/permissions';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
@@ -17,6 +18,8 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'reports', key: 'reports' },
   { id: 'clientMaster', key: 'clientMaster' },
   { id: 'floorMapping', key: 'floorMapping' },
+  { id: 'ownershipTransfer', key: 'ownershipTransfer' },
+  { id: 'environmentRecords', key: 'environmentRecords' },
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'print', 'approve'];
@@ -24,6 +27,7 @@ const ACTIONS = ['view', 'create', 'edit', 'delete', 'print', 'approve'];
 export default function StaffManagement() {
   const { t } = useColdTranslation();
   const [staff, setStaff] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
@@ -32,7 +36,8 @@ export default function StaffManagement() {
     email: '',
     password: '',
     phoneNumber: '',
-    permissions: {} as any
+    permissions: {} as any,
+    assignedWarehouseIds: [] as string[]
   });
 
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -46,8 +51,12 @@ export default function StaffManagement() {
   const loadStaff = async () => {
     setIsLoading(true);
     try {
-      const data = await getStaffList();
-      setStaff(data);
+      const [staffData, warehouseData] = await Promise.all([
+        getStaffList(),
+        getColdWarehouses()
+      ]);
+      setStaff(staffData);
+      setWarehouses(warehouseData);
     } catch (error) {
       console.error(error);
       alert(t('staff.failedToLoad'));
@@ -63,7 +72,8 @@ export default function StaffManagement() {
       email: '',
       password: '',
       phoneNumber: '',
-      permissions: {}
+      permissions: {},
+      assignedWarehouseIds: []
     });
     setIsModalOpen(true);
   };
@@ -75,7 +85,8 @@ export default function StaffManagement() {
       email: s.email,
       password: '',
       phoneNumber: s.phoneNumber,
-      permissions: s.permissions || {}
+      permissions: s.permissions || {},
+      assignedWarehouseIds: s.assignedWarehouseIds || []
     });
     setIsModalOpen(true);
   };
@@ -93,6 +104,17 @@ export default function StaffManagement() {
           }
         }
       };
+    });
+  };
+
+  const handleWarehouseToggle = (warehouseId: string) => {
+    setFormData(prev => {
+      const exists = prev.assignedWarehouseIds.includes(warehouseId);
+      if (exists) {
+        return { ...prev, assignedWarehouseIds: prev.assignedWarehouseIds.filter(id => id !== warehouseId) };
+      } else {
+        return { ...prev, assignedWarehouseIds: [...prev.assignedWarehouseIds, warehouseId] };
+      }
     });
   };
 
@@ -232,6 +254,24 @@ export default function StaffManagement() {
                       <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="mt-1 block w-full rounded-md border border-gray-300 p-2" />
                     </div>
                   )}
+                </div>
+
+                <div className="mt-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Assigned Warehouses</h3>
+                  <p className="text-xs text-gray-500 mb-4">Select the warehouses this staff member is allowed to access.</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {warehouses.map(w => (
+                      <label key={w._id} className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input 
+                          type="checkbox" 
+                          checked={formData.assignedWarehouseIds.includes(w._id)}
+                          onChange={() => handleWarehouseToggle(w._id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm font-medium text-gray-900">{w.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="mt-6">

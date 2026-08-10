@@ -7,6 +7,7 @@ import { formatWeight } from '@/lib/utils'; // Make sure this formats Kg properl
 
 interface CommodityData {
   commodityName: string;
+  unit: string;
   totalWeight: number;
   bookingCount: number;
 }
@@ -150,9 +151,8 @@ export default function ColdWarehouseInventory() {
     };
   };
 
-  const formatKg = (kg: number) => {
-    // Cold storage uses Kg directly, format it nicely
-    return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(kg) + ' Kg';
+  const formatWeightLabel = (value: number, unit: string = 'KG') => {
+    return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value) + ` ${unit}`;
   };
 
   if (loading && !data) {
@@ -291,8 +291,8 @@ export default function ColdWarehouseInventory() {
               ></div>
             </div>
             <div className="flex justify-between text-3xs text-slate-400 mt-1 font-semibold">
-              <span>0 Kg</span>
-              <span>{formatKg(warehouse_stats.total_capacity)}</span>
+              <span>0 KG</span>
+              <span>{formatWeightLabel(warehouse_stats.total_capacity)}</span>
             </div>
           </div>
 
@@ -300,15 +300,15 @@ export default function ColdWarehouseInventory() {
           <div className="grid grid-cols-3 gap-3">
             <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
               <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Total</p>
-              <p className="text-sm font-black text-slate-800 mt-0.5">{formatKg(warehouse_stats.total_capacity)}</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{formatWeightLabel(warehouse_stats.total_capacity)}</p>
             </div>
             <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
               <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Used</p>
-              <p className="text-sm font-black text-slate-800 mt-0.5">{formatKg(warehouse_stats.used_capacity)}</p>
+              <p className="text-sm font-black text-slate-800 mt-0.5">{formatWeightLabel(warehouse_stats.used_capacity)}</p>
             </div>
             <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-2xs">
               <p className="text-3xs font-extrabold uppercase tracking-wider text-slate-400">Available</p>
-              <p className={`text-sm font-black mt-0.5 ${capacityStatus.color}`}>{formatKg(availableCapacity)}</p>
+              <p className={`text-sm font-black mt-0.5 ${capacityStatus.color}`}>{formatWeightLabel(availableCapacity)}</p>
             </div>
           </div>
         </div>
@@ -341,7 +341,7 @@ export default function ColdWarehouseInventory() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value) => [typeof value === 'number' ? formatKg(value) : '0 Kg', 'Weight']}
+                    formatter={(value) => [typeof value === 'number' ? formatWeightLabel(value) : '0 KG', 'Weight']}
                     contentStyle={{
                       backgroundColor: '#ffffff',
                       border: '1px solid #f1f5f9',
@@ -377,7 +377,7 @@ export default function ColdWarehouseInventory() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-black text-slate-800">{formatKg(commodity.totalWeight)}</span>
+                    <span className="text-xs font-black text-slate-800">{formatWeightLabel(commodity.totalWeight, commodity.unit)}</span>
                     <span className="text-3xs font-bold text-slate-400 bg-white border border-slate-100 px-1 py-0.5 rounded">
                       {sharePercentage.toFixed(0)}%
                     </span>
