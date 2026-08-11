@@ -6,8 +6,8 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import { getTenantFilter, requireSession } from '@/lib/ownership';
 import mongoose from 'mongoose';
-import '@/lib/models/Client';
 import '@/lib/models/ColdCommodity';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 
 export async function getStackDetails(warehouseId: string, chamberName: string, floorNo: number, stackNo: number) {
   await connectToDatabase();
@@ -94,9 +94,21 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
   const transactions: any[] = [];
   
   // We need to fetch all inwards related to outwards to correctly show outward transactions.
-  // We'll keep a reference to inwards by ID.
   const allInwardsMap = new Map<string, any>();
   activeInwards.forEach(inward => allInwardsMap.set(inward._id.toString(), inward));
+
+  // Fetch previous owners via ColdTransfer
+  const activeInwardIds = activeInwards.map(i => i._id);
+  const transfers = await ColdTransfer.find({ newInwardId: { $in: activeInwardIds } })
+    .populate('fromClientId', 'name')
+    .lean();
+    
+  const previousOwnerMap = new Map();
+  transfers.forEach((t: any) => {
+    if (t.newInwardId && t.fromClientId) {
+      previousOwnerMap.set(t.newInwardId.toString(), t.fromClientId.name || '-');
+    }
+  });
 
   activeInwards.forEach(inward => {
     let stackAllocated = 0;
@@ -167,6 +179,7 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
           referencePersons: inward.referencePersons && inward.referencePersons.length > 0 
             ? inward.referencePersons.map((rp: any) => rp.name).join(', ') 
             : '-',
+          previousOwner: previousOwnerMap.get(inward._id.toString()) || '-',
           largeBags: allocBagsCount || 0,
           smallBags: inward.jin || 0,
           mixedBags: inward.mixed || 0,

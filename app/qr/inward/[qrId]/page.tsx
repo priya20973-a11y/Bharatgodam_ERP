@@ -1,31 +1,66 @@
-import { getColdInwardByQrId, getColdInwardById } from '@/app/actions/cold-inward-actions';
 import { notFound } from 'next/navigation';
 import { CalendarIcon, MapPinIcon, PackageIcon, ScaleIcon, FileTextIcon, InfoIcon } from 'lucide-react';
 import connectToDatabase from '@/lib/mongoose';
+import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
+import ColdTransfer from '@/lib/models/ColdTransfer';
+import mongoose from 'mongoose';
+import '@/lib/models/Client';
+import '@/lib/models/ColdCommodity';
+import '@/lib/models/ColdWarehouse';
 
 export default async function PublicInwardQRDetailsPage({ params }: { params: Promise<{ qrId: string }> }) {
   const resolvedParams = await params;
   
-  // Fetch inward by qrId first, then fallback to _id
-  let res = await getColdInwardByQrId(resolvedParams.qrId);
-  if (!res.success) {
-    res = await getColdInwardById(resolvedParams.qrId);
+  await connectToDatabase();
+
+  let inward = await ColdInward.findOne({ qrId: resolvedParams.qrId })
+    .populate('clientId', 'name')
+    .populate('commodityId', 'name type')
+    .populate('warehouseId', 'name warehouseId')
+    .lean() as any;
+
+  if (!inward && mongoose.Types.ObjectId.isValid(resolvedParams.qrId)) {
+    inward = await ColdInward.findOne({ _id: resolvedParams.qrId })
+      .populate('clientId', 'name')
+      .populate('commodityId', 'name type')
+      .populate('warehouseId', 'name warehouseId')
+      .lean() as any;
   }
   
-  if (!res.success || !res.data) {
+  if (!inward) {
     return notFound();
   }
-
-  const inward = res.data;
 
   // Fetch outwards for calculation
   await connectToDatabase();
   const outwards = await ColdOutward.find({ inwardId: inward._id }).lean();
   
   const inwardQuantity = inward.quantityKg || 0;
-  const totalOutward = outwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
-  const currentBalance = Math.max(0, inwardQuantity - totalOutward);
+  
+  const regularOutwards = outwards.filter((o: any) => o.remarks !== 'Ownership Transfer Out' && o.remarks !== 'Ownership Transfer Purchase');
+  const ownershipTransferOutwards = outwards.filter((o: any) => o.remarks === 'Ownership Transfer Out' || o.remarks === 'Ownership Transfer Purchase');
+  
+  const actualOutwardKg = regularOutwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
+  const ownershipTransferKg = ownershipTransferOutwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
+  
+  const currentBalance = Math.max(0, inwardQuantity - actualOutwardKg - ownershipTransferKg);
+
+  // Fetch transfers to determine current owners
+  const transfers = await ColdTransfer.find({ originalInwardId: inward._id }).populate('toClientId', 'name').lean();
+  let currentOwners: string[] = [];
+  if (currentBalance > 0 && inward.clientId?.name) {
+    currentOwners.push(inward.clientId.name);
+  }
+  transfers.forEach((t: any) => {
+    if (t.toClientId?.name && !currentOwners.includes(t.toClientId.name)) {
+      currentOwners.push(t.toClientId.name);
+    }
+  });
+  if (currentOwners.length === 0) {
+    currentOwners.push(inward.clientId?.name || '-');
+  }
+  const currentOwnerDisplay = currentOwners.join(', ');
 
   const displayDate = inward.date ? new Date(inward.date).toLocaleDateString('en-GB') : '-';
   const displayCommodity = inward.commodityId?.name || '-';
@@ -52,8 +87,12 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Client Name</span>
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Original Client</span>
               <span className="font-semibold text-slate-800">{inward.clientId?.name || '-'}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Current Owner(s)</span>
+              <span className="font-semibold text-indigo-700">{currentOwnerDisplay}</span>
             </div>
             <div>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Farmer Name</span>
@@ -144,7 +183,11 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
             </div>
             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
               <span className="text-slate-600 font-medium">Outward Quantity</span>
-              <span className="font-bold text-rose-600">{totalOutward > 0 ? `${totalOutward} ${inward.unit || 'Kg'}` : '-'}</span>
+              <span className="font-bold text-rose-600">{actualOutwardKg > 0 ? `${actualOutwardKg} ${inward.unit || 'Kg'}` : '-'}</span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+              <span className="text-slate-600 font-medium">Ownership Transfer</span>
+              <span className="font-bold text-blue-600">{ownershipTransferKg > 0 ? `${ownershipTransferKg} ${inward.unit || 'Kg'}` : '-'}</span>
             </div>
             <div className="flex justify-between items-center p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
               <span className="text-indigo-900 font-bold">Remaining Stock</span>

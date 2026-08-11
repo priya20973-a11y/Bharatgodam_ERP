@@ -7,7 +7,8 @@ import { getDynamicUnitLabel } from '@/lib/utils';
 export function generateColdTransferReceiptHTML(
   data: any,
   userDetails?: { companyLogo: string, phoneNumber: string },
-  lang: string = 'en'
+  lang: string = 'en',
+  qrDataUrl?: string
 ): string {
   const l = (lang === 'gu' ? gu.receipt : en.receipt) as any;
   const formatNum = (num: number | string) => lang === 'gu' ? toGujaratiDigits(num) : String(num);
@@ -49,7 +50,10 @@ export function generateColdTransferReceiptHTML(
   const unitStr = data.unit || data.commodityId?.unit || 'KG';
   const grossWeight = formatNum(data.grossWeight || 0) + ' KG';
   const emptyWeight = formatNum(data.emptyWeight || 0) + ' KG';
-  const netWeight = formatNum(data.quantityKg || 0) + ' KG'; // Net weight is stored as quantityKg
+  const netWeight = formatNum(data.quantityKg || 0) + ' ' + unitStr;
+  const outwardWeightDisplay = formatNum(data.outwardWeight || data.quantityKg || 0) + ' ' + unitStr;
+  const remainingWeightDisplay = data.remainingWeight !== undefined ? formatNum(data.remainingWeight) + ' ' + unitStr : '-';
+  const referencePerson = data.referencePersons && data.referencePersons.length > 0 ? data.referencePersons[0].name : '-';
 
   const kataBharati = formatNum('0'); // Typically not available in transfer
 
@@ -318,6 +322,10 @@ export function generateColdTransferReceiptHTML(
         <div class="main-title">${warehouseName}</div>
         <div class="sub-title">${warehouseAddress}</div>
       </div>
+      ${qrDataUrl ? `
+      <div class="qr-area" style="width: 80px; text-align: right; padding-right: 10px;">
+        <img src="${qrDataUrl}" style="max-width: 70px; max-height: 70px;" alt="QR Code" />
+      </div>` : ''}
     </div>
     
     <div class="badge-container">
@@ -350,7 +358,20 @@ export function generateColdTransferReceiptHTML(
     <div class="form-row">
       <div class="form-label">${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
       <div class="form-value">${farmerName}</div>
-    </div>` : ''}
+    </div>` : `
+    <div class="form-row">
+      <div class="form-label">${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
+      <div class="form-value">-</div>
+    </div>`}
+    
+    <div class="form-row">
+      <div class="form-label">${lang === 'gu' ? 'સંદર્ભ વ્યક્તિ:' : 'Reference Person:'}</div>
+      <div class="form-value">${referencePerson}</div>
+      <div class="form-label">${lang === 'gu' ? 'બહાર કાઢેલ વજન:' : 'Outward Weight:'}</div>
+      <div class="form-value">${outwardWeightDisplay}</div>
+      <div class="form-label">${lang === 'gu' ? 'બાકી વજન:' : 'Remaining Weight:'}</div>
+      <div class="form-value">${remainingWeightDisplay}</div>
+    </div>
     
     <div class="form-row">
       <div class="form-label">${l.commodityVarietyLabel}</div>

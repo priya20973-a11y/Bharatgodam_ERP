@@ -12,6 +12,7 @@ interface StackData {
   status: string;
   bags: number;
   receiptNos: string[];
+  records?: any[];
 }
 
 export default function PrintFloorGrid({ floorData }: { floorData: any }) {
@@ -92,7 +93,8 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
 
   return (
     <div className="w-full bg-white print:bg-white p-4">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @page {
           size: A3 landscape;
           margin: 10mm;
@@ -127,7 +129,7 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
             </p>
             <p className="text-xs text-slate-500 mt-1">Date: {dateStr}</p>
           </div>
-          
+
           <div className="flex gap-4 text-xs">
             <div className="flex items-center gap-1"><div className="w-4 h-4 rounded bg-slate-100 border border-slate-200"></div> Empty</div>
             <div className="flex items-center gap-1"><div className="w-4 h-4 rounded bg-amber-50 border border-amber-300"></div> Partial</div>
@@ -162,12 +164,32 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
                     <span className="font-semibold uppercase px-1.5 py-0.5 rounded text-[10px] bg-black/5">{cell.status}</span>
                   </div>
 
-                  <div className="flex-1 space-y-1 mt-1">
-                    <p className="line-clamp-1"><span className="font-medium">Client:</span> {cell.clients.length > 0 ? cell.clients.join(', ') : '-'}</p>
-                    <p className="line-clamp-1"><span className="font-medium">Cmdty:</span> {cell.commodities.length > 0 ? cell.commodities.join(', ') : '-'}</p>
-                    <p><span className="font-medium">Qty:</span> {cell.usedCapacity.toLocaleString()} / {cell.capacity.toLocaleString()} kg</p>
-                    <p><span className="font-medium">Bags:</span> {cell.bags}</p>
-                    <p className="line-clamp-1" title={cell.receiptNos && cell.receiptNos.length > 0 ? cell.receiptNos.join(', ') : ''}><span className="font-medium">Receipt:</span> {cell.receiptNos && cell.receiptNos.length > 0 ? cell.receiptNos.join(', ') : '-'}</p>
+                  <div className="flex-1 flex flex-col gap-2 mt-1">
+                    {cell.records && cell.records.length > 0 ? (
+                      cell.records.map((rec: any, idx: number) => (
+                        <div key={idx} className="space-y-1 border-b border-black/10 pb-2 last:border-0 last:pb-0">
+                          <p className="line-clamp-1"><span className="font-medium">Client:</span> {rec.clientName && rec.clientName !== 'Unknown' ? rec.clientName : '-'}</p>
+                          <p className="line-clamp-1"><span className="font-medium">Farmer:</span> {rec.farmerName && rec.farmerName !== '-' ? rec.farmerName : '-'}</p>
+                          <p className="line-clamp-1"><span className="font-medium">Ref Person:</span> {rec.referencePerson && rec.referencePerson !== '-' ? rec.referencePerson : '-'}</p>
+                          <p className="line-clamp-1"><span className="font-medium">Cmdty:</span> {rec.commodity && rec.commodity !== 'Unknown' ? rec.commodity : '-'}</p>
+                          <p><span className="font-medium">Qty:</span> {rec.quantity ? `${rec.quantity.toLocaleString()} kg` : '-'}</p>
+                          <p><span className="font-medium">Bags:</span> {rec.bags !== undefined && rec.bags !== null ? rec.bags : '-'}</p>
+                          <p><span className="font-medium">Inward Date:</span> {rec.inwardDate || '-'}</p>
+                          <p><span className="font-medium">Prev Owner:</span> {rec.previousOwner || '-'}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="line-clamp-1"><span className="font-medium">Client:</span> -</p>
+                        <p className="line-clamp-1"><span className="font-medium">Farmer:</span> -</p>
+                        <p className="line-clamp-1"><span className="font-medium">Ref Person:</span> -</p>
+                        <p className="line-clamp-1"><span className="font-medium">Cmdty:</span> -</p>
+                        <p><span className="font-medium">Qty:</span> {cell.usedCapacity > 0 ? `${cell.usedCapacity.toLocaleString()} / ${cell.capacity.toLocaleString()} kg` : '-'}</p>
+                        <p><span className="font-medium">Bags:</span> {cell.bags > 0 ? cell.bags : '-'}</p>
+                        <p><span className="font-medium">Inward Date:</span> -</p>
+                        <p><span className="font-medium">Prev Owner:</span> -</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

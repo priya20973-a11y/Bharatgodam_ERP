@@ -92,13 +92,19 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
       if (inward) {
         setValue('transferWeight', inward.availableQty);
         setValue('transferBags', inward.availableBags);
+        if (transferType === 'Purchase' && inward.warehouseId?._id) {
+          setValue('toClientId', inward.warehouseId._id);
+        }
       }
     } else {
       setSelectedInwardDetails(null);
       setValue('transferWeight', 0);
       setValue('transferBags', 0);
+      if (transferType === 'Purchase') {
+        setValue('toClientId', '');
+      }
     }
-  }, [inwardId, availableInwards, setValue]);
+  }, [inwardId, availableInwards, setValue, transferType]);
 
   const onSubmit = async (values: any) => {
     if (values.fromClientId === values.toClientId) {
@@ -274,22 +280,28 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">New Client (To Client) *</label>
-              <Controller
-                name="toClientId"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.toClientId ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select Client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.filter(c => c._id !== fromClientId).map(c => (
-                        <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+              {transferType === 'Purchase' ? (
+                <div className="flex h-10 w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 font-medium">
+                  {selectedInwardDetails?.warehouseId?.name || '-'}
+                </div>
+              ) : (
+                <Controller
+                  name="toClientId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.toClientId ? "border-red-500" : ""}>
+                        <SelectValue placeholder="Select Client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.filter(c => c._id !== fromClientId).map(c => (
+                          <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              )}
               {errors.toClientId && <p className="text-red-500 text-sm">{errors.toClientId.message}</p>}
             </div>
 

@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
         .populate('toClientId', 'name address village')
         .populate('commodityId', 'name type unit seasonalPrices priceType')
         .populate('warehouseId')
-        .populate('originalInwardId', 'farmerName farmerId');
+        .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg');
     }
     
     if (!transaction && transactions.length === 0) {
@@ -139,6 +139,13 @@ export async function GET(request: NextRequest) {
     if (type === 'transfer' && data?.originalInwardId) {
       data.farmerName = data.originalInwardId.farmerName || '';
       data.farmerId = data.originalInwardId.farmerId || '';
+      data.referencePersons = data.originalInwardId.referencePersons || [];
+      
+      // Calculate remaining weight on the original inward
+      const allOutwards = await ColdOutward.find({ inwardId: data.originalInwardId._id });
+      const totalOutwardKg = allOutwards.reduce((sum, out) => sum + (out.quantityKg || 0), 0);
+      data.outwardWeight = data.quantityKg; // The weight being transferred is the outward weight from this transaction
+      data.remainingWeight = Math.max(0, (data.originalInwardId.quantityKg || 0) - totalOutwardKg);
     }
     
     const warehouseData = type === 'inward' ? data?.warehouseId : (batchData.length > 0 ? batchData[0].warehouseId : data?.warehouseId);
@@ -173,7 +180,31 @@ export async function GET(request: NextRequest) {
     } else if (type === 'outward') {
       html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
     } else if (type === 'transfer') {
-      html = generateColdTransferReceiptHTML(data, userDetails, lang);
+      const QRCode = require('qrcode');
+      let host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
+      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        const os = require('os');
+        const nets = os.networkInterfaces();
+        let lanIp = '';
+        for (const name of Object.keys(nets)) {
+          for (const net of nets[name] || []) {
+            if (net.family === 'IPv4' && !net.internal) {
+              lanIp = net.address;
+              break;
+            }
+          }
+          if (lanIp) break;
+        }
+        if (lanIp) {
+          const port = host.split(':')[1] || '3000';
+          host = `${lanIp}:${port}`;
+        }
+      }
+      const protocol = request.headers.get('x-forwarded-proto') || (request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http');
+      const origin = `${protocol}://${host}`;
+      const scanUrl = `${origin}/qr/transfer/${data._id}`;
+      const qrDataUrl = await QRCode.toDataURL(scanUrl);
+      html = generateColdTransferReceiptHTML(data, userDetails, lang, qrDataUrl);
     }
     
     return new NextResponse(html, {

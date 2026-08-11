@@ -32,7 +32,7 @@ const ColdTransferSchema: Schema = new Schema(
     fromClientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     toClientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     originalInwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward', required: true },
-    newInwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward', required: true },
+    newInwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward', required: false },
     outwardId: { type: Schema.Types.ObjectId, ref: 'ColdOutward', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },

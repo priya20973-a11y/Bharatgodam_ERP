@@ -23,7 +23,7 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
 
   const inwards = await ColdInward.find({ clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter })
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name')
+    .populate('warehouseId', 'name chambers')
     .sort({ date: -1, createdAt: -1 })
     .lean();
 
@@ -56,7 +56,16 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
       if (transferType === 'Purchase' && stockType !== 'Purchase') return;
       if (transferType === 'Self' && stockType !== 'Self') return;
 
-      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      let resolvedChamberName = alloc.chamberName;
+      if (!resolvedChamberName && inward.warehouseId?.chambers) {
+         const chamber = inward.warehouseId.chambers.find((c: any) => c.chamberNo === alloc.chamberNo);
+         if (chamber) {
+            resolvedChamberName = chamber.name;
+         }
+      }
+      resolvedChamberName = resolvedChamberName || (alloc.chamberNo ? alloc.chamberNo.toString() : 'Unknown');
+
+      const chamberKey = resolvedChamberName || alloc.chamberNo;
       const k = `${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       if (mergedAllocations.has(k)) {
          const existing = mergedAllocations.get(k);
@@ -64,7 +73,7 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
          existing.bagsCount += (alloc.bagsCount || 0);
       } else {
          mergedAllocations.set(k, {
-           chamberName: alloc.chamberName,
+           chamberName: resolvedChamberName,
            chamberNo: alloc.chamberNo,
            floorNo: alloc.floorNo,
            stackNo: alloc.stackNo,
@@ -186,74 +195,122 @@ export async function createOwnershipTransfer(data: {
     }
   }
 
-  // 2. Create Transfer-Outs for the old client (deducts stock)
-  const outwardPromises = transferAllocations.map((item: any) => {
-    return ColdOutward.create(appendOwnership({
-      clientId: data.fromClientId,
-      inwardId: targetInward._id,
+  if (transferType === 'Purchase') {
+    const outwardPromises = transferAllocations.map((item: any) => {
+      return ColdOutward.create(appendOwnership({
+        clientId: data.toClientId,
+        inwardId: targetInward._id,
+        commodityId: targetInward.commodityId._id,
+        warehouseId: targetInward.warehouseId._id,
+        chamberName: item.chamberName,
+        chamberNo: item.chamberNo,
+        floorNo: item.floorNo,
+        stackNo: item.stackNo,
+        quantityKg: item.allocatedWeight,
+        bagsCount: item.bagsCount,
+        grade: item.grade,
+        gradingType: item.gradingType,
+        date: transferDateObj,
+        remarks: 'Ownership Transfer Purchase',
+      }, session));
+    });
+
+    const createdOutwards = await Promise.all(outwardPromises);
+    const outwardIdForTransfer = createdOutwards[0]._id;
+
+    const transferData = {
+      fromClientId: data.fromClientId,
+      toClientId: data.toClientId,
+      originalInwardId: targetInward._id,
+      outwardId: outwardIdForTransfer,
+      warehouseId: targetInward.warehouseId._id,
+      commodityId: targetInward.commodityId._id,
+      stackAllocations: transferAllocations,
+      quantityKg: data.transferWeight,
+      bagsCount: data.transferBags,
+      transferType: transferType,
+      date: transferDateObj
+    };
+
+    const transfer = await ColdTransfer.create(appendOwnership(transferData, session));
+
+    revalidatePath('/cold/dashboard');
+    revalidatePath('/cold/transfers');
+    revalidatePath('/cold/inward');
+    revalidatePath('/cold/outward');
+
+    return { success: true, transferId: transfer._id.toString() };
+
+  } else {
+    // 2. Create Transfer-Outs for the old client (deducts stock)
+    const outwardPromises = transferAllocations.map((item: any) => {
+      return ColdOutward.create(appendOwnership({
+        clientId: data.fromClientId,
+        inwardId: targetInward._id,
+        commodityId: targetInward.commodityId._id,
+        warehouseId: targetInward.warehouseId._id,
+        chamberName: item.chamberName,
+        chamberNo: item.chamberNo,
+        floorNo: item.floorNo,
+        stackNo: item.stackNo,
+        quantityKg: item.allocatedWeight,
+        bagsCount: item.bagsCount,
+        grade: item.grade,
+        gradingType: item.gradingType,
+        date: transferDateObj,
+        remarks: 'Ownership Transfer Out',
+      }, session));
+    });
+
+    const createdOutwards = await Promise.all(outwardPromises);
+    const outwardIdForTransfer = createdOutwards[0]._id;
+
+    // 3. Create Transfer-In for the new client (adds stock)
+    const newInwardData = {
+      clientId: data.toClientId,
       commodityId: targetInward.commodityId._id,
       warehouseId: targetInward.warehouseId._id,
-      chamberName: item.chamberName,
-      chamberNo: item.chamberNo,
-      floorNo: item.floorNo,
-      stackNo: item.stackNo,
-      quantityKg: item.allocatedWeight,
-      bagsCount: item.bagsCount,
-      grade: item.grade,
-      gradingType: item.gradingType,
+      stackAllocations: transferAllocations,
+      quantityKg: data.transferWeight,
+      bagsCount: data.transferBags,
+      grade: targetInward.grade,
+      gradingType: targetInward.gradingType,
+      stockType: transferType,
+      seed: targetInward.seed,
+      tableLabel: targetInward.tableLabel,
       date: transferDateObj,
-      remarks: 'Ownership Transfer Out',
-    }, session));
-  });
+      remarks: 'Ownership Transfer In',
+      weighbridgeSlipNo: targetInward.weighbridgeSlipNo,
+      marko: targetInward.marko,
+    };
 
-  const createdOutwards = await Promise.all(outwardPromises);
-  const outwardIdForTransfer = createdOutwards[0]._id;
+    const newInward = await ColdInward.create(appendOwnership(newInwardData, session));
 
-  // 3. Create Transfer-In for the new client (adds stock)
-  const newInwardData = {
-    clientId: data.toClientId,
-    commodityId: targetInward.commodityId._id,
-    warehouseId: targetInward.warehouseId._id,
-    stackAllocations: transferAllocations,
-    quantityKg: data.transferWeight,
-    bagsCount: data.transferBags,
-    grade: targetInward.grade,
-    gradingType: targetInward.gradingType,
-    stockType: transferType,
-    seed: targetInward.seed,
-    tableLabel: targetInward.tableLabel,
-    date: transferDateObj,
-    remarks: 'Ownership Transfer In',
-    weighbridgeSlipNo: targetInward.weighbridgeSlipNo,
-    marko: targetInward.marko,
-  };
+    // 4. Create Transfer Record
+    const transferData = {
+      fromClientId: data.fromClientId,
+      toClientId: data.toClientId,
+      originalInwardId: targetInward._id,
+      newInwardId: newInward._id,
+      outwardId: outwardIdForTransfer,
+      warehouseId: targetInward.warehouseId._id,
+      commodityId: targetInward.commodityId._id,
+      stackAllocations: transferAllocations,
+      quantityKg: data.transferWeight,
+      bagsCount: data.transferBags,
+      transferType: transferType,
+      date: transferDateObj
+    };
 
-  const newInward = await ColdInward.create(appendOwnership(newInwardData, session));
+    const transfer = await ColdTransfer.create(appendOwnership(transferData, session));
 
-  // 4. Create Transfer Record
-  const transferData = {
-    fromClientId: data.fromClientId,
-    toClientId: data.toClientId,
-    originalInwardId: targetInward._id,
-    newInwardId: newInward._id,
-    outwardId: outwardIdForTransfer,
-    warehouseId: targetInward.warehouseId._id,
-    commodityId: targetInward.commodityId._id,
-    stackAllocations: transferAllocations,
-    quantityKg: data.transferWeight,
-    bagsCount: data.transferBags,
-    transferType: transferType,
-    date: transferDateObj
-  };
+    revalidatePath('/cold/dashboard');
+    revalidatePath('/cold/transfers');
+    revalidatePath('/cold/inward');
+    revalidatePath('/cold/outward');
 
-  const transfer = await ColdTransfer.create(appendOwnership(transferData, session));
-
-  revalidatePath('/cold/dashboard');
-  revalidatePath('/cold/transfers');
-  revalidatePath('/cold/inward');
-  revalidatePath('/cold/outward');
-
-  return { success: true, transferId: transfer._id.toString() };
+    return { success: true, transferId: transfer._id.toString() };
+  }
 }
 
 export async function getColdTransfers() {

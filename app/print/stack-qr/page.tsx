@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
+import { getStackDetails } from '@/app/actions/cold-stack-actions';
 
 function PrintStackQRsContent() {
   const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ function PrintStackQRsContent() {
               light: '#ffffff',
             },
           });
+          
           codes.push({ stackNo: stack.stackNo, dataUrl, name: stack.name });
         }
         

@@ -122,7 +122,7 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <button
-          onClick={() => window.open(`/cold/floor-mapping/print?warehouseId=${warehouseId}&chamberNo=${actualChamberNo}&floorNo=${floorNo}`, '_blank')}
+          onClick={() => window.open(`/print/floor-mapping?warehouseId=${warehouseId}&chamberNo=${actualChamberNo}&floorNo=${floorNo}`, '_blank')}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
         >
           <Download className="w-4 h-4" />
@@ -175,8 +175,8 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                 </div>
 
                 <div className="text-center">
-                  <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">Stack</span>
-                  <span className="text-2xl font-bold block mb-1">{cell.stackNo}</span>
+                  <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">{actualChamberNo}/F{floorNo}</span>
+                  <span className="text-xl font-bold block mb-1">S{cell.stackNo}</span>
                 </div>
 
                 <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${getStatusBadgeColor(cell.status)}`}>
