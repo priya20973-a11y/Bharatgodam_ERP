@@ -43,9 +43,12 @@ interface TransactionRecord {
   warehouseName: string;
   warehouseId: string;
   quantityMT: number;
+  actualWeight?: number;
+  netWeightLoss?: number;
   rentTotal?: number;
   bagsCount?: number;
   gatePass?: string;
+  partyName?: string;
   stackNo?: string;
   lotNo?: string;
   status?: string;
@@ -444,11 +447,35 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     },
     {
       accessorKey: 'quantityMT',
-      header: 'Qty (MT)',
+      header: 'Inward Qty (MT)',
       cell: ({ row }) => {
         const value = row.getValue('quantityMT');
         if (typeof value !== 'number') return <span className="text-slate-400">—</span>;
         return <span className="font-bold">{value.toFixed(2)}</span>;
+      },
+    },
+    {
+      accessorKey: 'actualWeight',
+      header: 'Actual Wt (MT)',
+      cell: ({ row }) => {
+        const direction = row.getValue('direction') as string;
+        if (direction !== 'OUTWARD') return <span className="text-slate-300">—</span>;
+        
+        const value = row.getValue('actualWeight');
+        if (typeof value !== 'number') return <span className="text-slate-400">—</span>;
+        return <span className="font-medium text-slate-700">{value.toFixed(2)}</span>;
+      },
+    },
+    {
+      accessorKey: 'netWeightLoss',
+      header: 'Net Loss (MT)',
+      cell: ({ row }) => {
+        const direction = row.getValue('direction') as string;
+        if (direction !== 'OUTWARD') return <span className="text-slate-300">—</span>;
+        
+        const value = row.getValue('netWeightLoss');
+        if (typeof value !== 'number') return <span className="text-slate-400">—</span>;
+        return <span className="font-medium text-red-600">{value.toFixed(2)}</span>;
       },
     },
     {
@@ -467,6 +494,15 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         const value = row.getValue('gatePass');
         if (typeof value === 'object' || value === undefined || value === null) return <span className="text-slate-600">—</span>;
         return <span className="text-slate-600">{String(value) || '—'}</span>;
+      },
+    },
+    {
+      accessorKey: 'partyName',
+      header: 'Party Name',
+      cell: ({ row }) => {
+        const value = row.getValue('partyName');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
       },
     },
     {
@@ -588,7 +624,9 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         'Client': item.clientName,
         'Commodity': item.commodityName,
         'Warehouse': item.warehouseName,
-        'Qty (MT)': item.quantityMT !== null ? item.quantityMT : '-',
+        'Inward Qty (MT)': item.quantityMT !== null ? item.quantityMT : '-',
+        'Actual Wt (MT)': item.direction === 'OUTWARD' && item.actualWeight != null ? item.actualWeight : '-',
+        'Net Loss (MT)': item.direction === 'OUTWARD' && item.netWeightLoss != null ? item.netWeightLoss : '-',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',
         'Gate Pass': item.gatePass || '',
         'Stack No': item.stackNo || '',

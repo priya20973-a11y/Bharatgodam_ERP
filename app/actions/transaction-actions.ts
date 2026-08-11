@@ -466,6 +466,9 @@ export async function processOutward(data: {
   lotNo?: string;
   gatePass?: string;
   date?: string | Date;
+  actualWeight?: number;
+  netWeightLoss?: number;
+  partyName?: string;
   isColdStorage?: boolean;
 }) {
   if (!data.isColdStorage) {
@@ -486,6 +489,9 @@ export async function processOutward(data: {
       commodityId: data.commodityId,
       warehouseId: data.warehouseId,
       quantityMT: data.quantityMT,
+      actualWeight: data.actualWeight,
+      netWeightLoss: data.netWeightLoss,
+      partyName: data.partyName,
       date: outwardDate.toISOString(),
       gatePass: data.gatePass,
     });
@@ -546,6 +552,9 @@ export async function processOutward(data: {
     const c = commodity as any;
     const outwardPayload = appendOwnershipForMongo({
       ...data,
+      actualWeight: data.actualWeight,
+      netWeightLoss: data.netWeightLoss,
+      partyName: data.partyName,
       unit: c.unit || 'MT',
       unitRate: c.ratePerMtPerDay || (c.ratePerMtMonth ? c.ratePerMtMonth / 30 : 10),
       date: outwardDate,
@@ -578,9 +587,12 @@ export async function processOutward(data: {
       type: 'OUTWARD',
       date: outwardDate,
       quantityMT: data.quantityMT,
+      actualWeight: data.actualWeight,
+      netWeightLoss: data.netWeightLoss,
       stackNo: data.stackNo,
       lotNo: data.lotNo,
       gatePass: data.gatePass || `GP-${Date.now()}`,
+      partyName: data.partyName,
       status: 'COMPLETED',
       sourceType: 'outward',
       sourceId: newOutward._id?.toString(),

@@ -152,15 +152,32 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                   {/* Column 8: Transaction Type */}
                   <td className="px-4 py-3 text-xs">
                     {transaction ? (
-                      <span
-                        className={`inline-block px-2 py-1 rounded font-semibold ${
-                          transaction.direction === 'INWARD'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-orange-100 text-orange-700'
-                        }`}
-                      >
-                        {transaction.direction}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`inline-block px-2 py-1 rounded font-semibold ${
+                            transaction.direction === 'INWARD'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-orange-100 text-orange-700'
+                          }`}
+                        >
+                          {transaction.direction}
+                        </span>
+                        {transaction.partyName && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Party: {transaction.partyName}
+                          </span>
+                        )}
+                        {transaction.actualWeight !== undefined && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Actual: {formatDecimal(transaction.actualWeight)} MT
+                          </span>
+                        )}
+                        {transaction.netWeightLoss !== undefined && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Loss: {formatDecimal(transaction.netWeightLoss)} MT
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}

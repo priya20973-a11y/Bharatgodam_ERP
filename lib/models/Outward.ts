@@ -5,10 +5,13 @@ export interface IOutward extends Document {
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   quantityMT: number;
+  actualWeight?: number;
+  netWeightLoss?: number;
   bagsCount?: number;
   stackNo?: string;
-  lotNo?: string;
+    lotNo?: string;
   gatePass?: string;
+  partyName?: string;
   unit?: string;
   unitRate?: number;
   date: Date;
@@ -24,10 +27,13 @@ const OutwardSchema: Schema = new Schema(
     commodityId: { type: Schema.Types.ObjectId, ref: 'Commodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'Warehouse', required: true },
     quantityMT: { type: Number, required: true, min: 0 },
+    actualWeight: { type: Number, min: 0 },
+    netWeightLoss: { type: Number },
     bagsCount: { type: Number, min: 0 },
     stackNo: { type: String, trim: true },
     lotNo: { type: String, trim: true },
     gatePass: { type: String, trim: true },
+    partyName: { type: String, trim: true },
     unit: { type: String, default: 'MT' },
     unitRate: { type: Number, required: false },
     date: { type: Date, default: Date.now },

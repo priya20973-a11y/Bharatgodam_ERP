@@ -27,6 +27,11 @@ const outwardSchema = z.object({
   stackNo: z.string().optional(),
   lotNo: z.string().optional(),
   gatePass: z.string().optional(),
+  partyName: z.string().optional(),
+  actualWeight: z.preprocess((value) => {
+    if (value === '' || value === undefined || value === null) return undefined;
+    return Number(value);
+  }, z.number().min(0, 'Actual weight cannot be negative')).optional(),
   date: z.string().min(1, 'Date is required'),
 });
 
@@ -58,6 +63,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
   const stackNoId = useId();
   const lotNoId = useId();
   const gatePassId = useId();
+  const partyNameId = useId();
+  const actualWeightId = useId();
   const dateId = useId();
 
   const {
@@ -78,6 +85,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       stackNo: '',
       lotNo: '',
       gatePass: '',
+      partyName: '',
+      actualWeight: undefined,
       date: searchParams.get('date') || new Date().toISOString().split('T')[0],
     },
   });
@@ -160,8 +169,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       commodityId: data.commodityId,
       warehouseId: data.warehouseId,
       quantityMT: data.quantityMT,
+      actualWeight: data.actualWeight,
       date: data.date,
       gatePass: data.gatePass,
+      partyName: data.partyName,
     });
 
     startTransition(async () => {
@@ -171,10 +182,13 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           commodityId: data.commodityId,
           warehouseId: data.warehouseId,
           quantityMT: data.quantityMT,
+          actualWeight: data.actualWeight,
+          netWeightLoss: data.actualWeight !== undefined && data.actualWeight !== null ? Number((data.quantityMT - data.actualWeight).toFixed(2)) : undefined,
           bagsCount: data.bagsCount,
           stackNo: data.stackNo,
           lotNo: data.lotNo,
           gatePass: data.gatePass,
+          partyName: data.partyName,
           date: data.date,
         });
 
@@ -192,6 +206,8 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
             stackNo: '',
             lotNo: '',
             gatePass: '',
+            partyName: '',
+            actualWeight: undefined,
             date: new Date().toISOString().split('T')[0],
           });
           
@@ -307,7 +323,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         <div className="space-y-2">
           <label htmlFor={quantityId} className="text-sm font-semibold text-slate-700 flex justify-between items-center">
-            Quantity (MT) *
+            Inward Quantity (MT) *
             <div className="flex items-center gap-2">
               {checkingStock && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
               {currentStock !== null && (
@@ -366,6 +382,52 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           />
           {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
         </div>
+
+        <div className="space-y-2">
+          <label htmlFor={partyNameId} className="text-sm font-semibold text-slate-700">Party Name</label>
+          <Input 
+            id={partyNameId}
+            {...register('partyName')}
+            type="text" 
+            placeholder="Enter party name"
+          />
+          {errors.partyName && <p className="text-xs text-red-500">{errors.partyName.message}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <label htmlFor={actualWeightId} className="text-sm font-semibold text-slate-700">Actual Weight (MT)</label>
+          <Controller
+            name="actualWeight"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id={actualWeightId}
+                name="actualWeight"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className={errors.actualWeight ? 'border-red-500' : ''}
+                value={field.value ?? ''}
+                onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+              />
+            )}
+          />
+          {errors.actualWeight && <p className="text-xs text-red-500">{errors.actualWeight.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-slate-700">Net Weight Loss (MT)</label>
+          <Input 
+            type="text" 
+            readOnly 
+            disabled
+            value={watchedValues.quantityMT !== undefined && watchedValues.actualWeight !== undefined ? (watchedValues.quantityMT - watchedValues.actualWeight).toFixed(2) : ''}
+            placeholder="Auto-calculated"
+            className="bg-slate-50 text-slate-600"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -401,6 +463,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           />
           {errors.gatePass && <p className="text-xs text-red-500">{errors.gatePass.message}</p>}
         </div>
+
       </div>
 
       <div className="flex gap-4 pt-2">

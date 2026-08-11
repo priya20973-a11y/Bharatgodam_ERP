@@ -12,8 +12,11 @@ export interface Transaction {
   clientName: string;
   commodityName: string;
   gatePass: string;
+  actualWeight?: number;
+  netWeightLoss?: number;
   warehouseId?: string;
   warehouseName?: string;
+  partyName?: string;
 }
 
 export interface Payment {
@@ -37,6 +40,9 @@ export interface LedgerStep {
     id: string;
     direction: 'INWARD' | 'OUTWARD';
     gatePass: string;
+    actualWeight?: number;
+    netWeightLoss?: number;
+    partyName?: string;
   };
 }
 
@@ -289,7 +295,10 @@ export function calculateLedger(
       lastStep.transaction = {
         id: currentTxn._id,
         direction: currentTxn.direction,
-        gatePass: currentTxn.gatePass,
+        gatePass: currentTxn.gatePass || '',
+        actualWeight: currentTxn.actualWeight,
+        netWeightLoss: currentTxn.netWeightLoss,
+        partyName: currentTxn.partyName,
       };
     }
   }

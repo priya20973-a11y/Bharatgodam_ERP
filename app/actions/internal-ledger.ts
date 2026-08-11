@@ -155,6 +155,9 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
         ? warehouseNameById.get(txn.warehouseId.toString()) || 'Unknown Warehouse'
         : 'Unknown Warehouse',
       gatePass: txn.gatePass,
+      actualWeight: txn.actualWeight,
+      netWeightLoss: txn.netWeightLoss,
+      partyName: txn.partyName,
     })
   );
 
@@ -172,6 +175,9 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
         ? warehouseNameById.get(txn.warehouseId.toString()) || 'Unknown Warehouse'
         : 'Unknown Warehouse',
       gatePass: txn.gatePass || '',
+      actualWeight: txn.actualWeight,
+      netWeightLoss: txn.netWeightLoss,
+      partyName: txn.partyName,
     })
   );
 
