@@ -36,12 +36,12 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
     });
   } else {
     // Automated layouts
-    let currentStackNo = 1;
+    const currentStackNo = 1;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (currentStackNo > noOfStacks) break;
 
-        let targetR = r;
+        const targetR = r;
         let targetC = c;
 
         if (stackLayout === 'COLUMN_WISE') {
@@ -175,8 +175,8 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                 </div>
 
                 <div className="text-center">
-                  <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">{actualChamberNo}/F{floorNo}</span>
-                  <span className="text-xl font-bold block mb-1">S{cell.stackNo}</span>
+                  <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">Stack</span>
+                  <span className="text-2xl font-bold block mb-1">{cell.stackNo}</span>
                 </div>
 
                 <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${getStatusBadgeColor(cell.status)}`}>
