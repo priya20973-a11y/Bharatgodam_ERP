@@ -44,6 +44,16 @@ export async function GET(request: NextRequest) {
         
       if (transaction && transaction.stackAllocations) {
         transaction = JSON.parse(JSON.stringify(transaction));
+        const isPurchaseClient = transaction.clientId?.clientType === 'PURCHASE';
+        
+        if (isPurchaseClient) {
+          transaction.stockType = 'Purchase';
+          transaction.purchaseQuantityKg = transaction.quantityKg;
+          transaction.purchaseBagsCount = transaction.totalBags || transaction.bagsCount;
+          transaction.selfQuantityKg = 0;
+          transaction.selfBagsCount = 0;
+        }
+
         transaction.stacksInfo = transaction.stackAllocations.map((a: any) => {
           let floorName = a.floorNo;
           if (transaction.warehouseId?.chambers) {
@@ -56,7 +66,7 @@ export async function GET(request: NextRequest) {
             floorNo: floorName,
             stackNo: a.stackNo,
             quantityKg: a.allocatedWeight,
-            stockType: a.stockType || 'Self'
+            stockType: isPurchaseClient ? 'Purchase' : (a.stockType || 'Self')
           };
         });
       }
@@ -151,10 +161,8 @@ export async function GET(request: NextRequest) {
     const warehouseData = type === 'inward' ? data?.warehouseId : (batchData.length > 0 ? batchData[0].warehouseId : data?.warehouseId);
     
     let userLogo = '';
-    if (warehouseData?.logoUrl) {
-      userLogo = warehouseData.logoUrl;
-    } else if (dbUser?.companyLogo?.data) {
-      userLogo = `data:${dbUser.companyLogo.contentType};base64,${dbUser.companyLogo.data.toString('base64')}`;
+    if (warehouseData?.warehouseLogo) {
+      userLogo = warehouseData.warehouseLogo;
     }
 
     const userDetails = {

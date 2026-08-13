@@ -5,7 +5,7 @@ import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
-export default function ColdEnvironmentRecent({ records }: { records: any[] }) {
+export default function ColdEnvironmentRecent({ records, warehouses }: { records: any[], warehouses?: any[] }) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
 
@@ -23,6 +23,16 @@ export default function ColdEnvironmentRecent({ records }: { records: any[] }) {
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
     }).replace(',', '');
+  };
+
+  const getFloorName = (whId: string, chamberName: string, floorNo: number) => {
+    if (!warehouses) return `Floor ${floorNo}`;
+    const wh = warehouses.find(w => w._id === (typeof whId === 'object' ? (whId as any)._id : whId));
+    if (!wh) return `Floor ${floorNo}`;
+    const chamber = (wh.chambers || []).find((c: any) => c.name === chamberName);
+    if (!chamber) return `Floor ${floorNo}`;
+    const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
+    return floor ? floor.name : `Floor ${floorNo}`;
   };
 
   return (
@@ -45,7 +55,7 @@ export default function ColdEnvironmentRecent({ records }: { records: any[] }) {
             <div key={record._id} className="bg-slate-50 p-4 rounded-lg border flex justify-between items-center">
               <div>
                 <div className="text-sm font-medium text-slate-700">
-                  {record.chamberName} / Floor {record.floorNo}
+                  {record.chamberName} / {getFloorName(record.warehouseId, record.chamberName, record.floorNo)}
                 </div>
                 <div className="text-xs font-bold text-slate-900 mt-1">
                   {isMounted ? formatDate(record.date) : ''}

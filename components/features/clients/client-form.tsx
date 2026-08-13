@@ -222,6 +222,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
               <SelectItem value="FARMER">{t('clients.farmer')}</SelectItem>
               <SelectItem value="FPO">{t('clients.fpo')}</SelectItem>
               <SelectItem value="COMPANY">{t('clients.company')}</SelectItem>
+              <SelectItem value="PURCHASE">Purchase</SelectItem>
             </SelectContent>
           </Select>
         </div>

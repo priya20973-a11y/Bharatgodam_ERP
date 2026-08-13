@@ -20,7 +20,7 @@ export function getDropdownDisplayName(
   const isDuplicate = allItems.filter(
     i => i && (i.name || i.label)?.trim().toUpperCase() === name.trim().toUpperCase()
   ).length > 1;
-  
+
   if (isDuplicate && item.wspName) {
     return `${name} [${item.wspName}]`;
   }
@@ -61,7 +61,7 @@ export function getDynamicUnitLabel(unit: string, type: 'count' | 'alloc' | 'wei
     case 'alloc':
       return u === 'nos' || u === 'no' ? 'Alloc. Qty (Nos)' : `Alloc. ${plural}`;
     case 'weight':
-      return `Weight per ${singular} (KG)`;
+      return `(KG)`;
     case 'storage':
       return `Storage Units (${plural})`;
     case 'singular':

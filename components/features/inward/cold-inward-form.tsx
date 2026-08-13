@@ -80,6 +80,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       toast.error('Client already added');
       return;
     }
+    
+    const clientDetails = clients.find(c => c._id === clientId);
+    const initialStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : 'Self';
+    
     setClientSections([...clientSections, {
       id: Date.now().toString(),
       clientId,
@@ -94,7 +98,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       bagsCount: null,
       jin: null,
       mixed: null,
-      stockType: 'Self',
+      stockType: initialStockType,
       purchaseQuantityKg: null,
       purchaseBagsCount: null,
       selfQuantityKg: null,
@@ -103,7 +107,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       farmerName: '',
       farmerId: '',
       kataBharati: 0,
-      stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: 'Self' }],
+      stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: initialStockType }],
       referencePersons: [],
       qualityEntries: []
     }]);
@@ -133,7 +137,12 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
   const addStack = (clientIndex: number) => {
     const updated = [...clientSections];
-    updated[clientIndex].stacks.push({ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null });
+    const clientData = updated[clientIndex];
+    const clientDetails = clients.find(c => c._id === clientData.clientId);
+    const effectiveStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : (clientData.stockType || 'Self');
+    const stackStockType = effectiveStockType === 'Purchase' ? 'Purchase' : 'Self';
+    
+    updated[clientIndex].stacks.push({ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: stackStockType });
     setClientSections(updated);
   };
 
@@ -208,23 +217,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       }
       grandTotalBags += Number(c.bagsCount || 0) + Number(c.jin || 0) + Number(c.mixed || 0);
 
-      // Stock Type validation
-      if (c.stockType === 'Both') {
-        let totalSelfWt = 0;
-        let totalPurchaseWt = 0;
-        for (const s of c.stacks) {
-          if (s.stockType === 'Self') totalSelfWt += Number(s.allocatedWeight) || 0;
-          if (s.stockType === 'Purchase') totalPurchaseWt += Number(s.allocatedWeight) || 0;
-        }
-        if (Math.abs(totalSelfWt - (Number(c.selfQuantityKg) || 0)) > 0.01) {
-          toast.error(`Self allocated weight (${totalSelfWt}) does not match Self Qty (${c.selfQuantityKg}) for client ${i + 1}`);
-          return;
-        }
-        if (Math.abs(totalPurchaseWt - (Number(c.purchaseQuantityKg) || 0)) > 0.01) {
-          toast.error(`Purchase allocated weight (${totalPurchaseWt}) does not match Purchase Qty (${c.purchaseQuantityKg}) for client ${i + 1}`);
-          return;
-        }
-      }
+      // Validation for stockType === 'Both' has been removed, as quantities are now auto-calculated based on stack allocations.
     }
 
     if (grandTotalAllocatedBags !== grandTotalBags) {
@@ -242,7 +235,14 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
     for (let i = 0; i < clientSections.length; i++) {
       const c = clientSections[i];
-      
+      const clientDetails = clients.find(cl => cl._id === c.clientId);
+      const isPurchaseClient = clientDetails?.clientType === 'PURCHASE';
+
+      if (isPurchaseClient) {
+        c.stockType = 'Purchase';
+        c.stacks.forEach((s: any) => s.stockType = 'Purchase');
+      }
+
       let clientAllocated = 0;
       for (const s of c.stacks) {
         clientAllocated += Number(s.allocatedWeight) || 0;
@@ -272,15 +272,31 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         c.purchaseBagsCount = totalBags;
         c.selfBagsCount = 0;
       } else if (c.stockType === 'Both') {
-        // Quantities are already specified by the user manually, but we should calculate bags based on stacks
         let totalSelfBags = 0;
         let totalPurchaseBags = 0;
+        let totalSelfWt = 0;
+        let totalPurchaseWt = 0;
+        
         for (const s of c.stacks) {
-          if (s.stockType === 'Self') totalSelfBags += Number(s.allocatedBags) || 0;
-          if (s.stockType === 'Purchase') totalPurchaseBags += Number(s.allocatedBags) || 0;
+          if (s.stockType === 'Self') {
+            totalSelfBags += Number(s.allocatedBags) || 0;
+            totalSelfWt += Number(s.allocatedWeight) || 0;
+          }
+          if (s.stockType === 'Purchase') {
+            totalPurchaseBags += Number(s.allocatedBags) || 0;
+            totalPurchaseWt += Number(s.allocatedWeight) || 0;
+          }
         }
+        
         c.selfBagsCount = totalSelfBags;
         c.purchaseBagsCount = totalPurchaseBags;
+        
+        // Scale proportionally like gross weight
+        const selfRatio = clientAllocated > 0 ? (totalSelfWt / clientAllocated) : 0;
+        const purchaseRatio = clientAllocated > 0 ? (totalPurchaseWt / clientAllocated) : 0;
+        
+        c.selfQuantityKg = c.grossWeight * selfRatio;
+        c.purchaseQuantityKg = c.grossWeight * purchaseRatio;
       }
       
       if (c.gradingApplied) {
@@ -607,7 +623,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-purple-700">Stock Type</label>
-                <Select value={client.stockType || 'Self'} onValueChange={(v) => {
+                <Select disabled={clientDetails?.clientType === 'PURCHASE'} value={clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : (client.stockType || 'Self')} onValueChange={(v) => {
                   updateClient(cIdx, 'stockType', v);
                   // Auto-update all existing stacks
                   if (v === 'Self' || v === 'Purchase') {
@@ -627,24 +643,9 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               </div>
               
               {client.stockType === 'Both' && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-purple-700">Self Qty (KG)</label>
-                    <ColdNumberInput 
-                      value={client.selfQuantityKg ?? ''} 
-                      onChange={(v) => updateClient(cIdx, 'selfQuantityKg', v ? Number(v) : null)} 
-                      className="bg-white border-purple-200 focus:ring-purple-500" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-purple-700">Purchase Qty (KG)</label>
-                    <ColdNumberInput 
-                      value={client.purchaseQuantityKg ?? ''} 
-                      onChange={(v) => updateClient(cIdx, 'purchaseQuantityKg', v ? Number(v) : null)} 
-                      className="bg-white border-purple-200 focus:ring-purple-500" 
-                    />
-                  </div>
-                </>
+                <div className="col-span-2 text-sm text-purple-600 flex items-center h-full">
+                  Quantities will be automatically calculated based on stack allocations.
+                </div>
               )}
             </div>
 

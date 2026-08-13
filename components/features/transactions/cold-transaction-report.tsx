@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Download, Trash2, Edit, Search } from 'lucide-react';
+import { Download, Trash2, Edit, Search, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -59,6 +60,10 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   }, [transactions, clientFilter, warehouseFilter, monthFilter, search]);
 
   const handleDelete = async (id: string, type: string) => {
+    if (type === 'OWNERSHIP TRANSFER') {
+      toast.error('Cannot delete ownership transfers from this report.');
+      return;
+    }
     if (!confirm(t('transactions.deleteConfirm'))) return;
 
     try {
@@ -88,19 +93,35 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       t('transactions.qtyHeader'), 
       t('transactions.bagsHeader')
     ];
-    const rows = filteredTransactions.map(txn => [
-      txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward'),
-      txn.date ? format(new Date(txn.date), 'yyyy-MM-dd') : '',
-      txn.client?.name || '',
-      `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
-      txn.warehouse?.name || '',
-      txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
-      formatNumber(txn.chamberNo),
-      formatNumber(txn.floorNo),
-      formatNumber(txn.stackNo),
-      formatNumber(txn.quantityKg),
-      formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))
-    ]);
+    const rows = filteredTransactions.map(txn => {
+      let typeLabel = txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward');
+      if (txn.type === 'OWNERSHIP TRANSFER') typeLabel = 'OWNERSHIP TRANSFER';
+
+      let clientLabel = txn.client?.name || '';
+      if (txn.type === 'OWNERSHIP TRANSFER') {
+        if (txn.transferType === 'Purchase') {
+          clientLabel = `${txn.previousClient?.name || ''} -> Warehouse (${txn.warehouse?.name || ''})`;
+        } else {
+          clientLabel = `${txn.client?.name || ''} (From: ${txn.previousClient?.name || ''})`;
+        }
+      } else if (txn.client?.clientType === 'PURCHASE') {
+        clientLabel = `Warehouse (${txn.client?.name})`;
+      }
+
+      return [
+        typeLabel,
+        txn.date ? format(new Date(txn.date), 'yyyy-MM-dd') : '',
+        clientLabel,
+        `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
+        txn.warehouse?.name || '',
+        txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
+        txn.chamberNo,
+        txn.floorNo,
+        txn.stackNo,
+        formatNumber(txn.quantityKg),
+        formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))
+      ];
+    });
     
     const csvContent = [
       headers.join(','),
@@ -115,7 +136,8 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   };
 
   const downloadInvoice = (id: string, type: string) => {
-    window.open(`/api/cold/receipt/html?id=${id}&type=${type.toLowerCase()}`, '_blank');
+    const queryType = type === 'OWNERSHIP TRANSFER' ? 'transfer' : type.toLowerCase();
+    window.open(`/api/cold/receipt/html?id=${id}&type=${queryType}`, '_blank');
   };
 
   return (
@@ -186,17 +208,53 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
               filteredTransactions.map((txn) => (
                 <TableRow key={txn._id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      txn.type === 'INWARD' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward')}
-                    </span>
+                    {txn.type === 'OWNERSHIP TRANSFER' ? (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-cyan-50 text-cyan-700 border border-cyan-200">
+                        OWNERSHIP TRANSFER
+                      </span>
+                    ) : txn.client?.clientType === 'PURCHASE' ? (
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                        Purchase Stock ({txn.type === 'INWARD' ? 'In' : 'Out'})
+                      </Badge>
+                    ) : (
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge variant="outline" className={txn.type === 'INWARD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}>
+                          {txn.type === 'INWARD' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
+                          {txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward')}
+                        </Badge>
+                        {(txn.stockType === 'Purchase' || txn.stockType === 'Both') && (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] py-0">
+                            {txn.stockType === 'Both' ? 'Self + Purchase' : 'Purchase Stock'}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-slate-600">
                     {txn.date ? format(new Date(txn.date), 'dd/MM/yyyy') : '-'}
                   </TableCell>
                   <TableCell className="font-medium text-slate-900">
-                    {txn.client?.name || '-'}
+                    {txn.type === 'OWNERSHIP TRANSFER' ? (
+                      txn.transferType === 'Purchase' ? (
+                        <div>
+                          <span>{txn.previousClient?.name || '-'}</span>
+                          <div className="text-xs font-normal text-slate-500 mt-0.5">
+                            → Warehouse ({txn.warehouse?.name || '-'})
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span>{txn.client?.name || '-'}</span>
+                          <div className="text-xs font-normal text-slate-500 mt-0.5">
+                            From: {txn.previousClient?.name || '-'}
+                          </div>
+                        </div>
+                      )
+                    ) : txn.client?.clientType === 'PURCHASE' ? (
+                      <span className="text-purple-700 font-bold">Warehouse ({txn.client?.name})</span>
+                    ) : (
+                      txn.client?.name || '-'
+                    )}
                     {txn.farmerName && <div className="text-xs font-normal text-slate-500 mt-0.5">{t('outward.farmerPrefix')}{txn.farmerName}</div>}
                   </TableCell>
                   <TableCell className="text-slate-700">{txn.commodity?.name} ({txn.commodity?.type})</TableCell>
@@ -206,7 +264,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                       className="hover:text-blue-600 hover:underline transition-colors block"
                     >
                       {txn.warehouse?.name}<br/>
-                      C{formatNumber(txn.chamberNo)} • F{formatNumber(txn.floorNo)} • S{formatNumber(txn.stackNo)}
+                      C{txn.chamberNo}.F{txn.floorNo}.S{txn.stackNo}
                     </Link>
                   </TableCell>
                   <TableCell className="text-slate-700 text-sm">
@@ -224,28 +282,32 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-slate-400 hover:text-slate-600"
-                      onClick={() => {
-                        setEditingTxnId(txn._id);
-                        setEditingTxnType(txn.type as 'INWARD' | 'OUTWARD');
-                        setEditModalOpen(true);
-                      }}
-                      title={t('transactions.edit')}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="text-rose-500 hover:bg-rose-50"
-                      onClick={() => handleDelete(txn._id, txn.type)}
-                      title={t('transactions.delete')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {txn.type !== 'OWNERSHIP TRANSFER' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-slate-400 hover:text-slate-600"
+                        onClick={() => {
+                          setEditingTxnId(txn._id);
+                          setEditingTxnType(txn.type as 'INWARD' | 'OUTWARD');
+                          setEditModalOpen(true);
+                        }}
+                        title={t('transactions.edit')}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {txn.type !== 'OWNERSHIP TRANSFER' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-rose-500 hover:bg-rose-50"
+                        onClick={() => handleDelete(txn._id, txn.type)}
+                        title={t('transactions.delete')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

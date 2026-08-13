@@ -42,7 +42,13 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{clientName} - Transaction Ledger</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            {transactions.length > 0 && transactions[0].isPurchaseStock ? (
+              <span className="text-purple-700">Warehouse ({clientName}) - Purchase Stock Ledger</span>
+            ) : (
+              `${clientName} - Transaction Ledger`
+            )}
+          </h2>
           <p className="text-sm text-slate-600 mt-1">Chronological view of all Inward and Outward transactions.</p>
         </div>
         <div className="overflow-x-auto">
@@ -71,13 +77,23 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 </TableRow>
               ) : (
                 transactions.map((tx) => {
-                  const qty = Number(tx.quantityKg || 0);
-                  const bags = Number(tx.totalBags || 0);
+                  let qty = Number(tx.quantityKg || 0);
+                  let bags = Number(tx.totalBags || 0);
+                  
+                  if (!tx.isPurchaseStock && tx.type === 'INWARD') {
+                    if (tx.stockType === 'Purchase') {
+                      qty = 0;
+                      bags = 0;
+                    } else if (tx.stockType === 'Both') {
+                      qty = Number(tx.selfQuantityKg || 0);
+                      bags = Number(tx.selfBagsCount || 0);
+                    }
+                  }
                   
                   let inQty = 0;
                   let outQty = 0;
 
-                  if (tx.type === 'INWARD') {
+                  if (tx.type === 'INWARD' || tx.type === 'TRANSFER IN') {
                     inQty = qty;
                     runningBalance += qty;
                     runningBags += bags;
@@ -93,13 +109,30 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                     <TableRow key={tx._id} className="hover:bg-slate-50">
                       <TableCell className="font-medium">{new Date(tx.date).toLocaleDateString('en-GB')}</TableCell>
                       <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={tx.type === 'INWARD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}
-                        >
-                          {tx.type === 'INWARD' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
-                          {tx.type}
-                        </Badge>
+                        {tx.isPurchaseStock ? (
+                          <Badge 
+                            variant="outline" 
+                            className={tx.type === 'TRANSFER IN' || tx.type === 'TRANSFER OUT' || tx.type === 'PURCHASE TRANSFER' ? "bg-cyan-50 text-cyan-700 border-cyan-200" : "bg-purple-50 text-purple-700 border-purple-200"}
+                          >
+                            {tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
+                            Purchase Stock ({tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? 'In' : 'Out'})
+                          </Badge>
+                        ) : (
+                          <div className="flex flex-col gap-1 items-start">
+                            <Badge 
+                              variant="outline" 
+                              className={tx.type === 'TRANSFER IN' || tx.type === 'TRANSFER OUT' || tx.type === 'PURCHASE TRANSFER' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : (tx.type === 'INWARD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200')}
+                            >
+                              {tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
+                              {tx.type}
+                            </Badge>
+                            {(tx.type === 'INWARD' || tx.type === 'OUTWARD') && (tx.stockType === 'Purchase' || tx.stockType === 'Both') && (
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] py-0">
+                                {tx.stockType === 'Both' ? 'Self + Purchase' : 'Purchase Stock'}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>{tx.commodity || '-'}</TableCell>
                       <TableCell>

@@ -3,6 +3,7 @@
 import connectToDatabase from '@/lib/mongoose';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
@@ -15,40 +16,77 @@ export async function getColdTransactions() {
   const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
   const inwards = await ColdInward.find(tenantFilter)
-    .populate('clientId', 'name')
+    .populate('clientId', 'name clientType')
     .populate('commodityId', 'name type gradingType')
-    .populate('warehouseId', 'name warehouseId')
+    .populate('warehouseId', 'name warehouseId chambers')
     .lean();
 
   const outwards = await ColdOutward.find(tenantFilter)
-    .populate('clientId', 'name')
+    .populate('clientId', 'name clientType')
     .populate('commodityId', 'name type gradingType')
-    .populate('warehouseId', 'name warehouseId')
+    .populate('warehouseId', 'name warehouseId chambers')
+    .lean();
+
+  const transfers = await ColdTransfer.find(tenantFilter)
+    .populate('fromClientId', 'name clientType')
+    .populate('toClientId', 'name clientType')
+    .populate('commodityId', 'name type gradingType')
+    .populate('warehouseId', 'name warehouseId chambers')
     .lean();
 
   const combined = [
     ...inwards.map(i => ({ ...i, type: 'INWARD' })),
-    ...outwards.map(o => ({ ...o, type: 'OUTWARD' }))
-  ].map((t: any) => ({
-    _id: t._id.toString(),
-    type: t.type,
-    date: t.date,
-    client: { _id: t.clientId?._id?.toString(), name: t.clientId?.name },
-    commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
-    warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
-    chamberNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.chamberName || t.stackAllocations?.[0]?.chamberNo || '') : (t.chamberName || t.chamberNo),
-    floorNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.floorNo || '') : t.floorNo,
-    stackNo: t.type === 'INWARD' ? (t.stackAllocations?.[0]?.stackNo || '') : t.stackNo,
-    quantityKg: t.quantityKg,
-    bagsCount: t.totalBags !== undefined ? t.totalBags : t.bagsCount,
-    grade: t.grade,
-    gradingType: t.gradingType || t.commodityId?.gradingType,
-    referencePersons: t.referencePersons,
-    createdAt: t.createdAt,
-    stockType: t.stockType,
-    purchaseQuantityKg: t.purchaseQuantityKg,
-    selfQuantityKg: t.selfQuantityKg
-  }));
+    ...outwards.map(o => ({ ...o, type: 'OUTWARD' })),
+    ...transfers.map(t => ({ ...t, type: 'OWNERSHIP TRANSFER' }))
+  ].map((t: any) => {
+    let clientData;
+    let previousClientData;
+
+    if (t.type === 'OWNERSHIP TRANSFER') {
+      clientData = { _id: t.toClientId?._id?.toString(), name: t.toClientId?.name, clientType: t.toClientId?.clientType };
+      previousClientData = { _id: t.fromClientId?._id?.toString(), name: t.fromClientId?.name, clientType: t.fromClientId?.clientType };
+    } else {
+      clientData = { _id: t.clientId?._id?.toString(), name: t.clientId?.name, clientType: t.clientId?.clientType };
+    }
+
+    return {
+      _id: t._id.toString(),
+      type: t.type,
+      date: t.date,
+      client: clientData,
+      previousClient: previousClientData,
+      commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
+      warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
+      chamberNo: t.type === 'INWARD' || t.type === 'OWNERSHIP TRANSFER' ? (t.stackAllocations?.[0]?.chamberName || t.stackAllocations?.[0]?.chamberNo || '') : (t.chamberName || t.chamberNo),
+      floorNo: (() => {
+        const cName = t.type === 'INWARD' || t.type === 'OWNERSHIP TRANSFER' ? (t.stackAllocations?.[0]?.chamberName || t.stackAllocations?.[0]?.chamberNo) : (t.chamberName || t.chamberNo);
+        const fNo = t.type === 'INWARD' || t.type === 'OWNERSHIP TRANSFER' ? t.stackAllocations?.[0]?.floorNo : t.floorNo;
+        if (!t.warehouseId?.chambers) return fNo ?? '';
+        const chamber = t.warehouseId.chambers.find((c: any) => c.name === cName || c.chamberNo === cName);
+        if (!chamber) return fNo ?? '';
+        const floor = (chamber.floors || []).find((f: any) => f.floorNo === fNo);
+        return floor ? floor.name : (fNo ?? '');
+      })(),
+      stackNo: t.type === 'INWARD' || t.type === 'OWNERSHIP TRANSFER' ? (t.stackAllocations?.[0]?.stackNo || '') : t.stackNo,
+      quantityKg: t.quantityKg,
+      bagsCount: t.totalBags !== undefined ? t.totalBags : t.bagsCount,
+      grade: t.grade,
+      gradingType: t.gradingType || t.commodityId?.gradingType,
+      referencePersons: t.referencePersons,
+      createdAt: t.createdAt,
+      stockType: t.clientId?.clientType === 'PURCHASE' ? 'Purchase' : t.stockType,
+      purchaseQuantityKg: t.clientId?.clientType === 'PURCHASE' ? t.quantityKg : t.purchaseQuantityKg,
+      selfQuantityKg: t.clientId?.clientType === 'PURCHASE' ? 0 : t.selfQuantityKg,
+      transferType: t.transferType,
+      remarks: t.remarks
+    };
+  }).filter((t: any) => {
+    // Hide the automatically generated Inward/Outward for Ownership Transfers so they don't duplicate
+    if (t.type === 'INWARD' && (t as any).remarks === 'Ownership Transfer In') return false;
+    if (t.type === 'OUTWARD' && (t as any).remarks === 'Ownership Transfer Out') return false;
+    if (t.type === 'OUTWARD' && (t as any).remarks === 'Ownership Transfer Purchase') return false;
+    return true;
+  });
 
   // Sort by date DESC, then createdAt DESC
   combined.sort((a, b) => {
@@ -189,11 +227,28 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
         }
       }
 
+      const client = await connectToDatabase().then(() => mongoose.model('Client').findById(inward.clientId).lean());
+      const isPurchaseClient = client?.clientType === 'PURCHASE';
+
+      if (isPurchaseClient) {
+        data.stockType = 'Purchase';
+        data.purchaseQuantityKg = data.quantityKg || inward.quantityKg;
+        data.purchaseBagsCount = data.bagsCount || inward.bagsCount;
+        data.selfQuantityKg = 0;
+        data.selfBagsCount = 0;
+        if (data.stackAllocations) {
+          data.stackAllocations = data.stackAllocations.map((s: any) => ({ ...s, stockType: 'Purchase' }));
+        }
+      }
+
       // Update inward fields
       Object.assign(inward, data);
       
       if (data.stackAllocations) {
         inward.quantityKg = data.stackAllocations.reduce((sum: number, s: any) => sum + (Number(s.allocatedWeight) || 0), 0);
+        if (isPurchaseClient) {
+          inward.purchaseQuantityKg = inward.quantityKg;
+        }
       }
       
       inward.totalBags = (inward.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0);

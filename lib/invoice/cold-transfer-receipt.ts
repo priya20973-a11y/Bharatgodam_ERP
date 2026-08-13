@@ -316,7 +316,7 @@ export function generateColdTransferReceiptHTML(
       <div class="logo-area">
         ${logoUrl
       ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
-      : `S<span>C</span>S`}
+      : ``}
       </div>
       <div class="title-area">
         <div class="main-title">${warehouseName}</div>

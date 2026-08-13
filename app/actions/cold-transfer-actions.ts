@@ -51,10 +51,9 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
     
     const mergedAllocations = new Map();
     inward.stackAllocations.forEach((alloc: any) => {
-      // Filter by transferType
-      const stockType = alloc.stockType || 'Self';
-      if (transferType === 'Purchase' && stockType !== 'Purchase') return;
-      if (transferType === 'Self' && stockType !== 'Self') return;
+      // Filter by stockType (only Self stock can be transferred)
+      const stockType = alloc.stockType || inward.stockType || 'Self';
+      if (stockType !== 'Self') return;
 
       let resolvedChamberName = alloc.chamberName;
       if (!resolvedChamberName && inward.warehouseId?.chambers) {
@@ -196,33 +195,59 @@ export async function createOwnershipTransfer(data: {
   }
 
   if (transferType === 'Purchase') {
-    const outwardPromises = transferAllocations.map((item: any) => {
-      return ColdOutward.create(appendOwnership({
-        clientId: data.toClientId,
-        inwardId: targetInward._id,
-        commodityId: targetInward.commodityId._id,
-        warehouseId: targetInward.warehouseId._id,
+    const originalInward = await ColdInward.findById(targetInward._id);
+    if (!originalInward) throw new Error("Original inward not found");
+
+    for (const item of transferAllocations) {
+      // Find the corresponding Self allocation
+      const selfAlloc = originalInward.stackAllocations.find((a: any) => 
+        (a.chamberName === item.chamberName || (a.chamberNo && a.chamberNo === item.chamberNo)) && 
+        a.floorNo === item.floorNo && 
+        a.stackNo === item.stackNo &&
+        (a.stockType === 'Self' || !a.stockType)
+      );
+
+      if (selfAlloc) {
+        // Decrease the Self allocation
+        selfAlloc.allocatedWeight -= item.allocatedWeight;
+        if (selfAlloc.bagsCount) selfAlloc.bagsCount -= item.bagsCount;
+        
+        // Ensure we don't go below 0
+        if (selfAlloc.allocatedWeight < 0) selfAlloc.allocatedWeight = 0;
+        if (selfAlloc.bagsCount && selfAlloc.bagsCount < 0) selfAlloc.bagsCount = 0;
+      }
+
+      // Append the new Purchase allocation
+      originalInward.stackAllocations.push({
         chamberName: item.chamberName,
         chamberNo: item.chamberNo,
         floorNo: item.floorNo,
         stackNo: item.stackNo,
-        quantityKg: item.allocatedWeight,
+        allocatedWeight: item.allocatedWeight,
         bagsCount: item.bagsCount,
-        grade: item.grade,
-        gradingType: item.gradingType,
-        date: transferDateObj,
-        remarks: 'Ownership Transfer Purchase',
-      }, session));
-    });
+        stockType: 'Purchase'
+      });
+    }
 
-    const createdOutwards = await Promise.all(outwardPromises);
-    const outwardIdForTransfer = createdOutwards[0]._id;
+    // Set stockType of inward to 'Both' if there are multiple types
+    const hasSelf = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && (a.stockType === 'Self' || !a.stockType));
+    const hasPurchase = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && a.stockType === 'Purchase');
+    
+    if (hasSelf && hasPurchase) {
+      originalInward.stockType = 'Both';
+    } else if (hasPurchase) {
+      originalInward.stockType = 'Purchase';
+    } else {
+      originalInward.stockType = 'Self';
+    }
+
+    await originalInward.save();
 
     const transferData = {
       fromClientId: data.fromClientId,
-      toClientId: data.toClientId,
+      toClientId: data.fromClientId, // Same client
       originalInwardId: targetInward._id,
-      outwardId: outwardIdForTransfer,
+      newInwardId: targetInward._id, // Same inward
       warehouseId: targetInward.warehouseId._id,
       commodityId: targetInward.commodityId._id,
       stackAllocations: transferAllocations,
@@ -237,10 +262,9 @@ export async function createOwnershipTransfer(data: {
     revalidatePath('/cold/dashboard');
     revalidatePath('/cold/transfers');
     revalidatePath('/cold/inward');
-    revalidatePath('/cold/outward');
+    revalidatePath('/cold/purchase');
 
     return { success: true, transferId: transfer._id.toString() };
-
   } else {
     // 2. Create Transfer-Outs for the old client (deducts stock)
     const outwardPromises = transferAllocations.map((item: any) => {

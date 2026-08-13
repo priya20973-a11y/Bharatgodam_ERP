@@ -20,7 +20,7 @@ export async function getColdInwards() {
   const inwards = await ColdInward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name warehouseId')
+    .populate('warehouseId', 'name warehouseId chambers')
     .sort({ date: -1, createdAt: -1 });
     
   return JSON.parse(JSON.stringify(inwards));
@@ -188,6 +188,20 @@ export async function createColdInward(data: any) {
       warning = "Buffer capacity used.";
     }
 
+    const dbClient = await Client.findOne({ _id: data.clientId, ...getTenantFilter(session) }).lean();
+    const isPurchaseClient = dbClient?.clientType === 'PURCHASE';
+
+    if (isPurchaseClient) {
+      data.stockType = 'Purchase';
+      data.purchaseQuantityKg = data.quantityKg;
+      data.purchaseBagsCount = data.bagsCount;
+      data.selfQuantityKg = 0;
+      data.selfBagsCount = 0;
+      if (data.stackAllocations) {
+        data.stackAllocations = data.stackAllocations.map((s: any) => ({ ...s, stockType: 'Purchase' }));
+      }
+    }
+
     // Clean up empty strings for enums to avoid validation errors
     if (data.grade === '') {
       delete data.grade;
@@ -338,6 +352,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         delete client.grade;
       }
 
+      const dbClient = await Client.findOne({ _id: client.clientId, ...getTenantFilter(session) }).lean();
+      const isPurchaseClient = dbClient?.clientType === 'PURCHASE';
+
       const stackAllocations = client.stacks.map((s: any) => ({
         chamberName: s.chamberName || s.chamberNo?.toString(),
         chamberNo: s.chamberNo && !isNaN(parseInt(s.chamberNo)) ? parseInt(s.chamberNo) : undefined,
@@ -345,7 +362,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         stackNo: parseInt(s.stackNo),
         allocatedWeight: Number(s.allocatedWeight) || 0,
         bagsCount: Number(s.allocatedBags) || 0,
-        stockType: s.stockType || 'Self',
+        stockType: isPurchaseClient ? 'Purchase' : (s.stockType || 'Self'),
       }));
       
       const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
@@ -383,11 +400,11 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         gradingChargeType: client.gradingChargeType,
         gradingRate: client.gradingRate,
         gradingCharge: client.gradingCharge,
-        stockType: client.stockType || 'Self',
-        purchaseQuantityKg: client.purchaseQuantityKg || 0,
-        purchaseBagsCount: client.purchaseBagsCount || 0,
-        selfQuantityKg: client.selfQuantityKg || 0,
-        selfBagsCount: client.selfBagsCount || 0,
+        stockType: isPurchaseClient ? 'Purchase' : (client.stockType || 'Self'),
+        purchaseQuantityKg: isPurchaseClient ? totalQuantity : (client.purchaseQuantityKg || 0),
+        purchaseBagsCount: isPurchaseClient ? totalAllocatedBags : (client.purchaseBagsCount || 0),
+        selfQuantityKg: isPurchaseClient ? 0 : (client.selfQuantityKg || totalQuantity),
+        selfBagsCount: isPurchaseClient ? 0 : (client.selfBagsCount || totalAllocatedBags),
       };
       
       const inward = await ColdInward.create(appendOwnership({
