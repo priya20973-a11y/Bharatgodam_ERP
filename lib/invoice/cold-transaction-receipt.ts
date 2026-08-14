@@ -71,10 +71,53 @@ export function generateColdTransactionReceiptHTML(
   const unitStr = data.unit || data.commodityId?.unit || 'KG';
   const grossWeight = formatNum(data.grossWeight || 0) + ' KG';
   const emptyWeight = formatNum(data.emptyWeight || 0) + ' KG';
-  const netWeight = formatNum(data.quantityKg || 0) + ' KG'; // Net weight is stored as quantityKg
-  const stockType = data.stockType || 'Self';
-  const selfQuantityKg = formatNum(data.selfQuantityKg || 0) + ' KG';
-  const purchaseQuantityKg = formatNum(data.purchaseQuantityKg || 0) + ' KG';
+  let calculatedSelfQty = Number(data.selfQuantityKg) || 0;
+  let calculatedPurchaseQty = Number(data.purchaseQuantityKg) || 0;
+  let calculatedStockType = data.stockType || 'Self';
+  let actualNetWeight = Number(data.quantityKg) || 0;
+
+  if (data.stacksInfo && data.stacksInfo.length > 0) {
+    calculatedSelfQty = 0;
+    calculatedPurchaseQty = 0;
+
+    data.stacksInfo.forEach((s: any) => {
+      const sType = s.stockType || 'Self';
+      const sQty = Number(s.quantityKg) || 0;
+      if (sType === 'Purchase') {
+        calculatedPurchaseQty += sQty;
+      } else {
+        calculatedSelfQty += sQty;
+      }
+    });
+
+    calculatedSelfQty = parseFloat(calculatedSelfQty.toFixed(3));
+    calculatedPurchaseQty = parseFloat(calculatedPurchaseQty.toFixed(3));
+    actualNetWeight = parseFloat((calculatedSelfQty + calculatedPurchaseQty).toFixed(3));
+
+    if (calculatedSelfQty > 0 && calculatedPurchaseQty === 0) {
+      calculatedStockType = 'Self';
+    } else if (calculatedPurchaseQty > 0 && calculatedSelfQty === 0) {
+      calculatedStockType = 'Purchase';
+    } else if (calculatedSelfQty > 0 && calculatedPurchaseQty > 0) {
+      calculatedStockType = 'Both';
+    }
+  } else {
+    if (calculatedSelfQty > 0 && calculatedPurchaseQty === 0) {
+      calculatedStockType = 'Self';
+      actualNetWeight = calculatedSelfQty;
+    } else if (calculatedPurchaseQty > 0 && calculatedSelfQty === 0) {
+      calculatedStockType = 'Purchase';
+      actualNetWeight = calculatedPurchaseQty;
+    } else if (calculatedSelfQty > 0 && calculatedPurchaseQty > 0) {
+      calculatedStockType = 'Both';
+      actualNetWeight = parseFloat((calculatedSelfQty + calculatedPurchaseQty).toFixed(3));
+    }
+  }
+
+  const netWeight = formatNum(actualNetWeight) + ' KG';
+  const stockType = calculatedStockType;
+  const selfQuantityKg = formatNum(calculatedSelfQty) + ' KG';
+  const purchaseQuantityKg = formatNum(calculatedPurchaseQty) + ' KG';
 
   // Format Kata Bharati safely
   let kataBharatiRaw = data.kataBharati || 0;
@@ -341,7 +384,7 @@ export function generateColdTransactionReceiptHTML(
       <div class="logo-area">
         ${logoUrl
       ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
-      : `S<span>C</span>S`}
+      : ``}
       </div>
       <div class="title-area">
         <div class="main-title">${warehouseName}</div>

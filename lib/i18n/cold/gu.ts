@@ -11,6 +11,7 @@ export const gu: Dictionary = {
     warehouse: 'ગોડાઉન',
     commodities: 'કોમોડિટી',
     unitMaster: 'યુનિટ માસ્ટર',
+    purchase: 'ખરીદી',
     inward: 'આવક',
     outward: 'જાવક',
     transferOwnership: 'માલિકી બદલી',

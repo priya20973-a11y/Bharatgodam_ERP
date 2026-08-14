@@ -37,7 +37,7 @@ export default async function ColdEnvironmentRecordsPage() {
             You do not have permission to create records.
           </div>
         )}
-        <ColdEnvironmentRecent records={recentRecords} />
+        <ColdEnvironmentRecent records={recentRecords} warehouses={warehouses} />
       </div>
 
       <ColdEnvironmentTable records={records} warehouses={warehouses} />

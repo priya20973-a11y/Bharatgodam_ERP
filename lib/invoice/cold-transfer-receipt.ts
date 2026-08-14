@@ -21,7 +21,10 @@ export function generateColdTransferReceiptHTML(
   const receiptNoFormatted = formatNum(receiptNo);
 
   const fromClientName = data.fromClientId?.name || '';
-  const toClientName = data.toClientId?.name || '';
+  let toClientName = data.toClientId?.name || '';
+  if (data.transferType === 'Purchase') {
+    toClientName = data.warehouseId?.name || data.toClientId?.name || (lang === 'gu' ? 'ગોડાઉન' : 'Warehouse');
+  }
   const clientVillage = data.fromClientId?.address || data.fromClientId?.village || '';
   
   const commodityNameBase = data.commodityId?.name || '';
@@ -316,7 +319,7 @@ export function generateColdTransferReceiptHTML(
       <div class="logo-area">
         ${logoUrl
       ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
-      : `S<span>C</span>S`}
+      : ``}
       </div>
       <div class="title-area">
         <div class="main-title">${warehouseName}</div>

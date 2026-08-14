@@ -95,12 +95,14 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
 
   const getChambers = () => {
     if (!selectedWarehouse) return [];
-    return Array.from({ length: selectedWarehouse.noOfChambers || 0 }, (_, i) => `Chamber ${i + 1}`);
+    return (selectedWarehouse.chambers || []).map((c: any) => c.name);
   };
 
   const getFloors = () => {
-    if (!selectedWarehouse) return [];
-    return Array.from({ length: selectedWarehouse.noOfFloors || 0 }, (_, i) => i + 1);
+    if (!selectedWarehouse || !watchChamberName) return [];
+    const chamber = (selectedWarehouse.chambers || []).find((c: any) => c.name === watchChamberName);
+    if (!chamber) return [];
+    return chamber.floors || [];
   };
 
   return (
@@ -143,7 +145,7 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
                     <SelectValue placeholder="Select Chamber" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getChambers().map((c) => (
+                    {getChambers().map((c: any) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
@@ -166,8 +168,8 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
                     <SelectValue placeholder="Select Floor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getFloors().map((f) => (
-                      <SelectItem key={f} value={f.toString()}>Floor {f}</SelectItem>
+                    {getFloors().map((f: any) => (
+                      <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

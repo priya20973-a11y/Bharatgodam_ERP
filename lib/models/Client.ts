@@ -4,7 +4,7 @@ export interface IClient extends Document {
   name: string;
   nameKey: string;
   address: string;
-  clientType: 'FARMER' | 'FPO' | 'COMPANY';
+  clientType: 'FARMER' | 'FPO' | 'COMPANY' | 'PURCHASE';
   mobile: string;
   panNumber: string;
   aadharNumber: string;
@@ -26,7 +26,7 @@ const ClientSchema: Schema = new Schema(
     state: { type: String, required: false },
     clientType: {
       type: String,
-      enum: ['FARMER', 'FPO', 'COMPANY'],
+      enum: ['FARMER', 'FPO', 'COMPANY', 'PURCHASE'],
       required: true,
     },
     mobile: { type: String, required: true },

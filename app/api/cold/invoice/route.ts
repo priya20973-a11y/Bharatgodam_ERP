@@ -55,10 +55,10 @@ export async function GET(request: Request) {
     const isStaff = (session.user as any).isStaff;
     const userId = isStaff ? (session.user as any).staffId : session.user.id;
     const dbUser = await db.collection('users').findOne({ _id: new ObjectId(userId) });
-    const companyName = t.warehouseId?.name || session.user.companyName || 'Cold Storage Co.';
-    const companyAddress = t.warehouseId?.address || session.user.address || session.user.warehouseLocation || 'Default Address, City, State';
+    const companyName = t.warehouseId?.name || (session.user as any).companyName || 'Cold Storage Co.';
+    const companyAddress = t.warehouseId?.address || (session.user as any).companyAddress || 'Default Address';
     const mobile = session.user.phoneNumber || dbUser?.phoneNumber || '+91-0000000000';
-    const logoUrl = dbUser?.companyLogo || '';
+    const logoUrl = t.warehouseId?.warehouseLogo || '';
 
     const refPersons = t.referencePersons && t.referencePersons.length > 0 
       ? t.referencePersons.map((rp: any) => rp.name).join(', ')
@@ -309,7 +309,7 @@ export async function GET(request: Request) {
           <div class="inner-border">
             <div class="header">
               <div class="logo-area">
-                ${logoUrl ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />` : `<div style="font-size: 24px; font-weight: bold; color: #b91c1c;">LOGO</div>`}
+                ${logoUrl ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />` : ``}
               </div>
               <div class="company-info">
                 <h1 class="company-name">${companyName}</h1>

@@ -7,23 +7,146 @@ import ColdOutward from '@/lib/models/ColdOutward';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import ColdInwardDraft from '@/lib/models/ColdInwardDraft';
 import Client from '@/lib/models/Client';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
+function isSameStack(a: any, b: any): boolean {
+  if (!a || !b) return false;
+  const cA = a.chamberNo ?? a.chamberName;
+  const cB = b.chamberNo ?? b.chamberName;
+  if (cA !== undefined && cA !== null && cB !== undefined && cB !== null) {
+    if (String(cA).replace(/^Chamber\s+/i, '').trim() !== String(cB).replace(/^Chamber\s+/i, '').trim()) return false;
+  }
+  const fA = a.floorNo ?? a.floorName;
+  const fB = b.floorNo ?? b.floorName;
+  if (fA !== undefined && fA !== null && fB !== undefined && fB !== null) {
+    if (String(fA).trim() !== String(fB).trim()) return false;
+  }
+  const sA = a.stackNo ?? a.stackName;
+  const sB = b.stackNo ?? b.stackName;
+  if (sA !== undefined && sA !== null && sB !== undefined && sB !== null) {
+    if (String(sA).trim() !== String(sB).trim()) return false;
+  } else {
+    return false;
+  }
+  return true;
+}
+
 export async function getColdInwards() {
   await connectToDatabase();
   const session = await requireSession();
   
-  const inwards = await ColdInward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
+  const inwards = await ColdInward.find({ 
+    ...getTenantFilter(session), 
+    ...getWarehouseFilter(session),
+    remarks: { $ne: 'Ownership Transfer In' }
+  })
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name warehouseId')
-    .sort({ date: -1, createdAt: -1 });
+    .populate('warehouseId', 'name warehouseId chambers')
+    .sort({ date: -1, createdAt: -1 })
+    .lean();
     
-  return JSON.parse(JSON.stringify(inwards));
+  const inwardIds = inwards.map(i => i._id);
+  
+  const [allOutwards, allTransfers] = await Promise.all([
+    ColdOutward.find({ inwardId: { $in: inwardIds } }).lean(),
+    ColdTransfer.find({ originalInwardId: { $in: inwardIds } }).lean()
+  ]);
+
+  const outwardsByInward = allOutwards.reduce((acc: any, out: any) => {
+    if (!out.inwardId) return acc;
+    const id = out.inwardId.toString();
+    if (!acc[id]) acc[id] = [];
+    acc[id].push(out);
+    return acc;
+  }, {});
+
+  const transfersByInward = allTransfers.reduce((acc: any, t: any) => {
+    if (!t.originalInwardId) return acc;
+    const id = t.originalInwardId.toString();
+    if (!acc[id]) acc[id] = [];
+    acc[id].push(t);
+    return acc;
+  }, {});
+
+  const processedInwards = inwards.map((inward: any) => {
+    const inwardIdStr = inward._id.toString();
+    const outwards = outwardsByInward[inwardIdStr] || [];
+    const transfersForOwnership = transfersByInward[inwardIdStr] || [];
+
+    const regularOutwards = outwards.filter((o: any) => o.remarks !== 'Ownership Transfer Out' && o.remarks !== 'Ownership Transfer Purchase');
+    
+    let totalOutwardKg = 0;
+    let totalOutwardBags = 0;
+    let totalTransferKg = 0;
+    let totalTransferBags = 0;
+
+    regularOutwards.forEach((o: any) => {
+      totalOutwardKg += (o.quantityKg || 0);
+      totalOutwardBags += (o.bagsCount || 0);
+    });
+
+    transfersForOwnership.forEach((t: any) => {
+      totalTransferKg += (t.quantityKg || 0);
+      totalTransferBags += (t.bagsCount || 0);
+    });
+
+    const currentBalanceKg = Math.max(0, (inward.quantityKg || 0) - totalOutwardKg - totalTransferKg);
+    const currentBalanceBags = Math.max(0, (inward.bagsCount || 0) - totalOutwardBags - totalTransferBags);
+
+    const computedStackAllocations = (inward.stackAllocations || []).reduce((acc: any[], alloc: any) => {
+      const key = `${alloc.chamberName || alloc.chamberNo}-${alloc.floorName || alloc.floorNo}-${alloc.stackName || alloc.stackNo}`;
+      if (!acc.some(a => `${a.chamberName || a.chamberNo}-${a.floorName || a.floorNo}-${a.stackName || a.stackNo}` === key)) {
+        let outwardedWeight = 0;
+        let outwardedBags = 0;
+        let transferredWeight = 0;
+        let transferredBags = 0;
+
+        regularOutwards.forEach((out: any) => {
+          if (isSameStack(out, alloc)) {
+            outwardedWeight += (Number(out.quantityKg) || 0);
+            outwardedBags += (Number(out.bagsCount) || 0);
+          }
+        });
+
+        transfersForOwnership.forEach((t: any) => {
+          (t.stackAllocations || []).forEach((s: any) => {
+            if (isSameStack(s, alloc)) {
+              transferredWeight += (Number(s.allocatedWeight) || 0);
+              transferredBags += (Number(s.bagsCount) || 0);
+            }
+          });
+        });
+
+        const originalWeight = Number(alloc.allocatedWeight) || 0;
+        const remainingWeight = Math.max(0, originalWeight - outwardedWeight - transferredWeight);
+        
+        const originalBags = Number(alloc.bagsCount) || 0;
+        const remainingBags = Math.max(0, originalBags - outwardedBags - transferredBags);
+
+        acc.push({
+          ...alloc,
+          allocatedWeight: remainingWeight,
+          bagsCount: remainingBags
+        });
+      }
+      return acc;
+    }, []);
+
+    return {
+      ...inward,
+      quantityKg: currentBalanceKg,
+      bagsCount: currentBalanceBags,
+      stackAllocations: computedStackAllocations
+    };
+  });
+
+  return JSON.parse(JSON.stringify(processedInwards));
 }
 
 export async function getColdInwardById(id: string) {
@@ -188,6 +311,20 @@ export async function createColdInward(data: any) {
       warning = "Buffer capacity used.";
     }
 
+    const dbClient = await Client.findOne({ _id: data.clientId, ...getTenantFilter(session) }).lean();
+    const isPurchaseClient = dbClient?.clientType === 'PURCHASE';
+
+    if (isPurchaseClient) {
+      data.stockType = 'Purchase';
+      data.purchaseQuantityKg = data.quantityKg;
+      data.purchaseBagsCount = data.bagsCount;
+      data.selfQuantityKg = 0;
+      data.selfBagsCount = 0;
+      if (data.stackAllocations) {
+        data.stackAllocations = data.stackAllocations.map((s: any) => ({ ...s, stockType: 'Purchase' }));
+      }
+    }
+
     // Clean up empty strings for enums to avoid validation errors
     if (data.grade === '') {
       delete data.grade;
@@ -338,6 +475,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         delete client.grade;
       }
 
+      const dbClient = await Client.findOne({ _id: client.clientId, ...getTenantFilter(session) }).lean();
+      const isPurchaseClient = dbClient?.clientType === 'PURCHASE';
+
       const stackAllocations = client.stacks.map((s: any) => ({
         chamberName: s.chamberName || s.chamberNo?.toString(),
         chamberNo: s.chamberNo && !isNaN(parseInt(s.chamberNo)) ? parseInt(s.chamberNo) : undefined,
@@ -345,11 +485,23 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         stackNo: parseInt(s.stackNo),
         allocatedWeight: Number(s.allocatedWeight) || 0,
         bagsCount: Number(s.allocatedBags) || 0,
-        stockType: s.stockType || 'Self',
+        stockType: isPurchaseClient ? 'Purchase' : (s.stockType || 'Self'),
       }));
       
       const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
       const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + s.bagsCount, 0);
+      const derivedSelfWeight = stackAllocations
+        .filter((s: any) => s.stockType === 'Self')
+        .reduce((sum: number, s: any) => sum + (Number(s.allocatedWeight) || 0), 0);
+      const derivedPurchaseWeight = stackAllocations
+        .filter((s: any) => s.stockType === 'Purchase')
+        .reduce((sum: number, s: any) => sum + (Number(s.allocatedWeight) || 0), 0);
+      const derivedSelfBags = stackAllocations
+        .filter((s: any) => s.stockType === 'Self')
+        .reduce((sum: number, s: any) => sum + (Number(s.bagsCount) || 0), 0);
+      const derivedPurchaseBags = stackAllocations
+        .filter((s: any) => s.stockType === 'Purchase')
+        .reduce((sum: number, s: any) => sum + (Number(s.bagsCount) || 0), 0);
 
       const commodity = await ColdCommodity.findOne({ _id: client.commodityId, ...getTenantFilter(session) }).lean();
       const unit = commodity?.unit || 'KG';
@@ -383,11 +535,11 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         gradingChargeType: client.gradingChargeType,
         gradingRate: client.gradingRate,
         gradingCharge: client.gradingCharge,
-        stockType: client.stockType || 'Self',
-        purchaseQuantityKg: client.purchaseQuantityKg || 0,
-        purchaseBagsCount: client.purchaseBagsCount || 0,
-        selfQuantityKg: client.selfQuantityKg || 0,
-        selfBagsCount: client.selfBagsCount || 0,
+        stockType: isPurchaseClient ? 'Purchase' : (client.stockType || 'Self'),
+        purchaseQuantityKg: isPurchaseClient ? totalQuantity : (client.stockType === 'Both' ? (client.purchaseQuantityKg ?? derivedPurchaseWeight) : (client.purchaseQuantityKg ?? 0)),
+        purchaseBagsCount: isPurchaseClient ? totalAllocatedBags : (client.stockType === 'Both' ? (client.purchaseBagsCount ?? derivedPurchaseBags) : (client.purchaseBagsCount ?? 0)),
+        selfQuantityKg: isPurchaseClient ? 0 : (client.stockType === 'Both' ? (client.selfQuantityKg ?? derivedSelfWeight) : (client.selfQuantityKg ?? totalQuantity)),
+        selfBagsCount: isPurchaseClient ? 0 : (client.stockType === 'Both' ? (client.selfBagsCount ?? derivedSelfBags) : (client.selfBagsCount ?? totalAllocatedBags)),
       };
       
       const inward = await ColdInward.create(appendOwnership({

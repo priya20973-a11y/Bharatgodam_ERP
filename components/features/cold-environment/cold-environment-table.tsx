@@ -25,7 +25,20 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
         const w = (r.warehouseId?.name || '').replace(/,/g, '');
         const c = (r.chamberName || '').replace(/,/g, '');
         const n = (r.notes || '').replace(/,/g, '');
-        return `${d},${w},${c},Floor ${r.floorNo},${r.temperature},${r.moisture},${n}`;
+        
+        let floorName = `Floor ${r.floorNo}`;
+        const wh = warehouses.find(wh => wh._id === (r.warehouseId?._id || r.warehouseId));
+        if (wh) {
+          const chamber = (wh.chambers || []).find((ch: any) => ch.name === r.chamberName);
+          if (chamber) {
+            const floor = (chamber.floors || []).find((f: any) => f.floorNo === r.floorNo);
+            if (floor) {
+              floorName = floor.name;
+            }
+          }
+        }
+
+        return `${d},${w},${c},${floorName},${r.temperature},${r.moisture},${n}`;
       })
     ].join('\n');
 
@@ -55,13 +68,35 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
   const getChambers = () => {
     if (!filterWarehouse) return [];
     const wh = warehouses.find(w => w._id === filterWarehouse);
-    return Array.from({ length: wh?.noOfChambers || 0 }, (_, i) => `Chamber ${i + 1}`);
+    return (wh?.chambers || []).map((c: any) => c.name);
   };
 
   const getFloors = () => {
     if (!filterWarehouse) return [];
     const wh = warehouses.find(w => w._id === filterWarehouse);
-    return Array.from({ length: wh?.noOfFloors || 0 }, (_, i) => i + 1);
+    if (filterChamber) {
+      const chamber = (wh?.chambers || []).find((c: any) => c.name === filterChamber);
+      return chamber?.floors || [];
+    } else {
+      const allFloors: any[] = [];
+      (wh?.chambers || []).forEach((c: any) => {
+        (c.floors || []).forEach((f: any) => {
+          if (!allFloors.find(existing => existing.floorNo === f.floorNo)) {
+            allFloors.push(f);
+          }
+        });
+      });
+      return allFloors;
+    }
+  };
+
+  const getFloorName = (whId: string, chamberName: string, floorNo: number) => {
+    const wh = warehouses.find(w => w._id === (typeof whId === 'object' ? (whId as any)._id : whId));
+    if (!wh) return `Floor ${floorNo}`;
+    const chamber = (wh.chambers || []).find((c: any) => c.name === chamberName);
+    if (!chamber) return `Floor ${floorNo}`;
+    const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
+    return floor ? floor.name : `Floor ${floorNo}`;
   };
 
   return (
@@ -76,15 +111,15 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <select className="border p-2 rounded" value={filterWarehouse} onChange={(e) => { setFilterWarehouse(e.target.value); setFilterChamber(''); setFilterFloor(''); }}>
           <option value="">All Warehouses</option>
-          {warehouses.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
+          {warehouses.map((w: any) => <option key={w._id} value={w._id}>{w.name}</option>)}
         </select>
         <select className="border p-2 rounded" value={filterChamber} onChange={(e) => setFilterChamber(e.target.value)} disabled={!filterWarehouse}>
           <option value="">All Chambers</option>
-          {getChambers().map(c => <option key={c} value={c}>{c}</option>)}
+          {getChambers().map((c: any) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select className="border p-2 rounded" value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)} disabled={!filterWarehouse}>
           <option value="">All Floors</option>
-          {getFloors().map(f => <option key={f} value={f.toString()}>Floor {f}</option>)}
+          {getFloors().map((f: any) => <option key={f.floorNo} value={f.floorNo.toString()}>{f.name}</option>)}
         </select>
         <input type="date" className="border p-2 rounded" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
         <input type="date" className="border p-2 rounded" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
@@ -109,7 +144,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
               <tr key={i}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{isMounted ? new Date(r.date).toLocaleString() : ''}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.warehouseId?.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.chamberName} / Floor {r.floorNo}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.chamberName} / {getFloorName(r.warehouseId, r.chamberName, r.floorNo)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.temperature}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.moisture}</td>
                 <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{r.notes}</td>

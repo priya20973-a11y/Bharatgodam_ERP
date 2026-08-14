@@ -80,6 +80,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       toast.error('Client already added');
       return;
     }
+    
+    const clientDetails = clients.find(c => c._id === clientId);
+    const initialStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : 'Self';
+    
     setClientSections([...clientSections, {
       id: Date.now().toString(),
       clientId,
@@ -94,7 +98,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       bagsCount: null,
       jin: null,
       mixed: null,
-      stockType: 'Self',
+      stockType: initialStockType,
       purchaseQuantityKg: null,
       purchaseBagsCount: null,
       selfQuantityKg: null,
@@ -103,7 +107,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       farmerName: '',
       farmerId: '',
       kataBharati: 0,
-      stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: 'Self' }],
+      stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: initialStockType }],
       referencePersons: [],
       qualityEntries: []
     }]);
@@ -133,7 +137,12 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
   const addStack = (clientIndex: number) => {
     const updated = [...clientSections];
-    updated[clientIndex].stacks.push({ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null });
+    const clientData = updated[clientIndex];
+    const clientDetails = clients.find(c => c._id === clientData.clientId);
+    const effectiveStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : (clientData.stockType || 'Self');
+    const stackStockType = effectiveStockType === 'Purchase' ? 'Purchase' : 'Self';
+    
+    updated[clientIndex].stacks.push({ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: stackStockType });
     setClientSections(updated);
   };
 
@@ -143,9 +152,79 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     setClientSections(updated);
   };
 
+  const getWeightPerBag = (clientIndex: number) => {
+    const client = clientSections[clientIndex];
+    if (!client) return 50;
+
+    const effectiveCommodityId = common.sameCommodity ? common.commodityId : client.commodityId;
+    const comm = commodities.find(c => String(c._id) === String(effectiveCommodityId));
+    
+    // 1. Direct property on commodity
+    if (comm) {
+      const commW = Number(comm.weightPerBag ?? comm.bagWeight ?? comm.kataBharati ?? comm.defaultBagWeight ?? 0);
+      if (commW > 0) return commW;
+    }
+
+    // 2. Client kataBharati
+    if (client.kataBharati && Number(client.kataBharati) > 0) {
+      return Number(client.kataBharati);
+    }
+
+    // 3. Common kataBharati
+    if ((common as any).kataBharati && Number((common as any).kataBharati) > 0) {
+      return Number((common as any).kataBharati);
+    }
+
+    // 4. Client net weight & total bags
+    const calcTotalBags = Number(client.bagsCount || 0) + Number(client.jin || 0) + Number(client.mixed || 0);
+    const clientNetWeight = (Number(client.grossWeight) || 0) - (Number(client.emptyWeight) || 0);
+    if (calcTotalBags > 0 && clientNetWeight > 0) {
+      return clientNetWeight / calcTotalBags;
+    }
+
+    // 5. Common net weight & total bags across all clients
+    const grandTotalBags = clientSections.reduce((acc, c) => acc + (Number(c.bagsCount || 0) + Number(c.jin || 0) + Number(c.mixed || 0)), 0);
+    const commonNetWeight = (Number(common.grossWeight) || 0) - (Number(common.emptyWeight) || 0);
+    if (grandTotalBags > 0 && commonNetWeight > 0) {
+      return commonNetWeight / grandTotalBags;
+    }
+
+    return 50;
+  };
+
   const updateStack = (clientIndex: number, stackIndex: number, field: string, value: any) => {
     const updated = [...clientSections];
-    updated[clientIndex].stacks[stackIndex][field] = value;
+    const stack = { ...updated[clientIndex].stacks[stackIndex] };
+
+    if (field === 'allocatedBags') {
+      const bags = value !== null && value !== undefined && value !== '' ? Number(value) : null;
+      stack.allocatedBags = bags;
+      if (bags === null) {
+        stack.allocatedWeight = null;
+      } else {
+        const wPerBag = getWeightPerBag(clientIndex);
+        if (wPerBag > 0) {
+          const calculatedWeight = bags * wPerBag;
+          stack.allocatedWeight = Number.isInteger(calculatedWeight) ? calculatedWeight : Number(calculatedWeight.toFixed(2));
+        }
+      }
+    } else if (field === 'allocatedWeight') {
+      const wt = value !== null && value !== undefined && value !== '' ? Number(value) : null;
+      stack.allocatedWeight = wt;
+      if (wt === null) {
+        stack.allocatedBags = null;
+      } else {
+        const wPerBag = getWeightPerBag(clientIndex);
+        if (wPerBag > 0) {
+          const calculatedBags = wt / wPerBag;
+          stack.allocatedBags = Number.isInteger(calculatedBags) ? calculatedBags : Number(calculatedBags.toFixed(2));
+        }
+      }
+    } else {
+      stack[field] = value;
+    }
+
+    updated[clientIndex].stacks[stackIndex] = stack;
     setClientSections(updated);
   };
 
@@ -203,28 +282,18 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           toast.error(`Incomplete stack details for client ${i + 1}`);
           return;
         }
+
+        if (s.allocatedBags !== null && s.allocatedBags !== undefined && !Number.isInteger(Number(s.allocatedBags))) {
+          toast.error(`Allocated Bags (${s.allocatedBags} bags) for Stack ${s.stackNo} is a fraction. Please adjust values so Allocation Bags is a whole number.`);
+          return;
+        }
+
         grandTotalAllocatedWeight += Number(s.allocatedWeight) || 0;
         grandTotalAllocatedBags += Number(s.allocatedBags) || 0;
       }
       grandTotalBags += Number(c.bagsCount || 0) + Number(c.jin || 0) + Number(c.mixed || 0);
 
-      // Stock Type validation
-      if (c.stockType === 'Both') {
-        let totalSelfWt = 0;
-        let totalPurchaseWt = 0;
-        for (const s of c.stacks) {
-          if (s.stockType === 'Self') totalSelfWt += Number(s.allocatedWeight) || 0;
-          if (s.stockType === 'Purchase') totalPurchaseWt += Number(s.allocatedWeight) || 0;
-        }
-        if (Math.abs(totalSelfWt - (Number(c.selfQuantityKg) || 0)) > 0.01) {
-          toast.error(`Self allocated weight (${totalSelfWt}) does not match Self Qty (${c.selfQuantityKg}) for client ${i + 1}`);
-          return;
-        }
-        if (Math.abs(totalPurchaseWt - (Number(c.purchaseQuantityKg) || 0)) > 0.01) {
-          toast.error(`Purchase allocated weight (${totalPurchaseWt}) does not match Purchase Qty (${c.purchaseQuantityKg}) for client ${i + 1}`);
-          return;
-        }
-      }
+      // Validation for stockType === 'Both' has been removed, as quantities are now auto-calculated based on stack allocations.
     }
 
     if (grandTotalAllocatedBags !== grandTotalBags) {
@@ -242,7 +311,14 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
     for (let i = 0; i < clientSections.length; i++) {
       const c = clientSections[i];
-      
+      const clientDetails = clients.find(cl => cl._id === c.clientId);
+      const isPurchaseClient = clientDetails?.clientType === 'PURCHASE';
+
+      if (isPurchaseClient) {
+        c.stockType = 'Purchase';
+        c.stacks.forEach((s: any) => s.stockType = 'Purchase');
+      }
+
       let clientAllocated = 0;
       for (const s of c.stacks) {
         clientAllocated += Number(s.allocatedWeight) || 0;
@@ -272,15 +348,27 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         c.purchaseBagsCount = totalBags;
         c.selfBagsCount = 0;
       } else if (c.stockType === 'Both') {
-        // Quantities are already specified by the user manually, but we should calculate bags based on stacks
         let totalSelfBags = 0;
         let totalPurchaseBags = 0;
+        let totalSelfWt = 0;
+        let totalPurchaseWt = 0;
+        
         for (const s of c.stacks) {
-          if (s.stockType === 'Self') totalSelfBags += Number(s.allocatedBags) || 0;
-          if (s.stockType === 'Purchase') totalPurchaseBags += Number(s.allocatedBags) || 0;
+          if (s.stockType === 'Self') {
+            totalSelfBags += Number(s.allocatedBags) || 0;
+            totalSelfWt += Number(s.allocatedWeight) || 0;
+          }
+          if (s.stockType === 'Purchase') {
+            totalPurchaseBags += Number(s.allocatedBags) || 0;
+            totalPurchaseWt += Number(s.allocatedWeight) || 0;
+          }
         }
+        
         c.selfBagsCount = totalSelfBags;
         c.purchaseBagsCount = totalPurchaseBags;
+        
+        c.selfQuantityKg = totalSelfWt;
+        c.purchaseQuantityKg = totalPurchaseWt;
       }
       
       if (c.gradingApplied) {
@@ -607,7 +695,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-purple-700">Stock Type</label>
-                <Select value={client.stockType || 'Self'} onValueChange={(v) => {
+                <Select disabled={clientDetails?.clientType === 'PURCHASE'} value={clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : (client.stockType || 'Self')} onValueChange={(v) => {
                   updateClient(cIdx, 'stockType', v);
                   // Auto-update all existing stacks
                   if (v === 'Self' || v === 'Purchase') {
@@ -627,24 +715,9 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               </div>
               
               {client.stockType === 'Both' && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-purple-700">Self Qty (KG)</label>
-                    <ColdNumberInput 
-                      value={client.selfQuantityKg ?? ''} 
-                      onChange={(v) => updateClient(cIdx, 'selfQuantityKg', v ? Number(v) : null)} 
-                      className="bg-white border-purple-200 focus:ring-purple-500" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-purple-700">Purchase Qty (KG)</label>
-                    <ColdNumberInput 
-                      value={client.purchaseQuantityKg ?? ''} 
-                      onChange={(v) => updateClient(cIdx, 'purchaseQuantityKg', v ? Number(v) : null)} 
-                      className="bg-white border-purple-200 focus:ring-purple-500" 
-                    />
-                  </div>
-                </>
+                <div className="col-span-2 text-sm text-purple-600 flex items-center h-full">
+                  Quantities will be automatically calculated based on stack allocations.
+                </div>
               )}
             </div>
 
@@ -820,7 +893,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-blue-600">{getDynamicUnitLabel(clientUnit, 'alloc')}</label>
-                      <ColdNumberInput className="h-8 text-xs" min="0" value={stack.allocatedBags ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedBags', v ? Number(v) : null)} />
+                      <ColdNumberInput className={`h-8 text-xs ${stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) ? 'border-red-500 bg-red-50' : ''}`} min="0" value={stack.allocatedBags ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedBags', v ? Number(v) : null)} />
+                      {stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) && (
+                        <p className="text-[10px] text-red-600 font-semibold leading-tight">Fractional Bags ({stack.allocatedBags}). Must be a whole number.</p>
+                      )}
                     </div>
                     <div className="pb-0.5">
                       {client.stacks.length > 1 && (

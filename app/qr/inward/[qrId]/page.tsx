@@ -9,6 +9,28 @@ import '@/lib/models/Client';
 import '@/lib/models/ColdCommodity';
 import '@/lib/models/ColdWarehouse';
 
+function isSameStack(a: any, b: any): boolean {
+  if (!a || !b) return false;
+  const cA = a.chamberNo ?? a.chamberName;
+  const cB = b.chamberNo ?? b.chamberName;
+  if (cA !== undefined && cA !== null && cB !== undefined && cB !== null) {
+    if (String(cA).replace(/^Chamber\s+/i, '').trim() !== String(cB).replace(/^Chamber\s+/i, '').trim()) return false;
+  }
+  const fA = a.floorNo ?? a.floorName;
+  const fB = b.floorNo ?? b.floorName;
+  if (fA !== undefined && fA !== null && fB !== undefined && fB !== null) {
+    if (String(fA).trim() !== String(fB).trim()) return false;
+  }
+  const sA = a.stackNo ?? a.stackName;
+  const sB = b.stackNo ?? b.stackName;
+  if (sA !== undefined && sA !== null && sB !== undefined && sB !== null) {
+    if (String(sA).trim() !== String(sB).trim()) return false;
+  } else {
+    return false;
+  }
+  return true;
+}
+
 export default async function PublicInwardQRDetailsPage({ params }: { params: Promise<{ qrId: string }> }) {
   const resolvedParams = await params;
   
@@ -32,19 +54,52 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
     return notFound();
   }
 
-  // Fetch outwards for calculation
+  // Fetch outwards and transfers for calculation
   await connectToDatabase();
   const outwards = await ColdOutward.find({ inwardId: inward._id }).lean();
+  const transfersForOwnership = await ColdTransfer.find({ originalInwardId: inward._id }).lean();
   
   const inwardQuantity = inward.quantityKg || 0;
   
   const regularOutwards = outwards.filter((o: any) => o.remarks !== 'Ownership Transfer Out' && o.remarks !== 'Ownership Transfer Purchase');
-  const ownershipTransferOutwards = outwards.filter((o: any) => o.remarks === 'Ownership Transfer Out' || o.remarks === 'Ownership Transfer Purchase');
   
   const actualOutwardKg = regularOutwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
-  const ownershipTransferKg = ownershipTransferOutwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
+  const ownershipTransferKg = transfersForOwnership.reduce((sum: number, t: any) => sum + (t.quantityKg || 0), 0);
   
   const currentBalance = Math.max(0, inwardQuantity - actualOutwardKg - ownershipTransferKg);
+
+  const computedStackAllocations = (inward.stackAllocations || []).reduce((acc: any[], alloc: any) => {
+    const key = `${alloc.chamberName || alloc.chamberNo}-${alloc.floorName || alloc.floorNo}-${alloc.stackName || alloc.stackNo}`;
+    if (!acc.some(a => `${a.chamberName || a.chamberNo}-${a.floorName || a.floorNo}-${a.stackName || a.stackNo}` === key)) {
+      let outwardedWeight = 0;
+      let transferredWeight = 0;
+
+      regularOutwards.forEach((out: any) => {
+        if (isSameStack(out, alloc)) {
+          outwardedWeight += (Number(out.quantityKg) || 0);
+        }
+      });
+
+      transfersForOwnership.forEach((t: any) => {
+        (t.stackAllocations || []).forEach((s: any) => {
+          if (isSameStack(s, alloc)) {
+            transferredWeight += (Number(s.allocatedWeight) || 0);
+          }
+        });
+      });
+
+      const originalWeight = Number(alloc.allocatedWeight) || 0;
+      const remainingWeight = Math.max(0, originalWeight - outwardedWeight - transferredWeight);
+
+      acc.push({
+        ...alloc,
+        remainingWeight,
+        transferredWeight,
+        outwardedWeight
+      });
+    }
+    return acc;
+  }, []);
 
   // Fetch transfers to determine current owners
   const transfers = await ColdTransfer.find({ originalInwardId: inward._id }).populate('toClientId', 'name').lean();
@@ -124,20 +179,40 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Warehouse Name</span>
               <span className="font-semibold text-slate-800">{inward.warehouseId?.name || '-'}</span>
             </div>
-            {inward.stackAllocations && inward.stackAllocations.length > 0 ? (
-              inward.stackAllocations.map((alloc: any, i: number) => (
-                <div key={i} className="col-span-2 grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Chamber</span>
-                    <span className="font-medium text-slate-800">{alloc.chamberName || alloc.chamberNo || '-'}</span>
+            {computedStackAllocations && computedStackAllocations.length > 0 ? (
+              computedStackAllocations.map((alloc: any, i: number) => (
+                <div key={i} className="col-span-2 flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Chamber</span>
+                      <span className="font-medium text-slate-800">{alloc.chamberName || alloc.chamberNo || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Floor</span>
+                      <span className="font-medium text-slate-800">{alloc.floorName || alloc.floorNo || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Stack</span>
+                      <span className="font-medium text-slate-800">{alloc.stackName || alloc.stackNo || '-'}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Floor</span>
-                    <span className="font-medium text-slate-800">{alloc.floorName || alloc.floorNo || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Stack</span>
-                    <span className="font-medium text-slate-800">{alloc.stackName || alloc.stackNo || '-'}</span>
+                  <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-200">
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Remaining Stock</span>
+                      <span className="font-bold text-indigo-700">{alloc.remainingWeight} {inward.unit || 'Kg'}</span>
+                    </div>
+                    {alloc.transferredWeight > 0 && (
+                      <div>
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Ownership Transfer</span>
+                        <span className="font-bold text-blue-600">{alloc.transferredWeight} {inward.unit || 'Kg'}</span>
+                      </div>
+                    )}
+                    {alloc.outwardedWeight > 0 && (
+                      <div>
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Outwarded</span>
+                        <span className="font-bold text-rose-600">{alloc.outwardedWeight} {inward.unit || 'Kg'}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

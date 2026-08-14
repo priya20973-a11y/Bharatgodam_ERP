@@ -3,7 +3,29 @@ import { notFound } from 'next/navigation';
 import { CalendarIcon, MapPinIcon, PackageIcon, TruckIcon, UserIcon, ScaleIcon, FileTextIcon, InfoIcon, HistoryIcon } from 'lucide-react';
 import connectToDatabase from '@/lib/mongoose';
 import ColdOutward from '@/lib/models/ColdOutward';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 
+function isSameStack(a: any, b: any): boolean {
+  if (!a || !b) return false;
+  const cA = a.chamberNo ?? a.chamberName;
+  const cB = b.chamberNo ?? b.chamberName;
+  if (cA !== undefined && cA !== null && cB !== undefined && cB !== null) {
+    if (String(cA).replace(/^Chamber\s+/i, '').trim() !== String(cB).replace(/^Chamber\s+/i, '').trim()) return false;
+  }
+  const fA = a.floorNo ?? a.floorName;
+  const fB = b.floorNo ?? b.floorName;
+  if (fA !== undefined && fA !== null && fB !== undefined && fB !== null) {
+    if (String(fA).trim() !== String(fB).trim()) return false;
+  }
+  const sA = a.stackNo ?? a.stackName;
+  const sB = b.stackNo ?? b.stackName;
+  if (sA !== undefined && sA !== null && sB !== undefined && sB !== null) {
+    if (String(sA).trim() !== String(sB).trim()) return false;
+  } else {
+    return false;
+  }
+  return true;
+}
 export default async function TransactionDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   
@@ -19,13 +41,49 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
 
   const inward = res.data;
 
-  // Fetch Outward History
+  // Fetch Outwards and Transfers
   await connectToDatabase();
   const outwards = await ColdOutward.find({ inwardId: inward._id }).sort({ date: -1, createdAt: -1 }).lean();
+  const transfersForOwnership = await ColdTransfer.find({ originalInwardId: inward._id }).lean();
   
   const totalOutward = outwards.reduce((sum: number, out: any) => sum + (out.quantityKg || 0), 0);
   const currentBalance = Math.max(0, (inward.quantityKg || 0) - totalOutward);
   const isFullyOutwarded = totalOutward >= (inward.quantityKg || 0);
+
+  const regularOutwards = outwards.filter((o: any) => o.remarks !== 'Ownership Transfer Out' && o.remarks !== 'Ownership Transfer Purchase');
+
+  const computedStackAllocations = (inward.stackAllocations || []).reduce((acc: any[], alloc: any) => {
+    const key = `${alloc.chamberName || alloc.chamberNo}-${alloc.floorName || alloc.floorNo}-${alloc.stackName || alloc.stackNo}`;
+    if (!acc.some(a => `${a.chamberName || a.chamberNo}-${a.floorName || a.floorNo}-${a.stackName || a.stackNo}` === key)) {
+      let outwardedWeight = 0;
+      let transferredWeight = 0;
+
+      regularOutwards.forEach((out: any) => {
+        if (isSameStack(out, alloc)) {
+          outwardedWeight += (Number(out.quantityKg) || 0);
+        }
+      });
+
+      transfersForOwnership.forEach((t: any) => {
+        (t.stackAllocations || []).forEach((s: any) => {
+          if (isSameStack(s, alloc)) {
+            transferredWeight += (Number(s.allocatedWeight) || 0);
+          }
+        });
+      });
+
+      const originalWeight = Number(alloc.allocatedWeight) || 0;
+      const remainingWeight = Math.max(0, originalWeight - outwardedWeight - transferredWeight);
+
+      acc.push({
+        ...alloc,
+        remainingWeight,
+        transferredWeight,
+        outwardedWeight
+      });
+    }
+    return acc;
+  }, []);
 
   const displayDate = inward.date ? new Date(inward.date).toLocaleDateString('en-GB') : 'N/A';
   const displayCommodity = `${inward.commodityId?.name || 'N/A'} ${inward.commodityId?.type ? `(${inward.commodityId.type})` : ''}`;
@@ -185,17 +243,21 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
                   <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs">Floor</th>
                   <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs">Stack</th>
                   <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs text-right">Bags (L/B)</th>
-                  <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs text-right">Quantity</th>
+                  <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs text-right">Remaining</th>
+                  <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs text-right">Transferred</th>
+                  <th className="px-4 py-3 font-bold uppercase tracking-wider text-xs text-right">Outwarded</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {inward.stackAllocations.map((alloc: any, i: number) => (
+                {computedStackAllocations.map((alloc: any, i: number) => (
                   <tr key={i} className="bg-white hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium">{alloc.chamberName || alloc.chamberNo}</td>
                     <td className="px-4 py-3 font-medium">{alloc.floorName || alloc.floorNo}</td>
                     <td className="px-4 py-3 font-bold text-indigo-600">{alloc.stackName || alloc.stackNo}</td>
                     <td className="px-4 py-3 font-medium text-right">{alloc.bagsCount || 0}</td>
-                    <td className="px-4 py-3 font-bold text-right text-slate-700">{alloc.allocatedWeight || 0} {inward.unit || 'Kg'}</td>
+                    <td className="px-4 py-3 font-bold text-right text-indigo-700">{alloc.remainingWeight} {inward.unit || 'Kg'}</td>
+                    <td className="px-4 py-3 font-bold text-right text-blue-600">{alloc.transferredWeight > 0 ? `${alloc.transferredWeight} ${inward.unit || 'Kg'}` : '-'}</td>
+                    <td className="px-4 py-3 font-bold text-right text-rose-600">{alloc.outwardedWeight > 0 ? `${alloc.outwardedWeight} ${inward.unit || 'Kg'}` : '-'}</td>
                   </tr>
                 ))}
               </tbody>

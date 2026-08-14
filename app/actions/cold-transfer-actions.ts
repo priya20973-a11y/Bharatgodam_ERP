@@ -28,7 +28,13 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
     .lean();
 
   const outwards = await ColdOutward.aggregate([
-    { $match: { clientId: new mongoose.Types.ObjectId(clientId), ...tenantFilter } },
+    { 
+      $match: { 
+        clientId: new mongoose.Types.ObjectId(clientId), 
+        remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] },
+        ...tenantFilter 
+      } 
+    },
     { $group: { 
         _id: { inwardId: '$inwardId', chamberName: '$chamberName', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
         totalOutward: { $sum: '$quantityKg' },
@@ -46,15 +52,34 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
     }
   });
 
+  const transfers = await ColdTransfer.find({
+    fromClientId: new mongoose.Types.ObjectId(clientId),
+    ...tenantFilter
+  }).lean();
+
+  const transferMap = new Map();
+  transfers.forEach((t: any) => {
+    if (t.originalInwardId && t.stackAllocations) {
+      t.stackAllocations.forEach((alloc: any) => {
+        const chamberKey = alloc.chamberName || alloc.chamberNo;
+        const key = `${t.originalInwardId.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+        const existing = transferMap.get(key) || { transferredQty: 0, transferredBags: 0 };
+        transferMap.set(key, {
+          transferredQty: existing.transferredQty + (alloc.allocatedWeight || 0),
+          transferredBags: existing.transferredBags + (alloc.bagsCount || 0)
+        });
+      });
+    }
+  });
+
   const availableInwards = inwards.map((inward: any) => {
     if (!inward.stackAllocations) return null;
     
     const mergedAllocations = new Map();
     inward.stackAllocations.forEach((alloc: any) => {
-      // Filter by transferType
-      const stockType = alloc.stockType || 'Self';
-      if (transferType === 'Purchase' && stockType !== 'Purchase') return;
-      if (transferType === 'Self' && stockType !== 'Self') return;
+      // Filter by stockType (only Self stock can be transferred)
+      const stockType = alloc.stockType || inward.stockType || 'Self';
+      if (stockType !== 'Self') return;
 
       let resolvedChamberName = alloc.chamberName;
       if (!resolvedChamberName && inward.warehouseId?.chambers) {
@@ -92,8 +117,10 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
       const chamberKey = alloc.chamberName || alloc.chamberNo;
       const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0, bagsOut: 0 };
-      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out);
-      const availableBags = Math.max(0, alloc.bagsCount - outData.bagsOut);
+      const transData = transferMap.get(key) || { transferredQty: 0, transferredBags: 0 };
+
+      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out - transData.transferredQty);
+      const availableBags = Math.max(0, alloc.bagsCount - outData.bagsOut - transData.transferredBags);
       
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
@@ -164,6 +191,23 @@ export async function createOwnershipTransfer(data: {
   }
 
   const transferDateObj = new Date(data.transferDate);
+
+  // Prevent duplicate submission within last 15 seconds
+  const fifteenSecondsAgo = new Date(Date.now() - 15000);
+  const recentDuplicate = await ColdTransfer.findOne({
+    originalInwardId: targetInward._id,
+    fromClientId: data.fromClientId,
+    toClientId: data.toClientId || data.fromClientId,
+    quantityKg: data.transferWeight,
+    bagsCount: data.transferBags,
+    transferType: transferType,
+    createdAt: { $gte: fifteenSecondsAgo }
+  });
+
+  if (recentDuplicate) {
+    return { success: true, transferId: recentDuplicate._id.toString() };
+  }
+
   let remainingWeight = data.transferWeight;
   let remainingBags = data.transferBags;
 
@@ -196,33 +240,60 @@ export async function createOwnershipTransfer(data: {
   }
 
   if (transferType === 'Purchase') {
-    const outwardPromises = transferAllocations.map((item: any) => {
-      return ColdOutward.create(appendOwnership({
-        clientId: data.toClientId,
-        inwardId: targetInward._id,
-        commodityId: targetInward.commodityId._id,
-        warehouseId: targetInward.warehouseId._id,
+    const originalInward = await ColdInward.findById(targetInward._id);
+    if (!originalInward) throw new Error("Original inward not found");
+
+    for (const item of transferAllocations) {
+      // Find the corresponding Self allocation
+      const selfAlloc = originalInward.stackAllocations.find((a: any) => 
+        (a.chamberName === item.chamberName || (a.chamberNo && a.chamberNo === item.chamberNo)) && 
+        a.floorNo === item.floorNo && 
+        a.stackNo === item.stackNo &&
+        (a.stockType === 'Self' || !a.stockType)
+      );
+
+      if (selfAlloc) {
+        // Decrease the Self allocation
+        selfAlloc.allocatedWeight -= item.allocatedWeight;
+        if (selfAlloc.bagsCount) selfAlloc.bagsCount -= item.bagsCount;
+        
+        // Ensure we don't go below 0
+        if (selfAlloc.allocatedWeight < 0) selfAlloc.allocatedWeight = 0;
+        if (selfAlloc.bagsCount && selfAlloc.bagsCount < 0) selfAlloc.bagsCount = 0;
+      }
+
+      // Append the new Purchase allocation
+      originalInward.stackAllocations.push({
         chamberName: item.chamberName,
         chamberNo: item.chamberNo,
         floorNo: item.floorNo,
         stackNo: item.stackNo,
-        quantityKg: item.allocatedWeight,
+        allocatedWeight: item.allocatedWeight,
         bagsCount: item.bagsCount,
-        grade: item.grade,
-        gradingType: item.gradingType,
-        date: transferDateObj,
-        remarks: 'Ownership Transfer Purchase',
-      }, session));
-    });
+        stockType: 'Purchase'
+      });
+    }
 
-    const createdOutwards = await Promise.all(outwardPromises);
-    const outwardIdForTransfer = createdOutwards[0]._id;
+    // Set stockType of inward to 'Both' if there are multiple types
+    const hasSelf = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && (a.stockType === 'Self' || !a.stockType));
+    const hasPurchase = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && a.stockType === 'Purchase');
+    
+    if (hasSelf && hasPurchase) {
+      originalInward.stockType = 'Both';
+    } else if (hasPurchase) {
+      originalInward.stockType = 'Purchase';
+    } else {
+      originalInward.stockType = 'Self';
+    }
+
+    await originalInward.save();
 
     const transferData = {
       fromClientId: data.fromClientId,
-      toClientId: data.toClientId,
+      toClientId: data.toClientId || targetInward.warehouseId._id,
+      toClientModel: 'ColdWarehouse',
       originalInwardId: targetInward._id,
-      outwardId: outwardIdForTransfer,
+      newInwardId: targetInward._id, // Same inward
       warehouseId: targetInward.warehouseId._id,
       commodityId: targetInward.commodityId._id,
       stackAllocations: transferAllocations,
@@ -237,35 +308,11 @@ export async function createOwnershipTransfer(data: {
     revalidatePath('/cold/dashboard');
     revalidatePath('/cold/transfers');
     revalidatePath('/cold/inward');
-    revalidatePath('/cold/outward');
+    revalidatePath('/cold/purchase');
 
     return { success: true, transferId: transfer._id.toString() };
-
   } else {
-    // 2. Create Transfer-Outs for the old client (deducts stock)
-    const outwardPromises = transferAllocations.map((item: any) => {
-      return ColdOutward.create(appendOwnership({
-        clientId: data.fromClientId,
-        inwardId: targetInward._id,
-        commodityId: targetInward.commodityId._id,
-        warehouseId: targetInward.warehouseId._id,
-        chamberName: item.chamberName,
-        chamberNo: item.chamberNo,
-        floorNo: item.floorNo,
-        stackNo: item.stackNo,
-        quantityKg: item.allocatedWeight,
-        bagsCount: item.bagsCount,
-        grade: item.grade,
-        gradingType: item.gradingType,
-        date: transferDateObj,
-        remarks: 'Ownership Transfer Out',
-      }, session));
-    });
-
-    const createdOutwards = await Promise.all(outwardPromises);
-    const outwardIdForTransfer = createdOutwards[0]._id;
-
-    // 3. Create Transfer-In for the new client (adds stock)
+    // 2. Create Transfer-In for the new client (adds stock)
     const newInwardData = {
       clientId: data.toClientId,
       commodityId: targetInward.commodityId._id,
@@ -286,13 +333,12 @@ export async function createOwnershipTransfer(data: {
 
     const newInward = await ColdInward.create(appendOwnership(newInwardData, session));
 
-    // 4. Create Transfer Record
+    // 3. Create Transfer Record
     const transferData = {
       fromClientId: data.fromClientId,
       toClientId: data.toClientId,
       originalInwardId: targetInward._id,
       newInwardId: newInward._id,
-      outwardId: outwardIdForTransfer,
       warehouseId: targetInward.warehouseId._id,
       commodityId: targetInward.commodityId._id,
       stackAllocations: transferAllocations,

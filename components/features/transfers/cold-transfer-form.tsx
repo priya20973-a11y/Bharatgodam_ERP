@@ -107,7 +107,7 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
   }, [inwardId, availableInwards, setValue, transferType]);
 
   const onSubmit = async (values: any) => {
-    if (values.fromClientId === values.toClientId) {
+    if (values.transferType !== 'Purchase' && values.fromClientId === values.toClientId) {
       alert("Cannot transfer to the same client.");
       return;
     }

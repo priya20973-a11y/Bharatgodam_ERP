@@ -32,6 +32,14 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
 
   const groupedInwards = inwards;
 
+  const getFloorName = (warehouse: any, chamberName: any, floorNo: any) => {
+    if (!warehouse || !warehouse.chambers) return floorNo ?? '-';
+    const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === chamberName);
+    if (!chamber) return floorNo ?? '-';
+    const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
+    return floor ? floor.name : (floorNo ?? '-');
+  };
+
   const exportCsv = () => {
     const headers = [
       t('inward.dateHeader') || 'Date',
@@ -54,7 +62,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
       const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
       const warehouse = w.warehouseId?.name || '-';
       const chamber = w.stackAllocations?.map((s: any) => String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')).join('; ') || String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
-      const floor = w.stackAllocations?.map((s: any) => s.floorNo).join('; ') || w.floorNo || '-';
+      const floor = w.stackAllocations?.map((s: any) => getFloorName(w.warehouseId, s.chamberName || s.chamberNo, s.floorNo)).join('; ') || getFloorName(w.warehouseId, w.chamberName || w.chamberNo, w.floorNo);
       const stack = w.stackAllocations?.map((s: any) => s.stackNo).join('; ') || w.stackNo || '-';
       const grade = w.gradingType || '-';
       const qty = w.quantityKg || 0;
@@ -148,7 +156,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                     {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{String(s.chamberName || formatNumber(s.chamberNo)).replace(/^Chamber\s+/i, '')}</div>) || String(w.chamberName || formatNumber(w.chamberNo)).replace(/^Chamber\s+/i, '')}
                   </TableCell>
                   <TableCell className="text-right text-slate-700">
-                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.floorNo)}</div>) || formatNumber(w.floorNo)}
+                    {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{getFloorName(w.warehouseId, s.chamberName || s.chamberNo, s.floorNo)}</div>) || getFloorName(w.warehouseId, w.chamberName || w.chamberNo, w.floorNo)}
                   </TableCell>
                   <TableCell className="text-right text-slate-700">
                     {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{formatNumber(s.stackNo)}</div>) || formatNumber(w.stackNo)}

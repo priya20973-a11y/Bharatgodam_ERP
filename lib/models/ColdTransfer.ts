@@ -3,9 +3,10 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IColdTransfer extends Document {
   fromClientId: mongoose.Types.ObjectId;
   toClientId: mongoose.Types.ObjectId;
+  toClientModel?: string;
   originalInwardId: mongoose.Types.ObjectId;
   newInwardId: mongoose.Types.ObjectId;
-  outwardId: mongoose.Types.ObjectId;
+  outwardId?: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   commodityId: mongoose.Types.ObjectId;
   transferType?: 'Self' | 'Purchase';
@@ -30,10 +31,11 @@ export interface IColdTransfer extends Document {
 const ColdTransferSchema: Schema = new Schema(
   {
     fromClientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
-    toClientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
+    toClientId: { type: Schema.Types.ObjectId, refPath: 'toClientModel', required: true },
+    toClientModel: { type: String, enum: ['Client', 'ColdWarehouse'], default: 'Client' },
     originalInwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward', required: true },
     newInwardId: { type: Schema.Types.ObjectId, ref: 'ColdInward', required: false },
-    outwardId: { type: Schema.Types.ObjectId, ref: 'ColdOutward', required: true },
+    outwardId: { type: Schema.Types.ObjectId, ref: 'ColdOutward', required: false },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     transferType: { type: String, enum: ['Self', 'Purchase'], default: 'Self' },

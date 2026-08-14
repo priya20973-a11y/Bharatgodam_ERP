@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const dbUser = await db.collection('users').findOne({ _id: new ObjectId(userId) });
     
     const userDetails = {
-      companyLogo: (warehouse as any)?.logoUrl || warehouse?.warehouseLogo || dbUser?.companyLogo || '',
+      companyLogo: warehouse?.warehouseLogo || '',
       phoneNumber: dbUser?.phoneNumber || (session.user as any).phoneNumber || '',
     };
     

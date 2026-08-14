@@ -57,7 +57,7 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     },
     ...getTenantFilter(session)
   })
-    .populate('clientId', 'name')
+    .populate('clientId', 'name clientType')
     .populate('commodityId', 'name')
     .lean();
 
@@ -111,20 +111,42 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
   });
 
   activeInwards.forEach(inward => {
+    let remainingOutQty = outwardMap.get(inward._id.toString()) || 0;
     let stackAllocated = 0;
     let allocBagsCount = 0;
+    let stackAvailable = 0;
+
     inward.stackAllocations.forEach((alloc: any) => {
       const matchChamber = alloc.chamberName === chamberName || (chamber.chamberNo && alloc.chamberNo === chamber.chamberNo);
       if (matchChamber && alloc.floorNo === floorNo && alloc.stackNo === stackNo) {
         stackAllocated += (alloc.allocatedWeight || 0);
         allocBagsCount += (alloc.bagsCount || 0);
+        
+        let allocAvailable = alloc.allocatedWeight || 0;
+        if (remainingOutQty > 0) {
+          const deduct = Math.min(allocAvailable, remainingOutQty);
+          allocAvailable -= deduct;
+          remainingOutQty -= deduct;
+        }
+        
+        stackAvailable += allocAvailable;
+
+        if (allocAvailable > 0) {
+          occupied += allocAvailable;
+          currentStockList.push({
+            clientId: inward.clientId?._id?.toString(),
+            clientName: (inward.clientId as any)?.name || 'Unknown',
+            commodityId: inward.commodityId?._id?.toString(),
+            commodityName: (inward.commodityId as any)?.name || 'Unknown',
+            quantity: allocAvailable,
+            unit: inward.unit,
+            stockType: (inward.clientId as any)?.clientType === 'PURCHASE' ? 'Purchase' : (alloc.stockType || 'Self')
+          });
+        }
       }
     });
 
     if (stackAllocated > 0) {
-      const outQty = outwardMap.get(inward._id.toString()) || 0;
-      const available = Math.max(0, stackAllocated - outQty);
-
       const type = (inward.commodityId as any)?.type ? ` (${(inward.commodityId as any).type})` : '';
       const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
       const commodityDisplay = `${(inward.commodityId as any)?.name || 'Unknown'}${type}${gradeOrWet}`;
@@ -141,27 +163,14 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
         client: clientNameDisplay
       });
 
-      if (available > 0) {
-        occupied += available;
-
-        currentStockList.push({
-          clientId: inward.clientId?._id?.toString(),
-          clientName: (inward.clientId as any)?.name || 'Unknown',
-          commodityId: inward.commodityId?._id?.toString(),
-          commodityName: (inward.commodityId as any)?.name || 'Unknown',
-          quantity: available,
-          unit: inward.unit,
-          stockType: inward.stackAllocations.find((a: any) =>
-            (a.chamberName === chamberName || a.chamberNo === chamber.chamberNo) && a.floorNo === floorNo && a.stackNo === stackNo
-          )?.stockType || 'Self'
-        });
+      if (stackAvailable > 0) {
 
         entries.push({
           _id: inward._id.toString(),
           receiptNo: (inward as any).receiptNo || inward.weighbridgeSlipNo,
           date: inward.date,
           clientName: clientNameDisplay,
-          quantity: available,
+          quantity: stackAvailable,
           qrId: inward.qrId,
         });
 

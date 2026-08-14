@@ -11,6 +11,7 @@ export const en: Dictionary = {
     warehouse: 'Warehouse',
     commodities: 'Commodities',
     unitMaster: 'Unit Master',
+    purchase: 'Purchase',
     inward: 'Inward',
     outward: 'Outward',
     transferOwnership: 'Ownership Transfer',

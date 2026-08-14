@@ -408,7 +408,7 @@ export function generateColdOutwardReceiptHTML(
     
     <div class="header-main">
       <div class="logo-area">
-        ${userDetails?.companyLogo ? `<img src="${userDetails.companyLogo}" alt="Logo" />` : `S<span>C</span>S`}
+        ${userDetails?.companyLogo ? `<img src="${userDetails.companyLogo}" alt="Logo" />` : ``}
       </div>
       <div class="title-area">
         <div class="main-title-box">
