@@ -7,6 +7,7 @@ export interface IColdEnvironmentRecord extends Document {
   date: Date;
   temperature: number;
   moisture: number;
+  co2?: number;
   notes?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
@@ -22,6 +23,7 @@ const ColdEnvironmentRecordSchema: Schema = new Schema(
     date: { type: Date, required: true, default: Date.now },
     temperature: { type: Number, required: true },
     moisture: { type: Number, required: true, min: 0, max: 100 },
+    co2: { type: Number, required: false, min: 0 },
     notes: { type: String, required: false },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },

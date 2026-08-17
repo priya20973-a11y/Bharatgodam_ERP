@@ -17,7 +17,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
 
   const exportCSV = () => {
     if (records.length === 0) return;
-    const headers = ['Date & Time', 'Warehouse', 'Chamber', 'Floor', 'Temperature (°C)', 'Moisture (%)', 'Notes'];
+    const headers = ['Date & Time', 'Warehouse', 'Chamber', 'Floor', 'Temperature (°C)', 'Moisture (%)', 'CO2 (ppm)', 'Notes'];
     const csvContent = [
       headers.join(','),
       ...records.map(r => {
@@ -25,6 +25,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
         const w = (r.warehouseId?.name || '').replace(/,/g, '');
         const c = (r.chamberName || '').replace(/,/g, '');
         const n = (r.notes || '').replace(/,/g, '');
+        const co2Val = r.co2 !== undefined && r.co2 !== null ? r.co2 : '';
         
         let floorName = `Floor ${r.floorNo}`;
         const wh = warehouses.find(wh => wh._id === (r.warehouseId?._id || r.warehouseId));
@@ -38,7 +39,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
           }
         }
 
-        return `${d},${w},${c},${floorName},${r.temperature},${r.moisture},${n}`;
+        return `${d},${w},${c},${floorName},${r.temperature},${r.moisture},${co2Val},${n}`;
       })
     ].join('\n');
 
@@ -134,12 +135,13 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chamber & Floor</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temp (°C)</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Moisture (%)</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CO2 (ppm)</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredRecords.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-4 text-gray-500">No records found.</td></tr>
+              <tr><td colSpan={7} className="text-center py-4 text-gray-500">No records found.</td></tr>
             ) : filteredRecords.map((r, i) => (
               <tr key={i}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{isMounted ? new Date(r.date).toLocaleString() : ''}</td>
@@ -147,6 +149,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.chamberName} / {getFloorName(r.warehouseId, r.chamberName, r.floorNo)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.temperature}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.moisture}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">{r.co2 !== undefined && r.co2 !== null ? `${r.co2} ppm` : '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{r.notes}</td>
               </tr>
             ))}

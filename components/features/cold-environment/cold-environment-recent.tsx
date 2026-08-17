@@ -40,7 +40,7 @@ export default function ColdEnvironmentRecent({ records, warehouses }: { records
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">Recent Records</h2>
-          <p className="text-sm text-slate-500">Latest temperature and moisture entries.</p>
+          <p className="text-sm text-slate-500">Latest temperature, moisture, and CO2 entries.</p>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh}>
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
@@ -61,9 +61,12 @@ export default function ColdEnvironmentRecent({ records, warehouses }: { records
                   {isMounted ? formatDate(record.date) : ''}
                 </div>
               </div>
-              <div className="text-right text-sm text-slate-600">
-                <span className="mr-4">Temp: {record.temperature}°C</span>
+              <div className="text-right text-xs sm:text-sm text-slate-600 space-x-3">
+                <span>Temp: {record.temperature}°C</span>
                 <span>Moisture: {record.moisture}%</span>
+                {record.co2 !== undefined && record.co2 !== null && (
+                  <span className="font-medium text-indigo-700">CO2: {record.co2} ppm</span>
+                )}
               </div>
             </div>
           ))

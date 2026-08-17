@@ -23,6 +23,7 @@ const formSchema = z.object({
   date: z.string().min(1, 'Please enter a valid date and time'),
   temperature: z.coerce.number(),
   moisture: z.coerce.number().min(0, 'Moisture cannot be negative').max(100, 'Moisture cannot exceed 100%'),
+  co2: z.coerce.number().min(0, 'CO2 cannot be negative').optional().or(z.literal('')),
   notes: z.string().optional(),
 });
 
@@ -39,6 +40,7 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
       date: new Date().toISOString().slice(0, 16),
       temperature: 0,
       moisture: 0,
+      co2: 0,
       notes: '',
     },
   });
@@ -74,6 +76,7 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
         date: new Date(values.date),
         temperature: values.temperature,
         moisture: values.moisture,
+        co2: values.co2 !== undefined && values.co2 !== '' ? Number(values.co2) : undefined,
         notes: values.notes,
       });
       form.reset({
@@ -83,6 +86,7 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
         date: new Date().toISOString().slice(0, 16),
         temperature: 0,
         moisture: 0,
+        co2: 0,
         notes: '',
       });
       alert('Environment record created successfully');
@@ -201,6 +205,14 @@ export default function ColdEnvironmentForm({ warehouses }: { warehouses: any[] 
             <Input type="number" step="0.1" min="0" max="100" placeholder="e.g. 60" {...form.register('moisture')} />
             {form.formState.errors.moisture && (
               <p className="text-xs text-red-500">{form.formState.errors.moisture.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">CO2 (ppm)</label>
+            <Input type="number" step="1" min="0" placeholder="e.g. 400" {...form.register('co2')} />
+            {form.formState.errors.co2 && (
+              <p className="text-xs text-red-500">{form.formState.errors.co2.message}</p>
             )}
           </div>
         </div>
