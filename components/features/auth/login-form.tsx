@@ -1,16 +1,27 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // <-- Native Next.js Router
-import { signIn } from 'next-auth/react'; // <-- Import NextAuth signIn
+import { getCsrfToken, signIn } from 'next-auth/react'; // <-- Import NextAuth helpers
 
 export default function LoginForm() {
   const router = useRouter(); // <-- Initialize Router
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getCsrfToken().then((token) => {
+      if (active) setCsrfToken(token as string | null);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // REAL API Integration
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,19 +29,39 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Handle Sign In with native redirect to avoid router fetch conflicts
+      // Normalize email to avoid lookup mismatches (trim + lowercase)
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Call signIn without automatic redirect and handle response manually
       const result = await signIn('credentials', {
-        redirect: true,
-        callbackUrl: '/dashboard',
-        email,
+        redirect: false,
+        callbackUrl: `${window.location.origin}/dashboard`,
+        email: normalizedEmail,
         password,
       });
 
-      if (result?.error) {
+      console.log('signIn result:', result);
+
+      if (!result) {
+        alert('Unexpected authentication response');
+        setIsLoading(false);
+        return;
+      }
+
+      if (result.error) {
         alert(`Error: ${result.error}`);
         setIsLoading(false);
+        return;
       }
-      // If successful, NextAuth will automatically redirect to /dashboard via window.location
+
+      // If signIn reports ok, navigate to dashboard by default
+      if ((result as any).ok) {
+        window.location.href = '/dashboard';
+        return;
+      }
+
+      // Fallback navigation
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Authentication error:', error);
       alert('Network error. Please try again.');
@@ -66,7 +97,15 @@ export default function LoginForm() {
         </div>
 
         {/* Auth Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit} aria-label="Authentication form">
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={handleSubmit}
+          action="/api/auth/callback/credentials"
+          method="post"
+          aria-label="Authentication form"
+        >
+          <input name="csrfToken" type="hidden" value={csrfToken || ''} />
+          <input name="callbackUrl" type="hidden" value="/dashboard" />
           <div className="space-y-4 rounded-md shadow-sm">
             
             {/* Email Field */}

@@ -1,6 +1,8 @@
 'use server';
 
 import connectToDatabase from '@/lib/mongoose';
+import { getDb } from '@/lib/mongodb';
+import ColdCommodity from '@/lib/models/ColdCommodity';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdOutward from '@/lib/models/ColdOutward';
@@ -230,6 +232,26 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
     }
 
     // Now insert
+    const commodityCache = new Map<string, any>();
+    const db = await getDb();
+    const masterConfig = await db.collection('warehouse_config').findOne({});
+    const qualityMode = masterConfig?.coldQualityValidationMode || 'strict';
+    const isStrictQualityValidation = qualityMode === 'strict';
+
+    for (const client of data.clients) {
+      const effectiveCommodityId = data.common?.sameCommodity ? data.common.commodityId : client.commodityId;
+      if (!effectiveCommodityId) {
+        throw new Error('Commodity is required for all inward transactions');
+      }
+      if (!commodityCache.has(effectiveCommodityId)) {
+        const commodity = await ColdCommodity.findOne({ _id: effectiveCommodityId, ...getTenantFilter(session) });
+        if (!commodity) {
+          throw new Error('Commodity not found for quality validation');
+        }
+        commodityCache.set(effectiveCommodityId, commodity);
+      }
+    }
+
     for (const client of data.clients) {
       if (client.grade === '') {
         delete client.grade;
@@ -245,6 +267,68 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
       
       const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
       const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + s.bagsCount, 0);
+
+      const effectiveCommodityId = data.common?.sameCommodity ? data.common.commodityId : client.commodityId;
+      const commodity = commodityCache.get(effectiveCommodityId);
+      const validatedQualityReadings: any[] = [];
+      const qualityNotes: string[] = [];
+
+      if (commodity?.qualityParameters?.length) {
+        for (let pIndex = 0; pIndex < commodity.qualityParameters.length; pIndex++) {
+          const parameter = commodity.qualityParameters[pIndex];
+
+          // Tolerant matching: prefer exact name match, fall back to case-insensitive/trimmed, then to positional index
+          const providedReadings = client.qualityReadings || [];
+          let reading = providedReadings.find((r: any) => r && r.name === parameter.name);
+          if (!reading) {
+            reading = providedReadings.find((r: any) => r && typeof r.name === 'string' && r.name.trim().toLowerCase() === String(parameter.name).trim().toLowerCase());
+          }
+          if (!reading) {
+            reading = providedReadings[pIndex];
+          }
+
+          const rawValue = reading?.value;
+          const hasValue = rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '';
+
+          if (!hasValue || isNaN(Number(rawValue))) {
+            if (isStrictQualityValidation) {
+              // Provide a clearer error message for debugging
+              throw new Error(`Quality value for ${parameter.name} is required for client ${client.clientId}`);
+            }
+            qualityNotes.push(`${parameter.name} (missing)`);
+            continue;
+          }
+
+          const value = Number(rawValue);
+          const status = value >= parameter.minValue && value <= parameter.maxValue ? 'within' : 'out-of-range';
+          validatedQualityReadings.push({
+            name: parameter.name,
+            unit: parameter.unit || '',
+            minValue: parameter.minValue,
+            maxValue: parameter.maxValue,
+            value,
+            status,
+          });
+          if (status === 'out-of-range') {
+            qualityNotes.push(`${parameter.name} (${value} not in ${parameter.minValue}-${parameter.maxValue})`);
+          }
+        }
+      } else {
+        validatedQualityReadings.push(...(client.qualityReadings || []).map((r: any) => ({
+          ...r,
+          value: Number(r.value),
+          status: 'within',
+        })));
+      }
+
+      let remark = data.common.remarks || '';
+      if (commodity?.qualityParameters?.length) {
+        if (qualityNotes.length > 0) {
+          remark = `${remark ? remark + ' ' : ''}Quality issues: ${qualityNotes.join(', ')}`;
+        } else {
+          remark = `${remark ? remark + ' ' : ''}Quality within expected ranges.`;
+        }
+      }
 
       const inwardData = {
         ...data.common,
@@ -263,7 +347,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         kataBharati: client.kataBharati,
         marko: client.marko,
         farmerName: client.farmerName,
+        qualityReadings: validatedQualityReadings,
         referencePersons: client.referencePersons,
+        remarks: remark,
         warehouseId: data.warehouseId,
       };
       

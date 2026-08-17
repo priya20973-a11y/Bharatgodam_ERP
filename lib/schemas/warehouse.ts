@@ -12,6 +12,7 @@ export const WarehouseConfigSchema = z.object({
   address: z.string().min(10, 'Full address is required'),
   contactEmail: z.string().email('Invalid email address'),
   totalCapacitySqFt: z.coerce.number().positive('Capacity must be valid'),
+  coldQualityValidationMode: z.enum(['strict', 'relaxed']).default('strict'),
   commodities: z.array(CommoditySchema).min(1, 'At least one commodity required'),
 });
 

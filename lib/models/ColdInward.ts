@@ -7,6 +7,15 @@ export interface IReferencePerson {
   designation: string;
 }
 
+export interface IQualityReading {
+  name: string;
+  unit?: string;
+  minValue: number;
+  maxValue: number;
+  value: number;
+  status?: 'within' | 'out-of-range';
+}
+
 export interface IColdInward extends Document {
   clientId: mongoose.Types.ObjectId;
   commodityId: mongoose.Types.ObjectId;
@@ -36,6 +45,7 @@ export interface IColdInward extends Document {
   marko?: string;
   remarks?: string;
   note?: string;
+  qualityReadings?: IQualityReading[];
   referencePersons?: IReferencePerson[];
   date: Date;
   batchId?: string;
@@ -51,6 +61,18 @@ const ReferencePersonSchema = new Schema({
   email: { type: String },
   designation: { type: String }
 });
+
+const QualityReadingSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    unit: { type: String, required: false },
+    minValue: { type: Number, required: true },
+    maxValue: { type: Number, required: true },
+    value: { type: Number, required: true },
+    status: { type: String, enum: ['within', 'out-of-range'], required: false },
+  },
+  { _id: false }
+);
 
 const ColdInwardSchema: Schema = new Schema(
   {
@@ -82,6 +104,7 @@ const ColdInwardSchema: Schema = new Schema(
     marko: { type: String, required: false },
     remarks: { type: String, required: false },
     note: { type: String, required: false },
+    qualityReadings: { type: [QualityReadingSchema], required: false, default: [] },
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
     batchId: { type: String, required: false },

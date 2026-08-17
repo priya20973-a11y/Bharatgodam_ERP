@@ -67,7 +67,7 @@ export default function SignupPage() {
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [gstNotApplicable, setGstNotApplicable] = useState(false);
-  const [isColdStorage, setIsColdStorage] = useState(false);
+  const [signupMode, setSignupMode] = useState<'dry' | 'cold' | 'manufacturing'>('dry');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -190,7 +190,7 @@ export default function SignupPage() {
           ...formData,
           gstNumber: gstNotApplicable ? 'NA' : formData.gstNumber,
           role: 'WSP',
-          storagePlan: isColdStorage ? 'COLD' : 'DRY',
+          storagePlan: signupMode === 'cold' ? 'COLD' : signupMode === 'manufacturing' ? 'MANUFACTURING' : 'DRY',
         }),
       });
 
@@ -233,6 +233,32 @@ export default function SignupPage() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-sm font-medium text-slate-700">Select operating mode</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[
+                  { id: 'dry', label: 'Dry Storage', hint: 'Warehouse' },
+                  { id: 'cold', label: 'Cold Storage', hint: 'Cold chain' },
+                  { id: 'manufacturing', label: 'Manufacturing', hint: 'Production' },
+                ].map((option) => {
+                  const isActive = signupMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSignupMode(option.id as 'dry' | 'cold' | 'manufacturing')}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        isActive ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-semibold">{option.label}</div>
+                      <div className="text-xs opacity-80">{option.hint}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Full Name */}
             <div>
               <label htmlFor="fullName" className="sr-only">Full Name *</label>
@@ -498,21 +524,6 @@ export default function SignupPage() {
               {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
             </div>
 
-            {/* Cold Storage Plan */}
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isColdStorage"
-                  checked={isColdStorage}
-                  onChange={(e) => setIsColdStorage(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="isColdStorage" className="text-sm font-medium text-gray-700 select-none">
-                  Enable Cold Storage
-                </label>
-              </div>
-            </div>
 
             {/* Bank Details */}
             <div className="space-y-2">

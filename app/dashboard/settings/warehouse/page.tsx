@@ -25,6 +25,7 @@ export default async function WarehouseSettingsPage() {
     address: configDoc.address,
     contactEmail: configDoc.contactEmail,
     totalCapacitySqFt: configDoc.totalCapacitySqFt,
+    coldQualityValidationMode: configDoc.coldQualityValidationMode || 'strict',
     commodities: configDoc.commodities
   } : undefined;
 

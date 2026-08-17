@@ -16,9 +16,15 @@ export default async function DashboardLayout({
     redirect('/');
   }
 
-  // Redirect Cold Storage users to their dedicated layout
-  if ((session.user as any).storagePlan === 'COLD') {
+  const storagePlan = ((session.user as any).storagePlan || 'DRY').toString().toUpperCase();
+
+  // Redirect specialized users to their dedicated layouts
+  if (storagePlan === 'COLD') {
     redirect('/cold/dashboard');
+  }
+
+  if (storagePlan === 'MANUFACTURING') {
+    redirect('/manufacturing/dashboard');
   }
 
   // Inject fresh WSP permissions into the session from DB so the sidebar reflects changes immediately

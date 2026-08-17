@@ -26,10 +26,13 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
+        console.log('Authorize attempt for email:', credentials.email);
+
         const db = await getDb();
         const user = await db.collection('users').findOne({ email: credentials.email });
 
         if (!user) {
+          console.log('Authorize failed: user not found for', credentials.email);
           throw new Error('No user found with this email');
         }
 
@@ -41,6 +44,7 @@ export const authOptions: NextAuthOptions = {
         const isValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isValid) {
+          console.log('Authorize failed: invalid password for', credentials.email);
           throw new Error('Invalid password');
         }
 
@@ -73,6 +77,7 @@ export const authOptions: NextAuthOptions = {
           isNewRegistration: !!userForSession.isNewRegistration,
           storagePlan: userForSession.storagePlan || 'DRY',
           coldLanguage: userForSession.coldLanguage || 'en',
+          moduleMode: (userForSession.storagePlan || 'DRY').toString().toUpperCase(),
           
           // Staff properties
           ...(user.role === 'STAFF' ? {
@@ -96,6 +101,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // Append user details to the JWT token
     async jwt({ token, user, trigger, session }) {
+      if (user) {
+        try {
+          console.log('jwt callback - user present:', { id: (user as any).id, email: (user as any).email, role: (user as any).role });
+        } catch (e) {}
+      }
       if (trigger === 'update' && session?.coldLanguage) {
         token.coldLanguage = session.coldLanguage;
       }
@@ -117,6 +127,7 @@ export const authOptions: NextAuthOptions = {
         token.isNewRegistration = (user as any).isNewRegistration || false;
         token.storagePlan = (user as any).storagePlan || 'DRY';
         token.coldLanguage = (user as any).coldLanguage || 'en';
+        token.moduleMode = ((user as any).storagePlan || 'DRY').toString().toUpperCase();
         
         if ((user as any).isStaff) {
           token.staffId = (user as any).staffId;
@@ -128,10 +139,12 @@ export const authOptions: NextAuthOptions = {
           token.wspPermissions = (user as any).wspPermissions || {};
         }
       }
+      try { console.log('jwt callback - token now:', token); } catch (e) {}
       return token;
     },
     // Pass the token details to the Client Session object
     async session({ session, token }) {
+      try { console.log('session callback - token:', token); } catch (e) {}
       if (session?.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
@@ -149,6 +162,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).isNewRegistration = token.isNewRegistration || false;
         (session.user as any).storagePlan = token.storagePlan || 'DRY';
         (session.user as any).coldLanguage = token.coldLanguage || 'en';
+        (session.user as any).moduleMode = token.moduleMode || ((token.storagePlan || 'DRY').toString().toUpperCase());
         
         if (token.isStaff) {
           (session.user as any).staffId = token.staffId;
@@ -160,6 +174,7 @@ export const authOptions: NextAuthOptions = {
           (session.user as any).wspPermissions = token.wspPermissions || {};
         }
       }
+      try { console.log('session callback - session:', session); } catch (e) {}
       return session;
     },
   },

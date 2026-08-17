@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { addColdCommodity, updateColdCommodity } from '@/app/actions/cold-commodities';
 import { toast } from 'react-hot-toast';
 import { X, Loader2, IndianRupee, Layers, Plus, Trash2 } from 'lucide-react';
-import { ISeasonalPrice } from '@/lib/models/ColdCommodity';
+import { IQualityParameter, ISeasonalPrice } from '@/lib/models/ColdCommodity';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
 
@@ -26,6 +26,7 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
   const [gradingType, setGradingType] = useState<'Grading' | 'Wet' | ''>('');
   const [priceType, setPriceType] = useState<'Same Price' | 'Different Price' | ''>('');
   const [seasonalPrices, setSeasonalPrices] = useState<ISeasonalPrice[]>([]);
+  const [qualityParameters, setQualityParameters] = useState<IQualityParameter[]>([]);
 
   useEffect(() => {
     if (initialData && isOpen) {
@@ -38,12 +39,19 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         fromDate: p.fromDate && !isNaN(new Date(p.fromDate).getTime()) ? new Date(p.fromDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         toDate: p.toDate && !isNaN(new Date(p.toDate).getTime()) ? new Date(p.toDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       })) || []);
+      setQualityParameters(initialData.qualityParameters?.map((q: any) => ({
+        name: q.name || '',
+        unit: q.unit || '',
+        minValue: q.minValue ?? 0,
+        maxValue: q.maxValue ?? 0,
+      })) || []);
     } else if (isOpen) {
       setName('');
       setType('');
       setGradingType('');
       setPriceType('Same Price');
       setSeasonalPrices([{ fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], pricePerKg: 10, priceLarge: 10, priceSmall: 10, priceMixed: 10 }] as any);
+      setQualityParameters([]);
     }
   }, [initialData, isOpen]);
 
@@ -63,6 +71,22 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     const newPrices = [...seasonalPrices];
     (newPrices[index] as any)[field] = value;
     setSeasonalPrices(newPrices);
+  };
+
+  const handleAddQualityParameter = () => {
+    setQualityParameters([...qualityParameters, { name: '', unit: '', minValue: 0, maxValue: 0 }]);
+  };
+
+  const handleRemoveQualityParameter = (index: number) => {
+    const newParams = [...qualityParameters];
+    newParams.splice(index, 1);
+    setQualityParameters(newParams);
+  };
+
+  const handleChangeQualityParameter = (index: number, field: string, value: any) => {
+    const newParams = [...qualityParameters];
+    (newParams[index] as any)[field] = field === 'name' || field === 'unit' ? value : Number(value);
+    setQualityParameters(newParams);
   };
 
   const validate = () => {
@@ -87,6 +111,18 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         if (isNaN(pL) || pL <= 0) return 'Large grade price is required and must be greater than 0.';
         if (isNaN(pS) || pS <= 0) return 'Small grade price is required and must be greater than 0.';
         if (isNaN(pM) || pM <= 0) return 'Mixed grade price is required and must be greater than 0.';
+      }
+    }
+
+    for (const q of qualityParameters) {
+      if (!q.name.trim()) {
+        return 'Quality parameter name is required.';
+      }
+      if (isNaN(Number(q.minValue)) || isNaN(Number(q.maxValue))) {
+        return 'Quality parameter min and max values are required.';
+      }
+      if (Number(q.minValue) > Number(q.maxValue)) {
+        return `Quality parameter ${q.name} must have min value less than or equal to max value.`;
       }
     }
 
@@ -123,7 +159,13 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
           priceLarge: priceType === 'Different Price' ? (p.priceLarge ? Number(p.priceLarge) : undefined) : undefined,
           priceSmall: priceType === 'Different Price' ? (p.priceSmall ? Number(p.priceSmall) : undefined) : undefined,
           priceMixed: priceType === 'Different Price' ? (p.priceMixed ? Number(p.priceMixed) : undefined) : undefined,
-        }))
+        })),
+        qualityParameters: qualityParameters.filter(q => q.name.trim()).map(q => ({
+          name: q.name.trim(),
+          unit: q.unit?.trim() || undefined,
+          minValue: Number(q.minValue),
+          maxValue: Number(q.maxValue)
+        })),
       };
 
       if (isEditing) {
@@ -348,6 +390,81 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                 <Plus className="h-4 w-4 mr-1" />
                 {t('commodities.addSeasonalBlock')}
               </button>
+            </div>
+
+            <div className="space-y-5">
+              <div className="flex items-center pb-2 border-b border-slate-100">
+                <div className="h-6 w-1 bg-indigo-500 rounded-full mr-3" />
+                <div className="flex flex-col">
+                  <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">Quality Parameters</h4>
+                  <p className="text-xs text-slate-500 font-medium">Add quality checks that will be applied for inward entries of this commodity.</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                {qualityParameters.map((parameter, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-white p-3 rounded-xl border border-slate-200">
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Name</label>
+                      <input
+                        type="text"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={parameter.name}
+                        onChange={(e) => handleChangeQualityParameter(idx, 'name', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Unit</label>
+                      <input
+                        type="text"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={parameter.unit}
+                        onChange={(e) => handleChangeQualityParameter(idx, 'unit', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Min</label>
+                      <ColdNumberInput
+                        className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={parameter.minValue ?? ''}
+                        min="0"
+                        step="0.01"
+                        onChange={(val) => handleChangeQualityParameter(idx, 'minValue', val)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Max</label>
+                      <ColdNumberInput
+                        className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={parameter.maxValue ?? ''}
+                        min="0"
+                        step="0.01"
+                        onChange={(val) => handleChangeQualityParameter(idx, 'maxValue', val)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveQualityParameter(idx)}
+                      className="h-10 w-10 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {qualityParameters.length === 0 && (
+                  <p className="text-sm text-slate-500">No quality parameters configured. Add parameters if this commodity requires quality validation.</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleAddQualityParameter}
+                  className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 mt-2 px-2 py-1 rounded hover:bg-indigo-100/50 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Quality Parameter
+                </button>
+              </div>
             </div>
           </div>
         </form>

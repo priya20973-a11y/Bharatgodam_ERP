@@ -64,6 +64,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
       align-items: start;
     }
     .company-left { text-align: left; }
+    .company-left img { max-height: 60px; max-width: 140px; object-fit: contain; }
     .company-center { text-align: center; }
     .company-right { text-align: right; font-size: 9pt; }
     
@@ -195,20 +196,35 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     /* Footer */
     .footer { 
       display: grid; 
-      grid-template-columns: 1fr 1fr 1fr; 
+      grid-template-columns: 1fr 1fr; 
       gap: 30px; 
       margin-top: 30px; 
       padding-top: 20px; 
       border-top: 1px solid #d1d5db;
+      align-items: start;
     }
     .footer-section { 
       text-align: center; 
       font-size: 8.5pt;
     }
-    .signature-line { 
-      margin-top: 30px; 
-      border-top: 1px solid #333; 
-      padding-top: 5px; 
+    .signature-dash { 
+      margin-top: 10px; 
+      border-top: 2px solid #333; 
+      width: 80%;
+      margin-left: auto;
+      margin-right: 0;
+      padding-top: 6px; 
+    }
+    .signature-warehouse { 
+      margin-top: 6px; 
+      text-align: right;
+      font-weight: bold;
+    }
+    .signature-authority { 
+      margin-top: 3px; 
+      text-align: right;
+      font-size: 8pt;
+      color: #333;
     }
     
     .page-break { page-break-after: always; }
@@ -218,7 +234,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <div class="company-left"></div>
+      <div class="company-left">${data.company.logo ? `<img src="${data.company.logo}" alt="logo" />` : ''}</div>
       <div class="company-center">
         <div class="company-name">${data.company.name}</div>
       </div>
@@ -276,11 +292,11 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 
 
     <!-- Summary Section: Only one line -->
-    <div style="padding: 30px 0 20px 0;">
-      <div style="font-size: 1.1em; color: #555; margin-bottom: 10px;">
-        Last inventory available at end of month: <strong>${lastInventory.toFixed(2)} MT</strong>
+      <div style="padding: 30px 0 20px 0;">
+        <div style="font-size: 1.1em; color: #555; margin-bottom: 10px;">
+          ${data.metadata && data.metadata.storageSummary ? `${data.metadata.storageSummary}` : `Last inventory available at end of month: <strong>${lastInventory.toFixed(2)} MT</strong>`}
+        </div>
       </div>
-    </div>
 
     <!-- Financial Summary -->
     <div class="financial">
@@ -346,15 +362,12 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     <!-- Footer / Signature -->
     <div class="footer">
       <div class="footer-section">
-        <div class="signature-line">
-          <div style="margin-top: 5px;">For ${data.company.name}</div>
-        </div>
+        <!-- intentionally left blank on the left side -->
       </div>
-      <div class="footer-section"></div>
       <div class="footer-section">
-        <div class="signature-line">
-          ${data.authorizedBy ? `<div>${data.authorizedBy}</div><div style="font-size: 8pt; margin-top: 3px;">Authorized Signatory</div>` : '<div>Authorized Signatory</div>'}
-        </div>
+        <div class="signature-dash"></div>
+        <div class="signature-warehouse">${(data.metadata && data.metadata.warehouseName) ? data.metadata.warehouseName : data.company.name}</div>
+        <div class="signature-authority">Authorized Signatory</div>
       </div>
     </div>
 

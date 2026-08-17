@@ -19,6 +19,15 @@ interface ColdInwardFormProps {
   draftId?: string;
 }
 
+interface QualityReading {
+  name: string;
+  unit?: string;
+  minValue: number;
+  maxValue: number;
+  value?: number | null;
+  status?: 'within' | 'out-of-range';
+}
+
 export default function ColdInwardForm({ clients, commodities, warehouses, onSuccess, prefillData, draftId }: ColdInwardFormProps) {
   const { t } = useColdTranslation();
   const [loading, setLoading] = useState(false);
@@ -39,7 +48,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     commodityId: prefillData?.common?.commodityId || '',
   });
 
-  const [clientSections, setClientSections] = useState<any[]>(prefillData?.clients || []);
+  const [clientSections, setClientSections] = useState<any[]>(prefillData?.clients?.map((client: any) => ({
+    ...client,
+    qualityReadings: client.qualityReadings || []
+  })) || []);
   const [stackCapacities, setStackCapacities] = useState<Record<string, number | null>>({});
 
   const selectedWarehouse = warehouses.find(w => w._id === common.warehouseId);
@@ -73,18 +85,34 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     fetchCapacities();
   }, [selectedStacksString]);
 
+  const getQualityReadingsForCommodity = (commodity: any, existingReadings: QualityReading[] = []) => {
+    if (!commodity?.qualityParameters?.length) return [];
+    return commodity.qualityParameters.map((parameter: any) => {
+      const existing = existingReadings?.find((r: QualityReading) => r.name === parameter.name);
+      return {
+        name: parameter.name,
+        unit: parameter.unit || '',
+        minValue: Number(parameter.minValue) || 0,
+        maxValue: Number(parameter.maxValue) || 0,
+        value: existing?.value ?? null,
+        status: existing?.status
+      };
+    });
+  };
+
   const handleAddClient = (clientId: string) => {
     if (!clientId) return;
     if (clientSections.find(c => c.clientId === clientId)) {
       toast.error('Client already added');
       return;
     }
+    const commodity = common.sameCommodity ? commodities.find(c => c._id === common.commodityId) : undefined;
     setClientSections([...clientSections, {
       id: Date.now().toString(),
       clientId,
-      commodityId: '',
+      commodityId: common.sameCommodity ? common.commodityId : '',
       grade: '',
-      gradingType: '',
+      gradingType: common.sameCommodity ? (commodity?.gradingType || '') : '',
       grossWeight: null,
       emptyWeight: null,
       bagsCount: null,
@@ -94,6 +122,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       farmerName: '',
       kataBharati: 0,
       stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null }],
+      qualityReadings: common.sameCommodity ? getQualityReadingsForCommodity(commodity) : [],
       referencePersons: []
     }]);
   };
@@ -109,6 +138,29 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     updated[index][field] = value;
     setClientSections(updated);
   };
+
+  const updateQualityReading = (clientIndex: number, parameterIndex: number, field: string, value: any) => {
+    const updated = [...clientSections];
+    const readings = updated[clientIndex].qualityReadings || [];
+    readings[parameterIndex] = {
+      ...readings[parameterIndex],
+      [field]: field === 'name' || field === 'unit' ? value : value === '' ? null : Number(value),
+    };
+    updated[clientIndex].qualityReadings = readings;
+    setClientSections(updated);
+  };
+
+  useEffect(() => {
+    if (!common.sameCommodity || !common.commodityId) return;
+    const commodity = commodities.find((comm: any) => comm._id === common.commodityId);
+    if (!commodity) return;
+    setClientSections(prev => prev.map((client) => ({
+      ...client,
+      commodityId: common.commodityId,
+      gradingType: commodity.gradingType || '',
+      qualityReadings: getQualityReadingsForCommodity(commodity, client.qualityReadings)
+    })));
+  }, [common.sameCommodity, common.commodityId, commodities]);
 
   const addStack = (clientIndex: number) => {
     const updated = [...clientSections];
@@ -177,6 +229,24 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         toast.error(`Commodity required for client ${i + 1}`);
         return;
       }
+
+      const effectiveCommodityId = common.sameCommodity ? common.commodityId : c.commodityId;
+      const selectedCommodity = commodities.find(comm => comm._id === effectiveCommodityId);
+      if (selectedCommodity?.qualityParameters?.length > 0) {
+        for (const parameter of selectedCommodity.qualityParameters) {
+          const reading = c.qualityReadings?.find((r: QualityReading) => r.name === parameter.name);
+          if (!reading || reading.value === null || reading.value === undefined || isNaN(Number(reading.value))) {
+            toast.error(`Quality value for ${parameter.name} is required for client ${i + 1}`);
+            return;
+          }
+          const value = Number(reading.value);
+          if (value < parameter.minValue || value > parameter.maxValue) {
+            toast.error(`Quality value for ${parameter.name} must be between ${parameter.minValue} and ${parameter.maxValue}.`);
+            return;
+          }
+        }
+      }
+
       for (const s of c.stacks) {
         if (!s.chamberNo || !s.floorNo || !s.stackNo) {
           toast.error(`Incomplete stack details for client ${i + 1}`);
@@ -459,6 +529,38 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                 <Input value={client.farmerName || ''} onChange={(e) => updateClient(cIdx, 'farmerName', e.target.value)} />
               </div>
             </div>
+
+            {selectedCommodity?.qualityParameters?.length > 0 && (
+              <div className="mt-4 border p-4 rounded-md bg-slate-50">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-medium text-sm">Quality Parameters</h4>
+                  <p className="text-xs text-slate-500">Enter readings for selected commodity parameters.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {getQualityReadingsForCommodity(selectedCommodity, client.qualityReadings).map((parameter, pIdx) => {
+                    const currentReading = client.qualityReadings?.[pIdx] || parameter;
+                    return (
+                      <div key={`${client.id}-quality-${parameter.name}`} className="space-y-2">
+                        <label className="text-xs font-medium">{parameter.name} ({parameter.unit || 'unit'})</label>
+                        <div className="text-[11px] text-slate-500">Range: {parameter.minValue} - {parameter.maxValue}</div>
+                        <ColdNumberInput
+                          min={parameter.minValue.toString()}
+                          max={parameter.maxValue.toString()}
+                          step="0.01"
+                          value={currentReading.value ?? ''}
+                          onChange={(v) => updateQualityReading(cIdx, pIdx, 'value', v)}
+                        />
+                        {currentReading.value !== null && currentReading.value !== undefined && (
+                          <div className={`text-[11px] ${currentReading.value < parameter.minValue || currentReading.value > parameter.maxValue ? 'text-red-600' : 'text-green-600'}`}>
+                            {currentReading.value < parameter.minValue || currentReading.value > parameter.maxValue ? 'Out of range' : 'Within range'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Stacks Section */}
             <div className="mt-4 border p-4 rounded-md bg-slate-50">

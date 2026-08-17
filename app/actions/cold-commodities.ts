@@ -1,7 +1,7 @@
 'use server';
 
 import connectToDatabase from '@/lib/mongoose';
-import ColdCommodity, { ISeasonalPrice, IColdCommodity } from '@/lib/models/ColdCommodity';
+import ColdCommodity, { IQualityParameter, ISeasonalPrice, IColdCommodity } from '@/lib/models/ColdCommodity';
 import Client from '@/lib/models/Client';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
@@ -33,6 +33,7 @@ export async function fetchColdCommodities() {
       gradingType: item.gradingType,
       priceType: item.priceType,
       seasonalPrices: item.seasonalPrices,
+      qualityParameters: item.qualityParameters || [],
       updatedAt: item.updatedAt,
       createdAt: item.createdAt,
       userId: item.userId,
@@ -83,7 +84,22 @@ function validateSeasonalPrices(prices: ISeasonalPrice[], priceType?: string): {
   return { valid: true };
 }
 
-export async function addColdCommodity(data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+function validateQualityParameters(parameters: IQualityParameter[]): { valid: boolean; error?: string } {
+  for (const parameter of parameters) {
+    if (!parameter.name || !parameter.name.trim()) {
+      return { valid: false, error: 'Quality parameter name is required.' };
+    }
+    if (parameter.minValue === undefined || parameter.maxValue === undefined || isNaN(parameter.minValue) || isNaN(parameter.maxValue)) {
+      return { valid: false, error: `Quality parameter ${parameter.name} must have valid min and max values.` };
+    }
+    if (parameter.minValue > parameter.maxValue) {
+      return { valid: false, error: `Quality parameter ${parameter.name} must have min value less than or equal to max value.` };
+    }
+  }
+  return { valid: true };
+}
+
+export async function addColdCommodity(data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[]; qualityParameters?: IQualityParameter[] }) {
   await connectToDatabase();
   try {
     console.log('addColdCommodity received:', JSON.stringify(data, null, 2));
@@ -95,6 +111,12 @@ export async function addColdCommodity(data: { name: string; type: string; gradi
     if (!validation.valid) {
       console.error('Validation failed:', validation.error);
       return { success: false, error: validation.error };
+    }
+
+    const qualityValidation = validateQualityParameters(data.qualityParameters || []);
+    if (!qualityValidation.valid) {
+      console.error('Quality validation failed:', qualityValidation.error);
+      return { success: false, error: qualityValidation.error };
     }
 
     const email = session.user.email?.trim().toLowerCase() || null;
@@ -123,7 +145,8 @@ export async function addColdCommodity(data: { name: string; type: string; gradi
       unit: 'KG',
       gradingType: data.gradingType,
       priceType: data.priceType,
-      seasonalPrices: data.seasonalPrices
+      seasonalPrices: data.seasonalPrices,
+      qualityParameters: data.qualityParameters || []
     }, session));
     
     revalidatePath('/cold/commodities');
@@ -138,7 +161,7 @@ export async function addColdCommodity(data: { name: string; type: string; gradi
   }
 }
 
-export async function updateColdCommodity(id: string, data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+export async function updateColdCommodity(id: string, data: { name: string; type: string; gradingType?: string; priceType?: string; seasonalPrices: ISeasonalPrice[]; qualityParameters?: IQualityParameter[] }) {
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -148,6 +171,11 @@ export async function updateColdCommodity(id: string, data: { name: string; type
     const validation = validateSeasonalPrices(data.seasonalPrices, data.priceType);
     if (!validation.valid) {
       return { success: false, error: validation.error };
+    }
+
+    const qualityValidation = validateQualityParameters(data.qualityParameters || []);
+    if (!qualityValidation.valid) {
+      return { success: false, error: qualityValidation.error };
     }
 
     const email = session.user.email?.trim().toLowerCase() || null;
@@ -178,7 +206,8 @@ export async function updateColdCommodity(id: string, data: { name: string; type
         type: data.type.trim(),
         gradingType: data.gradingType,
         priceType: data.priceType,
-        seasonalPrices: data.seasonalPrices
+        seasonalPrices: data.seasonalPrices,
+        qualityParameters: data.qualityParameters || []
       },
       { new: true }
     );

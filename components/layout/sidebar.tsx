@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail, Layers, Shield } from 'lucide-react';
+import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail, Layers, Shield, Factory } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import type { Session } from 'next-auth';
 import { hasWspPermission, WspModuleId } from '@/lib/wsp-permissions';
@@ -29,6 +29,7 @@ const wspNavItems: NavItem[] = [
 
 const adminNavItems = [
   { name: 'Cold Storage', href: '/cold/dashboard', icon: LayoutDashboard },
+  { name: 'Manufacturing', href: '/manufacturing/dashboard', icon: Factory },
   { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
   { name: 'WSP Permissions', href: '/admin/wsp-permissions', icon: Shield },
   // { name: 'Invoice Download', href: '/admin/invoices', icon: Receipt },

@@ -18,23 +18,25 @@ interface ColdInvoiceGeneratorProps {
 export default function ColdInvoiceGenerator({ warehouses, clients, userDetails }: ColdInvoiceGeneratorProps) {
   const [warehouseId, setWarehouseId] = useState('');
   const [clientId, setClientId] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [selectedOutwardIds, setSelectedOutwardIds] = useState<string[]>([]);
+  const [outwardDropdownOpen, setOutwardDropdownOpen] = useState(false);
   const [additionalCharges, setAdditionalCharges] = useState<{name: string, amount: number}[]>([]);
+  const [outwards, setOutwards] = useState<any[]>([]);
+  
   
   const [preview, setPreview] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   const handlePreview = async () => {
-    if (!warehouseId || !clientId || !fromDate || !toDate) {
-      toast.error('Please select all required fields');
+    if (!warehouseId || !clientId || selectedOutwardIds.length === 0) {
+      toast.error('Please select warehouse, client and at least one outward transaction');
       return;
     }
     
     setLoading(true);
     try {
-      const data = await generateColdClientInvoicePreview(warehouseId, clientId, fromDate, toDate);
+      const data = await generateColdClientInvoicePreview(warehouseId, clientId, null, null, selectedOutwardIds);
       setPreview(data);
       if (data.items.length === 0) {
         toast.error('No valid transactions found for the selected period.');
@@ -48,6 +50,31 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     }
   };
 
+  // Fetch outwards when warehouse or client changes
+  React.useEffect(() => {
+    const fetchOutwards = async () => {
+      if (!warehouseId || !clientId) {
+        setOutwards([]);
+        return;
+      }
+
+      try {
+        const qs = `?clientId=${encodeURIComponent(clientId)}&warehouseId=${encodeURIComponent(warehouseId)}`;
+        const res = await fetch(`/api/cold/outwards${qs}`);
+        const json = await res.json();
+        if (res.ok && json.success) setOutwards(json.data || []);
+      } catch (e) {
+        console.error('Failed to load outwards', e);
+      }
+    };
+
+    fetchOutwards();
+  }, [warehouseId, clientId]);
+
+  const toggleOutwardSelection = (id: string) => {
+    setSelectedOutwardIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
   const handleGenerate = async () => {
     if (!preview || preview.items.length === 0) return;
     
@@ -56,11 +83,22 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     const finalTotalAmount = preview.totalAmount + additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
     
     try {
+      // derive invoice date range from selected outward (use its date as both from/to)
+      // derive invoice date range from selected outwards (min and max dates)
+      const selectedOutwards = outwards.filter(o => selectedOutwardIds.includes(o._id?.toString()));
+      let invoiceFrom = new Date();
+      let invoiceTo = new Date();
+      if (selectedOutwards.length > 0) {
+        const dates = selectedOutwards.map(o => new Date(o.date));
+        invoiceFrom = new Date(Math.min(...dates.map(d => d.getTime())));
+        invoiceTo = new Date(Math.max(...dates.map(d => d.getTime())));
+      }
+
       const savedInvoice = await saveColdClientInvoice({
         warehouseId,
         clientId,
-        fromDate: new Date(fromDate),
-        toDate: new Date(toDate),
+        fromDate: invoiceFrom,
+        toDate: invoiceTo,
         items: preview.items,
         additionalCharges,
         totalAmount: finalTotalAmount
@@ -110,7 +148,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               <SelectTrigger><SelectValue placeholder="Select Warehouse" /></SelectTrigger>
               <SelectContent>
                 {warehouses.map(w => (
-                  <SelectItem key={w._id} value={w._id}>{w.name}</SelectItem>
+                  <SelectItem key={w._id} value={w._id?.toString()}>{w.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -121,23 +159,46 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               <SelectTrigger><SelectValue placeholder="Select Client" /></SelectTrigger>
               <SelectContent>
                 {clients.map(c => (
-                  <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
+                  <SelectItem key={c._id} value={c._id?.toString()}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">From Date</label>
-            <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">To Date</label>
-            <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+            <label className="text-sm font-medium">Outward Transactions</label>
+            <div className="relative">
+              <button type="button" className="w-full border rounded p-2 text-left" onClick={() => setOutwardDropdownOpen(!outwardDropdownOpen)}>
+                {selectedOutwardIds.length === 0 ? 'Select Outward Transactions' : `${selectedOutwardIds.length} selected`}
+              </button>
+              {outwardDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full max-h-56 overflow-auto border rounded bg-white shadow-lg p-2">
+                  {outwards.length === 0 && <div className="text-sm text-slate-500 p-2">No outwards found</div>}
+                  {outwards.map(o => (
+                    <div key={o._id} className="flex items-center justify-between gap-2 p-2 hover:bg-slate-50 rounded">
+                      <label className="flex items-center gap-3">
+                        <input type="checkbox" checked={selectedOutwardIds.includes(o._id?.toString())} onChange={() => {
+                          const idStr = o._id?.toString();
+                          setSelectedOutwardIds(prev => prev.includes(idStr) ? prev.filter(x => x !== idStr) : [...prev, idStr]);
+                        }} />
+                        <div className="text-sm">
+                          <div className="font-medium">{o.receiptNo || o._id} — {o.commodityName || o.commodityId?.name} — {new Date(o.date).toLocaleDateString()}</div>
+                          <div className="text-xs text-slate-500">{o.quantityKg} Kg</div>
+                        </div>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <a className="text-xs text-indigo-600 hover:underline" target="_blank" rel="noreferrer" href={`/api/cold/receipt/html?type=outward&id=${o._id}`}>View Outward</a>
+                        <div className="text-sm font-semibold">₹{(o.rentRs||0).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-2">
+          <CardFooter className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setPreview(null)}>Clear</Button>
-          <Button onClick={handlePreview} disabled={loading || !warehouseId || !clientId || !fromDate || !toDate}>
+          <Button onClick={handlePreview} disabled={loading || !warehouseId || !clientId || selectedOutwardIds.length === 0}>
             {loading ? 'Calculating...' : 'Preview Invoice'}
           </Button>
         </CardFooter>
@@ -179,6 +240,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               </tbody>
             </table>
             
+            {/* Outward selection moved to top dropdown (multi-select) */}
             <div className="mt-6 border-t pt-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-semibold">Additional Charges</h3>

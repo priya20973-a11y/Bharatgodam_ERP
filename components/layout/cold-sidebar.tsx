@@ -26,6 +26,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
+  { name: 'Invoices', translationKey: 'sidebar.invoices', href: '/cold/invoices', icon: FileText, module: 'invoice' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
   { name: 'Cold Storage Accounting', translationKey: 'sidebar.accounting', href: '/cold/accounting', icon: Calculator, module: 'accounting' },

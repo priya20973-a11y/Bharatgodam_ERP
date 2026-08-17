@@ -20,6 +20,7 @@ export default function WarehouseConfigForm({ initialData }: { initialData?: Par
       address: '',
       contactEmail: '',
       totalCapacitySqFt: 100000,
+      coldQualityValidationMode: 'strict',
       commodities: [{ name: 'General Storage', ratePerSqFt: 1.50, isActive: true }]
     }
   });
@@ -73,7 +74,33 @@ export default function WarehouseConfigForm({ initialData }: { initialData?: Par
           </div>
         </div>
 
-        {/* SECTION 2: Dynamic Pricing Engine */}
+        {/* SECTION 2: Cold Storage Validation Mode */}
+        <div className="pt-6 border-t border-slate-200">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Cold Storage Quality Validation</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Choose how cold storage quality readings are enforced during inward creation.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-4 cursor-pointer hover:border-slate-400">
+                <input type="radio" value="strict" {...register('coldQualityValidationMode')} className="h-4 w-4 text-blue-600" />
+                <div>
+                  <div className="font-semibold">Strict validation</div>
+                  <div className="text-sm text-slate-600">Require all defined quality readings on inward submission and reject missing values.</div>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-4 cursor-pointer hover:border-slate-400">
+                <input type="radio" value="relaxed" {...register('coldQualityValidationMode')} className="h-4 w-4 text-blue-600" />
+                <div>
+                  <div className="font-semibold">Relaxed validation</div>
+                  <div className="text-sm text-slate-600">Allow inward creation even when some quality readings are missing, but record notes.</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 3: Dynamic Pricing Engine */}
         <div className="pt-6 border-t border-slate-200">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-slate-800">Commodities & Pricing</h3>

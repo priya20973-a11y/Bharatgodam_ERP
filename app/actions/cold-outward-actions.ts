@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import mongoose from 'mongoose';
+import ColdInvoice from '@/lib/models/ColdInvoice';
 
 export async function getColdOutwards() {
   await connectToDatabase();
@@ -258,6 +259,68 @@ export async function createColdOutward(data: any) {
       date: outDate,
     }, session));
     
+    // Generate invoice for cold outward (one invoice per outward)
+    try {
+      const invoiceItems = [] as any[];
+      const additionalCharges: any[] = [];
+
+      invoiceItems.push({
+        inwardId: outward.inwardId || null,
+        inwardDate: outward.inwardId ? (await ColdInward.findById(outward.inwardId)).then(d => d?.date) : null,
+        outwardDate: outward.date,
+        commodityId: outward.commodityId,
+        commodityName: (await ColdCommodity.findById(outward.commodityId))?.name || '',
+        quantityKg: outward.quantityKg || 0,
+        outwardKg: outward.quantityKg || 0,
+        balanceKg: 0,
+        bagsLarge: outward.bagsCount || 0,
+        bagsSmall: outward.jin || 0,
+        bagsMixed: outward.mixed || 0,
+        totalBags: outward.totalBags || 0,
+        days: 0,
+        rateApplied: outward.rentRs || 0,
+        subtotal: outward.rentRs || 0,
+        calculationPath: 'Billed as per outward receipt',
+      });
+
+      // If outward contains any explicit grading/rent fields beyond rentRs, include them
+      if ((outward as any).gradingCharge) {
+        additionalCharges.push({ name: 'Grading Charge', amount: Number((outward as any).gradingCharge) || 0 });
+      }
+      if ((outward as any).additionalCharges && Array.isArray((outward as any).additionalCharges)) {
+        for (const ac of outward.additionalCharges) {
+          additionalCharges.push({ name: ac.name || 'Additional', amount: Number(ac.amount) || 0 });
+        }
+      }
+
+      const totalAmount = invoiceItems.reduce((s, it) => s + Number(it.subtotal || 0), 0) + additionalCharges.reduce((s, c) => s + Number(c.amount || 0), 0);
+
+      const invoiceId = `CINV-${Date.now().toString().slice(-6)}`;
+      const invoiceDoc = appendOwnership({
+        invoiceId,
+        clientId: outward.clientId,
+        warehouseId: outward.warehouseId,
+        fromDate: outward.date,
+        toDate: outward.date,
+        items: invoiceItems,
+        additionalCharges: additionalCharges.length ? additionalCharges : undefined,
+        totalAmount,
+        status: 'ACTIVE',
+        generatedAt: new Date()
+      }, session);
+
+      const createdInvoice = await ColdInvoice.create(invoiceDoc);
+
+      // Link the created invoice back to the outward
+      try {
+        await ColdOutward.findByIdAndUpdate(outward._id, { $set: { invoiceId: invoiceId } });
+      } catch (linkErr) {
+        console.error('Failed to link outward to created invoice:', linkErr);
+      }
+    } catch (invErr) {
+      console.error('Failed to auto-create cold invoice for outward:', invErr);
+    }
+
     revalidatePath('/cold/outward');
     return { success: true, data: JSON.parse(JSON.stringify(outward)) };
   } catch (error: any) {
@@ -372,6 +435,71 @@ export async function createBatchColdOutwards(payload: any) {
       createdOutwards.push(outward);
     }
     
+    // After batch create, generate a consolidated invoice for the batch
+    try {
+      const invoiceItems: any[] = [];
+      const additionalCharges: any[] = [];
+
+      for (const out of createdOutwards) {
+        const commodity = await ColdCommodity.findById(out.commodityId);
+        invoiceItems.push({
+          inwardId: out.inwardId || null,
+          inwardDate: out.inwardId ? (await ColdInward.findById(out.inwardId)).then(d => d?.date) : null,
+          outwardDate: out.date,
+          commodityId: out.commodityId,
+          commodityName: commodity?.name || '',
+          quantityKg: out.quantityKg || 0,
+          outwardKg: out.quantityKg || 0,
+          balanceKg: 0,
+          bagsLarge: out.bagsCount || 0,
+          bagsSmall: out.jin || 0,
+          bagsMixed: out.mixed || 0,
+          totalBags: out.totalBags || 0,
+          days: 0,
+          rateApplied: out.rentRs || 0,
+          subtotal: out.rentRs || 0,
+          calculationPath: 'Billed as per outward receipt',
+        });
+
+        if ((out as any).gradingCharge) {
+          additionalCharges.push({ name: 'Grading Charge', amount: Number((out as any).gradingCharge) || 0 });
+        }
+        if ((out as any).additionalCharges && Array.isArray((out as any).additionalCharges)) {
+          for (const ac of out.additionalCharges) {
+            additionalCharges.push({ name: ac.name || 'Additional', amount: Number(ac.amount) || 0 });
+          }
+        }
+      }
+
+      const totalAmount = invoiceItems.reduce((s, it) => s + Number(it.subtotal || 0), 0) + additionalCharges.reduce((s, c) => s + Number(c.amount || 0), 0);
+      const invoiceId = `CINV-${Date.now().toString().slice(-6)}`;
+      const invoiceDoc = appendOwnership({
+        invoiceId,
+        clientId: payload.clientId,
+        warehouseId: createdOutwards[0]?.warehouseId,
+        fromDate: payload.date ? new Date(payload.date) : new Date(),
+        toDate: payload.date ? new Date(payload.date) : new Date(),
+        items: invoiceItems,
+        additionalCharges: additionalCharges.length ? additionalCharges : undefined,
+        totalAmount,
+        status: 'ACTIVE',
+        generatedAt: new Date()
+      }, session);
+
+      const createdInvoice = await ColdInvoice.create(invoiceDoc);
+      // Link the created invoice back to the created outwards
+      try {
+        const outwardIds = createdOutwards.map(o => o._id).filter(Boolean);
+        if (outwardIds.length > 0) {
+          await ColdOutward.updateMany({ _id: { $in: outwardIds } }, { $set: { invoiceId: invoiceId } });
+        }
+      } catch (linkErr) {
+        console.error('Failed to link batch outwards to created invoice:', linkErr);
+      }
+    } catch (errInv) {
+      console.error('Failed to auto-create cold invoice for batch outward:', errInv);
+    }
+
     revalidatePath('/cold/outward');
     return { success: true, data: JSON.parse(JSON.stringify(createdOutwards)) };
   } catch (error: any) {

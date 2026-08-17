@@ -9,6 +9,13 @@ export interface ISeasonalPrice {
   priceMixed?: number;
 }
 
+export interface IQualityParameter {
+  name: string;
+  unit?: string;
+  minValue: number;
+  maxValue: number;
+}
+
 export interface IColdCommodity extends Document {
   name: string;
   type: string;
@@ -16,6 +23,7 @@ export interface IColdCommodity extends Document {
   gradingType?: 'Grading' | 'Wet';
   priceType?: 'Same Price' | 'Different Price';
   seasonalPrices: ISeasonalPrice[];
+  qualityParameters?: IQualityParameter[];
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -34,6 +42,16 @@ const SeasonalPriceSchema = new Schema<ISeasonalPrice>(
   { _id: false } // No need for separate IDs on subdocuments
 );
 
+const QualityParameterSchema = new Schema<IQualityParameter>(
+  {
+    name: { type: String, required: true },
+    unit: { type: String, required: false },
+    minValue: { type: Number, required: true },
+    maxValue: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
 const ColdCommoditySchema: Schema = new Schema(
   {
     name: { type: String, required: true, uppercase: true },
@@ -42,6 +60,7 @@ const ColdCommoditySchema: Schema = new Schema(
     gradingType: { type: String, enum: ['Grading', 'Wet'], required: false },
     priceType: { type: String, enum: ['Same Price', 'Different Price'], required: false },
     seasonalPrices: { type: [SeasonalPriceSchema], required: true, default: [] },
+    qualityParameters: { type: [QualityParameterSchema], required: false, default: [] },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },
