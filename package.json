@@ -30,6 +30,7 @@
     "framer-motion": "^12.38.0",
     "html2pdf.js": "^0.9.3",
     "html5-qrcode": "^2.3.8",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.7.0",
     "mongodb": "^7.2.0",
     "mongoose": "^9.4.1",

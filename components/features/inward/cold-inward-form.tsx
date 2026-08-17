@@ -8,8 +8,9 @@ import { ColdNumberInput } from '@/components/ui/cold-number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, QrCode, Camera, Upload } from 'lucide-react';
 import { getDynamicUnitLabel } from '@/lib/utils';
+import StackQRScannerModal from './stack-qr-scanner-modal';
 
 interface ColdInwardFormProps {
   clients: any[];
@@ -23,6 +24,12 @@ interface ColdInwardFormProps {
 export default function ColdInwardForm({ clients, commodities, warehouses, onSuccess, prefillData, draftId }: ColdInwardFormProps) {
   const { t } = useColdTranslation();
   const [loading, setLoading] = useState(false);
+
+  // Allocation Mode & Stack QR Scanner State
+  const [allocationMode, setAllocationMode] = useState<'MANUAL' | 'SCAN_QR'>('MANUAL');
+  const [scanningTarget, setScanningTarget] = useState<{ cIdx: number; sIdx: number } | null>(null);
+  const [initialModalTab, setInitialModalTab] = useState<'camera' | 'upload'>('camera');
+  const [isStackScannerOpen, setIsStackScannerOpen] = useState(false);
 
   // Common Fields
   const [common, setCommon] = useState({
@@ -60,12 +67,11 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         if (newCaps[key] === undefined) {
           const [wId, cNo, fNo, sNo] = key.split('-');
           try {
-            const res = await getStackAvailableCapacity(wId, cNo, parseInt(fNo), parseInt(sNo));
+            const res = await getStackAvailableCapacity(wId, cNo, fNo, sNo);
             newCaps[key] = { availableCapacity: res.availableCapacity, bufferCapacity: res.bufferCapacity || 0 };
             changed = true;
-          } catch {
-            newCaps[key] = null;
-            changed = true;
+          } catch (err) {
+            console.error('Stack capacity fetch error:', err);
           }
         }
       }
@@ -226,6 +232,185 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
     updated[clientIndex].stacks[stackIndex] = stack;
     setClientSections(updated);
+  };
+
+  const updateStackFields = (clientIndex: number, stackIndex: number, fieldsObj: Record<string, any>) => {
+    setClientSections((prevClientSections) => {
+      const updated = prevClientSections.map((clientItem, cI) => {
+        if (cI !== clientIndex) return clientItem;
+        const stacks = clientItem.stacks.map((stackItem: any, sI: number) => {
+          if (sI !== stackIndex) return stackItem;
+          return {
+            ...stackItem,
+            ...fieldsObj
+          };
+        });
+        return {
+          ...clientItem,
+          stacks
+        };
+      });
+      return updated;
+    });
+  };
+
+  const handleStackQrScan = (scannedText: string) => {
+    if (!scanningTarget) return;
+    const { cIdx, sIdx } = scanningTarget;
+
+    if (!selectedWarehouse) {
+      toast.error('Please select a warehouse first.');
+      return;
+    }
+
+    const trimmed = scannedText.trim();
+    let parsedWarehouseId: string | undefined = undefined;
+    let parsedChamber = '';
+    let parsedFloor = '';
+    let parsedStack = '';
+
+    try {
+      // 1. Key-Value text format (e.g. Chamber:A | Floor:F1 | Stack:48 or Chamber: Chamber 1, Floor: Ground, Stack: 3)
+      if (/Chamber\s*:/i.test(trimmed) || /Floor\s*:/i.test(trimmed) || /Stack\s*:/i.test(trimmed)) {
+        const chamberMatch = trimmed.match(/Chamber\s*:\s*([^|,;\n]+)/i);
+        if (chamberMatch) parsedChamber = chamberMatch[1].trim();
+
+        const floorMatch = trimmed.match(/Floor\s*:\s*([^|,;\n]+)/i);
+        if (floorMatch) parsedFloor = floorMatch[1].trim();
+
+        const stackMatch = trimmed.match(/Stack\s*:\s*([^|,;\n]+)/i);
+        if (stackMatch) parsedStack = stackMatch[1].trim();
+
+        const whMatch = trimmed.match(/(?:Warehouse|WH|WhId)\s*:\s*([^|,;\n]+)/i);
+        if (whMatch) parsedWarehouseId = whMatch[1].trim();
+      }
+      // 2. JSON format
+      else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        const json = JSON.parse(trimmed);
+        parsedWarehouseId = (json.warehouseId || json.wId || json.warehouse || '').toString();
+        parsedChamber = (json.chamberName || json.chamberNo || json.chamber || '').toString();
+        parsedFloor = (json.floorName || json.floorNo || json.floor || '').toString();
+        parsedStack = (json.stackName || json.stackNo || json.stack || '').toString();
+      }
+      // 3. URL format (/cold/stack/{warehouseId}/{chamberName}/{floorNo}/{stackNo})
+      else if (trimmed.includes('/cold/stack/')) {
+        const parts = trimmed.split('/cold/stack/')[1]?.split('/');
+        if (parts && parts.length >= 4) {
+          parsedWarehouseId = decodeURIComponent(parts[0]);
+          parsedChamber = decodeURIComponent(parts[1]);
+          parsedFloor = decodeURIComponent(parts[2]);
+          parsedStack = decodeURIComponent(parts[3]);
+        }
+      }
+      // 4. Delimited format (e.g. CWH-1001/A/F1/48 or A/F1/48)
+      else {
+        const parts = trimmed.split(/[\/|]/);
+        if (parts.length >= 4) {
+          parsedWarehouseId = parts[0].trim();
+          parsedChamber = parts[1].trim();
+          parsedFloor = parts[2].trim();
+          parsedStack = parts[3].trim();
+        } else if (parts.length === 3) {
+          parsedChamber = parts[0].trim();
+          parsedFloor = parts[1].trim();
+          parsedStack = parts[2].trim();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse stack QR:', err);
+    }
+
+    if (!parsedChamber || !parsedFloor || !parsedStack) {
+      toast.error('Invalid Stack QR code format. QR must contain Chamber, Floor, and Stack details.');
+      return;
+    }
+
+    // Validate warehouse if included in QR
+    if (parsedWarehouseId) {
+      const warehouseMatches = 
+        selectedWarehouse._id?.toString() === parsedWarehouseId ||
+        (selectedWarehouse.warehouseId && selectedWarehouse.warehouseId.toLowerCase() === parsedWarehouseId.toLowerCase()) ||
+        (selectedWarehouse.name && selectedWarehouse.name.toLowerCase() === parsedWarehouseId.toLowerCase());
+
+      if (!warehouseMatches) {
+        toast.error(`Invalid QR: Belongs to warehouse "${parsedWarehouseId}". Currently selected warehouse is "${selectedWarehouse.name}".`);
+        return;
+      }
+    }
+
+    const cleanChamber = (str: string) => str.toLowerCase().replace(/^chamber\s*/i, '').trim();
+
+    // Match Chamber (supports custom names)
+    const chamber = selectedWarehouse.chambers?.find((c: any) => {
+      const cName = (c.name || '').trim().toLowerCase();
+      const cNo = c.chamberNo !== undefined ? c.chamberNo.toString() : '';
+      const search = parsedChamber.trim().toLowerCase();
+      const cleanSearch = cleanChamber(search);
+
+      return cName === search || 
+             cNo === search || 
+             cleanChamber(cName) === cleanSearch || 
+             cNo === cleanSearch;
+    });
+
+    if (!chamber) {
+      toast.error(`Chamber "${parsedChamber}" not found in warehouse "${selectedWarehouse.name}".`);
+      return;
+    }
+
+    const cleanFloor = (str: string) => str.toLowerCase().replace(/^floor\s*/i, '').trim();
+
+    // Match Floor in Chamber (supports custom names)
+    const floor = chamber.floors?.find((f: any) => {
+      const fName = (f.name || '').trim().toLowerCase();
+      const fNo = f.floorNo !== undefined ? f.floorNo.toString() : '';
+      const search = parsedFloor.trim().toLowerCase();
+      const cleanSearch = cleanFloor(search);
+
+      return fName === search || 
+             fNo === search || 
+             cleanFloor(fName) === cleanSearch || 
+             fNo === cleanSearch;
+    });
+
+    if (!floor) {
+      toast.error(`Floor "${parsedFloor}" not found in Chamber "${chamber.name || chamber.chamberNo}".`);
+      return;
+    }
+
+    const cleanStack = (str: string) => str.toLowerCase().replace(/^stack\s*/i, '').trim();
+
+    // Match Stack on Floor
+    const stackObj = floor.stacks?.find((s: any) => {
+      const sName = (s.name || '').trim().toLowerCase();
+      const sNo = s.stackNo !== undefined ? s.stackNo.toString() : '';
+      const search = parsedStack.trim().toLowerCase();
+      const cleanSearch = cleanStack(search);
+
+      return sName === search || 
+             sNo === search || 
+             cleanStack(sName) === cleanSearch || 
+             sNo === cleanSearch;
+    });
+
+    if (!stackObj) {
+      toast.error(`Stack "${parsedStack}" not found on Floor "${floor.name || floor.floorNo}".`);
+      return;
+    }
+
+    // Extract canonical field values matching SelectItem values
+    const chamberVal = (chamber.name || chamber.chamberNo).toString();
+    const floorVal = (floor.name || floor.floorNo).toString();
+    const stackVal = stackObj.stackNo.toString();
+
+    // Atomically populate Chamber, Floor, and Stack in one React state update
+    updateStackFields(cIdx, sIdx, {
+      chamberNo: chamberVal,
+      floorNo: floorVal,
+      stackNo: stackVal
+    });
+
+    toast.success(`Scanned & Auto-Filled: Chamber ${chamber.name || chamber.chamberNo} → Floor ${floor.name || floor.floorNo} → Stack ${stackObj.stackNo}`);
   };
 
   const handleSaveDraft = async () => {
@@ -808,105 +993,226 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
             {/* Stacks Section */}
             <div className="mt-4 border p-4 rounded-md bg-slate-50">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-medium text-sm">Stack Allocations</h4>
+              <div className="flex flex-wrap justify-between items-center mb-3 gap-2 border-b pb-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h4 className="font-semibold text-sm text-slate-800">Stack Allocations</h4>
+                  
+                  {/* Allocation Mode Selector */}
+                  <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg border text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAllocationMode('MANUAL')}
+                      className={`px-3 py-1 rounded-md font-medium transition-all ${
+                        allocationMode === 'MANUAL' 
+                          ? 'bg-white text-indigo-700 shadow-sm font-semibold' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Manual Stack Entry
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAllocationMode('SCAN_QR')}
+                      className={`px-3 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+                        allocationMode === 'SCAN_QR' 
+                          ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      Scan Stack QR
+                    </button>
+                  </div>
+                </div>
+
                 <Button type="button" variant="outline" size="sm" onClick={() => addStack(cIdx)}>
                   <Plus className="w-4 h-4 mr-1" /> Add Stack
                 </Button>
               </div>
+
               {client.stacks.map((stack: any, sIdx: number) => {
-                const chamber = selectedWarehouse?.chambers?.find((c: any) => (c.name || c.chamberNo.toString()) === stack.chamberNo);
-                const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(stack.floorNo));
-                const floorName = floor?.name || `Floor ${stack.floorNo}`;
+                const chamber = selectedWarehouse?.chambers?.find((c: any) => 
+                  (c.name || c.chamberNo.toString()).toString().toLowerCase() === (stack.chamberNo || '').toString().toLowerCase() ||
+                  c.chamberNo.toString() === (stack.chamberNo || '').toString() ||
+                  (c.name && c.name.toLowerCase() === (stack.chamberNo || '').toString().toLowerCase())
+                );
+                const floor = chamber?.floors?.find((f: any) => 
+                  (f.name || f.floorNo.toString()).toString().toLowerCase() === (stack.floorNo || '').toString().toLowerCase() ||
+                  f.floorNo.toString() === (stack.floorNo || '').toString() ||
+                  (f.name && f.name.toLowerCase() === (stack.floorNo || '').toString().toLowerCase())
+                );
+                const cleanStackStr = (str: string) => (str || '').toString().toLowerCase().replace(/^stack\s*/i, '').trim();
+
+                const stackObj = floor?.stacks?.find((s: any) => 
+                  s.stackNo.toString() === (stack.stackNo || '').toString() ||
+                  cleanStackStr(stack.stackNo || '') === s.stackNo.toString() ||
+                  (s.name && s.name.toLowerCase() === (stack.stackNo || '').toString().toLowerCase())
+                );
+
+                const floorName = floor?.name || (stack.floorNo ? `Floor ${stack.floorNo}` : '');
+                const stackName = stackObj ? (stackObj.name || `Stack ${stackObj.stackNo}`) : (stack.stackNo ? `Stack ${stack.stackNo}` : '');
                 
                 return (
-                  <div key={stack.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 mb-2 items-start">
-                    <div className="space-y-1">
-                      <label className="text-xs">Chamber</label>
-                      <Select value={stack.chamberNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'chamberNo', v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Chamber" /></SelectTrigger>
-                        <SelectContent>
-                          {selectedWarehouse?.chambers?.map((c: any) => {
-                            const val = (c.name || c.chamberNo).toString();
-                            return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs">Floor</label>
-                      <Select value={stack.floorNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'floorNo', v)} disabled={!stack.chamberNo}>
-                        <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-300 shadow-sm"><SelectValue placeholder="Floor" /></SelectTrigger>
-                        <SelectContent>
-                          {chamber?.floors?.map((f: any) => (
-                            <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs">Stack</label>
-                      <Select value={stack.stackNo} onValueChange={(v) => updateStack(cIdx, sIdx, 'stackNo', v)} disabled={!stack.floorNo}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Stack" /></SelectTrigger>
-                        <SelectContent>
-                          {floor?.stacks?.map((s: any) => {
-                            const clientSelectedStackKeys = client.stacks
-                              .filter((clientStack: any, idx: number) => idx !== sIdx && clientStack.chamberNo && clientStack.floorNo && clientStack.stackNo)
-                              .map((clientStack: any) => `${clientStack.chamberNo}-${clientStack.floorNo}-${clientStack.stackNo}`);
-                              
-                            const itemKey = `${stack.chamberNo}-${stack.floorNo}-${s.stackNo}`;
-                            const isSelectedByThisClient = clientSelectedStackKeys.includes(itemKey);
-                            const remaining = getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, s.stackNo.toString(), cIdx, sIdx);
-                            const isCurrentSelection = stack.stackNo === s.stackNo.toString();
-                            const noCapacity = remaining !== null && remaining <= 0;
-                            const isDisabled = isSelectedByThisClient || (!isCurrentSelection && noCapacity);
-                            
-                            return (
-                              <SelectItem key={s.stackNo} value={s.stackNo.toString()} disabled={isDisabled}>
-                                {s.stackNo} {isSelectedByThisClient ? '(Already Selected)' : ''}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      {stack.chamberNo && stack.floorNo && stack.stackNo && stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`] !== undefined && (
-                        <div className="text-[10px] text-green-600 font-semibold leading-tight pt-1">
-                          Avail: {getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, -1, -1, false)?.toLocaleString() ?? (stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.availableCapacity || 0)?.toLocaleString()} KG
+                  <div key={stack.id} className="mb-3 p-3 bg-white border rounded-lg shadow-2xs space-y-2">
+                    {allocationMode === 'SCAN_QR' && (
+                      <div className="flex flex-wrap items-center justify-between bg-indigo-50/90 p-2.5 rounded-md border border-indigo-200 mb-2 gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-indigo-900 font-semibold">
+                            {stack.chamberNo && stack.floorNo && stack.stackNo
+                              ? `✓ Auto-Filled: Chamber ${stack.chamberNo} → ${floorName} → ${stackName}`
+                              : 'Click Scan QR to auto-fill Chamber, Floor & Stack:'}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                    {client.stockType === 'Both' && (
-                      <div className="space-y-1">
-                        <label className="text-xs text-purple-600">Type</label>
-                        <Select value={stack.stockType || 'Self'} onValueChange={(v) => updateStack(cIdx, sIdx, 'stockType', v)}>
-                          <SelectTrigger className="h-8 text-xs bg-purple-50"><SelectValue placeholder="Type" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Self">Self</SelectItem>
-                            <SelectItem value="Purchase">Purchase</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setScanningTarget({ cIdx, sIdx });
+                            setIsStackScannerOpen(true);
+                          }}
+                          className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 font-semibold shadow-xs"
+                        >
+                          <QrCode className="w-4 h-4" />
+                          Scan QR
+                        </Button>
                       </div>
                     )}
-                    <div className="space-y-1">
-                      <label className="text-xs text-blue-600">Alloc. Qty (KG)</label>
-                      <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx, true) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-blue-600">{getDynamicUnitLabel(clientUnit, 'alloc')}</label>
-                      <ColdNumberInput className={`h-8 text-xs ${stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) ? 'border-red-500 bg-red-50' : ''}`} min="0" value={stack.allocatedBags ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedBags', v ? Number(v) : null)} />
-                      {stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) && (
-                        <p className="text-[10px] text-red-600 font-semibold leading-tight">Fractional Bags ({stack.allocatedBags}). Must be a whole number.</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">Chamber</label>
+                        {allocationMode === 'SCAN_QR' ? (
+                          <div className="h-8 text-xs px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-medium text-slate-700 flex items-center shadow-2xs truncate">
+                            {chamber ? (chamber.name || `Chamber ${chamber.chamberNo}`) : (stack.chamberNo || 'Chamber')}
+                          </div>
+                        ) : (
+                          <Select 
+                            value={stack.chamberNo} 
+                            onValueChange={(v) => updateStackFields(cIdx, sIdx, { chamberNo: v, floorNo: '', stackNo: '' })}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Chamber" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectedWarehouse?.chambers?.map((c: any) => {
+                                const val = (c.name || c.chamberNo).toString();
+                                return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">Floor</label>
+                        {allocationMode === 'SCAN_QR' ? (
+                          <div className="h-8 text-xs px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-medium text-slate-700 flex items-center shadow-2xs truncate">
+                            {floor ? (floor.name || `Floor ${floor.floorNo}`) : (stack.floorNo || 'Floor')}
+                          </div>
+                        ) : (
+                          <Select 
+                            value={stack.floorNo} 
+                            onValueChange={(v) => updateStackFields(cIdx, sIdx, { floorNo: v, stackNo: '' })} 
+                            disabled={!stack.chamberNo}
+                          >
+                            <SelectTrigger className="h-8 text-xs border-slate-300 shadow-sm bg-slate-50">
+                              <SelectValue placeholder="Floor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {chamber?.floors?.map((f: any) => {
+                                const val = (f.name || f.floorNo).toString();
+                                return <SelectItem key={f.floorNo} value={val}>{f.name || `Floor ${f.floorNo}`}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">Stack</label>
+                        {allocationMode === 'SCAN_QR' ? (
+                          <div className="h-8 text-xs px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-medium text-slate-700 flex items-center shadow-2xs truncate">
+                            {stackObj ? (stackObj.name || `Stack ${stackObj.stackNo}`) : (stack.stackNo ? `Stack ${stack.stackNo}` : 'Stack')}
+                          </div>
+                        ) : (
+                          <Select 
+                            value={stack.stackNo} 
+                            onValueChange={(v) => updateStack(cIdx, sIdx, 'stackNo', v)} 
+                            disabled={!stack.floorNo}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Stack" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {floor?.stacks?.map((s: any) => {
+                                const clientSelectedStackKeys = client.stacks
+                                  .filter((clientStack: any, idx: number) => idx !== sIdx && clientStack.chamberNo && clientStack.floorNo && clientStack.stackNo)
+                                  .map((clientStack: any) => `${clientStack.chamberNo}-${clientStack.floorNo}-${clientStack.stackNo}`);
+                                  
+                                const itemKey = `${stack.chamberNo}-${stack.floorNo}-${s.stackNo}`;
+                                const isSelectedByThisClient = clientSelectedStackKeys.includes(itemKey);
+                                const remaining = getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, s.stackNo.toString(), cIdx, sIdx);
+                                const isCurrentSelection = stack.stackNo === s.stackNo.toString();
+                                const noCapacity = remaining !== null && remaining <= 0;
+                                const isDisabled = isSelectedByThisClient || (!isCurrentSelection && noCapacity);
+                                
+                                const customCapKey1 = `${chamber?.chamberNo}-${floor?.floorNo}-${s.stackNo}`;
+                                const customCapKey2 = `${chamber?.name || chamber?.chamberNo}-${floor?.name || floor?.floorNo}-${s.stackNo}`;
+                                const customCap = selectedWarehouse?.customStackCapacities?.[customCapKey1] || selectedWarehouse?.customStackCapacities?.[customCapKey2];
+                                const stackTotalCap = Number(s.capacity || customCap || selectedWarehouse?.stackCapacity || 1000);
+
+                                return (
+                                  <SelectItem key={s.stackNo} value={s.stackNo.toString()} disabled={isDisabled}>
+                                    Stack {s.stackNo} ({stackTotalCap.toLocaleString()} KG) {isSelectedByThisClient ? '(Already Selected)' : ''}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {stack.chamberNo && stack.floorNo && stack.stackNo && (
+                          <div className="text-[10px] text-green-600 font-semibold leading-tight pt-1">
+                            Avail: {(getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, -1, -1, false) ?? stackCapacities[`${common.warehouseId}-${stack.chamberNo}-${stack.floorNo}-${stack.stackNo}`]?.availableCapacity ?? 0).toLocaleString()} KG
+                          </div>
+                        )}
+                      </div>
+
+                      {client.stockType === 'Both' && (
+                        <div className="space-y-1">
+                          <label className="text-xs text-purple-600">Type</label>
+                          <Select value={stack.stockType || 'Self'} onValueChange={(v) => updateStack(cIdx, sIdx, 'stockType', v)}>
+                            <SelectTrigger className="h-8 text-xs bg-purple-50"><SelectValue placeholder="Type" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Self">Self</SelectItem>
+                              <SelectItem value="Purchase">Purchase</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
-                    </div>
-                    <div className="pb-0.5">
-                      {client.stacks.length > 1 && (
-                        <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => removeStack(cIdx, sIdx)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+
+                      <div className="space-y-1">
+                        <label className="text-xs text-blue-600">Alloc. Qty (KG)</label>
+                        <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx, true) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs text-blue-600">{getDynamicUnitLabel(clientUnit, 'alloc')}</label>
+                        <ColdNumberInput className={`h-8 text-xs ${stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) ? 'border-red-500 bg-red-50' : ''}`} min="0" value={stack.allocatedBags ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedBags', v ? Number(v) : null)} />
+                        {stack.allocatedBags !== null && stack.allocatedBags !== undefined && !Number.isInteger(Number(stack.allocatedBags)) && (
+                          <p className="text-[10px] text-red-600 font-semibold leading-tight">Fractional Bags ({stack.allocatedBags}). Must be a whole number.</p>
+                        )}
+                      </div>
+
+                      <div className="pb-0.5">
+                        {client.stacks.length > 1 && (
+                          <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => removeStack(cIdx, sIdx)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
             
@@ -1015,6 +1321,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           {loading ? t('inward.saving') : t('inward.saveInward')}
         </Button>
       </div>
+
+      <StackQRScannerModal
+        isOpen={isStackScannerOpen}
+        onClose={() => setIsStackScannerOpen(false)}
+        onScanSuccess={handleStackQrScan}
+        initialTab={initialModalTab}
+      />
     </form>
   );
 }

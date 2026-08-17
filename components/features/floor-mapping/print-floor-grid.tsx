@@ -35,46 +35,46 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
 
   if (stackLayout === 'CUSTOM' && customLayout && customLayout.length > 0) {
     customLayout.forEach((mapping: any) => {
-      const s = stacks.find((st: any) => st.stackNo === mapping.stackNo);
+      const s = stacks.find((st: any) => st.stackNo === mapping.stackNo) || stacks[mapping.stackNo - 1];
       if (s && mapping.rowIndex < rows && mapping.colIndex < cols) {
         gridCells[mapping.rowIndex][mapping.colIndex] = s;
       }
     });
   } else {
-    let sNo = 1;
+    let stackIdx = 0;
     if (stackLayout === 'ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'REVERSE_ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let c = cols - 1; c >= 0; c--) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'COLUMN_WISE') {
       for (let c = 0; c < cols; c++) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'REVERSE_COLUMN_WISE') {
       for (let c = cols - 1; c >= 0; c--) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
@@ -160,7 +160,12 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
                   className={`flex flex-col p-2 rounded-lg border ${getStatusColor(cell.status)} min-h-[160px] text-xs break-inside-avoid`}
                 >
                   <div className="flex justify-between items-center mb-1 border-b border-black/10 pb-1">
-                    <span className="font-bold text-lg">#{cell.stackNo}</span>
+                    <div>
+                      <span className="font-bold text-lg">#{cell.stackNo}</span>
+                      {cell.capacity && (
+                        <span className="ml-1.5 text-[10px] font-mono text-slate-600">({cell.capacity.toLocaleString()} kg)</span>
+                      )}
+                    </div>
                     <span className="font-semibold uppercase px-1.5 py-0.5 rounded text-[10px] bg-black/5">{cell.status}</span>
                   </div>
 

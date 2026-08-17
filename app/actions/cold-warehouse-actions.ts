@@ -59,6 +59,11 @@ export async function createColdWarehouse(data: {
   noOfChambers: number;
   noOfFloors: number;
   noOfStacks: number;
+  sameFloorsPerChamber?: boolean;
+  sameStacksPerFloor?: boolean;
+  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
+  chamberFloorsConfig?: number[];
+  floorStacksConfig?: Record<string, number>;
   stackCapacity: number;
   bufferCapacity?: number;
   stackLayout: string;
@@ -73,6 +78,15 @@ export async function createColdWarehouse(data: {
   warehouseLogo?: string;
   chamberNames?: string[];
   floorNames?: string[];
+  chamberCustomNames?: Record<number, string>;
+  floorCustomNames?: Record<string, string>;
+  floorLayoutConfig?: Record<string, {
+    stackLayout: string;
+    gridRows: number;
+    gridCols: number;
+    customLayout?: any[];
+  }>;
+  customStackCapacities?: Record<string, number>;
 }) {
   await connectToDatabase();
   try {
@@ -96,36 +110,89 @@ export async function createColdWarehouse(data: {
       return { success: false, error: 'Cold Warehouse name already exists for this WSP. Please use a different name.' };
     }
 
-    // Generate hierarchy
+    // Dynamic hierarchy generation
+    const sameFloors = data.sameFloorsPerChamber !== false;
+    const sameStacks = data.sameStacksPerFloor !== false;
+    const numberingOption = data.stackNumberingOption || 'RESTART_PER_FLOOR';
+    const customCapacities = data.customStackCapacities || {};
+
+    let totalCapacity = 0;
+    let totalStacksCount = 0;
+    let maxFloorsCount = 0;
+    let currentStackNumber = 1;
+
     const chambers = [];
     for (let c = 1; c <= data.noOfChambers; c++) {
+      const chamberFloorsCount = sameFloors
+        ? data.noOfFloors
+        : (data.chamberFloorsConfig?.[c - 1] || 1);
+
+      if (chamberFloorsCount > maxFloorsCount) {
+        maxFloorsCount = chamberFloorsCount;
+      }
+
       const floors = [];
-      for (let f = 1; f <= data.noOfFloors; f++) {
-        let stacks = [];
-        for (let s = 1; s <= data.noOfStacks; s++) {
-          stacks.push({
-            name: `Stack ${s}`,
-            stackNo: s,
-            capacity: data.stackCapacity
-          });
+      for (let f = 1; f <= chamberFloorsCount; f++) {
+        const floorStacksCount = sameStacks
+          ? data.noOfStacks
+          : (data.floorStacksConfig?.[`${c}-${f}`] || 1);
+
+        if (numberingOption === 'RESTART_PER_FLOOR') {
+          currentStackNumber = 1;
         }
+
+        const stacks = [];
+        for (let s = 1; s <= floorStacksCount; s++) {
+          const stackNo = currentStackNumber;
+          const customCapKey = `${c}-${f}-${stackNo}`;
+          const customCapKeyIdx = `${c}-${f}-${s}`;
+          const customCap = customCapacities[customCapKey] !== undefined ? customCapacities[customCapKey] : customCapacities[customCapKeyIdx];
+          const sCapacity = customCap !== undefined && Number(customCap) > 0 ? Number(customCap) : data.stackCapacity;
+
+          stacks.push({
+            name: `Stack ${stackNo}`,
+            stackNo: stackNo,
+            capacity: sCapacity
+          });
+          currentStackNumber++;
+          totalStacksCount++;
+          totalCapacity += sCapacity;
+        }
+
+        const rawFloorName = data.floorCustomNames?.[`${c}-${f}`] || (data.floorNames && data.floorNames[f - 1]);
+        const floorName = rawFloorName && rawFloorName.trim() !== '' ? rawFloorName.trim() : `Floor ${f}`;
+
+        const floorLayout = data.floorLayoutConfig?.[`${c}-${f}`] || {
+          stackLayout: data.stackLayout || 'ROW_WISE',
+          gridRows: data.gridRows || Math.ceil(Math.sqrt(floorStacksCount)),
+          gridCols: data.gridCols || Math.ceil(floorStacksCount / (data.gridRows || Math.ceil(Math.sqrt(floorStacksCount)))),
+          customLayout: data.customLayout
+        };
+
         floors.push({
-          name: data.floorNames && data.floorNames[f - 1] ? data.floorNames[f - 1] : `Floor ${f}`,
+          name: floorName,
           floorNo: f,
-          stacks
+          stacks,
+          stackLayout: floorLayout.stackLayout || 'ROW_WISE',
+          gridRows: floorLayout.gridRows,
+          gridCols: floorLayout.gridCols,
+          customLayout: floorLayout.customLayout
         });
       }
+
+      const rawChamberName = data.chamberCustomNames?.[c] || (data.chamberNames && data.chamberNames[c - 1]);
+      const chamberName = rawChamberName && rawChamberName.trim() !== '' ? rawChamberName.trim() : `Chamber ${c}`;
       chambers.push({
-        name: data.chamberNames && data.chamberNames[c - 1] ? data.chamberNames[c - 1] : `Chamber ${c}`,
+        name: chamberName,
         chamberNo: c,
         floors
       });
     }
 
-    const totalCapacity = data.noOfChambers * data.noOfFloors * data.noOfStacks * data.stackCapacity;
-
     const warehouse = await ColdWarehouse.create(appendOwnership({
       ...data,
+      noOfFloors: sameFloors ? data.noOfFloors : maxFloorsCount,
+      noOfStacks: sameStacks ? data.noOfStacks : totalStacksCount,
       totalCapacity,
       chambers,
       status: 'ACTIVE',
@@ -155,6 +222,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
   chambers: any[];
   floorNames: string[];
   bufferCapacity?: number;
+  customStackCapacities?: Record<string, number>;
 }>) {
   await connectToDatabase();
   try {
@@ -233,6 +301,39 @@ export async function updateColdWarehouse(id: string, data: Partial<{
           });
         }
       });
+    }
+
+    if (data.customStackCapacities !== undefined) {
+      warehouse.customStackCapacities = data.customStackCapacities;
+      warehouse.markModified('customStackCapacities');
+
+      warehouse.chambers.forEach((chamber: any, cIdx: number) => {
+        const cNo = chamber.chamberNo || (cIdx + 1);
+        chamber.floors.forEach((floor: any, fIdx: number) => {
+          const fNo = floor.floorNo || (fIdx + 1);
+          floor.stacks.forEach((stack: any, sIdx: number) => {
+            const keyByStackNo = `${cNo}-${fNo}-${stack.stackNo}`;
+            const keyByIndex = `${cNo}-${fNo}-${sIdx + 1}`;
+            const override = data.customStackCapacities?.[keyByStackNo] !== undefined
+              ? data.customStackCapacities[keyByStackNo]
+              : data.customStackCapacities?.[keyByIndex];
+
+            if (override !== undefined && Number(override) > 0) {
+              stack.capacity = Number(override);
+            }
+          });
+        });
+      });
+
+      let newTotalCapacity = 0;
+      warehouse.chambers.forEach((chamber: any) => {
+        chamber.floors.forEach((floor: any) => {
+          floor.stacks.forEach((stack: any) => {
+            newTotalCapacity += (stack.capacity || 0);
+          });
+        });
+      });
+      warehouse.totalCapacity = newTotalCapacity;
     }
 
     await warehouse.save();

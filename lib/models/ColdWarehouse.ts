@@ -17,6 +17,10 @@ export interface IColdFloor {
   name: string;
   floorNo: number;
   stacks: IColdStack[];
+  stackLayout?: 'ROW_WISE' | 'COLUMN_WISE' | 'REVERSE_ROW_WISE' | 'REVERSE_COLUMN_WISE' | 'CUSTOM';
+  gridRows?: number;
+  gridCols?: number;
+  customLayout?: ICustomStackMapping[];
 }
 
 export interface IColdChamber {
@@ -41,6 +45,14 @@ export interface IColdWarehouse extends Document {
   stackCapacity: number; // in Kg
   bufferCapacity: number; // buffer allowed in Kg
   totalCapacity: number; // calculated total in Kg
+
+  // Hierarchy Configuration Options
+  sameFloorsPerChamber?: boolean;
+  sameStacksPerFloor?: boolean;
+  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
+  chamberFloorsConfig?: number[];
+  floorStacksConfig?: Record<string, number>;
+  customStackCapacities?: Record<string, number>;
 
   aadhaarNo?: string;
   panNo?: string;
@@ -81,10 +93,24 @@ const StackSchema = new Schema({
   capacity: { type: Number, required: true }
 });
 
+const CustomStackMappingSchema = new Schema({
+  rowIndex: { type: Number, required: true },
+  colIndex: { type: Number, required: true },
+  stackNo: { type: Number, required: true }
+}, { _id: false });
+
 const FloorSchema = new Schema({
   name: { type: String, required: true },
   floorNo: { type: Number, required: true },
-  stacks: [StackSchema]
+  stacks: [StackSchema],
+  stackLayout: { 
+    type: String, 
+    enum: ['ROW_WISE', 'COLUMN_WISE', 'REVERSE_ROW_WISE', 'REVERSE_COLUMN_WISE', 'CUSTOM'],
+    default: 'ROW_WISE'
+  },
+  gridRows: { type: Number, required: false },
+  gridCols: { type: Number, required: false },
+  customLayout: [CustomStackMappingSchema]
 });
 
 const ChamberSchema = new Schema({
@@ -92,12 +118,6 @@ const ChamberSchema = new Schema({
   chamberNo: { type: Number, required: false },
   floors: [FloorSchema]
 });
-
-const CustomStackMappingSchema = new Schema({
-  rowIndex: { type: Number, required: true },
-  colIndex: { type: Number, required: true },
-  stackNo: { type: Number, required: true }
-}, { _id: false });
 
 const ColdWarehouseSchema: Schema = new Schema(
   {
@@ -110,6 +130,17 @@ const ColdWarehouseSchema: Schema = new Schema(
     stackCapacity: { type: Number, required: true, min: 0 },
     bufferCapacity: { type: Number, required: true, default: 0, min: 0 },
     totalCapacity: { type: Number, required: true, min: 0 },
+    
+    sameFloorsPerChamber: { type: Boolean, default: true },
+    sameStacksPerFloor: { type: Boolean, default: true },
+    stackNumberingOption: {
+      type: String,
+      enum: ['RESTART_PER_FLOOR', 'CONTINUE_ACROSS_FLOORS'],
+      default: 'RESTART_PER_FLOOR'
+    },
+    chamberFloorsConfig: [Number],
+    floorStacksConfig: { type: Schema.Types.Mixed, required: false },
+    customStackCapacities: { type: Schema.Types.Mixed, required: false },
     
     aadhaarNo: { type: String, required: false },
     panNo: { type: String, required: false },

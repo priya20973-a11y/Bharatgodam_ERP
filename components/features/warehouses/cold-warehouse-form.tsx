@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
 import { toast } from 'react-hot-toast';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Layers, Hash, CheckCircle, Tag, Grid, Weight } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
@@ -35,7 +35,106 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     gridCols: initialData?.gridCols || 0,
   });
 
-  const [customLayout, setCustomLayout] = useState<{ rowIndex: number, colIndex: number, stackNo: number }[]>(initialData?.customLayout || []);
+  // Dynamic Hierarchy Configuration State
+  const [sameFloorsPerChamber, setSameFloorsPerChamber] = useState<boolean>(
+    initialData?.sameFloorsPerChamber ?? true
+  );
+  const [chamberFloorsConfig, setChamberFloorsConfig] = useState<number[]>(
+    initialData?.chamberFloorsConfig?.length
+      ? initialData.chamberFloorsConfig
+      : Array(initialData?.noOfChambers || 1).fill(initialData?.noOfFloors || 1)
+  );
+
+  const [sameStacksPerFloor, setSameStacksPerFloor] = useState<boolean>(
+    initialData?.sameStacksPerFloor ?? true
+  );
+  const [floorStacksConfig, setFloorStacksConfig] = useState<Record<string, number>>(
+    initialData?.floorStacksConfig || {}
+  );
+
+  const [stackNumberingOption, setStackNumberingOption] = useState<'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS'>(
+    initialData?.stackNumberingOption || 'RESTART_PER_FLOOR'
+  );
+
+  // Custom Naming State
+  const [useCustomNames, setUseCustomNames] = useState<boolean>(true);
+  const [chamberCustomNames, setChamberCustomNames] = useState<Record<number, string>>(() => {
+    const map: Record<number, string> = {};
+    if (initialData?.chambers) {
+      initialData.chambers.forEach((c: any, idx: number) => {
+        map[idx + 1] = c.name || '';
+      });
+    }
+    return map;
+  });
+
+  const [floorCustomNames, setFloorCustomNames] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    if (initialData?.chambers) {
+      initialData.chambers.forEach((c: any, cIdx: number) => {
+        if (c.floors) {
+          c.floors.forEach((f: any, fIdx: number) => {
+            map[`${cIdx + 1}-${fIdx + 1}`] = f.name || '';
+          });
+        }
+      });
+    }
+    return map;
+  });
+
+  // Per-Floor Layout Configuration State
+  const [floorLayoutConfig, setFloorLayoutConfig] = useState<Record<string, {
+    stackLayout: string;
+    gridRows: number;
+    gridCols: number;
+    customLayout?: { rowIndex: number; colIndex: number; stackNo: number }[];
+  }>>(() => {
+    const initialConfig: Record<string, any> = {};
+    if (initialData?.chambers) {
+      initialData.chambers.forEach((c: any, cIdx: number) => {
+        if (c.floors) {
+          c.floors.forEach((f: any, fIdx: number) => {
+            const key = `${cIdx + 1}-${fIdx + 1}`;
+            const stacksCount = f.stacks?.length || 1;
+            const defaultRows = f.gridRows || Math.ceil(Math.sqrt(stacksCount));
+            const defaultCols = f.gridCols || Math.ceil(stacksCount / defaultRows);
+            initialConfig[key] = {
+              stackLayout: f.stackLayout || initialData.stackLayout || 'ROW_WISE',
+              gridRows: defaultRows,
+              gridCols: defaultCols,
+              customLayout: f.customLayout || []
+            };
+          });
+        }
+      });
+    }
+    return initialConfig;
+  });
+
+  // Custom Stack Capacity Overrides State
+  const [customStackCapacities, setCustomStackCapacities] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    if (initialData?.customStackCapacities) {
+      Object.assign(map, initialData.customStackCapacities);
+    } else if (initialData?.chambers) {
+      initialData.chambers.forEach((c: any, cIdx: number) => {
+        c.floors?.forEach((f: any, fIdx: number) => {
+          f.stacks?.forEach((s: any) => {
+            if (s.capacity && s.capacity !== initialData.stackCapacity) {
+              map[`${cIdx + 1}-${fIdx + 1}-${s.stackNo}`] = s.capacity;
+            }
+          });
+        });
+      });
+    }
+    return map;
+  });
+
+  // Form controls state for adding a custom stack capacity override
+  const [overrideChamber, setOverrideChamber] = useState<number>(1);
+  const [overrideFloor, setOverrideFloor] = useState<number>(1);
+  const [overrideStackNo, setOverrideStackNo] = useState<number>(1);
+  const [overrideCapacity, setOverrideCapacity] = useState<number>(1000);
 
   const [referencePersons, setReferencePersons] = useState(
     initialData?.referencePersons?.length > 0 
@@ -55,72 +154,213 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     branch: initialData?.bankDetails?.branch || '',
   });
 
-  const initialChamberNames = initialData?.chambers?.map((c: any) => c.name) || Array(initialData?.noOfChambers || 1).fill('');
-  const [chamberNames, setChamberNames] = useState<string[]>(initialChamberNames);
-
-  // Initialize floor names from the first chamber since they are applied globally
-  const initialFloorNames = initialData?.chambers?.[0]?.floors?.map((f: any) => f.name) || Array(initialData?.noOfFloors || 1).fill('');
-  const [floorNames, setFloorNames] = useState<string[]>(initialFloorNames);
-
-  const hasCustomNames = isEdit ? (initialData?.chambers?.some((c: any) => isNaN(Number(c.name))) || initialData?.chambers?.[0]?.floors?.some((f: any) => isNaN(Number(f.name)))) : false;
-  const [useCustomNames, setUseCustomNames] = useState<boolean>(hasCustomNames || false);
-
+  // Sync chamberFloorsConfig array when noOfChambers changes
   useEffect(() => {
     if (!isEdit) {
-      setChamberNames((prev) => {
+      setChamberFloorsConfig((prev) => {
         const next = [...prev];
         if (formData.noOfChambers > next.length) {
-          next.push(...Array(formData.noOfChambers - next.length).fill(''));
+          next.push(...Array(formData.noOfChambers - next.length).fill(formData.noOfFloors || 1));
         } else if (formData.noOfChambers < next.length) {
           next.length = formData.noOfChambers;
-        }
-        return next;
-      });
-      setFloorNames((prev) => {
-        const next = [...prev];
-        if (formData.noOfFloors > next.length) {
-          next.push(...Array(formData.noOfFloors - next.length).fill(''));
-        } else if (formData.noOfFloors < next.length) {
-          next.length = formData.noOfFloors;
         }
         return next;
       });
     }
   }, [formData.noOfChambers, formData.noOfFloors, isEdit]);
 
+  // Helper to get floor count for chamber c (1-indexed)
+  const getFloorCountForChamber = (c: number) => {
+    if (sameFloorsPerChamber) return formData.noOfFloors || 1;
+    return chamberFloorsConfig[c - 1] || 1;
+  };
+
+  // Helper to get stack count for chamber c, floor f (1-indexed)
+  const getStackCountForFloor = (c: number, f: number) => {
+    if (sameStacksPerFloor) return formData.noOfStacks || 1;
+    const key = `${c}-${f}`;
+    return floorStacksConfig[key] || formData.noOfStacks || 1;
+  };
+
+  // Helper to get layout configuration for chamber c, floor f (1-indexed)
+  const getFloorLayout = (c: number, f: number) => {
+    const key = `${c}-${f}`;
+    const stacksCount = getStackCountForFloor(c, f);
+    const defaultRows = Math.ceil(Math.sqrt(stacksCount));
+    const defaultCols = Math.ceil(stacksCount / defaultRows);
+    
+    if (!floorLayoutConfig[key]) {
+      return {
+        stackLayout: 'ROW_WISE',
+        gridRows: defaultRows,
+        gridCols: defaultCols,
+        customLayout: []
+      };
+    }
+    return floorLayoutConfig[key];
+  };
+
+  const updateFloorLayout = (c: number, f: number, fields: Partial<{ stackLayout: string, gridRows: number, gridCols: number, customLayout: any[] }>) => {
+    const key = `${c}-${f}`;
+    const current = getFloorLayout(c, f);
+    setFloorLayoutConfig(prev => ({
+      ...prev,
+      [key]: {
+        ...current,
+        ...fields
+      }
+    }));
+  };
+
+  // Calculate total stacks count across all chambers and floors
+  const getTotalStacksCount = () => {
+    let total = 0;
+    for (let c = 1; c <= formData.noOfChambers; c++) {
+      const floorsCount = getFloorCountForChamber(c);
+      for (let f = 1; f <= floorsCount; f++) {
+        total += getStackCountForFloor(c, f);
+      }
+    }
+    return total;
+  };
+
+  // Calculate calculated total warehouse capacity considering default stack capacity & individual overrides
+  const getCalculatedTotalCapacity = () => {
+    let total = 0;
+    for (let c = 1; c <= formData.noOfChambers; c++) {
+      const floorsCount = getFloorCountForChamber(c);
+      for (let f = 1; f <= floorsCount; f++) {
+        const stacksCount = getStackCountForFloor(c, f);
+        for (let s = 1; s <= stacksCount; s++) {
+          const key = `${c}-${f}-${s}`;
+          const customCap = customStackCapacities[key];
+          const cap = customCap !== undefined && customCap > 0 ? customCap : (formData.stackCapacity || 0);
+          total += cap;
+        }
+      }
+    }
+    return total;
+  };
+
+  const addCapacityOverride = () => {
+    if (overrideCapacity <= 0) {
+      toast.error('Override capacity must be a positive number');
+      return;
+    }
+    const key = `${overrideChamber}-${overrideFloor}-${overrideStackNo}`;
+    setCustomStackCapacities(prev => ({
+      ...prev,
+      [key]: overrideCapacity
+    }));
+    toast.success(`Capacity for Chamber ${chamberCustomNames[overrideChamber] || overrideChamber} → Floor ${floorCustomNames[`${overrideChamber}-${overrideFloor}`] || overrideFloor} → Stack ${overrideStackNo} set to ${overrideCapacity} KG`);
+  };
+
+  const removeCapacityOverride = (key: string) => {
+    setCustomStackCapacities(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (formData.noOfChambers < 1) {
+        toast.error('Number of Chambers must be at least 1');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.stackCapacity < 1) {
+        toast.error('Stack Capacity must be a positive number');
+        setLoading(false);
+        return;
+      }
+
+      if (sameFloorsPerChamber && formData.noOfFloors < 1) {
+        toast.error('Number of Floors must be at least 1');
+        setLoading(false);
+        return;
+      }
+
+      if (sameStacksPerFloor && formData.noOfStacks < 1) {
+        toast.error('Number of Stacks per Floor must be at least 1');
+        setLoading(false);
+        return;
+      }
+
+      // Validate per-floor grid dimensions & layout
+      for (let c = 1; c <= formData.noOfChambers; c++) {
+        const floorsCount = getFloorCountForChamber(c);
+        for (let f = 1; f <= floorsCount; f++) {
+          const layout = getFloorLayout(c, f);
+          const stacksCount = getStackCountForFloor(c, f);
+          const cName = chamberCustomNames[c] || `Chamber ${c}`;
+          const fName = floorCustomNames[`${c}-${f}`] || `Floor ${f}`;
+
+          if (['ROW_WISE', 'COLUMN_WISE', 'REVERSE_ROW_WISE', 'REVERSE_COLUMN_WISE', 'CUSTOM'].includes(layout.stackLayout)) {
+            if (!layout.gridRows || !layout.gridCols || layout.gridRows * layout.gridCols < stacksCount) {
+              toast.error(`${cName} → ${fName}: Grid dimensions (${layout.gridRows}x${layout.gridCols} = ${layout.gridRows * layout.gridCols}) must be at least ${stacksCount} to fit all stacks on this floor.`);
+              setLoading(false);
+              return;
+            }
+          }
+
+          if (layout.stackLayout === 'CUSTOM' && (layout.customLayout?.length || 0) !== stacksCount) {
+            toast.error(`${cName} → ${fName}: Please map all ${stacksCount} stacks in the custom layout.`);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Build prepared floor layout config
+      const preparedFloorLayoutConfig: Record<string, any> = {};
+      for (let c = 1; c <= formData.noOfChambers; c++) {
+        const floorsCount = getFloorCountForChamber(c);
+        for (let f = 1; f <= floorsCount; f++) {
+          const key = `${c}-${f}`;
+          preparedFloorLayoutConfig[key] = getFloorLayout(c, f);
+        }
+      }
+
       const payload = {
         ...formData,
+        sameFloorsPerChamber,
+        chamberFloorsConfig: sameFloorsPerChamber ? undefined : chamberFloorsConfig,
+        sameStacksPerFloor,
+        floorStacksConfig: sameStacksPerFloor ? undefined : floorStacksConfig,
+        stackNumberingOption,
+        chamberCustomNames,
+        floorCustomNames,
+        floorLayoutConfig: preparedFloorLayoutConfig,
+        customStackCapacities,
         warehouseId: formData.warehouseId,
-        customLayout: formData.stackLayout === 'CUSTOM' ? customLayout : undefined,
         referencePersons: referencePersons.filter((rp: any) => rp.name.trim() !== ''),
         aadhaarNo,
         panNo,
         gstin,
         bankDetails,
         warehouseLogo,
-        chamberNames: useCustomNames ? chamberNames : Array.from({ length: formData.noOfChambers }).map((_, i) => String(i + 1)),
-        floorNames: useCustomNames ? floorNames : Array.from({ length: formData.noOfFloors }).map((_, i) => String(i + 1)),
-        chambers: isEdit ? initialData.chambers.map((c: any, i: number) => ({ ...c, name: useCustomNames ? chamberNames[i] : String(i + 1) })) : undefined,
+        chambers: isEdit ? initialData.chambers.map((c: any, cIdx: number) => ({
+          ...c,
+          name: chamberCustomNames[cIdx + 1] && chamberCustomNames[cIdx + 1].trim() !== '' ? chamberCustomNames[cIdx + 1].trim() : `Chamber ${cIdx + 1}`,
+          floors: c.floors?.map((f: any, fIdx: number) => {
+            const fLayout = getFloorLayout(cIdx + 1, fIdx + 1);
+            return {
+              ...f,
+              name: floorCustomNames[`${cIdx + 1}-${fIdx + 1}`] && floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() !== '' ? floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() : `Floor ${fIdx + 1}`,
+              stackLayout: fLayout.stackLayout,
+              gridRows: fLayout.gridRows,
+              gridCols: fLayout.gridCols,
+              customLayout: fLayout.customLayout
+            };
+          })
+        })) : undefined,
       };
-      
-      if (formData.stackLayout === 'CUSTOM' && customLayout.length !== formData.noOfStacks) {
-        toast.error(`Please map all ${formData.noOfStacks} stacks in the custom layout.`);
-        setLoading(false);
-        return;
-      }
-
-      if (['ROW_WISE', 'COLUMN_WISE', 'REVERSE_ROW_WISE', 'REVERSE_COLUMN_WISE', 'CUSTOM'].includes(formData.stackLayout)) {
-        if (!formData.gridRows || !formData.gridCols || formData.gridRows * formData.gridCols < formData.noOfStacks) {
-          toast.error(`Grid dimensions (${formData.gridRows}x${formData.gridCols}) must be at least ${formData.noOfStacks} to fit all stacks.`);
-          setLoading(false);
-          return;
-        }
-      }
 
       let res;
       if (isEdit) {
@@ -130,13 +370,13 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
       }
 
       if (res.success) {
-        toast.success(isEdit ? t('warehouses.warehouseUpdated') || 'Warehouse updated successfully' : t('warehouses.warehouseCreated'));
+        toast.success(isEdit ? t('warehouses.warehouseUpdated') || 'Warehouse updated successfully' : t('warehouses.warehouseCreated') || 'Warehouse created successfully');
         onSuccess();
       } else {
         toast.error(res.error || (isEdit ? 'Failed to update warehouse' : t('warehouses.warehouseCreationFailed')));
       }
     } catch (err) {
-      toast.error(t('warehouses.somethingWentWrong'));
+      toast.error(t('warehouses.somethingWentWrong') || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -156,54 +396,76 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     setReferencePersons(updated);
   };
 
-  const renderLivePreview = () => {
-    if (formData.stackLayout === 'CUSTOM' || formData.gridRows <= 0 || formData.gridCols <= 0) return null;
+  // Render individual live layout preview for chamber c, floor f
+  const renderFloorLivePreview = (c: number, f: number) => {
+    const layout = getFloorLayout(c, f);
+    const stacksCount = getStackCountForFloor(c, f);
+    const rows = layout.gridRows || 1;
+    const cols = layout.gridCols || 1;
 
-    let gridCells: (number | null)[][] = Array.from({ length: formData.gridRows }).map(() => Array(formData.gridCols).fill(null));
+    if (layout.stackLayout === 'CUSTOM' || rows <= 0 || cols <= 0) return null;
+
+    let gridCells: (number | null)[][] = Array.from({ length: rows }).map(() => Array(cols).fill(null));
     let sNo = 1;
-    if (formData.stackLayout === 'ROW_WISE') {
-      for (let r = 0; r < formData.gridRows; r++) {
-        for (let c = 0; c < formData.gridCols; c++) {
-          if (sNo <= formData.noOfStacks) gridCells[r][c] = sNo++;
+
+    if (layout.stackLayout === 'ROW_WISE') {
+      for (let r = 0; r < rows; r++) {
+        for (let cIdx = 0; cIdx < cols; cIdx++) {
+          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
         }
       }
-    } else if (formData.stackLayout === 'REVERSE_ROW_WISE') {
-      for (let r = 0; r < formData.gridRows; r++) {
-        for (let c = formData.gridCols - 1; c >= 0; c--) {
-          if (sNo <= formData.noOfStacks) gridCells[r][c] = sNo++;
+    } else if (layout.stackLayout === 'REVERSE_ROW_WISE') {
+      for (let r = 0; r < rows; r++) {
+        for (let cIdx = cols - 1; cIdx >= 0; cIdx--) {
+          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
         }
       }
-    } else if (formData.stackLayout === 'COLUMN_WISE') {
-      for (let c = 0; c < formData.gridCols; c++) {
-        for (let r = 0; r < formData.gridRows; r++) {
-          if (sNo <= formData.noOfStacks) gridCells[r][c] = sNo++;
+    } else if (layout.stackLayout === 'COLUMN_WISE') {
+      for (let cIdx = 0; cIdx < cols; cIdx++) {
+        for (let r = 0; r < rows; r++) {
+          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
         }
       }
-    } else if (formData.stackLayout === 'REVERSE_COLUMN_WISE') {
-      for (let c = formData.gridCols - 1; c >= 0; c--) {
-        for (let r = 0; r < formData.gridRows; r++) {
-          if (sNo <= formData.noOfStacks) gridCells[r][c] = sNo++;
+    } else if (layout.stackLayout === 'REVERSE_COLUMN_WISE') {
+      for (let cIdx = cols - 1; cIdx >= 0; cIdx--) {
+        for (let r = 0; r < rows; r++) {
+          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
         }
       }
     }
 
     return (
-      <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-md">
-        <h5 className="text-sm font-medium mb-2 text-indigo-700">Live Layout Preview {isEdit && "(Read-Only)"}</h5>
-        <p className="text-xs text-slate-500 mb-4">This grid visualizes how your stacks will be numbered on the floor.</p>
+      <div className="mt-3 p-3 bg-slate-100 border border-slate-200 rounded-md">
+        <div className="flex justify-between items-center mb-2">
+          <h6 className="text-xs font-semibold text-indigo-700">Live Layout Preview ({layout.stackLayout.replace(/_/g, ' ')})</h6>
+          <span className="text-[11px] text-slate-500 font-mono">{rows} rows × {cols} cols ({stacksCount} stacks)</span>
+        </div>
         <div 
           className="inline-grid gap-1 bg-slate-200 p-1 rounded-md max-w-full overflow-x-auto"
-          style={{ gridTemplateColumns: `repeat(${formData.gridCols}, minmax(40px, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(36px, 1fr))` }}
         >
           {gridCells.map((row, rIdx) => 
-            row.map((cell, cIdx) => (
-              <div 
-                key={`${rIdx}-${cIdx}`}
-                className={`h-10 w-10 flex items-center justify-center text-xs font-semibold rounded select-none ${cell !== null ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-300'}`}
-              >
-                {cell !== null ? cell : '-'}
-              </div>
-            ))
+            row.map((cell, cIdx) => {
+              const capKey = `${c}-${f}-${cell}`;
+              const customCap = cell !== null ? customStackCapacities[capKey] : undefined;
+              const hasCustomCap = customCap !== undefined && customCap > 0;
+
+              return (
+                <div 
+                  key={`${rIdx}-${cIdx}`}
+                  title={cell !== null ? `Stack ${cell}: ${hasCustomCap ? customCap : formData.stackCapacity} KG` : ''}
+                  className={`h-8 w-8 flex items-center justify-center text-[10px] font-semibold rounded select-none relative ${cell !== null ? (hasCustomCap ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-400' : 'bg-indigo-600 text-white shadow-sm') : 'bg-slate-100 text-slate-300'}`}
+                >
+                  {cell !== null ? cell : '-'}
+                  {hasCustomCap && (
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -220,13 +482,8 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
           </Button>
         )}
       </div>
-      
-      {isEdit && (
-        <div className="bg-amber-50 text-amber-800 p-3 rounded-md text-sm mb-4">
-          <strong>Note:</strong> Structural details (Chambers, Floors, Stacks, Layout) cannot be changed after creation to prevent data corruption.
-        </div>
-      )}
 
+      {/* Basic Warehouse Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-6">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('warehouses.warehouseName')}</label>
@@ -317,6 +574,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         </div>
       </div>
 
+      {/* Bank Details */}
       <div className="border-b pb-6">
         <h4 className="font-medium text-sm mb-4 text-slate-700">Bank Details</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -355,202 +613,613 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('warehouses.noOfChambers')}</label>
+      {/* Chamber -> Floor -> Stack Hierarchy Configuration */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-6">
+        <h4 className="font-semibold text-base text-indigo-900 border-b pb-2 flex items-center gap-2">
+          <Layers className="w-5 h-5 text-indigo-600" />
+          Warehouse Structure Configuration (Chamber → Floor → Stack)
+        </h4>
+
+        {/* 1. Chambers Field */}
+        <div className="space-y-2 max-w-xs">
+          <label className="text-sm font-semibold text-slate-700">{t('warehouses.noOfChambers') || 'No. of Chambers *'}</label>
           <ColdNumberInput 
             required 
             min="1"
             disabled={isEdit}
             value={formData.noOfChambers} 
-            onChange={(val) => setFormData({ ...formData, noOfChambers: parseInt(val) || 0 })} 
+            onChange={(val) => setFormData({ ...formData, noOfChambers: Math.max(1, parseInt(val) || 1) })} 
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('warehouses.noOfFloorsPerChamber')}</label>
-          <ColdNumberInput 
-            required 
-            min="1"
-            disabled={isEdit}
-            value={formData.noOfFloors} 
-            onChange={(val) => setFormData({ ...formData, noOfFloors: parseInt(val) || 0 })} 
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('warehouses.noOfStacksPerFloor')}</label>
-          <ColdNumberInput 
-            required 
-            min="1"
-            disabled={isEdit}
-            value={formData.noOfStacks} 
-            onChange={(val) => setFormData({ ...formData, noOfStacks: parseInt(val) || 0 })} 
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('warehouses.stackCapacityReq')}</label>
-          <ColdNumberInput 
-            required 
-            min="1"
-            disabled={isEdit}
-            value={formData.stackCapacity} 
-            onChange={(val) => setFormData({ ...formData, stackCapacity: parseInt(val) || 0 })} 
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Buffer Capacity (Kg)</label>
-          <ColdNumberInput 
-            required 
-            min="0"
-            value={formData.bufferCapacity} 
-            onChange={(val) => setFormData({ ...formData, bufferCapacity: parseInt(val) || 0 })} 
-          />
-        </div>
-      </div>
-      <div className="border-t pt-4">
-        <div className="flex items-center space-x-2 mb-4">
-          <input 
-            type="checkbox" 
-            id="customNames" 
-            checked={useCustomNames} 
-            onChange={(e) => setUseCustomNames(e.target.checked)} 
-            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          <label htmlFor="customNames" className="text-sm font-medium text-slate-700 cursor-pointer">
-            Use Custom Names for Chambers and Floors
+
+        {/* 2. Floor Configuration */}
+        <div className="space-y-3 border-t pt-4">
+          <label className="text-sm font-semibold text-slate-800 block">
+            {t('warehouses.areFloorsSame') || 'Are floors the same for every chamber?'}
           </label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameFloorsPerChamber(true)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                sameFloorsPerChamber 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Yes (Same floors for all chambers)
+            </button>
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameFloorsPerChamber(false)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                !sameFloorsPerChamber 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              No (Different floors per chamber)
+            </button>
+          </div>
+
+          {sameFloorsPerChamber ? (
+            <div className="mt-3 max-w-xs space-y-2">
+              <label className="text-sm font-medium">{t('warehouses.noOfFloorsPerChamber') || 'No. of Floors *'}</label>
+              <ColdNumberInput 
+                required 
+                min="1"
+                disabled={isEdit}
+                value={formData.noOfFloors} 
+                onChange={(val) => setFormData({ ...formData, noOfFloors: Math.max(1, parseInt(val) || 1) })} 
+              />
+            </div>
+          ) : (
+            <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+              <p className="text-xs text-slate-500 font-medium">Enter number of floors for each chamber:</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => (
+                  <div key={cIdx} className="space-y-1 bg-white p-3 rounded border">
+                    <label className="text-xs font-semibold text-slate-700">
+                      {chamberCustomNames[cIdx + 1] ? chamberCustomNames[cIdx + 1] : `Chamber ${cIdx + 1}`} → No. of Floors
+                    </label>
+                    <ColdNumberInput 
+                      required 
+                      min="1"
+                      disabled={isEdit}
+                      value={chamberFloorsConfig[cIdx] || 1} 
+                      onChange={(val) => {
+                        const newConfig = [...chamberFloorsConfig];
+                        newConfig[cIdx] = Math.max(1, parseInt(val) || 1);
+                        setChamberFloorsConfig(newConfig);
+                      }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 3. Stack Configuration */}
+        <div className="space-y-3 border-t pt-4">
+          <label className="text-sm font-semibold text-slate-800 block">
+            {t('warehouses.areStacksSame') || 'Are stacks the same for every floor?'}
+          </label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameStacksPerFloor(true)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                sameStacksPerFloor 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Yes (Same stack count on every floor)
+            </button>
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameStacksPerFloor(false)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                !sameStacksPerFloor 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              No (Different stack count per floor)
+            </button>
+          </div>
+
+          {sameStacksPerFloor ? (
+            <div className="mt-3 max-w-xs space-y-2">
+              <label className="text-sm font-medium">{t('warehouses.noOfStacksPerFloor') || 'No. of Stacks per Floor *'}</label>
+              <ColdNumberInput 
+                required 
+                min="1"
+                disabled={isEdit}
+                value={formData.noOfStacks} 
+                onChange={(val) => setFormData({ ...formData, noOfStacks: Math.max(1, parseInt(val) || 1) })} 
+              />
+            </div>
+          ) : (
+            <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+              <p className="text-xs text-slate-500 font-medium">Enter stack count for each floor:</p>
+              {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
+                const cNo = cIdx + 1;
+                const floorsCount = getFloorCountForChamber(cNo);
+                const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+
+                return (
+                  <div key={cNo} className="bg-white p-3 rounded border space-y-2">
+                    <h6 className="text-xs font-bold text-indigo-800 uppercase tracking-wide">{cName}</h6>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {Array.from({ length: floorsCount }).map((_, fIdx) => {
+                        const fNo = fIdx + 1;
+                        const key = `${cNo}-${fNo}`;
+                        const currentVal = floorStacksConfig[key] || formData.noOfStacks || 1;
+                        const fName = floorCustomNames[key] || `Floor ${fNo}`;
+
+                        return (
+                          <div key={fNo} className="space-y-1 bg-slate-50 p-2.5 rounded border">
+                            <label className="text-xs font-medium text-slate-600">
+                              {cName} → {fName} Stacks
+                            </label>
+                            <ColdNumberInput 
+                              required 
+                              min="1"
+                              disabled={isEdit}
+                              value={currentVal} 
+                              onChange={(val) => {
+                                setFloorStacksConfig(prev => ({
+                                  ...prev,
+                                  [key]: Math.max(1, parseInt(val) || 1)
+                                }));
+                              }} 
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 4. Stack Numbering Options */}
+        <div className="space-y-3 border-t pt-4">
+          <label className="text-sm font-semibold text-slate-800 block flex items-center gap-2">
+            <Hash className="w-4 h-4 text-indigo-600" />
+            {t('warehouses.stackNumbering') || 'Stack Numbering'}
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div 
+              onClick={() => !isEdit && setStackNumberingOption('RESTART_PER_FLOOR')}
+              className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                stackNumberingOption === 'RESTART_PER_FLOOR' 
+                  ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-500/20' 
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-sm text-slate-900">{t('warehouses.restartOnEachFloor') || 'Restart on each floor'}</span>
+                {stackNumberingOption === 'RESTART_PER_FLOOR' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+              </div>
+              <p className="text-xs text-slate-500">Numbering resets to Stack 1 on every floor.</p>
+              <div className="mt-2 text-[11px] font-mono text-slate-600 bg-slate-100 p-1.5 rounded">
+                Floor 1: Stack 1–50 | Floor 2: Stack 1–50
+              </div>
+            </div>
+
+            <div 
+              onClick={() => !isEdit && setStackNumberingOption('CONTINUE_ACROSS_FLOORS')}
+              className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                stackNumberingOption === 'CONTINUE_ACROSS_FLOORS' 
+                  ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-500/20' 
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-sm text-slate-900">{t('warehouses.continueAcrossFloors') || 'Continue numbering across floors'}</span>
+                {stackNumberingOption === 'CONTINUE_ACROSS_FLOORS' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+              </div>
+              <p className="text-xs text-slate-500">Numbering continues sequentially from the previous floor's last stack.</p>
+              <div className="mt-2 text-[11px] font-mono text-slate-600 bg-slate-100 p-1.5 rounded">
+                Floor 1: Stack 1–50 | Floor 2: Stack 51–100
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Stack Capacity & Buffer Capacity */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t('warehouses.stackCapacityReq') || 'Default Per Stack Capacity (Kg) *'}</label>
+            <ColdNumberInput 
+              required 
+              min="1"
+              value={formData.stackCapacity} 
+              onChange={(val) => setFormData({ ...formData, stackCapacity: parseInt(val) || 0 })} 
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Buffer Capacity (Kg)</label>
+            <ColdNumberInput 
+              required 
+              min="0"
+              value={formData.bufferCapacity} 
+              onChange={(val) => setFormData({ ...formData, bufferCapacity: parseInt(val) || 0 })} 
+            />
+          </div>
+        </div>
+
+        {/* Structure Summary Banner */}
+        <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-md text-xs text-indigo-950 flex flex-wrap gap-x-6 gap-y-1">
+          <span><strong>Total Chambers:</strong> {formData.noOfChambers}</span>
+          <span><strong>Total Stacks:</strong> {getTotalStacksCount()}</span>
+          <span><strong>Calculated Total Capacity:</strong> {getCalculatedTotalCapacity().toLocaleString()} Kg</span>
         </div>
       </div>
 
-      {useCustomNames && (
-        <>
-          <div className="border-t pt-4">
-            <h4 className="font-medium text-sm mb-4 text-slate-700">Chamber Names</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Array.from({ length: formData.noOfChambers }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <label className="text-sm font-medium">Chamber {i + 1} Name</label>
-                  <Input 
-                    value={chamberNames[i] || ''} 
-                    onChange={(e) => {
-                      const newNames = [...chamberNames];
-                      newNames[i] = e.target.value;
-                      setChamberNames(newNames);
-                    }} 
-                    placeholder={`e.g. Chamber ${i + 1} or Main Chamber`}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="border-t pt-4">
-            <h4 className="font-medium text-sm mb-4 text-slate-700">Floor Names</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Array.from({ length: formData.noOfFloors }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <label className="text-sm font-medium">Floor {i + 1} Name</label>
-                  <Input 
-                    value={floorNames[i] || ''} 
-                    onChange={(e) => {
-                      const newNames = [...floorNames];
-                      newNames[i] = e.target.value;
-                      setFloorNames(newNames);
-                    }} 
-                    placeholder={`e.g. Ground, F1, Basement`}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+      {/* Customize Individual Stack Capacity (Optional) */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
+        <h4 className="font-semibold text-base text-slate-800 flex items-center gap-2 border-b pb-2">
+          <Weight className="w-5 h-5 text-amber-600" />
+          Customize Stack Capacity (Optional)
+        </h4>
 
-      <div className="border-t pt-4">
-        <h4 className="font-medium text-sm mb-4 text-slate-700">Stack Layout Configuration</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Layout Type</label>
+        <p className="text-xs text-slate-500">
+          Specify custom capacity for individual stacks if they differ from the default capacity ({formData.stackCapacity.toLocaleString()} KG). Unspecified stacks keep the default floor capacity.
+        </p>
+
+        {/* Form controls to add override */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end bg-slate-50 p-3 rounded-lg border">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Chamber</label>
             <Select 
-              disabled={isEdit}
-              value={formData.stackLayout} 
-              onValueChange={(val) => setFormData({ ...formData, stackLayout: val })}
+              value={overrideChamber.toString()} 
+              onValueChange={(val) => {
+                const cVal = Number(val);
+                setOverrideChamber(cVal);
+                setOverrideFloor(1);
+                setOverrideStackNo(1);
+              }}
             >
-              <SelectTrigger><SelectValue placeholder="Select Layout" /></SelectTrigger>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Chamber" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ROW_WISE">Row Wise</SelectItem>
-                <SelectItem value="COLUMN_WISE">Column Wise</SelectItem>
-                <SelectItem value="REVERSE_ROW_WISE">Reverse Row Wise</SelectItem>
-                <SelectItem value="REVERSE_COLUMN_WISE">Reverse Column Wise</SelectItem>
-                <SelectItem value="CUSTOM">Custom Mapping</SelectItem>
+                {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => (
+                  <SelectItem key={cIdx + 1} value={(cIdx + 1).toString()}>
+                    {chamberCustomNames[cIdx + 1] || `Chamber ${cIdx + 1}`}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Grid Rows</label>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Floor</label>
+            <Select 
+              value={overrideFloor.toString()} 
+              onValueChange={(val) => {
+                setOverrideFloor(Number(val));
+                setOverrideStackNo(1);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Floor" /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: getFloorCountForChamber(overrideChamber) }).map((_, fIdx) => (
+                  <SelectItem key={fIdx + 1} value={(fIdx + 1).toString()}>
+                    {floorCustomNames[`${overrideChamber}-${fIdx + 1}`] || `Floor ${fIdx + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Stack No.</label>
             <ColdNumberInput 
-              required
               min="1"
-              disabled={isEdit}
-              value={formData.gridRows} 
-              onChange={(val) => setFormData({ ...formData, gridRows: parseInt(val) || 0 })} 
+              max={getStackCountForFloor(overrideChamber, overrideFloor)}
+              value={overrideStackNo}
+              onChange={(val) => setOverrideStackNo(Math.max(1, parseInt(val) || 1))}
+              className="h-9 text-xs"
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Grid Columns</label>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">Custom Cap (KG)</label>
             <ColdNumberInput 
-              required
               min="1"
-              disabled={isEdit}
-              value={formData.gridCols} 
-              onChange={(val) => setFormData({ ...formData, gridCols: parseInt(val) || 0 })} 
+              value={overrideCapacity}
+              onChange={(val) => setOverrideCapacity(parseInt(val) || 0)}
+              className="h-9 text-xs"
             />
+          </div>
+
+          <div>
+            <Button 
+              type="button" 
+              onClick={addCapacityOverride} 
+              size="sm"
+              className="w-full h-9 bg-amber-600 hover:bg-amber-700 text-white text-xs flex items-center justify-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Capacity
+            </Button>
           </div>
         </div>
 
-        {formData.stackLayout === 'CUSTOM' && formData.gridRows > 0 && formData.gridCols > 0 && (
-          <div className="mt-4 p-4 bg-white border rounded-md">
-            <h5 className="text-sm font-medium mb-2">Custom Grid Mapping</h5>
-            <p className="text-xs text-slate-500 mb-4">Click on a grid cell to assign the next available stack number, or double-click to remove.</p>
-            <div 
-              className="inline-grid gap-1 bg-slate-200 p-1 rounded-md"
-              style={{ gridTemplateColumns: `repeat(${formData.gridCols}, minmax(40px, 1fr))` }}
-            >
-              {Array.from({ length: formData.gridRows }).map((_, rIdx) => 
-                Array.from({ length: formData.gridCols }).map((_, cIdx) => {
-                  const mapped = customLayout.find(c => c.rowIndex === rIdx && c.colIndex === cIdx);
-                  return (
-                    <div 
-                      key={`${rIdx}-${cIdx}`}
-                      onClick={() => {
-                        if (isEdit) return; // Prevent changing layout if editing
-                        if (!mapped && customLayout.length < formData.noOfStacks) {
-                          // Find next unassigned stack No
-                          const assigned = customLayout.map(c => c.stackNo);
-                          let nextStack = 1;
-                          while(assigned.includes(nextStack)) nextStack++;
-                          if (nextStack <= formData.noOfStacks) {
-                            setCustomLayout([...customLayout, { rowIndex: rIdx, colIndex: cIdx, stackNo: nextStack }]);
-                          }
-                        }
-                      }}
-                      onDoubleClick={() => {
-                        if (mapped) {
-                          setCustomLayout(customLayout.filter(c => !(c.rowIndex === rIdx && c.colIndex === cIdx)));
-                        }
-                      }}
-                      className={`h-10 w-10 flex items-center justify-center text-xs font-semibold rounded cursor-pointer select-none transition-colors ${mapped ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700' : 'bg-white text-slate-400 hover:bg-slate-100'}`}
-                    >
-                      {mapped ? mapped.stackNo : '-'}
+        {/* Overrides Table */}
+        {Object.keys(customStackCapacities).length > 0 && (
+          <div className="mt-3 space-y-2">
+            <h6 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Active Stack Capacity Overrides</h6>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {Object.entries(customStackCapacities).map(([key, cap]) => {
+                const [c, f, s] = key.split('-');
+                const cName = chamberCustomNames[Number(c)] || `Chamber ${c}`;
+                const fName = floorCustomNames[`${c}-${f}`] || `Floor ${f}`;
+
+                return (
+                  <div key={key} className="flex justify-between items-center p-2 bg-amber-50 border border-amber-200 rounded-md text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-900">{cName} → {fName} → Stack {s}</span>
+                      <div className="font-mono text-amber-900 font-bold">{cap.toLocaleString()} KG</div>
                     </div>
-                  );
-                })
-              )}
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => removeCapacityOverride(key)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
-
-        {renderLivePreview()}
       </div>
 
+      {/* Custom Names Section for Chambers and Floors */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b pb-2">
+          <h4 className="font-semibold text-base text-slate-800 flex items-center gap-2">
+            <Tag className="w-4 h-4 text-indigo-600" />
+            Custom Chamber & Floor Names / Numbers (Optional)
+          </h4>
+          <div className="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              id="customNames" 
+              checked={useCustomNames} 
+              onChange={(e) => setUseCustomNames(e.target.checked)} 
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="customNames" className="text-xs font-medium text-slate-700 cursor-pointer">
+              Enable Custom Names
+            </label>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Enter custom names/numbers for each chamber and floor (e.g. Chamber "A", Floor "Ground", "First"). If left blank, automatic defaults (Chamber 1, Floor 1) are kept.
+        </p>
+
+        {useCustomNames && (
+          <div className="space-y-4 pt-2">
+            {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
+              const cNo = cIdx + 1;
+              const floorsCount = getFloorCountForChamber(cNo);
+
+              return (
+                <div key={cNo} className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center border-b pb-2">
+                    <label className="text-xs font-bold text-indigo-900 uppercase tracking-wide">
+                      Chamber {cNo} Name / Number
+                    </label>
+                    <Input 
+                      value={chamberCustomNames[cNo] || ''} 
+                      onChange={(e) => {
+                        setChamberCustomNames(prev => ({
+                          ...prev,
+                          [cNo]: e.target.value
+                        }));
+                      }} 
+                      placeholder={`e.g. A, B, or Chamber ${cNo}`}
+                      className="bg-white text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <label className="text-xs font-semibold text-slate-600 block">
+                      Floors in {chamberCustomNames[cNo] || `Chamber ${cNo}`}:
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {Array.from({ length: floorsCount }).map((_, fIdx) => {
+                        const fNo = fIdx + 1;
+                        const key = `${cNo}-${fNo}`;
+
+                        return (
+                          <div key={fNo} className="space-y-1 bg-white p-2.5 rounded border">
+                            <label className="text-[11px] font-medium text-slate-500 block">
+                              Floor {fNo} Name / Number
+                            </label>
+                            <Input 
+                              value={floorCustomNames[key] || ''} 
+                              onChange={(e) => {
+                                setFloorCustomNames(prev => ({
+                                  ...prev,
+                                  [key]: e.target.value
+                                }));
+                              }} 
+                              placeholder={`e.g. Ground, First, or Floor ${fNo}`}
+                              className="text-xs"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Per-Floor Stack Layout Configuration */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-6">
+        <h4 className="font-semibold text-base text-indigo-900 border-b pb-2 flex items-center gap-2">
+          <Grid className="w-5 h-5 text-indigo-600" />
+          Per-Floor Stack Layout Configuration & Live Previews
+        </h4>
+
+        <p className="text-xs text-slate-500">
+          Configure Layout Type, Grid Rows, and Grid Columns separately for every floor. Each floor generates its own visual grid layout and preview.
+        </p>
+
+        <div className="space-y-6">
+          {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
+            const cNo = cIdx + 1;
+            const floorsCount = getFloorCountForChamber(cNo);
+            const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+
+            return (
+              <div key={cNo} className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-4">
+                <h5 className="font-bold text-sm text-indigo-950 uppercase tracking-wide border-b pb-2">
+                  {cName} Layout Configurations
+                </h5>
+
+                <div className="space-y-6">
+                  {Array.from({ length: floorsCount }).map((_, fIdx) => {
+                    const fNo = fIdx + 1;
+                    const fName = floorCustomNames[`${cNo}-${fNo}`] || `Floor ${fNo}`;
+                    const layout = getFloorLayout(cNo, fNo);
+                    const stacksCount = getStackCountForFloor(cNo, fNo);
+
+                    return (
+                      <div key={fNo} className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+                        <div className="flex justify-between items-center border-b pb-2">
+                          <h6 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
+                            {cName} → {fName} Layout
+                          </h6>
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                            {stacksCount} Stacks
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-700">Layout Type</label>
+                            <Select 
+                              disabled={isEdit}
+                              value={layout.stackLayout} 
+                              onValueChange={(val) => updateFloorLayout(cNo, fNo, { stackLayout: val })}
+                            >
+                              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Layout" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ROW_WISE">Row Wise</SelectItem>
+                                <SelectItem value="COLUMN_WISE">Column Wise</SelectItem>
+                                <SelectItem value="REVERSE_ROW_WISE">Reverse Row Wise</SelectItem>
+                                <SelectItem value="REVERSE_COLUMN_WISE">Reverse Column Wise</SelectItem>
+                                <SelectItem value="CUSTOM">Custom Mapping</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-700">Grid Rows</label>
+                            <ColdNumberInput 
+                              required
+                              min="1"
+                              disabled={isEdit}
+                              className="h-9 text-xs"
+                              value={layout.gridRows} 
+                              onChange={(val) => updateFloorLayout(cNo, fNo, { gridRows: Math.max(1, parseInt(val) || 1) })} 
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-700">Grid Columns</label>
+                            <ColdNumberInput 
+                              required
+                              min="1"
+                              disabled={isEdit}
+                              className="h-9 text-xs"
+                              value={layout.gridCols} 
+                              onChange={(val) => updateFloorLayout(cNo, fNo, { gridCols: Math.max(1, parseInt(val) || 1) })} 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Custom Grid Mapping Editor if layout is CUSTOM */}
+                        {layout.stackLayout === 'CUSTOM' && layout.gridRows > 0 && layout.gridCols > 0 && (
+                          <div className="mt-3 p-3 bg-slate-50 border rounded-md">
+                            <h6 className="text-xs font-semibold text-slate-800 mb-1">Custom Grid Mapping for {cName} → {fName}</h6>
+                            <p className="text-[11px] text-slate-500 mb-3">Click a cell to assign stack number, double-click to remove.</p>
+                            <div 
+                              className="inline-grid gap-1 bg-slate-200 p-1 rounded-md max-w-full overflow-x-auto"
+                              style={{ gridTemplateColumns: `repeat(${layout.gridCols}, minmax(36px, 1fr))` }}
+                            >
+                              {Array.from({ length: layout.gridRows }).map((_, rIdx) => 
+                                Array.from({ length: layout.gridCols }).map((_, colIdx) => {
+                                  const customArr = layout.customLayout || [];
+                                  const mapped = customArr.find(cItem => cItem.rowIndex === rIdx && cItem.colIndex === colIdx);
+                                  return (
+                                    <div 
+                                      key={`${rIdx}-${colIdx}`}
+                                      onClick={() => {
+                                        if (isEdit) return;
+                                        if (!mapped && customArr.length < stacksCount) {
+                                          const assigned = customArr.map(cItem => cItem.stackNo);
+                                          let nextStack = 1;
+                                          while(assigned.includes(nextStack)) nextStack++;
+                                          if (nextStack <= stacksCount) {
+                                            updateFloorLayout(cNo, fNo, {
+                                              customLayout: [...customArr, { rowIndex: rIdx, colIndex: colIdx, stackNo: nextStack }]
+                                            });
+                                          }
+                                        }
+                                      }}
+                                      onDoubleClick={() => {
+                                        if (mapped) {
+                                          updateFloorLayout(cNo, fNo, {
+                                            customLayout: customArr.filter(cItem => !(cItem.rowIndex === rIdx && cItem.colIndex === colIdx))
+                                          });
+                                        }
+                                      }}
+                                      className={`h-8 w-8 flex items-center justify-center text-[10px] font-semibold rounded cursor-pointer select-none transition-colors ${mapped ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'bg-white text-slate-400 hover:bg-slate-100'}`}
+                                    >
+                                      {mapped ? mapped.stackNo : '-'}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Live Layout Preview for this Floor */}
+                        {renderFloorLivePreview(cNo, fNo)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Reference Persons */}
       <div className="space-y-4 pt-4 border-t">
         <div className="flex justify-between items-center">
           <label className="text-sm font-medium">{t('warehouses.referencePersons')}</label>

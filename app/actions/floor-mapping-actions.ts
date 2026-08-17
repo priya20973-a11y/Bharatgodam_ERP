@@ -64,9 +64,21 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
     const stacksMap = new Map();
     
     floor.stacks.forEach((s: any) => {
+      const customCapKey1 = `${chamber.chamberNo}-${floor.floorNo}-${s.stackNo}`;
+      const customCapKey2 = `${chamber.name || chamber.chamberNo}-${floor.name || floor.floorNo}-${s.stackNo}`;
+      let customCap: number | undefined = undefined;
+      if (warehouse.customStackCapacities) {
+        if (typeof (warehouse.customStackCapacities as any).get === 'function') {
+          customCap = (warehouse.customStackCapacities as any).get(customCapKey1) || (warehouse.customStackCapacities as any).get(customCapKey2);
+        } else {
+          customCap = (warehouse.customStackCapacities as any)[customCapKey1] || (warehouse.customStackCapacities as any)[customCapKey2];
+        }
+      }
+      const cap = Number(s.capacity || customCap || warehouse.stackCapacity || 1000);
+
       stacksMap.set(s.stackNo, {
         stackNo: s.stackNo,
-        capacity: s.capacity,
+        capacity: cap,
         usedCapacity: 0,
         clients: new Set(),
         commodities: new Map(), // map commodity display string to qty

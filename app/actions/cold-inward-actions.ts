@@ -204,84 +204,127 @@ export async function ensureInwardQrId(id: string) {
   }
 }
 
-export async function getStackAvailableCapacity(warehouseId: string, chamberName: string, floorNo: number, stackNo: number) {
+export async function getStackAvailableCapacity(warehouseId: string, chamberName: string | number, floorNo: string | number, stackNo: string | number) {
   await connectToDatabase();
   const session = await requireSession();
   
   const warehouse = await ColdWarehouse.findOne({ _id: warehouseId, ...getTenantFilter(session) });
   if (!warehouse) throw new Error('Warehouse not found');
 
-  const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === parseInt(chamberName));
-  if (!chamber) throw new Error('Chamber not found');
+  const chamberStr = (chamberName || '').toString().trim();
+  const floorStr = (floorNo || '').toString().trim();
+  const stackStr = (stackNo || '').toString().trim();
 
-  const floor = chamber.floors.find((f: any) => f.floorNo === floorNo);
-  if (!floor) throw new Error('Floor not found');
+  // Match Chamber (supports custom names or chamberNo)
+  const chamber = warehouse.chambers.find((c: any) => 
+    (c.name || '').toString().toLowerCase() === chamberStr.toLowerCase() ||
+    c.chamberNo?.toString() === chamberStr ||
+    (c.name && c.name.toLowerCase() === chamberStr.toLowerCase()) ||
+    c.chamberNo === parseInt(chamberStr)
+  );
+  if (!chamber) throw new Error(`Chamber "${chamberName}" not found`);
 
-  const stack = floor.stacks.find((s: any) => s.stackNo === stackNo);
-  if (!stack) throw new Error('Stack not found');
+  // Match Floor (supports custom names or floorNo)
+  const floor = chamber.floors.find((f: any) => 
+    (f.name || '').toString().toLowerCase() === floorStr.toLowerCase() ||
+    f.floorNo?.toString() === floorStr ||
+    (f.name && f.name.toLowerCase() === floorStr.toLowerCase()) ||
+    f.floorNo === parseInt(floorStr)
+  );
+  if (!floor) throw new Error(`Floor "${floorNo}" not found`);
 
-  const totalCapacity = stack.capacity;
+  // Match Stack (supports name or stackNo)
+  const cleanStackStr = (str: string) => (str || '').toString().toLowerCase().replace(/^stack\s*/i, '').trim();
 
-  const inwards = await ColdInward.aggregate([
-    {
-      $unwind: '$stackAllocations'
-    },
-    {
-      $match: {
-        $and: [
-          { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-          { 
-            $or: [
-              { 'stackAllocations.chamberName': chamberName },
-              ...(chamber.chamberNo ? [{ 'stackAllocations.chamberNo': chamber.chamberNo }] : [])
-            ]
-          },
-          { 'stackAllocations.floorNo': floorNo },
-          { 'stackAllocations.stackNo': stackNo },
-          getTenantFilter(session)
-        ]
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        totalInward: { $sum: '$stackAllocations.allocatedWeight' }
-      }
-    }
-  ]);
+  const stack = floor.stacks.find((s: any) => 
+    s.stackNo?.toString() === stackStr ||
+    cleanStackStr(stackStr) === s.stackNo?.toString() ||
+    (s.name && s.name.toLowerCase() === stackStr.toLowerCase()) ||
+    s.stackNo === parseInt(stackStr)
+  );
+  if (!stack) throw new Error(`Stack "${stackNo}" not found`);
 
-  const outwards = await ColdOutward.aggregate([
-    {
-      $match: {
-        $and: [
-          { warehouseId: new mongoose.Types.ObjectId(warehouseId) },
-          { 
-            $or: [
-              { chamberName: chamberName },
-              ...(chamber.chamberNo ? [{ chamberNo: chamber.chamberNo }] : [])
-            ]
-          },
-          { floorNo },
-          { stackNo },
-          getTenantFilter(session)
-        ]
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        totalOutward: { $sum: '$quantityKg' }
-      }
-    }
-  ]);
-
-  const totalInward = inwards.length > 0 ? inwards[0].totalInward : 0;
-  const totalOutward = outwards.length > 0 ? outwards[0].totalOutward : 0;
-  const occupied = Math.max(0, totalInward - totalOutward);
-  const bufferCapacity = warehouse.bufferCapacity || 0;
+  // Calculate actual total capacity for this specific stack (Custom stack capacity if configured; otherwise floor default)
+  const customCapKey1 = `${chamber.chamberNo}-${floor.floorNo}-${stack.stackNo}`;
+  const customCapKey2 = `${chamber.name || chamber.chamberNo}-${floor.name || floor.floorNo}-${stack.stackNo}`;
   
+  let customCap: number | undefined = undefined;
+  if (warehouse.customStackCapacities) {
+    if (typeof (warehouse.customStackCapacities as any).get === 'function') {
+      customCap = (warehouse.customStackCapacities as any).get(customCapKey1) || (warehouse.customStackCapacities as any).get(customCapKey2);
+    } else {
+      customCap = (warehouse.customStackCapacities as any)[customCapKey1] || (warehouse.customStackCapacities as any)[customCapKey2];
+    }
+  }
+
+  const totalCapacity = Number(stack.capacity || customCap || warehouse.stackCapacity || 1000);
+
+  // Calculate occupied quantity for this selected stack ONLY
+  const targetChamberName = (chamber.name || chamber.chamberNo?.toString() || '').toLowerCase();
+  const targetChamberNo = chamber.chamberNo;
+  const targetFloorNo = floor.floorNo;
+  const targetStackNo = stack.stackNo;
+
+  const inwardDocs = await ColdInward.find({
+    warehouseId: new mongoose.Types.ObjectId(warehouseId),
+    ...getTenantFilter(session)
+  }).lean();
+
+  let totalInwardWeight = 0;
+  for (const inward of inwardDocs) {
+    if (Array.isArray(inward.stackAllocations)) {
+      for (const sa of inward.stackAllocations) {
+        const saChamberName = (sa.chamberName || sa.chamberNo || '').toString().toLowerCase();
+        const saChamberNo = sa.chamberNo !== undefined ? Number(sa.chamberNo) : undefined;
+        const saFloorNo = Number(sa.floorNo);
+        const saStackNo = Number(sa.stackNo);
+
+        const matchesChamber = 
+          saChamberName === targetChamberName ||
+          saChamberName === targetChamberNo?.toString() ||
+          (targetChamberNo !== undefined && saChamberNo === targetChamberNo);
+
+        const matchesFloor = saFloorNo === targetFloorNo;
+        const matchesStack = saStackNo === targetStackNo;
+
+        if (matchesChamber && matchesFloor && matchesStack) {
+          totalInwardWeight += Number(sa.allocatedWeight || 0);
+        }
+      }
+    }
+  }
+
+  const outwardDocs = await ColdOutward.find({
+    warehouseId: new mongoose.Types.ObjectId(warehouseId),
+    ...getTenantFilter(session)
+  }).lean();
+
+  let totalOutwardWeight = 0;
+  for (const outward of outwardDocs) {
+    const oChamberName = (outward.chamberName || outward.chamberNo || '').toString().toLowerCase();
+    const oChamberNo = outward.chamberNo !== undefined ? Number(outward.chamberNo) : undefined;
+    const oFloorNo = Number(outward.floorNo);
+    const oStackNo = Number(outward.stackNo);
+
+    const matchesChamber = 
+      oChamberName === targetChamberName ||
+      oChamberName === targetChamberNo?.toString() ||
+      (targetChamberNo !== undefined && oChamberNo === targetChamberNo);
+
+    const matchesFloor = oFloorNo === targetFloorNo;
+    const matchesStack = oStackNo === targetStackNo;
+
+    if (matchesChamber && matchesFloor && matchesStack) {
+      totalOutwardWeight += Number(outward.quantityKg || 0);
+    }
+  }
+
+  const occupied = Math.max(0, totalInwardWeight - totalOutwardWeight);
+  const availableCapacity = Math.max(0, totalCapacity - occupied);
+  const bufferCapacity = Number(warehouse.bufferCapacity || 0);
+
   return { 
-    availableCapacity: Math.max(0, totalCapacity - occupied), 
+    availableCapacity, 
     totalCapacity, 
     occupied,
     bufferCapacity
@@ -443,7 +486,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         usedStacks.add(stackKey);
 
         if (!stackCapacities.has(stackKey)) {
-          const capacityInfo = await getStackAvailableCapacity(data.warehouseId, stack.chamberName || stack.chamberNo?.toString(), parseInt(stack.floorNo), parseInt(stack.stackNo));
+          const capacityInfo = await getStackAvailableCapacity(data.warehouseId, stack.chamberName || stack.chamberNo?.toString(), stack.floorNo, stack.stackNo);
           stackCapacities.set(stackKey, { totalCapacity: capacityInfo.totalCapacity, bufferCapacity: capacityInfo.bufferCapacity, occupied: capacityInfo.occupied, availableCapacity: capacityInfo.availableCapacity });
         }
         
@@ -469,6 +512,8 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
       }
     }
 
+    const warehouse = await ColdWarehouse.findOne({ _id: data.warehouseId, ...getTenantFilter(session) }).lean();
+
     // Now insert
     for (const client of data.clients) {
       if (client.grade === '') {
@@ -478,15 +523,47 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
       const dbClient = await Client.findOne({ _id: client.clientId, ...getTenantFilter(session) }).lean();
       const isPurchaseClient = dbClient?.clientType === 'PURCHASE';
 
-      const stackAllocations = client.stacks.map((s: any) => ({
-        chamberName: s.chamberName || s.chamberNo?.toString(),
-        chamberNo: s.chamberNo && !isNaN(parseInt(s.chamberNo)) ? parseInt(s.chamberNo) : undefined,
-        floorNo: parseInt(s.floorNo),
-        stackNo: parseInt(s.stackNo),
-        allocatedWeight: Number(s.allocatedWeight) || 0,
-        bagsCount: Number(s.allocatedBags) || 0,
-        stockType: isPurchaseClient ? 'Purchase' : (s.stockType || 'Self'),
-      }));
+      const stackAllocations = client.stacks.map((s: any) => {
+        const chamberStr = (s.chamberName || s.chamberNo || '').toString().trim();
+        const floorStr = (s.floorNo || '').toString().trim();
+        const stackStr = (s.stackNo || '').toString().trim();
+
+        const cleanStackStr = (str: string) => (str || '').toString().toLowerCase().replace(/^stack\s*/i, '').trim();
+
+        const chamber = warehouse?.chambers?.find((c: any) => 
+          (c.name || '').toString().toLowerCase() === chamberStr.toLowerCase() ||
+          c.chamberNo?.toString() === chamberStr ||
+          c.chamberNo === parseInt(chamberStr)
+        );
+
+        const floor = chamber?.floors?.find((f: any) => 
+          (f.name || '').toString().toLowerCase() === floorStr.toLowerCase() ||
+          f.floorNo?.toString() === floorStr ||
+          f.floorNo === parseInt(floorStr)
+        );
+
+        const stackObj = floor?.stacks?.find((st: any) => 
+          st.stackNo?.toString() === stackStr ||
+          cleanStackStr(stackStr) === st.stackNo?.toString() ||
+          (st.name && st.name.toLowerCase() === stackStr.toLowerCase()) ||
+          st.stackNo === parseInt(stackStr)
+        );
+
+        const numericFloorNo = floor?.floorNo ?? (!isNaN(parseInt(s.floorNo)) ? parseInt(s.floorNo) : 1);
+        const numericStackNo = stackObj?.stackNo ?? (!isNaN(parseInt(s.stackNo)) ? parseInt(s.stackNo) : 1);
+        const finalChamberName = s.chamberName || chamber?.name || s.chamberNo || chamber?.chamberNo?.toString() || 'Chamber 1';
+        const numericChamberNo = chamber?.chamberNo ?? (s.chamberNo && !isNaN(parseInt(s.chamberNo)) ? parseInt(s.chamberNo) : undefined);
+
+        return {
+          chamberName: finalChamberName,
+          chamberNo: numericChamberNo,
+          floorNo: numericFloorNo,
+          stackNo: numericStackNo,
+          allocatedWeight: Number(s.allocatedWeight) || 0,
+          bagsCount: Number(s.allocatedBags) || 0,
+          stockType: isPurchaseClient ? 'Purchase' : (s.stockType || 'Self'),
+        };
+      });
       
       const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
       const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + s.bagsCount, 0);

@@ -29,69 +29,46 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
 
   if (stackLayout === 'CUSTOM' && customLayout && customLayout.length > 0) {
     customLayout.forEach((mapping: any) => {
-      const s = stacks.find((st: any) => st.stackNo === mapping.stackNo);
+      const s = stacks.find((st: any) => st.stackNo === mapping.stackNo) || stacks[mapping.stackNo - 1];
       if (s && mapping.rowIndex < rows && mapping.colIndex < cols) {
         gridCells[mapping.rowIndex][mapping.colIndex] = s;
       }
     });
   } else {
-    // Automated layouts
-    const currentStackNo = 1;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (currentStackNo > noOfStacks) break;
-
-        const targetR = r;
-        let targetC = c;
-
-        if (stackLayout === 'COLUMN_WISE') {
-          // c is the outer loop theoretically, so we swap index assignment
-        } else if (stackLayout === 'REVERSE_ROW_WISE') {
-          targetC = cols - 1 - c;
-        } else if (stackLayout === 'REVERSE_COLUMN_WISE') {
-          // reverse logic
-        }
-
-        // For automated, just simplify if needed based on the type.
-        // Re-implementing loops for precise matching:
-      }
-    }
-
-    // Accurate loops based on type
-    let sNo = 1;
+    let stackIdx = 0;
     if (stackLayout === 'ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'REVERSE_ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let c = cols - 1; c >= 0; c--) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'COLUMN_WISE') {
       for (let c = 0; c < cols; c++) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
     } else if (stackLayout === 'REVERSE_COLUMN_WISE') {
       for (let c = cols - 1; c >= 0; c--) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= noOfStacks) {
-            gridCells[r][c] = stacks.find((s: any) => s.stackNo === sNo) || null;
-            sNo++;
+          if (stackIdx < stacks.length) {
+            gridCells[r][c] = stacks[stackIdx];
+            stackIdx++;
           }
         }
       }
@@ -176,7 +153,8 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
 
                 <div className="text-center">
                   <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">Stack</span>
-                  <span className="text-2xl font-bold block mb-1">{cell.stackNo}</span>
+                  <span className="text-2xl font-bold block mb-0.5">{cell.stackNo}</span>
+                  <span className="text-[10px] font-semibold opacity-80 block mb-1">{cell.capacity?.toLocaleString() || 0} KG</span>
                 </div>
 
                 <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${getStatusBadgeColor(cell.status)}`}>
