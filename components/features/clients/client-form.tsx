@@ -90,14 +90,10 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
       validationErrors.gstNumber = 'Enter valid GSTIN or NA if not available';
     }
 
-    // Email required for new clients
+    // Email optional for clients
     const emailVal = (formData as any).email?.trim() || '';
-    if (!client) {
-      if (!emailVal) {
-        validationErrors.email = 'Email is required for new clients';
-      } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) {
-        validationErrors.email = 'Enter a valid email address';
-      }
+    if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) {
+      validationErrors.email = 'Enter a valid email address';
     }
 
     if (!client && !formData.state) {
@@ -210,9 +206,8 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-800 block">Email {client ? '' : '*'}</label>
+          <label className="text-sm font-semibold text-slate-800 block">Email</label>
           <Input
-            required={!client}
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}

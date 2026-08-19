@@ -287,13 +287,10 @@ export async function POST(request: Request) {
       updatedAt: new Date(),
     }, session);
 
-    // Require email for new clients
     const providedEmail = normalizeEmail((body as any).email || '');
-    if (!providedEmail) {
-      return NextResponse.json({ success: false, message: 'Email is required for new client' }, { status: 400 });
+    if (providedEmail) {
+      client.email = providedEmail;
     }
-
-    client.email = providedEmail;
 
     const result = await db.collection('clients').insertOne(client);
 
@@ -304,12 +301,12 @@ export async function POST(request: Request) {
       mobile,
       address,
       gstNumber,
-      providedEmail
+      providedEmail || undefined
     );
 
     await db.collection('clients').updateOne(
       { _id: result.insertedId },
-      { $set: { userId: credentials.userId, userEmail: credentials.userEmail, email: providedEmail } }
+      { $set: { userId: credentials.userId, userEmail: credentials.userEmail, email: providedEmail || credentials.userEmail } }
     );
 
     return NextResponse.json({

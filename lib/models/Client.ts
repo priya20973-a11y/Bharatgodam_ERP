@@ -36,7 +36,7 @@ const ClientSchema: Schema = new Schema(
     commodityIds: [{ type: Schema.Types.ObjectId, ref: 'Commodity' }],
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
-    email: { type: String, required: function() { return this.isNew === true; } },
+    email: { type: String, required: false },
   },
   { timestamps: true }
 );

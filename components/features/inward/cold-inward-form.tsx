@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createColdInwardBulk, getStackAvailableCapacity, saveColdInwardDraft } from '@/app/actions/cold-inward-actions';
+import { createColdInwardBulk, getStackAvailableCapacity, getMultipleStackCapacities, saveColdInwardDraft } from '@/app/actions/cold-inward-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
@@ -84,21 +84,22 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     if (!selectedStacksString) return;
     const fetchCapacities = async () => {
       const keys = selectedStacksString.split(',').filter(Boolean);
-      const newCaps = { ...stackCapacities };
-      let changed = false;
-      for (const key of keys) {
-        if (newCaps[key] === undefined) {
-          const [wId, cNo, fNo, sNo] = key.split('-');
-          try {
-            const res = await getStackAvailableCapacity(wId, cNo, fNo, sNo);
-            newCaps[key] = { availableCapacity: res.availableCapacity, bufferCapacity: res.bufferCapacity || 0 };
-            changed = true;
-          } catch (err) {
-            console.error('Stack capacity fetch error:', err);
-          }
+      const missingKeys = keys.filter(key => stackCapacities[key] === undefined);
+      if (missingKeys.length === 0) return;
+
+      const requests = missingKeys.map(key => {
+        const [warehouseId, chamberNo, floorNo, stackNo] = key.split('-');
+        return { warehouseId, chamberNo, floorNo, stackNo };
+      });
+
+      try {
+        const res = await getMultipleStackCapacities(requests);
+        if (res && Object.keys(res).length > 0) {
+          setStackCapacities(prev => ({ ...prev, ...res }));
         }
+      } catch (err) {
+        console.error('Stack capacity fetch error:', err);
       }
-      if (changed) setStackCapacities(newCaps);
     };
     fetchCapacities();
   }, [selectedStacksString]);
