@@ -12,13 +12,16 @@ export interface IColdInward extends Document {
   commodityId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   stackAllocations: {
+    warehouseId?: mongoose.Types.ObjectId;
     chamberName: string;
     chamberNo?: number;
     floorNo: number;
+    floorName?: string;
     stackNo: number;
     allocatedWeight: number;
     bagsCount?: number;
     stockType?: string;
+    isStockShifting?: boolean;
   }[];
   quantityKg: number; // Net Weight
   bagsCount: number; // Bags
@@ -81,13 +84,16 @@ const ColdInwardSchema: Schema = new Schema(
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     stackAllocations: [{
+      warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: false },
       chamberName: { type: String, required: true },
       chamberNo: { type: Number, required: false },
       floorNo: { type: Number, required: true, min: 1 },
+      floorName: { type: String, required: false },
       stackNo: { type: Number, required: true, min: 1 },
       allocatedWeight: { type: Number, required: true, min: 0 },
       bagsCount: { type: Number, required: false, min: 0 },
       stockType: { type: String, enum: ['Self', 'Purchase'], required: false },
+      isStockShifting: { type: Boolean, default: false },
     }],
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },

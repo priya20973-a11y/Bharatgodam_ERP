@@ -4,6 +4,7 @@ import connectToDatabase from '@/lib/mongoose';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdTransfer from '@/lib/models/ColdTransfer';
+import ColdStockShifting from '@/lib/models/ColdStockShifting';
 import mongoose from 'mongoose';
 import '@/lib/models/Client';
 import '@/lib/models/ColdCommodity';
@@ -68,6 +69,9 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
   
   const currentBalance = Math.max(0, inwardQuantity - actualOutwardKg - ownershipTransferKg);
 
+  const shiftings = await ColdStockShifting.find({ inwardId: inward._id }).lean();
+  const cleanStr = (val: any) => String(val || '').toLowerCase().replace(/^(chamber|floor|stack|c|f|s)\s*/i, '').trim();
+
   const computedStackAllocations = (inward.stackAllocations || []).reduce((acc: any[], alloc: any) => {
     const key = `${alloc.chamberName || alloc.chamberNo}-${alloc.floorName || alloc.floorNo}-${alloc.stackName || alloc.stackNo}`;
     if (!acc.some(a => `${a.chamberName || a.chamberNo}-${a.floorName || a.floorNo}-${a.stackName || a.stackNo}` === key)) {
@@ -90,12 +94,17 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
 
       const originalWeight = Number(alloc.allocatedWeight) || 0;
       const remainingWeight = Math.max(0, originalWeight - outwardedWeight - transferredWeight);
+      const cClean = cleanStr(alloc.chamberName || alloc.chamberNo);
+      const isShifted = alloc.isStockShifting === true || shiftings.some((sh: any) =>
+        (sh.destAllocations || []).some((dest: any) => cleanStr(dest.chamberName || dest.chamberNo) === cClean && dest.floorNo === alloc.floorNo && dest.stackNo === alloc.stackNo)
+      );
 
       acc.push({
         ...alloc,
         remainingWeight,
         transferredWeight,
-        outwardedWeight
+        outwardedWeight,
+        isStockShifting: isShifted,
       });
     }
     return acc;
@@ -193,7 +202,14 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
                     </div>
                     <div>
                       <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Stack</span>
-                      <span className="font-medium text-slate-800">{alloc.stackName || alloc.stackNo || '-'}</span>
+                      <span className="font-medium text-slate-800 flex items-center gap-1">
+                        {alloc.stackName || alloc.stackNo || '-'}
+                        {alloc.isStockShifting && (
+                          <span className="text-amber-800 bg-amber-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                            (Stock Shifting)
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-200">

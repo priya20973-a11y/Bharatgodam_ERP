@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ClientForm from '@/components/features/clients/client-form';
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { Trash2, Plus, QrCode, Camera, Upload } from 'lucide-react';
@@ -24,6 +27,14 @@ interface ColdInwardFormProps {
 export default function ColdInwardForm({ clients, commodities, warehouses, onSuccess, prefillData, draftId }: ColdInwardFormProps) {
   const { t } = useColdTranslation();
   const [loading, setLoading] = useState(false);
+
+  // Local clients state for inline creation
+  const [localClients, setLocalClients] = useState<any[]>(clients);
+  const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+
+  useEffect(() => {
+    setLocalClients(clients);
+  }, [clients]);
 
   // Allocation Mode & Stack QR Scanner State
   const [allocationMode, setAllocationMode] = useState<'MANUAL' | 'SCAN_QR'>('MANUAL');
@@ -52,15 +63,27 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
   const selectedWarehouse = warehouses.find(w => w._id === common.warehouseId);
 
-  const selectedStacksString = clientSections.flatMap(c => c.stacks)
-    .filter(s => s.chamberNo && s.floorNo && s.stackNo)
-    .map(s => `${common.warehouseId}-${s.chamberNo}-${s.floorNo}-${s.stackNo}`)
-    .join(',');
+  const selectedStacksString = Array.from(new Set(
+    clientSections.flatMap(c => c.stacks)
+      .filter(s => s.chamberNo && s.floorNo)
+      .flatMap(s => {
+        if (!common.warehouseId) return [];
+        const chamber = selectedWarehouse?.chambers?.find((c: any) => 
+          (c.name || c.chamberNo.toString()).toString().toLowerCase() === (s.chamberNo || '').toString().toLowerCase() ||
+          c.chamberNo.toString() === (s.chamberNo || '').toString()
+        );
+        const floor = chamber?.floors?.find((f: any) => 
+          (f.name || f.floorNo.toString()).toString().toLowerCase() === (s.floorNo || '').toString().toLowerCase() ||
+          f.floorNo.toString() === (s.floorNo || '').toString()
+        );
+        return (floor?.stacks || []).map((st: any) => `${common.warehouseId}-${s.chamberNo}-${s.floorNo}-${st.stackNo}`);
+      })
+  )).join(',');
 
   useEffect(() => {
     if (!selectedStacksString) return;
     const fetchCapacities = async () => {
-      const keys = selectedStacksString.split(',');
+      const keys = selectedStacksString.split(',').filter(Boolean);
       const newCaps = { ...stackCapacities };
       let changed = false;
       for (const key of keys) {
@@ -82,12 +105,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
   const handleAddClient = (clientId: string) => {
     if (!clientId) return;
-    if (clientSections.find(c => c.clientId === clientId)) {
-      toast.error('Client already added');
+
+    if (clientSections.some((c) => c.clientId === clientId)) {
+      toast.error('Client is already added to this inward transaction');
       return;
     }
-    
-    const clientDetails = clients.find(c => c._id === clientId);
+
+    const clientDetails = localClients.find((c) => c._id === clientId);
     const initialStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : 'Self';
     
     setClientSections([...clientSections, {
@@ -144,7 +168,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
   const addStack = (clientIndex: number) => {
     const updated = [...clientSections];
     const clientData = updated[clientIndex];
-    const clientDetails = clients.find(c => c._id === clientData.clientId);
+    const clientDetails = localClients.find(c => c._id === clientData.clientId);
     const effectiveStockType = clientDetails?.clientType === 'PURCHASE' ? 'Purchase' : (clientData.stockType || 'Self');
     const stackStockType = effectiveStockType === 'Purchase' ? 'Purchase' : 'Self';
     
@@ -496,7 +520,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
     for (let i = 0; i < clientSections.length; i++) {
       const c = clientSections[i];
-      const clientDetails = clients.find(cl => cl._id === c.clientId);
+      const clientDetails = localClients.find((cl) => cl._id === c.clientId);
       const isPurchaseClient = clientDetails?.clientType === 'PURCHASE';
 
       if (isPurchaseClient) {
@@ -631,7 +655,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
   };
 
   const getClientCommodities = (clientId: string) => {
-    const client = clients.find(c => c._id === clientId);
+    const client = localClients.find((c) => c._id === clientId);
     if (!client) return [];
     if (!client.commodityIds || client.commodityIds.length === 0) return commodities;
     return commodities.filter(c => client.commodityIds.includes(c._id) || client.commodityIds.includes(c._id.toString()));
@@ -677,21 +701,30 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('inward.warehouse')}</label>
-            <Select value={common.warehouseId} onValueChange={(v) => setCommon({ ...common, warehouseId: v })} required>
-              <SelectTrigger><SelectValue placeholder={t('inward.selectWarehouse')} /></SelectTrigger>
-              <SelectContent>
-                {warehouses.map(w => <SelectItem key={w._id} value={w._id}>{w.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={common.warehouseId}
+              onValueChange={(v) => setCommon({ ...common, warehouseId: v })}
+              options={warehouses.map(w => ({ value: w._id, label: w.name }))}
+              placeholder={t('inward.selectWarehouse')}
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Select Client for Inward</label>
-            <Select onValueChange={handleAddClient} value="">
-              <SelectTrigger><SelectValue placeholder="Add Client..." /></SelectTrigger>
-              <SelectContent>
-                {clients.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value=""
+              onValueChange={(v) => {
+                if (v === '__ADD_NEW_CLIENT__') {
+                  setIsAddClientModalOpen(true);
+                } else {
+                  handleAddClient(v);
+                }
+              }}
+              options={[
+                { value: '__ADD_NEW_CLIENT__', label: '+ Add Client' },
+                ...localClients.map((c) => ({ value: c._id, label: c.name })),
+              ]}
+              placeholder="Add Client..."
+            />
           </div>
         </div>
 
@@ -756,14 +789,13 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t bg-slate-100 p-4 rounded-md">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('inward.commodityVariety')} *</label>
-              <Select value={common.commodityId} onValueChange={(v) => {
-                setCommon({ ...common, commodityId: v });
-                const comm = commodities.find(c => c._id === v);
-                if (comm) {
-                  const newClients = clientSections.map(c => {
-                    const updates: any = {};
-                    
-                    if (comm.qualityParameters) {
+              <SearchableSelect
+                value={common.commodityId}
+                onValueChange={(v) => {
+                  if (v && v !== 'none') {
+                    const comm = commodities.find(c => c._id === v);
+                    const updates: any = { commodityId: v };
+                    if (comm && comm.qualityParameters) {
                       updates.qualityEntries = comm.qualityParameters.map((qp: any) => ({
                         parameterName: qp.name,
                         lowerLimit: qp.lowerLimit,
@@ -776,27 +808,40 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                       updates.qualityEntries = [];
                     }
 
-                    if (comm.gradingCharge) {
+                    if (comm && comm.gradingCharge) {
                       updates.gradingChargeType = comm.gradingCharge.type || 'Per Bag';
                       updates.gradingRate = comm.gradingCharge.defaultRate || 0;
                     }
 
-                    return { ...c, ...updates };
-                  });
-                  setClientSections(newClients);
-                }
-              }} required>
-                <SelectTrigger className="bg-white"><SelectValue placeholder={t('inward.selectCommodity')} /></SelectTrigger>
-                <SelectContent>
-                  {commonCommodities.length > 0 ? (
-                    commonCommodities.map(c => (
-                      <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>No common commodity available for the selected clients.</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    setCommon({ ...common, ...updates });
+                    const newClients = clientSections.map(c => {
+                      const fieldsToUpdate: any = { commodityId: v };
+                      if (comm && comm.qualityParameters) {
+                        fieldsToUpdate.qualityEntries = comm.qualityParameters.map((qp: any) => ({
+                          parameterName: qp.name,
+                          lowerLimit: qp.lowerLimit,
+                          upperLimit: qp.upperLimit,
+                          value: '',
+                          status: '',
+                          remark: ''
+                        }));
+                      } else {
+                        fieldsToUpdate.qualityEntries = [];
+                      }
+
+                      if (comm && comm.gradingCharge) {
+                        fieldsToUpdate.gradingChargeType = comm.gradingCharge.type || 'Per Bag';
+                        fieldsToUpdate.gradingRate = comm.gradingCharge.defaultRate || 0;
+                      }
+
+                      return { ...c, ...updates };
+                    });
+                    setClientSections(newClients);
+                  }
+                }}
+                options={commonCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})` }))}
+                placeholder={t('inward.selectCommodity')}
+              />
             </div>
           </div>
         )}
@@ -804,7 +849,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
       {/* Client Sections */}
       {clientSections.map((client, cIdx) => {
-        const clientDetails = clients.find(c => c._id === client.clientId);
+        const clientDetails = localClients.find((c) => c._id === client.clientId);
         const effectiveCommodityId = common.sameCommodity ? common.commodityId : client.commodityId;
         
         const calcTotalBags = Number(client.bagsCount || 0) + Number(client.jin || 0) + Number(client.mixed || 0);
@@ -825,41 +870,35 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               {!common.sameCommodity ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">{t('inward.commodityVariety')} *</label>
-                  <Select value={client.commodityId} onValueChange={(v) => {
-                    const comm = commodities.find(c => c._id === v);
-                    const fieldsToUpdate: any = { commodityId: v };
-                    
-                    if (comm && comm.qualityParameters) {
-                      fieldsToUpdate.qualityEntries = comm.qualityParameters.map((qp: any) => ({
-                        parameterName: qp.name,
-                        lowerLimit: qp.lowerLimit,
-                        upperLimit: qp.upperLimit,
-                        value: '',
-                        status: '',
-                        remark: ''
-                      }));
-                    } else {
-                      fieldsToUpdate.qualityEntries = [];
-                    }
+                  <SearchableSelect
+                    value={client.commodityId}
+                    onValueChange={(v) => {
+                      const comm = commodities.find(c => c._id === v);
+                      const fieldsToUpdate: any = { commodityId: v };
+                      
+                      if (comm && comm.qualityParameters) {
+                        fieldsToUpdate.qualityEntries = comm.qualityParameters.map((qp: any) => ({
+                          parameterName: qp.name,
+                          lowerLimit: qp.lowerLimit,
+                          upperLimit: qp.upperLimit,
+                          value: '',
+                          status: '',
+                          remark: ''
+                        }));
+                      } else {
+                        fieldsToUpdate.qualityEntries = [];
+                      }
 
-                    if (comm && comm.gradingCharge) {
-                      fieldsToUpdate.gradingChargeType = comm.gradingCharge.type || 'Per Bag';
-                      fieldsToUpdate.gradingRate = comm.gradingCharge.defaultRate || 0;
-                    }
+                      if (comm && comm.gradingCharge) {
+                        fieldsToUpdate.gradingChargeType = comm.gradingCharge.type || 'Per Bag';
+                        fieldsToUpdate.gradingRate = comm.gradingCharge.defaultRate || 0;
+                      }
 
-                    updateClientFields(cIdx, fieldsToUpdate);
-                  }} required>
-                    <SelectTrigger className="bg-white"><SelectValue placeholder={t('inward.selectCommodity')} /></SelectTrigger>
-                    <SelectContent>
-                      {clientAllowedCommodities.length > 0 ? (
-                        clientAllowedCommodities.map(c => (
-                          <SelectItem key={c._id} value={c._id}>{c.name} ({c.type})</SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>No commodities assigned to this client.</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                      updateClientFields(cIdx, fieldsToUpdate);
+                    }}
+                    options={clientAllowedCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})` }))}
+                    placeholder={t('inward.selectCommodity')}
+                  />
                 </div>
               ) : (
                 <div className="text-sm text-slate-500 italic flex items-center h-full">
@@ -1086,20 +1125,16 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                             {chamber ? (chamber.name || `Chamber ${chamber.chamberNo}`) : (stack.chamberNo || 'Chamber')}
                           </div>
                         ) : (
-                          <Select 
+                          <SearchableSelect 
                             value={stack.chamberNo} 
                             onValueChange={(v) => updateStackFields(cIdx, sIdx, { chamberNo: v, floorNo: '', stackNo: '' })}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Chamber" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {selectedWarehouse?.chambers?.map((c: any) => {
-                                const val = (c.name || c.chamberNo).toString();
-                                return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
-                              })}
-                            </SelectContent>
-                          </Select>
+                            options={(selectedWarehouse?.chambers || []).map((c: any) => {
+                              const val = (c.name || c.chamberNo).toString();
+                              return { value: val, label: c.name || `Chamber ${c.chamberNo}` };
+                            })}
+                            placeholder="Chamber"
+                            className="h-8 text-xs font-normal"
+                          />
                         )}
                       </div>
 
@@ -1110,21 +1145,17 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                             {floor ? (floor.name || `Floor ${floor.floorNo}`) : (stack.floorNo || 'Floor')}
                           </div>
                         ) : (
-                          <Select 
+                          <SearchableSelect 
                             value={stack.floorNo} 
                             onValueChange={(v) => updateStackFields(cIdx, sIdx, { floorNo: v, stackNo: '' })} 
                             disabled={!stack.chamberNo}
-                          >
-                            <SelectTrigger className="h-8 text-xs border-slate-300 shadow-sm bg-slate-50">
-                              <SelectValue placeholder="Floor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {chamber?.floors?.map((f: any) => {
-                                const val = (f.name || f.floorNo).toString();
-                                return <SelectItem key={f.floorNo} value={val}>{f.name || `Floor ${f.floorNo}`}</SelectItem>;
-                              })}
-                            </SelectContent>
-                          </Select>
+                            options={(chamber?.floors || []).map((f: any) => {
+                              const val = (f.name || f.floorNo).toString();
+                              return { value: val, label: f.name || `Floor ${f.floorNo}` };
+                            })}
+                            placeholder="Floor"
+                            className="h-8 text-xs font-normal border-slate-300 bg-slate-50"
+                          />
                         )}
                       </div>
 
@@ -1135,40 +1166,39 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                             {stackObj ? (stackObj.name || `Stack ${stackObj.stackNo}`) : (stack.stackNo ? `Stack ${stack.stackNo}` : 'Stack')}
                           </div>
                         ) : (
-                          <Select 
+                          <SearchableSelect 
                             value={stack.stackNo} 
                             onValueChange={(v) => updateStack(cIdx, sIdx, 'stackNo', v)} 
                             disabled={!stack.floorNo}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Stack" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {floor?.stacks?.map((s: any) => {
-                                const clientSelectedStackKeys = client.stacks
-                                  .filter((clientStack: any, idx: number) => idx !== sIdx && clientStack.chamberNo && clientStack.floorNo && clientStack.stackNo)
-                                  .map((clientStack: any) => `${clientStack.chamberNo}-${clientStack.floorNo}-${clientStack.stackNo}`);
-                                  
-                                const itemKey = `${stack.chamberNo}-${stack.floorNo}-${s.stackNo}`;
-                                const isSelectedByThisClient = clientSelectedStackKeys.includes(itemKey);
-                                const remaining = getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, s.stackNo.toString(), cIdx, sIdx);
-                                const isCurrentSelection = stack.stackNo === s.stackNo.toString();
-                                const noCapacity = remaining !== null && remaining <= 0;
-                                const isDisabled = isSelectedByThisClient || (!isCurrentSelection && noCapacity);
+                            options={(floor?.stacks || []).map((s: any) => {
+                              const clientSelectedStackKeys = client.stacks
+                                .filter((clientStack: any, idx: number) => idx !== sIdx && clientStack.chamberNo && clientStack.floorNo && clientStack.stackNo)
+                                .map((clientStack: any) => `${clientStack.chamberNo}-${clientStack.floorNo}-${clientStack.stackNo}`);
                                 
-                                const customCapKey1 = `${chamber?.chamberNo}-${floor?.floorNo}-${s.stackNo}`;
-                                const customCapKey2 = `${chamber?.name || chamber?.chamberNo}-${floor?.name || floor?.floorNo}-${s.stackNo}`;
-                                const customCap = selectedWarehouse?.customStackCapacities?.[customCapKey1] || selectedWarehouse?.customStackCapacities?.[customCapKey2];
-                                const stackTotalCap = Number(s.capacity || customCap || selectedWarehouse?.stackCapacity || 1000);
+                              const itemKey = `${stack.chamberNo}-${stack.floorNo}-${s.stackNo}`;
+                              const isSelectedByThisClient = clientSelectedStackKeys.includes(itemKey);
+                              const remaining = getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, s.stackNo.toString(), cIdx, sIdx);
+                              const isCurrentSelection = stack.stackNo === s.stackNo.toString();
+                              const noCapacity = remaining !== null && remaining <= 0;
+                              const isDisabled = isSelectedByThisClient || (!isCurrentSelection && noCapacity);
+                              
+                              const stackDisplayName = s.name || `Stack ${s.stackNo}`;
+                              let optionLabel = stackDisplayName;
+                              if (isSelectedByThisClient) {
+                                optionLabel = `${stackDisplayName} (Already Selected)`;
+                              } else if (!isCurrentSelection && noCapacity) {
+                                optionLabel = `${stackDisplayName} (Full)`;
+                              }
 
-                                return (
-                                  <SelectItem key={s.stackNo} value={s.stackNo.toString()} disabled={isDisabled}>
-                                    Stack {s.stackNo} ({stackTotalCap.toLocaleString()} KG) {isSelectedByThisClient ? '(Already Selected)' : ''}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                              return {
+                                value: s.stackNo.toString(),
+                                label: optionLabel,
+                                disabled: isDisabled
+                              };
+                            })}
+                            placeholder="Stack"
+                            className="h-8 text-xs font-normal"
+                          />
                         )}
                         {stack.chamberNo && stack.floorNo && stack.stackNo && (
                           <div className="text-[10px] text-green-600 font-semibold leading-tight pt-1">
@@ -1328,6 +1358,30 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
         onScanSuccess={handleStackQrScan}
         initialTab={initialModalTab}
       />
+
+      <Dialog open={isAddClientModalOpen} onOpenChange={setIsAddClientModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white text-slate-900 border border-slate-200 shadow-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">Create New Client</DialogTitle>
+          </DialogHeader>
+          <ClientForm
+            availableCommodities={commodities}
+            isColdStorage={true}
+            onSuccess={(newClient: any) => {
+              setIsAddClientModalOpen(false);
+              if (newClient) {
+                const clientId = newClient._id || newClient.id;
+                if (clientId) {
+                  const createdObj = { ...newClient, _id: clientId };
+                  setLocalClients((prev) => [...prev.filter((c) => c._id !== clientId), createdObj]);
+                  handleAddClient(clientId);
+                  toast.success(`Client "${createdObj.name || 'New Client'}" created and added to Inward form.`);
+                }
+              }
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

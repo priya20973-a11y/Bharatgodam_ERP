@@ -11,6 +11,7 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'dashboard', key: 'dashboard' },
   { id: 'warehouse', key: 'warehouse' },
   { id: 'commodity', key: 'commodity' },
+  { id: 'purchase', key: 'purchase' },
   { id: 'inward', key: 'inward' },
   { id: 'outward', key: 'outward' },
   { id: 'ledger', key: 'ledger' },
@@ -19,6 +20,7 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'clientMaster', key: 'clientMaster' },
   { id: 'floorMapping', key: 'floorMapping' },
   { id: 'ownershipTransfer', key: 'ownershipTransfer' },
+  { id: 'stockShifting', key: 'stockShifting' },
   { id: 'environmentRecords', key: 'environmentRecords' },
 ];
 

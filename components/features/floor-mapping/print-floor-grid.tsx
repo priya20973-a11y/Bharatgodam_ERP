@@ -28,8 +28,21 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
     }, 500);
   }, []);
 
-  const rows = gridRows || Math.ceil(Math.sqrt(noOfStacks));
-  const cols = gridCols || Math.ceil(noOfStacks / rows);
+  let rows = Number(gridRows) || 0;
+  let cols = Number(gridCols) || 0;
+
+  if (rows > 0 && cols <= 0) {
+    cols = Math.ceil(noOfStacks / rows);
+  } else if (cols > 0 && rows <= 0) {
+    rows = Math.ceil(noOfStacks / cols);
+  } else if (rows <= 0 && cols <= 0) {
+    rows = Math.ceil(Math.sqrt(noOfStacks)) || 1;
+    cols = Math.ceil(noOfStacks / rows) || 1;
+  }
+
+  if (rows * cols < noOfStacks) {
+    cols = Math.ceil(noOfStacks / rows);
+  }
 
   const gridCells: (StackData | null)[][] = Array.from({ length: rows }).map(() => Array(cols).fill(null));
 

@@ -467,7 +467,7 @@ export function generateColdTransactionReceiptHTML(
               <td>${s.stockType || 'Self'}</td>
               <td>${formatNum(s.chamberNo)}</td>
               <td>${formatNum(s.floorNo)}</td>
-              <td>${formatNum(s.stackNo)}</td>
+              <td>${formatNum(s.stackNo)}${s.isStockShifting ? ' (Stock Shifting)' : ''}</td>
               <td>${formatNum(s.quantityKg)} ${unitStr}</td>
             </tr>
             `).join('')
@@ -476,7 +476,7 @@ export function generateColdTransactionReceiptHTML(
               <td>${stockType}</td>
               <td>${chamber}</td>
               <td>${floor}</td>
-              <td>${stack}</td>
+              <td>${stack}${data.isStockShifting ? ' (Stock Shifting)' : ''}</td>
               <td>${netWeight}</td>
             </tr>
           `}

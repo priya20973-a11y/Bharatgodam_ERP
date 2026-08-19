@@ -5,6 +5,7 @@ export type PermissionModule =
   | 'dashboard'
   | 'warehouse'
   | 'commodity'
+  | 'purchase'
   | 'inward'
   | 'outward'
   | 'ledger'
@@ -14,7 +15,8 @@ export type PermissionModule =
   | 'clientMaster'
   | 'floorMapping'
   | 'ownershipTransfer'
-  | 'environmentRecords';
+  | 'environmentRecords'
+  | 'stockShifting';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'print' | 'approve';
 
@@ -35,8 +37,18 @@ export function hasPermission(session: Session | null, module: PermissionModule,
   // For Staff, check their specific permissions
   if (isStaff) {
     const permissions = (session.user as any).permissions;
-    if (!permissions || !permissions[module]) return false;
-    return !!permissions[module][action];
+    if (!permissions) return false;
+
+    if (permissions[module]) {
+      return !!permissions[module][action];
+    }
+
+    // Fallback for stockShifting to match ownershipTransfer permission
+    if (module === 'stockShifting' && permissions.ownershipTransfer) {
+      return !!permissions.ownershipTransfer[action];
+    }
+
+    return false;
   }
 
   return false;

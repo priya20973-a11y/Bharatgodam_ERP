@@ -3,6 +3,7 @@
 import connectToDatabase from '@/lib/mongoose';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdInward from '@/lib/models/ColdInward';
+import ColdTransfer from '@/lib/models/ColdTransfer';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
@@ -155,6 +156,25 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     }
   });
 
+  const transfers = await ColdTransfer.find({
+    fromClientId: new mongoose.Types.ObjectId(clientId),
+    ...tenantFilter
+  }).lean();
+
+  const transferMap = new Map();
+  transfers.forEach((t: any) => {
+    if (t.originalInwardId && t.stackAllocations) {
+      t.stackAllocations.forEach((alloc: any) => {
+        const chamberKey = alloc.chamberName || alloc.chamberNo;
+        const key = `${t.originalInwardId.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+        const existing = transferMap.get(key) || { transferredQty: 0 };
+        transferMap.set(key, {
+          transferredQty: existing.transferredQty + (alloc.allocatedWeight || 0)
+        });
+      });
+    }
+  });
+
   const availableInwards = inwards.map((inward: any) => {
     if (!inward.stackAllocations) return null;
     
@@ -192,7 +212,8 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
       const chamberKey = alloc.chamberName || alloc.chamberNo;
       const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0 };
-      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out);
+      const transData = transferMap.get(key) || { transferredQty: 0 };
+      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out - transData.transferredQty);
       
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
@@ -377,6 +398,8 @@ export async function createColdOutward(data: any) {
     }, session));
     
     revalidatePath('/cold/outward');
+    revalidatePath('/cold/floor-mapping');
+    revalidatePath('/cold/inward');
     return { success: true, data: JSON.parse(JSON.stringify(outward)) };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -543,8 +566,159 @@ export async function createBatchColdOutwards(payload: any) {
     }
     
     revalidatePath('/cold/outward');
+    revalidatePath('/cold/floor-mapping');
+    revalidatePath('/cold/inward');
     return { success: true, data: JSON.parse(JSON.stringify(createdOutwards)) };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+export async function resolveQRForColdOutward(qrCodeString: string) {
+  await connectToDatabase();
+  const session = await requireSession();
+  const tenantFilter = getTenantFilter(session);
+
+  if (!qrCodeString || typeof qrCodeString !== 'string') {
+    return { success: false, error: 'Invalid QR code scanned.' };
+  }
+
+  const trimmed = qrCodeString.trim();
+
+  const parseUrlPath = (str: string) => {
+    try {
+      if (str.startsWith('http://') || str.startsWith('https://')) {
+        const url = new URL(str);
+        return url.pathname;
+      }
+    } catch (e) {}
+    return str;
+  };
+
+  const path = parseUrlPath(trimmed);
+  const isTransferUrl = path.includes('/qr/transfer/');
+  const isInwardUrl = path.includes('/qr/inward/') || path.includes('/cold/inward/qr/');
+
+  let idOrQrId = trimmed;
+  if (isTransferUrl) {
+    idOrQrId = path.split('/qr/transfer/')[1]?.split('?')[0]?.split('/')[0] || trimmed;
+  } else if (isInwardUrl) {
+    if (path.includes('/qr/inward/')) {
+      idOrQrId = path.split('/qr/inward/')[1]?.split('?')[0]?.split('/')[0] || trimmed;
+    } else if (path.includes('/cold/inward/qr/')) {
+      idOrQrId = path.split('/cold/inward/qr/')[1]?.split('?')[0]?.split('/')[0] || trimmed;
+    }
+  }
+
+  ColdCommodity.init();
+  ColdInward.init();
+  ColdTransfer.init();
+
+  // 1. Try ColdTransfer lookup if URL specifies transfer or ID format matches
+  let transfer: any = null;
+  if (isTransferUrl || (mongoose.Types.ObjectId.isValid(idOrQrId) && !isInwardUrl)) {
+    if (mongoose.Types.ObjectId.isValid(idOrQrId)) {
+      transfer = await ColdTransfer.findOne({ _id: idOrQrId, ...tenantFilter })
+        .populate('fromClientId', 'name')
+        .populate('toClientId', 'name')
+        .populate('commodityId', 'name type unit')
+        .populate('warehouseId', 'name chambers')
+        .lean();
+    }
+  }
+
+  if (transfer) {
+    const newOwnerId = transfer.toClientId._id ? transfer.toClientId._id.toString() : transfer.toClientId.toString();
+    const newOwnerModel = transfer.toClientModel || 'Client';
+
+    let newInward: any = null;
+    if (transfer.newInwardId) {
+      newInward = await ColdInward.findById(transfer.newInwardId)
+        .populate('commodityId', 'name type unit')
+        .populate('warehouseId')
+        .lean();
+    }
+
+    if (!newInward && transfer.originalInwardId) {
+      newInward = await ColdInward.findById(transfer.originalInwardId)
+        .populate('commodityId', 'name type unit')
+        .populate('warehouseId')
+        .lean();
+    }
+
+    if (!newInward) {
+      return { success: false, error: 'Associated inward stock record for transfer not found.' };
+    }
+
+    const availableForNewOwner = await getAvailableInwardsForClient(newOwnerId, newOwnerModel === 'ColdWarehouse');
+    const matchedInward = availableForNewOwner.find((inv: any) => inv._id === newInward._id.toString());
+
+    if (!matchedInward || matchedInward.availableQty <= 0) {
+      return { 
+        success: false, 
+        error: `Transferred stock for ${transfer.toClientId?.name || 'New Client'} has no available stock remaining.`,
+        clientName: transfer.toClientId?.name,
+        clientId: newOwnerId,
+        clientModel: newOwnerModel
+      };
+    }
+
+    return {
+      success: true,
+      qrType: 'transfer',
+      clientId: newOwnerId,
+      clientModel: newOwnerModel,
+      clientName: transfer.toClientId?.name,
+      inward: matchedInward,
+      message: `Ownership Transfer QR loaded for ${transfer.toClientId?.name}. Available transferred stock: ${matchedInward.availableQty.toFixed(2)} KG.`
+    };
+  }
+
+  // 2. Try ColdInward lookup by qrId or _id
+  let inward: any = null;
+  if (isInwardUrl || !isTransferUrl) {
+    inward = await ColdInward.findOne({ qrId: idOrQrId, ...tenantFilter })
+      .populate('clientId', 'name')
+      .populate('commodityId', 'name type unit')
+      .populate('warehouseId')
+      .lean();
+
+    if (!inward && mongoose.Types.ObjectId.isValid(idOrQrId)) {
+      inward = await ColdInward.findOne({ _id: idOrQrId, ...tenantFilter })
+        .populate('clientId', 'name')
+        .populate('commodityId', 'name type unit')
+        .populate('warehouseId')
+        .lean();
+    }
+  }
+
+  if (inward) {
+    const clientId = inward.clientId._id ? inward.clientId._id.toString() : inward.clientId.toString();
+    const isWarehouse = false;
+
+    const availableInwards = await getAvailableInwardsForClient(clientId, isWarehouse);
+    const matchedInward = availableInwards.find((inv: any) => inv._id === inward._id.toString());
+
+    if (!matchedInward || matchedInward.availableQty <= 0) {
+      return {
+        success: false,
+        error: `Inward receipt for ${inward.clientId?.name || 'Client'} has no remaining available stock after outwards/transfers.`,
+        clientName: inward.clientId?.name,
+        clientId: clientId,
+        clientModel: 'Client'
+      };
+    }
+
+    return {
+      success: true,
+      qrType: 'inward',
+      clientId: clientId,
+      clientModel: 'Client',
+      clientName: inward.clientId?.name,
+      inward: matchedInward,
+      message: `Inward Receipt QR loaded for ${inward.clientId?.name}. Remaining available stock: ${matchedInward.availableQty.toFixed(2)} KG.`
+    };
+  }
+
+  return { success: false, error: 'No matching Inward or Ownership Transfer record found for scanned QR code.' };
 }

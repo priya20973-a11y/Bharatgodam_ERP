@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers, ShoppingCart } from 'lucide-react';
@@ -24,13 +24,14 @@ const coldNavItems: NavItem[] = [
   { name: 'Warehouse Master', translationKey: 'sidebar.warehouse', href: '/cold/warehouses', icon: Box, module: 'warehouse' },
   { name: 'Environment Records', translationKey: 'sidebar.environmentRecords', href: '/cold/environment-records', icon: Box, module: 'environmentRecords' },
   { name: 'Floor Mapping', translationKey: 'floorMapping.title', href: '/cold/floor-mapping', icon: Grid, module: 'floorMapping' },
-  { name: 'Purchase', translationKey: 'sidebar.purchase', href: '/cold/purchase', icon: ShoppingCart },
+  { name: 'Purchase', translationKey: 'sidebar.purchase', href: '/cold/purchase', icon: ShoppingCart, module: 'purchase' },
   { name: 'Commodity Master', translationKey: 'sidebar.commodities', href: '/cold/commodities', icon: Package, module: 'commodity' },
   { name: 'Unit Master', translationKey: 'sidebar.unitMaster', href: '/cold/units', icon: Layers, adminOnly: true },
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
   { name: 'Ownership Transfer', translationKey: 'sidebar.transferOwnership', href: '/cold/transfers', icon: ArrowRightLeft, module: 'ownershipTransfer' },
+  { name: 'Stock Shifting', translationKey: 'sidebar.stockShifting', href: '/cold/stock-shifting', icon: ArrowRightLeft, module: 'stockShifting' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
@@ -44,7 +45,12 @@ interface SidebarProps {
 export default function ColdSidebar({ session }: SidebarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { t } = useColdTranslation();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const role = session?.user && (session.user as any).role;
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
@@ -90,6 +96,8 @@ export default function ColdSidebar({ session }: SidebarProps) {
               .map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
+                const translated = t(item.translationKey);
+                const label = translated && translated !== item.translationKey ? translated : item.name;
 
                 return (
                   <Link
@@ -105,7 +113,7 @@ export default function ColdSidebar({ session }: SidebarProps) {
                       className={`mr-3 h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                         }`}
                     />
-                    {t(item.translationKey)}
+                    {label}
                   </Link>
                 );
               })}

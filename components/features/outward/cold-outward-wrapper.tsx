@@ -22,9 +22,7 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
   const router = useRouter();
   const { t } = useColdTranslation();
   const [outwards, setOutwards] = useState(initialOutwards);
-  const qrId = searchParams?.qrId || searchParams?.scanQrId;
-  const isQrShortcut = !!qrId;
-  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || isQrShortcut);
+  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || !!searchParams?.qr || !!searchParams?.qrId || !!searchParams?.transferId);
 
   const refreshData = async () => {
     try {
@@ -34,13 +32,13 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
       toast.error(err.message || t('outward.refreshFailed'));
     }
     setIsAdding(false);
-    if (isQrShortcut || searchParams?.action) {
+    if (searchParams?.action) {
       router.replace('/cold/outward');
     }
   };
 
   const handleToggleAdding = () => {
-    if (isAdding && (isQrShortcut || searchParams?.action)) {
+    if (isAdding && searchParams?.action) {
       router.replace('/cold/outward');
     }
     setIsAdding(!isAdding);
@@ -72,7 +70,7 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
             commodities={commodities} 
             warehouses={warehouses} 
             onSuccess={refreshData} 
-            prefillData={qrId ? { scanQrId: qrId, ...searchParams } : searchParams}
+            prefillData={searchParams}
           />
         </div>
       )}

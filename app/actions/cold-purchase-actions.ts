@@ -6,6 +6,7 @@ import ColdInward from '@/lib/models/ColdInward';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdTransfer from '@/lib/models/ColdTransfer';
 import { getTenantFilter, requireSession } from '@/lib/ownership';
+import { hasPermission } from '@/lib/permissions';
 import mongoose from 'mongoose';
 import '@/lib/models/ColdCommodity';
 
@@ -13,6 +14,10 @@ export async function getPurchaseStock(warehouseId: string) {
   try {
     await connectToDatabase();
     const session = await requireSession();
+
+    if (!hasPermission(session, 'purchase', 'view')) {
+      return { success: false, error: '403_FORBIDDEN: Unauthorized access to purchase module' };
+    }
 
     if (!warehouseId || !mongoose.Types.ObjectId.isValid(warehouseId)) {
       return { success: false, error: 'Invalid warehouse ID' };

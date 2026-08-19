@@ -4,6 +4,7 @@ import { CalendarIcon, MapPinIcon, PackageIcon, TruckIcon, UserIcon, ScaleIcon, 
 import connectToDatabase from '@/lib/mongoose';
 import ColdOutward from '@/lib/models/ColdOutward';
 import ColdTransfer from '@/lib/models/ColdTransfer';
+import ColdStockShifting from '@/lib/models/ColdStockShifting';
 
 function isSameStack(a: any, b: any): boolean {
   if (!a || !b) return false;
@@ -52,6 +53,9 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
 
   const regularOutwards = outwards.filter((o: any) => o.remarks !== 'Ownership Transfer Out' && o.remarks !== 'Ownership Transfer Purchase');
 
+  const shiftings = await ColdStockShifting.find({ inwardId: inward._id }).lean();
+  const cleanStr = (val: any) => String(val || '').toLowerCase().replace(/^(chamber|floor|stack|c|f|s)\s*/i, '').trim();
+
   const computedStackAllocations = (inward.stackAllocations || []).reduce((acc: any[], alloc: any) => {
     const key = `${alloc.chamberName || alloc.chamberNo}-${alloc.floorName || alloc.floorNo}-${alloc.stackName || alloc.stackNo}`;
     if (!acc.some(a => `${a.chamberName || a.chamberNo}-${a.floorName || a.floorNo}-${a.stackName || a.stackNo}` === key)) {
@@ -74,12 +78,17 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
 
       const originalWeight = Number(alloc.allocatedWeight) || 0;
       const remainingWeight = Math.max(0, originalWeight - outwardedWeight - transferredWeight);
+      const cClean = cleanStr(alloc.chamberName || alloc.chamberNo);
+      const isShifted = alloc.isStockShifting === true || shiftings.some((sh: any) =>
+        (sh.destAllocations || []).some((dest: any) => cleanStr(dest.chamberName || dest.chamberNo) === cClean && dest.floorNo === alloc.floorNo && dest.stackNo === alloc.stackNo)
+      );
 
       acc.push({
         ...alloc,
         remainingWeight,
         transferredWeight,
-        outwardedWeight
+        outwardedWeight,
+        isStockShifting: isShifted,
       });
     }
     return acc;
@@ -253,7 +262,14 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
                   <tr key={i} className="bg-white hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium">{alloc.chamberName || alloc.chamberNo}</td>
                     <td className="px-4 py-3 font-medium">{alloc.floorName || alloc.floorNo}</td>
-                    <td className="px-4 py-3 font-bold text-indigo-600">{alloc.stackName || alloc.stackNo}</td>
+                    <td className="px-4 py-3 font-bold text-indigo-600">
+                      {alloc.stackName || alloc.stackNo}
+                      {alloc.isStockShifting && (
+                        <span className="ml-2 text-amber-800 bg-amber-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                          (Stock Shifting)
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-right">{alloc.bagsCount || 0}</td>
                     <td className="px-4 py-3 font-bold text-right text-indigo-700">{alloc.remainingWeight} {inward.unit || 'Kg'}</td>
                     <td className="px-4 py-3 font-bold text-right text-blue-600">{alloc.transferredWeight > 0 ? `${alloc.transferredWeight} ${inward.unit || 'Kg'}` : '-'}</td>

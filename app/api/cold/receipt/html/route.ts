@@ -10,6 +10,7 @@ import { generateColdTransactionReceiptHTML } from '@/lib/invoice/cold-transacti
 import { generateColdOutwardReceiptHTML } from '@/lib/invoice/cold-outward-receipt';
 import { generateColdTransferReceiptHTML } from '@/lib/invoice/cold-transfer-receipt';
 import ColdTransfer from '@/lib/models/ColdTransfer';
+import ColdStockShifting from '@/lib/models/ColdStockShifting';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import crypto from 'crypto';
@@ -42,33 +43,45 @@ export async function GET(request: NextRequest) {
         .populate('commodityId', 'name type seasonalPrices')
         .populate('warehouseId');
         
-      if (transaction && transaction.stackAllocations) {
-        transaction = JSON.parse(JSON.stringify(transaction));
-        const isPurchaseClient = transaction.clientId?.clientType === 'PURCHASE';
-        
-        if (isPurchaseClient) {
-          transaction.stockType = 'Purchase';
-          transaction.purchaseQuantityKg = transaction.quantityKg;
-          transaction.purchaseBagsCount = transaction.totalBags || transaction.bagsCount;
-          transaction.selfQuantityKg = 0;
-          transaction.selfBagsCount = 0;
-        }
+      if (transaction) {
+        const shiftings = await ColdStockShifting.find({ inwardId: transaction._id }).lean();
+        const cleanStr = (val: any) => String(val || '').toLowerCase().replace(/^(chamber|floor|stack|c|f|s)\s*/i, '').trim();
 
-        transaction.stacksInfo = transaction.stackAllocations.map((a: any) => {
-          let floorName = a.floorNo;
-          if (transaction.warehouseId?.chambers) {
-            const chamber = transaction.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(a.chamberNo || '1') || c.name === a.chamberName);
-            const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(a.floorNo));
-            if (floor?.name) floorName = floor.name;
+        if (transaction.stackAllocations) {
+          transaction = JSON.parse(JSON.stringify(transaction));
+          const isPurchaseClient = transaction.clientId?.clientType === 'PURCHASE';
+          
+          if (isPurchaseClient) {
+            transaction.stockType = 'Purchase';
+            transaction.purchaseQuantityKg = transaction.quantityKg;
+            transaction.purchaseBagsCount = transaction.totalBags || transaction.bagsCount;
+            transaction.selfQuantityKg = 0;
+            transaction.selfBagsCount = 0;
           }
-          return {
-            chamberNo: a.chamberName || a.chamberNo,
-            floorNo: floorName,
-            stackNo: a.stackNo,
-            quantityKg: a.allocatedWeight,
-            stockType: isPurchaseClient ? 'Purchase' : (a.stockType || 'Self')
-          };
-        });
+
+          transaction.stacksInfo = transaction.stackAllocations.map((a: any) => {
+            let floorName = a.floorNo;
+            if (transaction.warehouseId?.chambers) {
+              const chamber = transaction.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(a.chamberNo || '1') || c.name === a.chamberName);
+              const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(a.floorNo));
+              if (floor?.name) floorName = floor.name;
+            }
+
+            const cClean = cleanStr(a.chamberName || a.chamberNo);
+            const isShifted = a.isStockShifting === true || shiftings.some((sh: any) =>
+              (sh.destAllocations || []).some((dest: any) => cleanStr(dest.chamberName || dest.chamberNo) === cClean && dest.floorNo === a.floorNo && dest.stackNo === a.stackNo)
+            );
+
+            return {
+              chamberNo: a.chamberName || a.chamberNo,
+              floorNo: floorName,
+              stackNo: a.stackNo,
+              quantityKg: a.allocatedWeight,
+              stockType: isPurchaseClient ? 'Purchase' : (a.stockType || 'Self'),
+              isStockShifting: isShifted,
+            };
+          });
+        }
       }
     } else if (type === 'outward') {
       if (batchId) {

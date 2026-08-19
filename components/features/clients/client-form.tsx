@@ -20,7 +20,7 @@ const INDIAN_STATES = [
 interface ClientFormProps {
   client?: any;
   availableCommodities: any[];
-  onSuccess: () => void;
+  onSuccess: (newClient?: any) => void;
   isColdStorage?: boolean;
 }
 
@@ -172,7 +172,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
         } else {
           toast.success(client ? t('clients.clientUpdated') : t('clients.clientRegistered'));
         }
-        onSuccess();
+        onSuccess(res.data);
       } else {
         toast.error(res.error || t('common.error'));
       }
@@ -196,89 +196,143 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-slate-50">
-      <h3 className="font-semibold text-lg">{client ? t('clients.editClient') : t('clients.registerNewClient')}</h3>
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 border border-slate-200 rounded-lg bg-white text-slate-900 shadow-xs">
+      <h3 className="font-bold text-lg text-slate-900 border-b pb-2">{client ? t('clients.editClient') : t('clients.registerNewClient')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.businessOwnerName')}</label>
-          <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Akshay Vadher" />
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.businessOwnerName')}</label>
+          <Input 
+            required 
+            value={formData.name} 
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+            placeholder="e.g. Akshay Vadher" 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Email {client ? '' : '*'}</label>
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">Email {client ? '' : '*'}</label>
           <Input
             required={!client}
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             placeholder="user@example.com"
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
           />
-          {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+          {errors.email && <p className="mt-1 text-xs font-semibold text-red-600">{errors.email}</p>}
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.clientType')}</label>
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.clientType')}</label>
           <Select value={formData.clientType} onValueChange={(val) => setFormData({ ...formData, clientType: val })}>
-            <SelectTrigger><SelectValue placeholder={t('clients.selectType')} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="FARMER">{t('clients.farmer')}</SelectItem>
-              <SelectItem value="FPO">{t('clients.fpo')}</SelectItem>
-              <SelectItem value="COMPANY">{t('clients.company')}</SelectItem>
-              <SelectItem value="PURCHASE">Purchase</SelectItem>
+            <SelectTrigger className="bg-white text-slate-900 font-medium border-slate-300 focus:ring-indigo-600">
+              <SelectValue placeholder={t('clients.selectType')} className="text-slate-900 font-medium" />
+            </SelectTrigger>
+            <SelectContent className="bg-white text-slate-900 border-slate-200">
+              <SelectItem value="FARMER" className="text-slate-900 font-medium focus:bg-indigo-50 focus:text-indigo-900">{t('clients.farmer')}</SelectItem>
+              <SelectItem value="FPO" className="text-slate-900 font-medium focus:bg-indigo-50 focus:text-indigo-900">{t('clients.fpo')}</SelectItem>
+              <SelectItem value="COMPANY" className="text-slate-900 font-medium focus:bg-indigo-50 focus:text-indigo-900">{t('clients.company')}</SelectItem>
+              <SelectItem value="PURCHASE" className="text-slate-900 font-medium focus:bg-indigo-50 focus:text-indigo-900">Purchase</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.addressReq')}</label>
-          <Input required value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder={t('clients.placeholderLocation')} />
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.addressReq')}</label>
+          <Input 
+            required 
+            value={formData.address} 
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+            placeholder={t('clients.placeholderLocation')} 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.state')}{!client ? ' *' : ''}</label>
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.state')}{!client ? ' *' : ''}</label>
           <Select value={formData.state} onValueChange={(val) => handleFieldChange('state', val)}>
-            <SelectTrigger><SelectValue placeholder={t('clients.selectState')} /></SelectTrigger>
-            <SelectContent>
-              {INDIAN_STATES.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+            <SelectTrigger className="bg-white text-slate-900 font-medium border-slate-300 focus:ring-indigo-600">
+              <SelectValue placeholder={t('clients.selectState')} className="text-slate-900 font-medium" />
+            </SelectTrigger>
+            <SelectContent className="bg-white text-slate-900 border-slate-200 max-h-60 overflow-y-auto">
+              {INDIAN_STATES.map((state) => (
+                <SelectItem key={state} value={state} className="text-slate-900 font-medium focus:bg-indigo-50 focus:text-indigo-900">
+                  {state}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
+          {errors.state && <p className="mt-1 text-xs font-semibold text-red-600">{errors.state}</p>}
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.mobileReq')}</label>
-          <Input required value={formData.mobile} onChange={(e) => handleFieldChange('mobile', e.target.value)} placeholder={t('clients.placeholderMobile')} />
-          {errors.mobile && <p className="mt-1 text-sm text-red-600">{errors.mobile}</p>}
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.mobileReq')}</label>
+          <Input 
+            required 
+            value={formData.mobile} 
+            onChange={(e) => handleFieldChange('mobile', e.target.value)} 
+            placeholder={t('clients.placeholderMobile')} 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
+          {errors.mobile && <p className="mt-1 text-xs font-semibold text-red-600">{errors.mobile}</p>}
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.panReq')}</label>
-          <Input required value={formData.panNumber} onChange={(e) => handleFieldChange('panNumber', e.target.value)} placeholder={t('clients.placeholderPan')} />
-          {errors.panNumber && <p className="mt-1 text-sm text-red-600">{errors.panNumber}</p>}
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.panReq')}</label>
+          <Input 
+            required 
+            value={formData.panNumber} 
+            onChange={(e) => handleFieldChange('panNumber', e.target.value)} 
+            placeholder={t('clients.placeholderPan')} 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
+          {errors.panNumber && <p className="mt-1 text-xs font-semibold text-red-600">{errors.panNumber}</p>}
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.aadhaarReq')}</label>
-          <Input required value={formData.aadharNumber} onChange={(e) => handleFieldChange('aadharNumber', e.target.value)} placeholder={t('clients.placeholderAadhaar')} />
-          {errors.aadharNumber && <p className="mt-1 text-sm text-red-600">{errors.aadharNumber}</p>}
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.aadhaarReq')}</label>
+          <Input 
+            required 
+            value={formData.aadharNumber} 
+            onChange={(e) => handleFieldChange('aadharNumber', e.target.value)} 
+            placeholder={t('clients.placeholderAadhaar')} 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
+          {errors.aadharNumber && <p className="mt-1 text-xs font-semibold text-red-600">{errors.aadharNumber}</p>}
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('clients.gstinReq')}</label>
-          <Input required value={formData.gstNumber} onChange={(e) => handleFieldChange('gstNumber', e.target.value)} placeholder={t('clients.placeholderGst')} />
-          {errors.gstNumber && <p className="mt-1 text-sm text-red-600">{errors.gstNumber}</p>}
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">{t('clients.gstinReq')}</label>
+          <Input 
+            required 
+            value={formData.gstNumber} 
+            onChange={(e) => handleFieldChange('gstNumber', e.target.value)} 
+            placeholder={t('clients.placeholderGst')} 
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
+          {errors.gstNumber && <p className="mt-1 text-xs font-semibold text-red-600">{errors.gstNumber}</p>}
         </div>
       </div>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{t('clients.allowedCommodities')}</label>
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-slate-800 block">{t('clients.allowedCommodities')}</label>
         <div className="rounded-xl border border-slate-300 bg-white p-3 min-h-[120px]">
           {availableCommodities.length === 0 ? (
-            <p className="text-sm text-slate-500">{t('clients.noCommodities')}</p>
+            <p className="text-sm text-slate-500 font-medium">{t('clients.noCommodities')}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {availableCommodities.map((commodity) => {
                 const commodityId = commodity._id?.toString?.() || commodity.id;
                 const selected = formData.commodityIds.includes(commodityId);
                 return (
-                  <button key={commodityId} type="button" onClick={() => toggleCommodity(commodityId)} className={`rounded-full border px-3 py-1 text-sm transition ${selected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}>
+                  <button 
+                    key={commodityId} 
+                    type="button" 
+                    onClick={() => toggleCommodity(commodityId)} 
+                    className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                      selected 
+                        ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-2xs' 
+                        : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
                     {commodity.type ? `${commodity.name} (${commodity.type})` : commodity.name}
                   </button>
                 );
@@ -286,12 +340,12 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
             </div>
           )}
         </div>
-        <p className="text-xs text-slate-500 mt-1">{t('clients.commodityHint')}</p>
-        {errors.commodityIds && <p className="mt-1 text-sm text-red-600">{errors.commodityIds}</p>}
+        <p className="text-xs text-slate-500 font-medium mt-1">{t('clients.commodityHint')}</p>
+        {errors.commodityIds && <p className="mt-1 text-xs font-semibold text-red-600">{errors.commodityIds}</p>}
       </div>
       <div className="flex justify-between items-center gap-2 pt-2">
-        <p className="text-sm text-slate-500">{formData.commodityIds.length} {t('clients.commoditiesAssigned')}</p>
-        <Button type="submit" disabled={loading}>
+        <p className="text-sm font-medium text-slate-600">{formData.commodityIds.length} {t('clients.commoditiesAssigned')}</p>
+        <Button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
           {loading ? t('common.loading') : client ? t('clients.updateClient') : t('clients.registerClient')}
         </Button>
       </div>

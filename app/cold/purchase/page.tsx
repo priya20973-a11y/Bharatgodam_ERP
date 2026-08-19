@@ -9,10 +9,7 @@ export const metadata = {
 
 export default async function PurchaseModulePage() {
   await requireSession();
-  
-  // You might want a separate permission for purchase module, but 'dashboard' or 'inward' is a safe fallback
-  // If a new permission 'purchase' is needed, you can add it, but using 'warehouse' or no-permission is safer 
-  // if not defined in permissions map. Let's just allow it for users who have access to cold storage.
+  await requirePagePermission('purchase');
 
   const warehousesRes = await getColdWarehouses({ includeInactive: false });
   const warehouses = Array.isArray(warehousesRes) ? warehousesRes : [];
