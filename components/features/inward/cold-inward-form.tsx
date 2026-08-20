@@ -1221,10 +1221,31 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                         </div>
                       )}
 
-                      <div className="space-y-1">
-                        <label className="text-xs text-blue-600">Alloc. Qty (KG)</label>
-                        <ColdNumberInput className="h-8 text-xs" min="0" max={getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx, true) ?? undefined} step="0.01" value={stack.allocatedWeight ?? ''} onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} />
-                      </div>
+                      {(() => {
+                        const availableWeight = (stack.chamberNo && stack.floorNo && stack.stackNo)
+                          ? getRemainingCapacity(common.warehouseId, stack.chamberNo, stack.floorNo, stack.stackNo, cIdx, sIdx, false)
+                          : null;
+                        const allocQty = Number(stack.allocatedWeight) || 0;
+                        const isExceedingAvailable = availableWeight !== null && allocQty > availableWeight;
+
+                        return (
+                          <div className="space-y-1">
+                            <label className="text-xs text-blue-600">Alloc. Qty (KG)</label>
+                            <ColdNumberInput 
+                              className={`h-8 text-xs ${isExceedingAvailable ? 'border-red-500 bg-red-50 focus-visible:ring-red-500' : ''}`} 
+                              min="0" 
+                              step="0.01" 
+                              value={stack.allocatedWeight ?? ''} 
+                              onChange={(v) => updateStack(cIdx, sIdx, 'allocatedWeight', v ? Number(v) : null)} 
+                            />
+                            {isExceedingAvailable && (
+                              <p className="text-[10px] text-red-600 font-semibold leading-tight mt-1">
+                                Allocation quantity cannot exceed available weight.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div className="space-y-1">
                         <label className="text-xs text-blue-600">{getDynamicUnitLabel(clientUnit, 'alloc')}</label>

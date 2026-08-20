@@ -52,6 +52,39 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     initialData?.floorStacksConfig || {}
   );
 
+  const [sameStackLayoutPerFloor, setSameStackLayoutPerFloor] = useState<boolean>(
+    initialData?.sameStackLayoutPerFloor ?? true
+  );
+
+  const [sharedLayoutConfig, setSharedLayoutConfig] = useState<{
+    stackLayout: string;
+    gridRows: number;
+    gridCols: number;
+    customLayout?: { rowIndex: number; colIndex: number; stackNo: number }[];
+  }>(() => {
+    if (initialData?.chambers?.[0]?.floors?.[0]) {
+      const f0 = initialData.chambers[0].floors[0];
+      const stacksCount = f0.stacks?.length || initialData.noOfStacks || 1;
+      const defaultRows = f0.gridRows || Math.ceil(Math.sqrt(stacksCount));
+      const defaultCols = f0.gridCols || Math.ceil(stacksCount / defaultRows);
+      return {
+        stackLayout: f0.stackLayout || initialData.stackLayout || 'ROW_WISE',
+        gridRows: defaultRows,
+        gridCols: defaultCols,
+        customLayout: f0.customLayout || []
+      };
+    }
+    const stacksCount = initialData?.noOfStacks || 1;
+    const defaultRows = initialData?.gridRows || Math.ceil(Math.sqrt(stacksCount));
+    const defaultCols = initialData?.gridCols || Math.ceil(stacksCount / defaultRows);
+    return {
+      stackLayout: initialData?.stackLayout || 'ROW_WISE',
+      gridRows: defaultRows,
+      gridCols: defaultCols,
+      customLayout: []
+    };
+  });
+
   const [stackNumberingOption, setStackNumberingOption] = useState<'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS'>(
     initialData?.stackNumberingOption || 'RESTART_PER_FLOOR'
   );
@@ -153,6 +186,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     ifsc: initialData?.bankDetails?.ifsc || '',
     branch: initialData?.bankDetails?.branch || '',
   });
+  const [termsAndConditions, setTermsAndConditions] = useState(initialData?.termsAndConditions || '');
 
   // Sync chamberFloorsConfig array when noOfChambers changes
   useEffect(() => {
@@ -184,6 +218,9 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
 
   // Helper to get layout configuration for chamber c, floor f (1-indexed)
   const getFloorLayout = (c: number, f: number) => {
+    if (sameStackLayoutPerFloor) {
+      return sharedLayoutConfig;
+    }
     const key = `${c}-${f}`;
     const stacksCount = getStackCountForFloor(c, f);
     const defaultRows = Math.ceil(Math.sqrt(stacksCount));
@@ -201,6 +238,13 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
   };
 
   const updateFloorLayout = (c: number, f: number, fields: Partial<{ stackLayout: string, gridRows: number, gridCols: number, customLayout: any[] }>) => {
+    if (sameStackLayoutPerFloor) {
+      setSharedLayoutConfig(prev => ({
+        ...prev,
+        ...fields
+      }));
+      return;
+    }
     const key = `${c}-${f}`;
     const current = getFloorLayout(c, f);
     setFloorLayoutConfig(prev => ({
@@ -333,6 +377,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         chamberFloorsConfig: sameFloorsPerChamber ? undefined : chamberFloorsConfig,
         sameStacksPerFloor,
         floorStacksConfig: sameStacksPerFloor ? undefined : floorStacksConfig,
+        sameStackLayoutPerFloor,
         stackNumberingOption,
         chamberCustomNames,
         floorCustomNames,
@@ -345,6 +390,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         gstin,
         bankDetails,
         warehouseLogo,
+        termsAndConditions,
         chambers: isEdit ? initialData.chambers.map((c: any, cIdx: number) => ({
           ...c,
           name: chamberCustomNames[cIdx + 1] && chamberCustomNames[cIdx + 1].trim() !== '' ? chamberCustomNames[cIdx + 1].trim() : `Chamber ${cIdx + 1}`,
@@ -610,6 +656,16 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               placeholder="Branch Name"
             />
           </div>
+          <div className="space-y-2 col-span-1 md:col-span-2 mt-2">
+            <label className="text-sm font-medium">Terms & Conditions (Displayed on Cold Storage Invoices)</label>
+            <textarea 
+              rows={4}
+              value={termsAndConditions} 
+              onChange={(e) => setTermsAndConditions(e.target.value)} 
+              placeholder="Enter terms & conditions to be printed on cold storage invoices (e.g. 1. Goods stored at depositor's risk. 2. Storage charges payable monthly...)"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-500 font-sans"
+            />
+          </div>
         </div>
       </div>
 
@@ -628,7 +684,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             min="1"
             disabled={isEdit}
             value={formData.noOfChambers} 
-            onChange={(val) => setFormData({ ...formData, noOfChambers: Math.max(1, parseInt(val) || 1) })} 
+            onChange={(val) => setFormData({ ...formData, noOfChambers: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) })} 
           />
         </div>
 
@@ -672,7 +728,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                 min="1"
                 disabled={isEdit}
                 value={formData.noOfFloors} 
-                onChange={(val) => setFormData({ ...formData, noOfFloors: Math.max(1, parseInt(val) || 1) })} 
+                onChange={(val) => setFormData({ ...formData, noOfFloors: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) })} 
               />
             </div>
           ) : (
@@ -691,7 +747,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                       value={chamberFloorsConfig[cIdx] || 1} 
                       onChange={(val) => {
                         const newConfig = [...chamberFloorsConfig];
-                        newConfig[cIdx] = Math.max(1, parseInt(val) || 1);
+                        newConfig[cIdx] = val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1);
                         setChamberFloorsConfig(newConfig);
                       }} 
                     />
@@ -742,7 +798,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                 min="1"
                 disabled={isEdit}
                 value={formData.noOfStacks} 
-                onChange={(val) => setFormData({ ...formData, noOfStacks: Math.max(1, parseInt(val) || 1) })} 
+                onChange={(val) => setFormData({ ...formData, noOfStacks: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) })} 
               />
             </div>
           ) : (
@@ -760,7 +816,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                       {Array.from({ length: floorsCount }).map((_, fIdx) => {
                         const fNo = fIdx + 1;
                         const key = `${cNo}-${fNo}`;
-                        const currentVal = floorStacksConfig[key] || formData.noOfStacks || 1;
+                        const currentVal = floorStacksConfig[key] !== undefined ? floorStacksConfig[key] : (formData.noOfStacks || 1);
                         const fName = floorCustomNames[key] || `Floor ${fNo}`;
 
                         return (
@@ -776,7 +832,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                               onChange={(val) => {
                                 setFloorStacksConfig(prev => ({
                                   ...prev,
-                                  [key]: Math.max(1, parseInt(val) || 1)
+                                  [key]: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1)
                                 }));
                               }} 
                             />
@@ -844,7 +900,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               required 
               min="1"
               value={formData.stackCapacity} 
-              onChange={(val) => setFormData({ ...formData, stackCapacity: parseInt(val) || 0 })} 
+              onChange={(val) => setFormData({ ...formData, stackCapacity: val === '' ? ('' as any) : (parseInt(val) || 0) })} 
             />
           </div>
           <div className="space-y-2">
@@ -853,7 +909,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               required 
               min="0"
               value={formData.bufferCapacity} 
-              onChange={(val) => setFormData({ ...formData, bufferCapacity: parseInt(val) || 0 })} 
+              onChange={(val) => setFormData({ ...formData, bufferCapacity: val === '' ? ('' as any) : (parseInt(val) || 0) })} 
             />
           </div>
         </div>
@@ -927,7 +983,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               min="1"
               max={getStackCountForFloor(overrideChamber, overrideFloor)}
               value={overrideStackNo}
-              onChange={(val) => setOverrideStackNo(Math.max(1, parseInt(val) || 1))}
+              onChange={(val) => setOverrideStackNo(val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1))}
               className="h-9 text-xs"
             />
           </div>
@@ -937,7 +993,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             <ColdNumberInput 
               min="1"
               value={overrideCapacity}
-              onChange={(val) => setOverrideCapacity(parseInt(val) || 0)}
+              onChange={(val) => setOverrideCapacity(val === '' ? ('' as any) : (parseInt(val) || 0))}
               className="h-9 text-xs"
             />
           </div>
@@ -1078,145 +1134,284 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-6">
         <h4 className="font-semibold text-base text-indigo-900 border-b pb-2 flex items-center gap-2">
           <Grid className="w-5 h-5 text-indigo-600" />
-          Per-Floor Stack Layout Configuration & Live Previews
+          Stack Layout Configuration & Live Previews
         </h4>
 
-        <p className="text-xs text-slate-500">
-          Configure Layout Type, Grid Rows, and Grid Columns separately for every floor. Each floor generates its own visual grid layout and preview.
-        </p>
+        {/* Stack Layout Configuration question */}
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-slate-800 block">
+            Is the Stack Layout Configuration the same for every floor?
+          </label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameStackLayoutPerFloor(true)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                sameStackLayoutPerFloor 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm font-semibold' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Yes (Same layout for all floors)
+            </button>
+            <button
+              type="button"
+              disabled={isEdit}
+              onClick={() => setSameStackLayoutPerFloor(false)}
+              className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-all ${
+                !sameStackLayoutPerFloor 
+                  ? 'bg-indigo-50 border-indigo-600 text-indigo-700 shadow-sm font-semibold' 
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              No (Separate layout for each floor)
+            </button>
+          </div>
+        </div>
 
-        <div className="space-y-6">
-          {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
-            const cNo = cIdx + 1;
-            const floorsCount = getFloorCountForChamber(cNo);
-            const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+        {sameStackLayoutPerFloor ? (
+          /* Single Stack Layout Configuration applied to all floors */
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+              <h6 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
+                Shared Stack Layout Configuration (Applied to All Floors)
+              </h6>
+            </div>
 
-            return (
-              <div key={cNo} className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-4">
-                <h5 className="font-bold text-sm text-indigo-950 uppercase tracking-wide border-b pb-2">
-                  {cName} Layout Configurations
-                </h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-700">Layout Type</label>
+                <Select 
+                  disabled={isEdit}
+                  value={sharedLayoutConfig.stackLayout} 
+                  onValueChange={(val) => setSharedLayoutConfig(prev => ({ ...prev, stackLayout: val }))}
+                >
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Layout" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ROW_WISE">Row Wise</SelectItem>
+                    <SelectItem value="COLUMN_WISE">Column Wise</SelectItem>
+                    <SelectItem value="REVERSE_ROW_WISE">Reverse Row Wise</SelectItem>
+                    <SelectItem value="REVERSE_COLUMN_WISE">Reverse Column Wise</SelectItem>
+                    <SelectItem value="CUSTOM">Custom Mapping</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-6">
-                  {Array.from({ length: floorsCount }).map((_, fIdx) => {
-                    const fNo = fIdx + 1;
-                    const fName = floorCustomNames[`${cNo}-${fNo}`] || `Floor ${fNo}`;
-                    const layout = getFloorLayout(cNo, fNo);
-                    const stacksCount = getStackCountForFloor(cNo, fNo);
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-700">Grid Rows</label>
+                <ColdNumberInput 
+                  required
+                  min="1"
+                  disabled={isEdit}
+                  className="h-9 text-xs"
+                  value={sharedLayoutConfig.gridRows} 
+                  onChange={(val) => setSharedLayoutConfig(prev => ({ ...prev, gridRows: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) }))} 
+                />
+              </div>
 
-                    return (
-                      <div key={fNo} className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
-                        <div className="flex justify-between items-center border-b pb-2">
-                          <h6 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
-                            {cName} → {fName} Layout
-                          </h6>
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-                            {stacksCount} Stacks
-                          </span>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-700">Grid Columns</label>
+                <ColdNumberInput 
+                  required
+                  min="1"
+                  disabled={isEdit}
+                  className="h-9 text-xs"
+                  value={sharedLayoutConfig.gridCols} 
+                  onChange={(val) => setSharedLayoutConfig(prev => ({ ...prev, gridCols: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) }))} 
+                />
+              </div>
+            </div>
+
+            {/* Custom Grid Mapping Editor if shared layout is CUSTOM */}
+            {sharedLayoutConfig.stackLayout === 'CUSTOM' && sharedLayoutConfig.gridRows > 0 && sharedLayoutConfig.gridCols > 0 && (
+              <div className="mt-3 p-3 bg-white border rounded-md">
+                <h6 className="text-xs font-semibold text-slate-800 mb-1">Custom Shared Grid Mapping</h6>
+                <p className="text-[11px] text-slate-500 mb-3">Click a cell to assign stack number, double-click to remove.</p>
+                <div 
+                  className="inline-grid gap-1 bg-slate-200 p-1 rounded-md max-w-full overflow-x-auto"
+                  style={{ gridTemplateColumns: `repeat(${sharedLayoutConfig.gridCols}, minmax(36px, 1fr))` }}
+                >
+                  {Array.from({ length: sharedLayoutConfig.gridRows }).map((_, rIdx) => 
+                    Array.from({ length: sharedLayoutConfig.gridCols }).map((_, colIdx) => {
+                      const customArr = sharedLayoutConfig.customLayout || [];
+                      const mapped = customArr.find(cItem => cItem.rowIndex === rIdx && cItem.colIndex === colIdx);
+                      const stacksCount = formData.noOfStacks || 1;
+                      return (
+                        <div 
+                          key={`${rIdx}-${colIdx}`}
+                          onClick={() => {
+                            if (isEdit) return;
+                            if (!mapped && customArr.length < stacksCount) {
+                              const assigned = customArr.map(cItem => cItem.stackNo);
+                              let nextStack = 1;
+                              while(assigned.includes(nextStack)) nextStack++;
+                              if (nextStack <= stacksCount) {
+                                setSharedLayoutConfig(prev => ({
+                                  ...prev,
+                                  customLayout: [...customArr, { rowIndex: rIdx, colIndex: colIdx, stackNo: nextStack }]
+                                }));
+                              }
+                            }
+                          }}
+                          onDoubleClick={() => {
+                            if (mapped) {
+                              setSharedLayoutConfig(prev => ({
+                                ...prev,
+                                customLayout: customArr.filter(cItem => !(cItem.rowIndex === rIdx && cItem.colIndex === colIdx))
+                              }));
+                            }
+                          }}
+                          className={`h-8 w-8 flex items-center justify-center text-[10px] font-semibold rounded cursor-pointer select-none transition-colors ${mapped ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'bg-white text-slate-400 hover:bg-slate-100'}`}
+                        >
+                          {mapped ? mapped.stackNo : '-'}
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-700">Layout Type</label>
-                            <Select 
-                              disabled={isEdit}
-                              value={layout.stackLayout} 
-                              onValueChange={(val) => updateFloorLayout(cNo, fNo, { stackLayout: val })}
-                            >
-                              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Layout" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="ROW_WISE">Row Wise</SelectItem>
-                                <SelectItem value="COLUMN_WISE">Column Wise</SelectItem>
-                                <SelectItem value="REVERSE_ROW_WISE">Reverse Row Wise</SelectItem>
-                                <SelectItem value="REVERSE_COLUMN_WISE">Reverse Column Wise</SelectItem>
-                                <SelectItem value="CUSTOM">Custom Mapping</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-700">Grid Rows</label>
-                            <ColdNumberInput 
-                              required
-                              min="1"
-                              disabled={isEdit}
-                              className="h-9 text-xs"
-                              value={layout.gridRows} 
-                              onChange={(val) => updateFloorLayout(cNo, fNo, { gridRows: Math.max(1, parseInt(val) || 1) })} 
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-700">Grid Columns</label>
-                            <ColdNumberInput 
-                              required
-                              min="1"
-                              disabled={isEdit}
-                              className="h-9 text-xs"
-                              value={layout.gridCols} 
-                              onChange={(val) => updateFloorLayout(cNo, fNo, { gridCols: Math.max(1, parseInt(val) || 1) })} 
-                            />
-                          </div>
-                        </div>
-
-                        {/* Custom Grid Mapping Editor if layout is CUSTOM */}
-                        {layout.stackLayout === 'CUSTOM' && layout.gridRows > 0 && layout.gridCols > 0 && (
-                          <div className="mt-3 p-3 bg-slate-50 border rounded-md">
-                            <h6 className="text-xs font-semibold text-slate-800 mb-1">Custom Grid Mapping for {cName} → {fName}</h6>
-                            <p className="text-[11px] text-slate-500 mb-3">Click a cell to assign stack number, double-click to remove.</p>
-                            <div 
-                              className="inline-grid gap-1 bg-slate-200 p-1 rounded-md max-w-full overflow-x-auto"
-                              style={{ gridTemplateColumns: `repeat(${layout.gridCols}, minmax(36px, 1fr))` }}
-                            >
-                              {Array.from({ length: layout.gridRows }).map((_, rIdx) => 
-                                Array.from({ length: layout.gridCols }).map((_, colIdx) => {
-                                  const customArr = layout.customLayout || [];
-                                  const mapped = customArr.find(cItem => cItem.rowIndex === rIdx && cItem.colIndex === colIdx);
-                                  return (
-                                    <div 
-                                      key={`${rIdx}-${colIdx}`}
-                                      onClick={() => {
-                                        if (isEdit) return;
-                                        if (!mapped && customArr.length < stacksCount) {
-                                          const assigned = customArr.map(cItem => cItem.stackNo);
-                                          let nextStack = 1;
-                                          while(assigned.includes(nextStack)) nextStack++;
-                                          if (nextStack <= stacksCount) {
-                                            updateFloorLayout(cNo, fNo, {
-                                              customLayout: [...customArr, { rowIndex: rIdx, colIndex: colIdx, stackNo: nextStack }]
-                                            });
-                                          }
-                                        }
-                                      }}
-                                      onDoubleClick={() => {
-                                        if (mapped) {
-                                          updateFloorLayout(cNo, fNo, {
-                                            customLayout: customArr.filter(cItem => !(cItem.rowIndex === rIdx && cItem.colIndex === colIdx))
-                                          });
-                                        }
-                                      }}
-                                      className={`h-8 w-8 flex items-center justify-center text-[10px] font-semibold rounded cursor-pointer select-none transition-colors ${mapped ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'bg-white text-slate-400 hover:bg-slate-100'}`}
-                                    >
-                                      {mapped ? mapped.stackNo : '-'}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Live Layout Preview for this Floor */}
-                        {renderFloorLivePreview(cNo, fNo)}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
+
+            {/* Live Shared Layout Preview */}
+            {renderFloorLivePreview(1, 1)}
+          </div>
+        ) : (
+          /* Separate Stack Layout Configuration per floor */
+          <div className="space-y-6">
+            {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
+              const cNo = cIdx + 1;
+              const floorsCount = getFloorCountForChamber(cNo);
+              const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+
+              return (
+                <div key={cNo} className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-4">
+                  <h5 className="font-bold text-sm text-indigo-950 uppercase tracking-wide border-b pb-2">
+                    {cName} Layout Configurations
+                  </h5>
+
+                  <div className="space-y-6">
+                    {Array.from({ length: floorsCount }).map((_, fIdx) => {
+                      const fNo = fIdx + 1;
+                      const fName = floorCustomNames[`${cNo}-${fNo}`] || `Floor ${fNo}`;
+                      const layout = getFloorLayout(cNo, fNo);
+                      const stacksCount = getStackCountForFloor(cNo, fNo);
+
+                      return (
+                        <div key={fNo} className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+                          <div className="flex justify-between items-center border-b pb-2">
+                            <h6 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-indigo-600"></span>
+                              {cName} → {fName} Layout
+                            </h6>
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                              {stacksCount} Stacks
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-700">Layout Type</label>
+                              <Select 
+                                disabled={isEdit}
+                                value={layout.stackLayout} 
+                                onValueChange={(val) => updateFloorLayout(cNo, fNo, { stackLayout: val })}
+                              >
+                                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Layout" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ROW_WISE">Row Wise</SelectItem>
+                                  <SelectItem value="COLUMN_WISE">Column Wise</SelectItem>
+                                  <SelectItem value="REVERSE_ROW_WISE">Reverse Row Wise</SelectItem>
+                                  <SelectItem value="REVERSE_COLUMN_WISE">Reverse Column Wise</SelectItem>
+                                  <SelectItem value="CUSTOM">Custom Mapping</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-700">Grid Rows</label>
+                              <ColdNumberInput 
+                                required
+                                min="1"
+                                disabled={isEdit}
+                                className="h-9 text-xs"
+                                value={layout.gridRows} 
+                                onChange={(val) => updateFloorLayout(cNo, fNo, { gridRows: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) })} 
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-700">Grid Columns</label>
+                              <ColdNumberInput 
+                                required
+                                min="1"
+                                disabled={isEdit}
+                                className="h-9 text-xs"
+                                value={layout.gridCols} 
+                                onChange={(val) => updateFloorLayout(cNo, fNo, { gridCols: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) })} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Custom Grid Mapping Editor if layout is CUSTOM */}
+                          {layout.stackLayout === 'CUSTOM' && layout.gridRows > 0 && layout.gridCols > 0 && (
+                            <div className="mt-3 p-3 bg-slate-50 border rounded-md">
+                              <h6 className="text-xs font-semibold text-slate-800 mb-1">Custom Grid Mapping for {cName} → {fName}</h6>
+                              <p className="text-[11px] text-slate-500 mb-3">Click a cell to assign stack number, double-click to remove.</p>
+                              <div 
+                                className="inline-grid gap-1 bg-slate-200 p-1 rounded-md max-w-full overflow-x-auto"
+                                style={{ gridTemplateColumns: `repeat(${layout.gridCols}, minmax(36px, 1fr))` }}
+                              >
+                                {Array.from({ length: layout.gridRows }).map((_, rIdx) => 
+                                  Array.from({ length: layout.gridCols }).map((_, colIdx) => {
+                                    const customArr = layout.customLayout || [];
+                                    const mapped = customArr.find(cItem => cItem.rowIndex === rIdx && cItem.colIndex === colIdx);
+                                    return (
+                                      <div 
+                                        key={`${rIdx}-${colIdx}`}
+                                        onClick={() => {
+                                          if (isEdit) return;
+                                          if (!mapped && customArr.length < stacksCount) {
+                                            const assigned = customArr.map(cItem => cItem.stackNo);
+                                            let nextStack = 1;
+                                            while(assigned.includes(nextStack)) nextStack++;
+                                            if (nextStack <= stacksCount) {
+                                              updateFloorLayout(cNo, fNo, {
+                                                customLayout: [...customArr, { rowIndex: rIdx, colIndex: colIdx, stackNo: nextStack }]
+                                              });
+                                            }
+                                          }
+                                        }}
+                                        onDoubleClick={() => {
+                                          if (mapped) {
+                                            updateFloorLayout(cNo, fNo, {
+                                              customLayout: customArr.filter(cItem => !(cItem.rowIndex === rIdx && cItem.colIndex === colIdx))
+                                            });
+                                          }
+                                        }}
+                                        className={`h-8 w-8 flex items-center justify-center text-[10px] font-semibold rounded cursor-pointer select-none transition-colors ${mapped ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'bg-white text-slate-400 hover:bg-slate-100'}`}
+                                      >
+                                        {mapped ? mapped.stackNo : '-'}
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Live Layout Preview for this Floor */}
+                          {renderFloorLivePreview(cNo, fNo)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Reference Persons */}

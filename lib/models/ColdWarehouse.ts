@@ -49,6 +49,7 @@ export interface IColdWarehouse extends Document {
   // Hierarchy Configuration Options
   sameFloorsPerChamber?: boolean;
   sameStacksPerFloor?: boolean;
+  sameStackLayoutPerFloor?: boolean;
   stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
   chamberFloorsConfig?: number[];
   floorStacksConfig?: Record<string, number>;
@@ -64,6 +65,7 @@ export interface IColdWarehouse extends Document {
     branch: string;
   };
   warehouseLogo?: string;
+  termsAndConditions?: string;
   
   // Layout Configuration
   stackLayout: 'ROW_WISE' | 'COLUMN_WISE' | 'REVERSE_ROW_WISE' | 'REVERSE_COLUMN_WISE' | 'CUSTOM';
@@ -133,6 +135,7 @@ const ColdWarehouseSchema: Schema = new Schema(
     
     sameFloorsPerChamber: { type: Boolean, default: true },
     sameStacksPerFloor: { type: Boolean, default: true },
+    sameStackLayoutPerFloor: { type: Boolean, default: true },
     stackNumberingOption: {
       type: String,
       enum: ['RESTART_PER_FLOOR', 'CONTINUE_ACROSS_FLOORS'],
@@ -152,6 +155,7 @@ const ColdWarehouseSchema: Schema = new Schema(
       branch: { type: String, required: false }
     },
     warehouseLogo: { type: String, required: false },
+    termsAndConditions: { type: String, required: false },
     
     stackLayout: { 
       type: String, 

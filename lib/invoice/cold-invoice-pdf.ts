@@ -1,185 +1,660 @@
 import { format } from 'date-fns';
-import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
+import { formatCurrency, amountInWords, formatNumber } from './formatters';
 
+/**
+ * Generates a professional real-world Indian Cold Storage Commercial Invoice HTML.
+ * Supports warehouse logo (if uploaded), complete address, GSTIN, PAN, SAC Code 998612,
+ * structured line items, additional charges, financial totals, amount in words, bank details,
+ * and print/PDF optimization.
+ */
 export function generateColdInvoiceHTML(
   invoice: any,
   client: any,
   warehouse: any,
-  userDetails?: { companyLogo?: string; phoneNumber?: string; companyName?: string; address?: string },
+  userDetails?: { companyLogo?: string; phoneNumber?: string; companyName?: string; address?: string; coldLanguage?: string; termsAndConditions?: string },
   lang: string = 'en'
 ): string {
-  const isGu = lang === 'gu';
-  const fNum = (num: number | string) => isGu ? toGujaratiDigits(num) : String(num);
-  const fDate = (d: string | Date) => fNum(format(new Date(d), 'dd/MM/yyyy'));
-
-  const invoiceNo = invoice.invoiceId || 'CIN-XXXXXX';
-  const fromDate = fDate(invoice.fromDate);
-  const toDate = fDate(invoice.toDate);
-  const generatedDate = fDate(invoice.generatedAt || new Date());
+  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || userDetails?.companyLogo || '';
+  const warehouseName = warehouse?.name || userDetails?.companyName || 'Cold Storage Warehouse';
+  const warehouseAddress = warehouse?.address || userDetails?.address || '';
+  const warehouseGstin = warehouse?.gstin || '';
+  const warehousePan = warehouse?.panNo || warehouse?.pan || '';
   
-  const clientName = client?.name || (isGu ? 'લાગુ પડતું નથી' : 'N.A.');
-  const clientMobile = fNum(client?.mobile || '');
-  const warehouseName = warehouse?.name || userDetails?.companyName || (isGu ? 'કોલ્ડ સ્ટોરેજ' : 'Cold Storage Co.');
+  // Ref persons / Phone / Email for warehouse header
+  const refPersonMobile = warehouse?.referencePersons?.[0]?.mobile || userDetails?.phoneNumber || '';
+  const refPersonEmail = warehouse?.referencePersons?.[0]?.email || warehouse?.userEmail || '';
+
+  // Invoice Number & Dates
+  const invoiceNo = invoice.invoiceId || invoice.invoiceNo || (invoice._id ? `CIN-${String(invoice._id).slice(-6).toUpperCase()}` : 'CIN-000000');
   
-  const logoHtml = userDetails?.companyLogo 
-    ? `<img src="${userDetails.companyLogo}" style="max-height: 80px; object-fit: contain;" alt="Logo" />`
-    : `<div style="font-size: 32px; font-weight: bold; color: #0b4b8a;">S<span style="color: #d63333;">C</span>S</div>`;
+  const rawDate = invoice.createdAt || invoice.generatedAt || invoice.date;
+  const invoiceDateStr = rawDate ? format(new Date(rawDate), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy');
 
-  const itemsHtml = invoice.items.map((item: any, index: number) => {
-    return `
-      <tr>
-        <td>${fNum(index + 1)}</td>
-        <td>${item.commodityName}</td>
-        <td>${fNum(item.quantityKg.toFixed(2))}</td>
-        <td>${fNum(item.outwardKg.toFixed(2))}</td>
-        <td>${fNum(item.balanceKg.toFixed(2))}</td>
-        <td>${fDate(item.inwardDate)}</td>
-        <td>${item.outwardDate ? fDate(item.outwardDate) : '-'}</td>
-        <td>${fNum(item.days)}</td>
-        <td style="text-align: right; font-weight: bold;">₹${fNum(item.subtotal.toFixed(2))}</td>
-      </tr>
-    `;
-  }).join('');
+  const storageFrom = invoice.fromDate ? format(new Date(invoice.fromDate), 'dd/MM/yyyy') : '';
+  const storageTo = invoice.toDate ? format(new Date(invoice.toDate), 'dd/MM/yyyy') : '';
+  const storagePeriod = (storageFrom && storageTo) ? `${storageFrom} to ${storageTo}` : (storageFrom || storageTo || 'N/A');
 
-  const additionalChargesHtml = invoice.additionalCharges && invoice.additionalCharges.length > 0 
-    ? `
-      <div style="margin-bottom: 30px;">
-        <h3 style="color: #0b4b8a; font-size: 16px; margin: 0 0 10px 0; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px;">${isGu ? 'વધારાનો ચાર્જ' : 'Additional Charges'}</h3>
-        <table style="width: 50%; margin-left: auto;">
-          <tbody>
-            ${invoice.additionalCharges.map((charge: any) => `
-              <tr>
-                <td style="font-weight: 600;">${charge.name}</td>
-                <td style="text-align: right; font-weight: bold;">₹${fNum(charge.amount.toFixed(2))}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `
-    : '';
+  // Customer / Bill To Details
+  const customerName = client?.name || 'Valued Customer';
+  const addressParts = [
+    client?.shopNo ? `Shop No: ${client.shopNo}` : '',
+    client?.marketYard,
+    client?.address,
+    client?.village,
+    client?.area,
+    client?.city,
+    client?.district,
+    client?.state ? `${client.state}${client.pincode ? ` - ${client.pincode}` : ''}` : client?.pincode
+  ].filter(Boolean);
+  const customerAddress = addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+  const customerContact = client?.mobile || client?.phone || '';
+  const customerGstin = client?.gstin || '';
+  const customerPan = client?.pan || '';
+
+  // Line items
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const lineItems = items.map((it: any, idx: number) => {
+    const inwardDateFormatted = it.inwardDate ? format(new Date(it.inwardDate), 'dd/MM/yyyy') : '-';
+    let outwardDateFormatted = '-';
+    if (it.outwardDate) {
+      outwardDateFormatted = format(new Date(it.outwardDate), 'dd/MM/yyyy');
+    } else if (it.outwardKg > 0) {
+      outwardDateFormatted = 'Completed';
+    }
+
+    const inKg = Number(it.quantityKg || 0);
+    const outKg = Number(it.outwardKg || 0);
+    const balKg = Number(it.balanceKg || 0);
+    const totalBags = Number(it.totalBags || it.bagsCount || (it.bagsLarge || 0) + (it.bagsSmall || 0) + (it.bagsMixed || 0));
+    const days = Number(it.days || 0);
+    const subtotal = Number(it.subtotal || it.amount || 0);
+    const rate = Number(it.rateApplied || it.rate || 0);
+
+    return {
+      srNo: idx + 1,
+      commodityName: it.commodityName || it.commodity || 'Commodity',
+      sacCode: it.sacCode || '998612',
+      inwardDate: inwardDateFormatted,
+      outwardDate: outwardDateFormatted,
+      inwardKg: inKg,
+      outwardKg: outKg,
+      balanceKg: balKg,
+      totalBags: totalBags,
+      days: days,
+      rate: rate,
+      calculationPath: it.calculationPath || '',
+      subtotal: subtotal
+    };
+  });
+
+  // Additional Charges
+  const additionalCharges = Array.isArray(invoice.additionalCharges) ? invoice.additionalCharges : [];
+  const rentTotal = lineItems.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+  const additionalTotal = additionalCharges.reduce((sum: number, chg: any) => sum + (Number(chg.amount) || 0), 0);
+  
+  const basicTotal = rentTotal + additionalTotal;
+  const netAmount = Math.round(basicTotal);
+  const roundOff = netAmount - basicTotal;
+
+  // Bank Details
+  const bankName = warehouse?.bankDetails?.bankName || '';
+  const accountNo = warehouse?.bankDetails?.accountNo || warehouse?.bankDetails?.accountNumber || '';
+  const ifscCode = warehouse?.bankDetails?.ifsc || warehouse?.bankDetails?.ifscCode || '';
+  const branch = warehouse?.bankDetails?.branch || '';
 
   return `
 <!DOCTYPE html>
-<html lang="${isGu ? 'gu' : 'en'}">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Cold Storage Invoice - ${invoiceNo}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Mukta+Vaani:wght@400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Mukta Vaani', sans-serif;
-      margin: 0; padding: 20px;
-      color: #333; background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 9.5pt;
+      color: #0f172a;
+      background: #fff;
+      line-height: 1.4;
     }
-    .container { max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
-    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0b4b8a; padding-bottom: 20px; margin-bottom: 20px; }
-    .header-left { display: flex; gap: 15px; align-items: center; }
-    .header-right { text-align: right; }
-    .title { color: #d63333; font-size: 24px; font-weight: bold; margin: 0; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-    .info-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .info-box h3 { margin: 0 0 10px 0; color: #0b4b8a; font-size: 16px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
-    .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-    .label { font-weight: 600; color: #64748b; }
-    
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 13px; }
-    th { background-color: #0b4b8a; color: white; font-weight: 600; }
-    tr:nth-child(even) { background-color: #f1f5f9; }
-    
-    .total-box { display: flex; justify-content: flex-end; }
-    .total-content { background: #e0f2fe; padding: 15px 30px; border-radius: 8px; border: 1px solid #7dd3fc; }
-    .total-row { display: flex; justify-content: space-between; gap: 40px; font-size: 18px; font-weight: bold; color: #0369a1; }
-    
-    .footer-sigs { display: flex; justify-content: space-between; margin-top: 60px; padding: 0 20px; }
-    .sig-line { width: 200px; border-top: 1px solid #64748b; text-align: center; padding-top: 5px; font-weight: 600; font-size: 14px; color: #334155; }
-    
-    .footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-    
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 12mm 12mm;
+    }
+
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .container { border: none; padding: 0; }
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .hide-on-print {
+        display: none !important;
+      }
+      .invoice-container {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        box-shadow: none !important;
+      }
+    }
+
+    .invoice-container {
+      width: 100%;
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 16px 20px;
+      background: #ffffff;
+    }
+
+    /* Top Title Bar */
+    .invoice-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+    }
+    .banner-title {
+      font-size: 16pt;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+    .banner-subtitle {
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Header section */
+    .header-grid {
+      display: grid;
+      grid-template-columns: ${logoUrl ? '140px 1fr 220px' : '1fr 220px'};
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: start;
+    }
+
+    ${logoUrl ? `
+    .logo-box {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .logo-img {
+      max-width: 130px;
+      max-height: 80px;
+      object-fit: contain;
+    }
+    ` : ''}
+
+    .company-box {
+      font-size: 9pt;
+      line-height: 1.45;
+    }
+    .company-name {
+      font-size: 14pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .company-address {
+      color: #334155;
+      font-size: 8.8pt;
+      margin-bottom: 3px;
+    }
+    .company-tax-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 8.5pt;
+      color: #1e293b;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    .tax-badge {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .metadata-card {
+      border: 1.5px solid #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .metadata-card-header {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-align: center;
+      padding: 4px 8px;
+      letter-spacing: 0.5px;
+    }
+    .metadata-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+    }
+    .metadata-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .metadata-table tr:last-child td {
+      border-bottom: none;
+    }
+    .meta-label {
+      font-weight: 600;
+      color: #475569;
+      width: 45%;
+    }
+    .meta-value {
+      font-weight: 700;
+      color: #0f172a;
+      text-align: right;
+    }
+
+    /* Bill To section */
+    .bill-to-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .bill-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: #fafafa;
+    }
+    .bill-box-title {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3px;
+    }
+    .client-name {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+    .client-detail {
+      font-size: 8.5pt;
+      color: #334155;
+      line-height: 1.4;
+    }
+
+    /* Table styling */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 8.5pt;
+    }
+    .items-table th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 7px 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .items-table td {
+      padding: 7px 8px;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+      vertical-align: top;
+    }
+    .items-table tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-semibold { font-weight: 600; }
+    .font-bold { font-weight: 700; }
+
+    /* Summary & Financial section */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: start;
+    }
+
+    .words-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      font-size: 8.5pt;
+    }
+    .words-title {
+      font-weight: 700;
+      color: #475569;
+      font-size: 8pt;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .words-value {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 9.5pt;
+    }
+
+    .financial-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 8.8pt;
+    }
+    .financial-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .financial-table tr:last-child td {
+      border-bottom: none;
+    }
+    .fin-label { font-weight: 600; color: #475569; }
+    .fin-val { text-align: right; font-weight: 700; color: #0f172a; }
+    .grand-total-row {
+      background: #0f172a !important;
+      color: #ffffff !important;
+    }
+    .grand-total-row td {
+      color: #ffffff !important;
+      font-size: 10.5pt !important;
+      padding: 8px 10px !important;
+    }
+
+    /* Bank Details & Terms */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .info-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 8.2pt;
+      background: #ffffff;
+    }
+    .info-card-title {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+    .bank-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .terms-list {
+      padding-left: 14px;
+      margin: 0;
+      line-height: 1.45;
+      color: #334155;
+    }
+    .terms-list li {
+      margin-bottom: 3px;
+    }
+
+    /* Signature footer */
+    .footer-signatures {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 28px;
+      padding-top: 10px;
+    }
+    .sig-box {
+      text-align: center;
+      width: 200px;
+    }
+    .sig-line {
+      border-top: 1.5px dashed #475569;
+      margin-bottom: 6px;
+    }
+    .sig-title {
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .sig-subtitle {
+      font-size: 7.8pt;
+      color: #64748b;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-left">
-        ${logoHtml}
-        <div>
-          <h1 class="title">${warehouseName}</h1>
-          <div style="color: #64748b; font-size: 14px;">${userDetails?.address || (isGu ? 'કોલ્ડ સ્ટોરેજ વિભાગ' : 'Cold Storage Division')}</div>
+  <div class="invoice-container">
+    <!-- Top Banner -->
+    <div class="invoice-banner">
+      <div class="banner-title">Tax Invoice</div>
+      <div class="banner-subtitle">Cold Storage & Warehousing Services</div>
+    </div>
+
+    <!-- Header Grid -->
+    <div class="header-grid">
+      ${logoUrl ? `
+      <div class="logo-box">
+        <img src="${logoUrl}" alt="Warehouse Logo" class="logo-img" />
+      </div>
+      ` : ''}
+      <div class="company-box">
+        <div class="company-name">${warehouseName}</div>
+        <div class="company-address">${warehouseAddress}</div>
+        ${(refPersonMobile || refPersonEmail) ? `
+          <div class="company-address">
+            ${refPersonMobile ? `<strong>Mobile:</strong> ${refPersonMobile}` : ''}
+            ${(refPersonMobile && refPersonEmail) ? ' | ' : ''}
+            ${refPersonEmail ? `<strong>Email:</strong> ${refPersonEmail}` : ''}
+          </div>
+        ` : ''}
+        <div class="company-tax-info">
+          ${warehouseGstin ? `<span class="tax-badge"><strong>GSTIN:</strong> ${warehouseGstin}</span>` : ''}
+          ${warehousePan ? `<span class="tax-badge"><strong>PAN:</strong> ${warehousePan}</span>` : ''}
         </div>
       </div>
-      <div class="header-right">
-        <h2 style="margin: 0; color: #0b4b8a;">${isGu ? 'ઇનવોઇસ' : 'INVOICE'}</h2>
-        <div style="font-weight: bold; font-size: 16px;">#${invoiceNo}</div>
-        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">${isGu ? 'તારીખ' : 'Date'}: ${generatedDate}</div>
+      <div class="metadata-card">
+        <div class="metadata-card-header">INVOICE DETAILS</div>
+        <table class="metadata-table">
+          <tr>
+            <td class="meta-label">Invoice No:</td>
+            <td class="meta-value">${invoiceNo}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">Invoice Date:</td>
+            <td class="meta-value">${invoiceDateStr}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">Storage Period:</td>
+            <td class="meta-value" style="font-size: 7.8pt;">${storagePeriod}</td>
+          </tr>
+        </table>
       </div>
     </div>
-    
-    <div class="info-grid">
-      <div class="info-box">
-        <h3>${isGu ? 'ગ્રાહક ની વિગત' : 'Client Details'}</h3>
-        <div class="row"><span class="label">${isGu ? 'નામ' : 'Name'}:</span> <span>${clientName}</span></div>
-        <div class="row"><span class="label">${isGu ? 'મોબાઇલ' : 'Mobile'}:</span> <span>${clientMobile}</span></div>
+
+    <!-- Bill To Section -->
+    <div class="bill-to-section">
+      <div class="bill-box">
+        <div class="bill-box-title">Bill To (Customer Details)</div>
+        <div class="client-name">${customerName}</div>
+        <div class="client-detail">${customerAddress}</div>
+        ${customerContact ? `<div class="client-detail"><strong>Mobile:</strong> ${customerContact}</div>` : ''}
       </div>
-      <div class="info-box">
-        <h3>${isGu ? 'બિલિંગ સમયગાળો' : 'Billing Period'}</h3>
-        <div class="row"><span class="label">${isGu ? 'થી તારીખ' : 'From Date'}:</span> <span>${fromDate}</span></div>
-        <div class="row"><span class="label">${isGu ? 'સુધી તારીખ' : 'To Date'}:</span> <span>${toDate}</span></div>
+      <div class="bill-box">
+        <div class="bill-box-title">Tax Registration Details</div>
+        <div class="client-detail" style="margin-top: 4px;">
+          <strong>GSTIN:</strong> ${customerGstin || 'Unregistered / NA'}
+        </div>
+        <div class="client-detail" style="margin-top: 4px;">
+          <strong>PAN:</strong> ${customerPan || 'NA'}
+        </div>
+        <div class="client-detail" style="margin-top: 4px;">
+          <strong>Place of Supply:</strong> ${client?.state || 'State Jurisdiction'}
+        </div>
       </div>
     </div>
-    
-    <table>
+
+    <!-- Items Table -->
+    <table class="items-table">
       <thead>
         <tr>
-          <th width="5%">${isGu ? 'ક્રમ' : 'No.'}</th>
-          <th width="15%">${isGu ? 'માલ' : 'Commodity'}</th>
-          <th width="10%">${isGu ? 'આવક' : 'Inward'}<br/><small>(Kg)</small></th>
-          <th width="10%">${isGu ? 'જાવક' : 'Outward'}<br/><small>(Kg)</small></th>
-          <th width="10%">${isGu ? 'બેલેન્સ' : 'Balance'}<br/><small>(Kg)</small></th>
-          <th width="12%">${isGu ? 'આવક તારીખ' : 'Inward Date'}</th>
-          <th width="12%">${isGu ? 'જાવક તારીખ' : 'Outward Date'}</th>
-          <th width="8%">${isGu ? 'દિવસ' : 'Days'}</th>
-          <th width="10%" style="text-align: right;">${isGu ? 'રકમ' : 'Amount'}</th>
+          <th style="width: 30px;" class="text-center">#</th>
+          <th>Commodity / Description</th>
+          <th class="text-center" style="width: 75px;">Inward</th>
+          <th class="text-center" style="width: 75px;">Outward</th>
+          <th class="text-right" style="width: 80px;">Qty (Kg)</th>
+          <th class="text-center" style="width: 55px;">Bags</th>
+          <th class="text-right" style="width: 75px;">Rate (₹)</th>
+          <th class="text-right" style="width: 90px;">Amount (₹)</th>
         </tr>
       </thead>
       <tbody>
-        ${itemsHtml}
+        ${lineItems.map((item: any) => `
+          <tr>
+            <td class="text-center font-semibold">${item.srNo}</td>
+            <td>
+              <div class="font-bold">${item.commodityName}</div>
+              ${item.calculationPath ? `<div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">${item.calculationPath}</div>` : ''}
+            </td>
+            <td class="text-center">${item.inwardDate}</td>
+            <td class="text-center">${item.outwardDate}</td>
+            <td class="text-right font-semibold">${formatNumber(item.inwardKg, 2)}</td>
+            <td class="text-center font-semibold">${item.totalBags}</td>
+            <td class="text-right">${item.rate > 0 ? formatNumber(item.rate, 2) : 'Variable'}</td>
+            <td class="text-right font-bold">${formatCurrency(item.subtotal, false)}</td>
+          </tr>
+        `).join('')}
+
+        ${additionalCharges.map((chg: any, idx: number) => `
+          <tr style="background: #fff9f5;">
+            <td class="text-center font-semibold">${lineItems.length + idx + 1}</td>
+            <td colspan="6">
+              <div class="font-bold" style="color: #c2410c;">Additional Charge: ${chg.name}</div>
+            </td>
+            <td class="text-right font-bold" style="color: #c2410c;">${formatCurrency(Number(chg.amount || 0), false)}</td>
+          </tr>
+        `).join('')}
+
+        ${(lineItems.length === 0 && additionalCharges.length === 0) ? `
+          <tr>
+            <td colspan="9" class="text-center" style="padding: 16px; color: #64748b;">No billing items recorded.</td>
+          </tr>
+        ` : ''}
       </tbody>
     </table>
-    
-    ${additionalChargesHtml}
-    
-    <div class="total-box">
-      <div class="total-content">
-        <div class="total-row">
-          <span>${isGu ? 'કુલ રકમ' : 'Total Amount'}:</span>
-          <span>₹${fNum((invoice.totalAmount || 0).toFixed(2))}</span>
-        </div>
+
+    <!-- Summary Section -->
+    <div class="summary-grid">
+      <div class="words-box">
+        <div class="words-title">Amount in Words</div>
+        <div class="words-value">${amountInWords(netAmount)}</div>
+      </div>
+      <div>
+        <table class="financial-table">
+          <tr>
+            <td class="fin-label">Storage Rent Subtotal:</td>
+            <td class="fin-val">${formatCurrency(rentTotal, false)}</td>
+          </tr>
+          ${additionalCharges.length > 0 ? `
+          <tr>
+            <td class="fin-label">Additional Charges:</td>
+            <td class="fin-val">${formatCurrency(additionalTotal, false)}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td class="fin-label">Basic Total:</td>
+            <td class="fin-val">${formatCurrency(basicTotal, false)}</td>
+          </tr>
+          ${Math.abs(roundOff) > 0.001 ? `
+          <tr>
+            <td class="fin-label">Round Off:</td>
+            <td class="fin-val">${roundOff >= 0 ? `+${formatCurrency(roundOff, false)}` : formatCurrency(roundOff, false)}</td>
+          </tr>
+          ` : ''}
+          <tr class="grand-total-row">
+            <td class="fin-label">NET AMOUNT PAYABLE:</td>
+            <td class="fin-val">${formatCurrency(netAmount, true)}</td>
+          </tr>
+        </table>
       </div>
     </div>
-    
-    <div class="footer-sigs">
-      <div class="sig-line">${isGu ? 'ગ્રાહકની સહી' : 'Customer Signature'}</div>
-      <div class="sig-line">${isGu ? 'અધિકૃત સહી' : 'Authorized Signatory'}</div>
+
+    <!-- Bank Details & Terms -->
+    <div class="bottom-grid">
+      <div class="info-card">
+        <div class="info-card-title">Bank Account Details</div>
+        ${bankName ? `
+          <div class="bank-row"><span><strong>Bank Name:</strong></span> <span>${bankName}</span></div>
+          <div class="bank-row"><span><strong>A/c Number:</strong></span> <span>${accountNo || 'N/A'}</span></div>
+          <div class="bank-row"><span><strong>IFSC Code:</strong></span> <span>${ifscCode || 'N/A'}</span></div>
+          <div class="bank-row"><span><strong>Branch:</strong></span> <span>${branch || 'N/A'}</span></div>
+        ` : `
+          <div style="color: #64748b; font-style: italic;">Bank details available upon request.</div>
+        `}
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">Terms & Conditions</div>
+        ${(() => {
+          const termsText = (warehouse?.termsAndConditions || userDetails?.termsAndConditions || '').trim();
+          if (!termsText) return '';
+          const lines = termsText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+          if (lines.length > 1) {
+            return `
+              <ol class="terms-list" style="margin: 0; padding-left: 14px;">
+                ${lines.map((line: string) => `<li>${line.replace(/^[0-9]+[\.\)\-]\s*/, '')}</li>`).join('')}
+              </ol>
+            `;
+          }
+          return `<div style="font-size: 8.5pt; color: #334155; white-space: pre-line; line-height: 1.4;">${termsText}</div>`;
+        })()}
+      </div>
     </div>
-    
-    <div class="footer">
-      ${isGu ? 'આ કમ્પ્યુટર દ્વારા બનાવેલ ઇન્વોઇસ છે.' : 'This is a computer generated invoice.'}<br/>
-      ${warehouseName}
+
+    <!-- Signatures -->
+    <div class="footer-signatures">
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-title">Depositor / Customer Signature</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-title">For ${warehouseName}</div>
+        <div class="sig-subtitle">Authorized Signatory</div>
+      </div>
     </div>
   </div>
-  
-  <script>
-    window.onload = function() {
-      setTimeout(() => window.print(), 500);
-    };
-  </script>
 </body>
 </html>
   `;
 }
+

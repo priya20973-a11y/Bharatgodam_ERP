@@ -525,7 +525,7 @@ export async function createColdInward(data: any) {
     let warning;
 
     if (data.quantityKg > maxAllowedCapacity) {
-      return { success: false, error: 'Maximum capacity exceeded.' };
+      return { success: false, error: 'Allocation quantity cannot exceed available weight.' };
     }
 
     if (data.quantityKg > availableStackCapacity && data.quantityKg <= maxAllowedCapacity) {
@@ -679,7 +679,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         const newTotalWeight = currentStackWeight + (Number(stack.allocatedWeight) || 0);
         
         if (newTotalWeight > maxAllowedCapacity) {
-          return { success: false, error: 'Maximum capacity exceeded.' };
+          return { success: false, error: 'Allocation quantity cannot exceed available weight.' };
         }
 
         if (newTotalWeight > availableStackCapacity && newTotalWeight <= maxAllowedCapacity) {

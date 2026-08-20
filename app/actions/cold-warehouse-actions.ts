@@ -61,6 +61,7 @@ export async function createColdWarehouse(data: {
   noOfStacks: number;
   sameFloorsPerChamber?: boolean;
   sameStacksPerFloor?: boolean;
+  sameStackLayoutPerFloor?: boolean;
   stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
   chamberFloorsConfig?: number[];
   floorStacksConfig?: Record<string, number>;
@@ -76,6 +77,7 @@ export async function createColdWarehouse(data: {
   gstin?: string;
   bankDetails?: any;
   warehouseLogo?: string;
+  termsAndConditions?: string;
   chamberNames?: string[];
   floorNames?: string[];
   chamberCustomNames?: Record<number, string>;
@@ -219,6 +221,8 @@ export async function updateColdWarehouse(id: string, data: Partial<{
   gstin: string;
   bankDetails: any;
   warehouseLogo: string;
+  termsAndConditions?: string;
+  sameStackLayoutPerFloor?: boolean;
   chambers: any[];
   floorNames: string[];
   bufferCapacity?: number;
@@ -286,6 +290,12 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     }
     if (data.warehouseLogo && data.warehouseLogo.trim() !== '') {
       warehouse.warehouseLogo = data.warehouseLogo;
+    }
+    if (data.termsAndConditions !== undefined) {
+      warehouse.termsAndConditions = data.termsAndConditions;
+    }
+    if (data.sameStackLayoutPerFloor !== undefined) {
+      warehouse.sameStackLayoutPerFloor = data.sameStackLayoutPerFloor;
     }
     if (data.bufferCapacity !== undefined) warehouse.bufferCapacity = data.bufferCapacity;
     if (data.chambers && Array.isArray(data.chambers)) {

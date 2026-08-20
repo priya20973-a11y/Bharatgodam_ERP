@@ -28,9 +28,9 @@ const wspNavItems: NavItem[] = [
 
 const adminNavItems = [
   { name: 'Cold Storage', href: '/cold/dashboard', icon: LayoutDashboard },
+  { name: 'Invoices', href: '/invoices', icon: Receipt },
   { name: 'User Management', href: '/dashboard/settings/users', icon: UserCheck },
   { name: 'WSP Permissions', href: '/admin/wsp-permissions', icon: Shield },
-  // { name: 'Invoice Download', href: '/admin/invoices', icon: Receipt },
   { name: 'Signup Requests', href: '/admin/signup-requests', icon: Mail },
 ];
 
