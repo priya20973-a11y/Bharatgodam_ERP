@@ -66,7 +66,7 @@ export async function generateColdClientInvoicePreview(
       outwardDate: out.date ? new Date(out.date).toISOString() : null,
       outwardId: out._id ? out._id.toString() : null,
       commodityId: commodity?._id?.toString() || (out.commodityId ? out.commodityId.toString() : null),
-      commodityName: commodity?.name || out.commodityName || 'Commodity',
+      commodityName: commodity?.name || (out as any).commodityName || 'Commodity',
       quantityKg: out.quantityKg || 0,
       outwardKg,
       balanceKg: 0,
@@ -80,12 +80,14 @@ export async function generateColdClientInvoicePreview(
       calculationPath: 'Billed as per outward receipt'
     });
 
-    if ((out as any).gradingCharge) {
-      totalAmount += Number(out.gradingCharge || 0);
+    const outwardAny = out as any;
+
+    if (outwardAny.gradingCharge) {
+      totalAmount += Number(outwardAny.gradingCharge || 0);
     }
 
-    if (Array.isArray(out.additionalCharges)) {
-      for (const ac of out.additionalCharges) totalAmount += Number(ac.amount || 0);
+    if (Array.isArray(outwardAny.additionalCharges)) {
+      for (const ac of outwardAny.additionalCharges) totalAmount += Number(ac.amount || 0);
     }
 
     totalAmount += subtotal;

@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import NextAuthSessionProvider from '@/components/providers/session-provider';
+import ManufacturingSidebar from '@/components/layout/manufacturing-sidebar';
 
 export default async function ManufacturingLayout({
   children,
@@ -23,10 +24,12 @@ export default async function ManufacturingLayout({
 
   return (
     <NextAuthSessionProvider>
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900">
+        <ManufacturingSidebar session={session} />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 w-full">
           {children}
-        </div>
+        </main>
       </div>
     </NextAuthSessionProvider>
   );

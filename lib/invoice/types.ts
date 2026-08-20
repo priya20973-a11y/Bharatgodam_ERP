@@ -34,6 +34,8 @@ export interface InvoiceMetadata {
   invoiceNumber?: string;
   invoiceDate: string; // Format: DD/MM/YYYY
   gstin?: string;
+  storageSummary?: string;
+  warehouseName?: string;
 }
 
 export interface BankDetails {

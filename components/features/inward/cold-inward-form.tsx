@@ -537,7 +537,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                   <p className="text-xs text-slate-500">Enter readings for selected commodity parameters.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {getQualityReadingsForCommodity(selectedCommodity, client.qualityReadings).map((parameter, pIdx) => {
+                  {getQualityReadingsForCommodity(selectedCommodity, client.qualityReadings).map((parameter: any, pIdx: number) => {
                     const currentReading = client.qualityReadings?.[pIdx] || parameter;
                     return (
                       <div key={`${client.id}-quality-${parameter.name}`} className="space-y-2">

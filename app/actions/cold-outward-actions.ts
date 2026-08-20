@@ -264,12 +264,15 @@ export async function createColdOutward(data: any) {
       const invoiceItems = [] as any[];
       const additionalCharges: any[] = [];
 
+      const inwardDoc = outward.inwardId ? await ColdInward.findById(outward.inwardId) : null;
+      const commodityDoc = outward.commodityId ? await ColdCommodity.findById(outward.commodityId) : null;
+
       invoiceItems.push({
         inwardId: outward.inwardId || null,
-        inwardDate: outward.inwardId ? (await ColdInward.findById(outward.inwardId)).then(d => d?.date) : null,
+        inwardDate: inwardDoc?.date || null,
         outwardDate: outward.date,
         commodityId: outward.commodityId,
-        commodityName: (await ColdCommodity.findById(outward.commodityId))?.name || '',
+        commodityName: commodityDoc?.name || '',
         quantityKg: outward.quantityKg || 0,
         outwardKg: outward.quantityKg || 0,
         balanceKg: 0,
@@ -287,8 +290,9 @@ export async function createColdOutward(data: any) {
       if ((outward as any).gradingCharge) {
         additionalCharges.push({ name: 'Grading Charge', amount: Number((outward as any).gradingCharge) || 0 });
       }
-      if ((outward as any).additionalCharges && Array.isArray((outward as any).additionalCharges)) {
-        for (const ac of outward.additionalCharges) {
+      const outwardAny = outward as any;
+      if (outwardAny.additionalCharges && Array.isArray(outwardAny.additionalCharges)) {
+        for (const ac of outwardAny.additionalCharges) {
           additionalCharges.push({ name: ac.name || 'Additional', amount: Number(ac.amount) || 0 });
         }
       }
@@ -441,10 +445,13 @@ export async function createBatchColdOutwards(payload: any) {
       const additionalCharges: any[] = [];
 
       for (const out of createdOutwards) {
-        const commodity = await ColdCommodity.findById(out.commodityId);
+        const commodity = out.commodityId ? await ColdCommodity.findById(out.commodityId) : null;
+        const inwardDoc = out.inwardId ? await ColdInward.findById(out.inwardId) : null;
+        const outwardAny = out as any;
+
         invoiceItems.push({
           inwardId: out.inwardId || null,
-          inwardDate: out.inwardId ? (await ColdInward.findById(out.inwardId)).then(d => d?.date) : null,
+          inwardDate: inwardDoc?.date || null,
           outwardDate: out.date,
           commodityId: out.commodityId,
           commodityName: commodity?.name || '',
@@ -461,11 +468,11 @@ export async function createBatchColdOutwards(payload: any) {
           calculationPath: 'Billed as per outward receipt',
         });
 
-        if ((out as any).gradingCharge) {
-          additionalCharges.push({ name: 'Grading Charge', amount: Number((out as any).gradingCharge) || 0 });
+        if (outwardAny.gradingCharge) {
+          additionalCharges.push({ name: 'Grading Charge', amount: Number(outwardAny.gradingCharge) || 0 });
         }
-        if ((out as any).additionalCharges && Array.isArray((out as any).additionalCharges)) {
-          for (const ac of out.additionalCharges) {
+        if (outwardAny.additionalCharges && Array.isArray(outwardAny.additionalCharges)) {
+          for (const ac of outwardAny.additionalCharges) {
             additionalCharges.push({ name: ac.name || 'Additional', amount: Number(ac.amount) || 0 });
           }
         }

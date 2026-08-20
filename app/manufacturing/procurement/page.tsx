@@ -1,5 +1,5 @@
 import { ClipboardList } from 'lucide-react';
-import ProcurementClient from './ProcurementClient';
+import SupplierMasterClient from './SupplierMasterClient';
 
 export default function ProcurementPage() {
   return (
@@ -10,13 +10,13 @@ export default function ProcurementPage() {
             <ClipboardList className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Procurement</h1>
-            <p className="text-sm text-slate-600">Manage purchase requests and raw-material sourcing flow.</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Procurement Master</h1>
+            <p className="text-sm text-slate-600">Manage supplier/vendor identities for raw material procurement. This entity is distinct from client/customer records.</p>
           </div>
         </div>
       </div>
 
-      <ProcurementClient />
+      <SupplierMasterClient />
     </div>
   );
 }

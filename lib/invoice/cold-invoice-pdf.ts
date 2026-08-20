@@ -37,7 +37,7 @@ export function generateColdInvoiceHTML(
     };
   });
 
-  const basicTotal = lineItems.reduce((s, li) => s + (li.amount || 0), 0);
+  const basicTotal = lineItems.reduce((s: number, li: any) => s + (li.amount || 0), 0);
   const roundOff = Math.round(basicTotal) - basicTotal;
   const netAmount = Math.round(basicTotal);
 
@@ -69,8 +69,9 @@ export function generateColdInvoiceHTML(
       invoiceId: invoice.invoiceId,
       invoiceNo,
       invoiceDate,
+      gstin: warehouse?.gstin || '',
       storageSummary,
-      gstin: warehouse?.gstin || ''
+      warehouseName: warehouse?.name || userDetails?.companyName || ''
     },
     lineItems,
     financial: {
@@ -85,7 +86,8 @@ export function generateColdInvoiceHTML(
       ifscCode: ''
     },
     termsAndConditions: [],
-    authorizedBy: userDetails?.companyName || ''
+    authorizedBy: userDetails?.companyName || '',
+    notes: storageSummary
   };
 
   return generateInvoiceHTML(invoiceData);

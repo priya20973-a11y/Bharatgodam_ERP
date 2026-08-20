@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Calculator, Thermometer } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, Calculator, Thermometer, Upload } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -25,6 +25,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Commodity Master', translationKey: 'sidebar.commodities', href: '/cold/commodities', icon: Package, module: 'commodity' },
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
+  { name: 'Bulk Upload', translationKey: 'sidebar.bulkUpload', href: '/cold/bulk-upload', icon: Upload, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
   { name: 'Invoices', translationKey: 'sidebar.invoices', href: '/cold/invoices', icon: FileText, module: 'invoice' },
   { name: 'Transaction Report', translationKey: 'sidebar.reports', href: '/cold/transactions-report', icon: ClipboardList, module: 'reports' },

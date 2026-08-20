@@ -41,6 +41,7 @@ export interface IColdInward extends Document {
   weighbridgeSlipNo?: string;
   grossWeight?: number;
   emptyWeight?: number;
+  purchaseType?: 'self' | 'purchase';
   kataBharati?: number;
   marko?: string;
   remarks?: string;
@@ -100,6 +101,7 @@ const ColdInwardSchema: Schema = new Schema(
     weighbridgeSlipNo: { type: String, required: false },
     grossWeight: { type: Number, required: false },
     emptyWeight: { type: Number, required: false },
+    purchaseType: { type: String, enum: ['self', 'purchase'], required: false },
     kataBharati: { type: Number, required: false },
     marko: { type: String, required: false },
     remarks: { type: String, required: false },

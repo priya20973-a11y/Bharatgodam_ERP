@@ -2,12 +2,15 @@ import connectToDatabase from '@/lib/mongoose';
 import ColdInvoice from '@/lib/models/ColdInvoice';
 import { requireSession, getTenantFilter } from '@/lib/ownership';
 
-export async function GET(req: Request, { params }: { params: { clientId: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ clientId: string }> }
+) {
   await connectToDatabase();
   try {
     const session = await requireSession();
     const filter = getTenantFilter(session);
-    const clientId = params.clientId;
+    const { clientId } = await params;
     const url = new URL(req.url);
     const warehouseId = url.searchParams.get('warehouseId');
 
