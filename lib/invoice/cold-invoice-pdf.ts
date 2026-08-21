@@ -11,22 +11,22 @@ export function generateColdInvoiceHTML(
   invoice: any,
   client: any,
   warehouse: any,
-  userDetails?: { companyLogo?: string; phoneNumber?: string; companyName?: string; address?: string; coldLanguage?: string; termsAndConditions?: string },
+  userDetails?: { companyLogo?: string; phoneNumber?: string; companyName?: string; address?: string; coldLanguage?: string; termsAndConditions?: string; state?: string; bankDetails?: { bankName?: string, accountNo?: string, ifsc?: string, branch?: string } },
   lang: string = 'en'
 ): string {
-  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || userDetails?.companyLogo || '';
+  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || '';
   const warehouseName = warehouse?.name || userDetails?.companyName || 'Cold Storage Warehouse';
   const warehouseAddress = warehouse?.address || userDetails?.address || '';
   const warehouseGstin = warehouse?.gstin || '';
   const warehousePan = warehouse?.panNo || warehouse?.pan || '';
-  
+
   // Ref persons / Phone / Email for warehouse header
   const refPersonMobile = warehouse?.referencePersons?.[0]?.mobile || userDetails?.phoneNumber || '';
   const refPersonEmail = warehouse?.referencePersons?.[0]?.email || warehouse?.userEmail || '';
 
   // Invoice Number & Dates
   const invoiceNo = invoice.invoiceId || invoice.invoiceNo || (invoice._id ? `CIN-${String(invoice._id).slice(-6).toUpperCase()}` : 'CIN-000000');
-  
+
   const rawDate = invoice.createdAt || invoice.generatedAt || invoice.date;
   const invoiceDateStr = rawDate ? format(new Date(rawDate), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy');
 
@@ -68,7 +68,21 @@ export function generateColdInvoiceHTML(
     const totalBags = Number(it.totalBags || it.bagsCount || (it.bagsLarge || 0) + (it.bagsSmall || 0) + (it.bagsMixed || 0));
     const days = Number(it.days || 0);
     const subtotal = Number(it.subtotal || it.amount || 0);
-    const rate = Number(it.rateApplied || it.rate || 0);
+    let rate = Number(it.rateApplied || it.rate || 0);
+
+    // Fallback: infer rate for legacy invoices that did not save rateApplied
+    if (rate === 0 && subtotal > 0) {
+      if (outKg > 0 && Math.abs((subtotal / outKg) * outKg - subtotal) < 0.01) {
+        rate = Number((subtotal / outKg).toFixed(4));
+      } else if (totalBags > 0 && Math.abs((subtotal / totalBags) * totalBags - subtotal) < 0.01) {
+        rate = Number((subtotal / totalBags).toFixed(4));
+      }
+    }
+
+    let isInterState = false;
+
+    const wState = warehouse?.state?.toLowerCase().trim() || userDetails?.state?.toLowerCase().trim() || '';
+    const bState = (invoice.billingState && invoice.billingState !== 'null_val');
 
     return {
       srNo: idx + 1,
@@ -91,10 +105,55 @@ export function generateColdInvoiceHTML(
   const additionalCharges = Array.isArray(invoice.additionalCharges) ? invoice.additionalCharges : [];
   const rentTotal = lineItems.reduce((sum: number, item: any) => sum + item.subtotal, 0);
   const additionalTotal = additionalCharges.reduce((sum: number, chg: any) => sum + (Number(chg.amount) || 0), 0);
-  
+
   const basicTotal = rentTotal + additionalTotal;
-  const netAmount = Math.round(basicTotal);
-  const roundOff = netAmount - basicTotal;
+
+  // GST Calculation (matching Dry Storage logic)
+  const companyGst = warehouseGstin.trim().toUpperCase();
+  const taxGroup = invoice.taxGroup || 'Non-GST Supply';
+  const gstRateMatch = taxGroup.match(/\d+/);
+  const gstRate = gstRateMatch ? Number(gstRateMatch[0]) : 0;
+
+  let cgstAmount = 0;
+  let sgstAmount = 0;
+  let igstAmount = 0;
+  let totalTaxAmount = 0;
+  const halfRate = gstRate / 2;
+
+  const hasValidGst = companyGst && companyGst !== 'NA' && companyGst !== 'UNREGISTERED' && !companyGst.includes('UNREGISTERED');
+  
+  if (gstRate > 0 && hasValidGst) {
+    totalTaxAmount = (basicTotal * gstRate) / 100;
+
+    let isInterState = false;
+
+    const wState = warehouse?.state?.toLowerCase().trim() || userDetails?.state?.toLowerCase().trim() || '';
+    const bState = (invoice.billingState && invoice.billingState !== 'null_val')
+      ? invoice.billingState.toLowerCase().trim()
+      : (client?.state?.toLowerCase().trim() || '');
+
+    if (wState && bState) {
+      isInterState = wState !== bState;
+    } else if (customerGstin && customerGstin.trim().toUpperCase() !== 'NA' && companyGst && companyGst !== 'NA') {
+      isInterState = customerGstin.substring(0, 2) !== companyGst.substring(0, 2);
+    }
+
+    if (isInterState) {
+      igstAmount = totalTaxAmount;
+    } else {
+      cgstAmount = totalTaxAmount / 2;
+      sgstAmount = totalTaxAmount / 2;
+    }
+  }
+
+  const adjustment = Number(invoice.adjustment) || 0;
+  const finalTotal = basicTotal + totalTaxAmount + adjustment;
+  const netAmount = finalTotal;
+  const roundOff = 0;
+
+  const cgstLabel = `CGST${halfRate} (${halfRate}%)`;
+  const sgstLabel = `SGST${halfRate} (${halfRate}%)`;
+  const igstLabel = `IGST${gstRate} (${gstRate}%)`;
 
   // Bank Details
   const bankName = warehouse?.bankDetails?.bankName || '';
@@ -510,18 +569,6 @@ export function generateColdInvoiceHTML(
         <div class="client-detail">${customerAddress}</div>
         ${customerContact ? `<div class="client-detail"><strong>Mobile:</strong> ${customerContact}</div>` : ''}
       </div>
-      <div class="bill-box">
-        <div class="bill-box-title">Tax Registration Details</div>
-        <div class="client-detail" style="margin-top: 4px;">
-          <strong>GSTIN:</strong> ${customerGstin || 'Unregistered / NA'}
-        </div>
-        <div class="client-detail" style="margin-top: 4px;">
-          <strong>PAN:</strong> ${customerPan || 'NA'}
-        </div>
-        <div class="client-detail" style="margin-top: 4px;">
-          <strong>Place of Supply:</strong> ${client?.state || 'State Jurisdiction'}
-        </div>
-      </div>
     </div>
 
     <!-- Items Table -->
@@ -534,7 +581,7 @@ export function generateColdInvoiceHTML(
           <th class="text-center" style="width: 75px;">Outward</th>
           <th class="text-right" style="width: 80px;">Qty (Kg)</th>
           <th class="text-center" style="width: 55px;">Bags</th>
-          <th class="text-right" style="width: 75px;">Rate (₹)</th>
+          <th class="text-right" style="width: 75px;">Rate (₹)/KG</th>
           <th class="text-right" style="width: 90px;">Amount (₹)</th>
         </tr>
       </thead>
@@ -595,6 +642,30 @@ export function generateColdInvoiceHTML(
             <td class="fin-label">Basic Total:</td>
             <td class="fin-val">${formatCurrency(basicTotal, false)}</td>
           </tr>
+          ${cgstAmount > 0 ? `
+          <tr>
+            <td class="fin-label">${cgstLabel}:</td>
+            <td class="fin-val">${formatCurrency(cgstAmount, false)}</td>
+          </tr>
+          ` : ''}
+          ${sgstAmount > 0 ? `
+          <tr>
+            <td class="fin-label">${sgstLabel}:</td>
+            <td class="fin-val">${formatCurrency(sgstAmount, false)}</td>
+          </tr>
+          ` : ''}
+          ${igstAmount > 0 ? `
+          <tr>
+            <td class="fin-label">${igstLabel}:</td>
+            <td class="fin-val">${formatCurrency(igstAmount, false)}</td>
+          </tr>
+          ` : ''}
+          ${adjustment !== 0 ? `
+          <tr>
+            <td class="fin-label">Adjustment:</td>
+            <td class="fin-val">${adjustment >= 0 ? `+${formatCurrency(adjustment, false)}` : formatCurrency(adjustment, false)}</td>
+          </tr>
+          ` : ''}
           ${Math.abs(roundOff) > 0.001 ? `
           <tr>
             <td class="fin-label">Round Off:</td>
@@ -625,18 +696,18 @@ export function generateColdInvoiceHTML(
       <div class="info-card">
         <div class="info-card-title">Terms & Conditions</div>
         ${(() => {
-          const termsText = (warehouse?.termsAndConditions || userDetails?.termsAndConditions || '').trim();
-          if (!termsText) return '';
-          const lines = termsText.split('\n').map((l: string) => l.trim()).filter(Boolean);
-          if (lines.length > 1) {
-            return `
+      const termsText = (warehouse?.termsAndConditions || userDetails?.termsAndConditions || '').trim();
+      if (!termsText) return '';
+      const lines = termsText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+      if (lines.length > 1) {
+        return `
               <ol class="terms-list" style="margin: 0; padding-left: 14px;">
                 ${lines.map((line: string) => `<li>${line.replace(/^[0-9]+[\.\)\-]\s*/, '')}</li>`).join('')}
               </ol>
             `;
-          }
-          return `<div style="font-size: 8.5pt; color: #334155; white-space: pre-line; line-height: 1.4;">${termsText}</div>`;
-        })()}
+      }
+      return `<div style="font-size: 8.5pt; color: #334155; white-space: pre-line; line-height: 1.4;">${termsText}</div>`;
+    })()}
       </div>
     </div>
 

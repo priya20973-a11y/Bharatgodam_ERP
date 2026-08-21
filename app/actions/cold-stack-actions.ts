@@ -42,9 +42,8 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     ]
   };
 
-  const activeInwards = await ColdInward.find({
+  const allStackInwards = await ColdInward.find({
     warehouseId: new mongoose.Types.ObjectId(warehouseId),
-    status: { $in: ['Active', 'Partial'] },
     'stackAllocations': {
       $elemMatch: {
         $or: [
@@ -58,7 +57,7 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     ...getTenantFilter(session)
   })
     .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name')
+    .populate('commodityId', 'name type')
     .lean();
 
   const outwardCriteria = {
@@ -76,14 +75,82 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     ]
   };
 
-  const outwardsDocs = await ColdOutward.find(outwardCriteria).lean();
+  const outwardsDocs = await ColdOutward.find(outwardCriteria)
+    .populate('clientId', 'name clientType')
+    .populate('commodityId', 'name type')
+    .populate({
+      path: 'inwardId',
+      populate: [
+        { path: 'clientId', select: 'name clientType' },
+        { path: 'commodityId', select: 'name type' }
+      ]
+    })
+    .lean();
 
-  const outwardMap = new Map();
+  const allInwardsMap = new Map<string, any>();
+  allStackInwards.forEach(inward => allInwardsMap.set(inward._id.toString(), inward));
+
+  const missingInwardIds: mongoose.Types.ObjectId[] = [];
   outwardsDocs.forEach((o: any) => {
     if (o.inwardId) {
-      const idStr = o.inwardId.toString();
-      const current = outwardMap.get(idStr) || 0;
-      outwardMap.set(idStr, current + o.quantityKg);
+      const inwardObj = typeof o.inwardId === 'object' ? o.inwardId : null;
+      const inwardIdStr = (inwardObj?._id || o.inwardId).toString();
+      if (inwardObj && inwardObj._id) {
+        allInwardsMap.set(inwardIdStr, inwardObj);
+      } else if (!allInwardsMap.has(inwardIdStr)) {
+        missingInwardIds.push(new mongoose.Types.ObjectId(inwardIdStr));
+      }
+    }
+  });
+
+  if (missingInwardIds.length > 0) {
+    const extraInwards = await ColdInward.find({ _id: { $in: missingInwardIds }, ...getTenantFilter(session) })
+      .populate('clientId', 'name clientType')
+      .populate('commodityId', 'name type')
+      .lean();
+    extraInwards.forEach(inward => allInwardsMap.set(inward._id.toString(), inward));
+  }
+
+  const getResolvedClientName = (doc: any, linkedInward?: any): string => {
+    if (linkedInward) {
+      const inwardClient = (linkedInward.clientId as any)?.name || linkedInward.farmerName || linkedInward.referencePersons?.[0]?.name;
+      if (inwardClient && inwardClient !== 'Unknown') return inwardClient;
+    }
+    if (doc) {
+      const docClient = (doc.clientId as any)?.name || doc.farmerName || doc.referencePersons?.[0]?.name;
+      if (docClient && docClient !== 'Unknown') return docClient;
+    }
+    return 'Unknown';
+  };
+
+  const getResolvedCommodityDisplay = (doc: any, linkedInward?: any): string => {
+    const comm = linkedInward?.commodityId || doc?.commodityId;
+    const grade = linkedInward?.grade || doc?.grade;
+    const gradingType = linkedInward?.gradingType || doc?.gradingType;
+    
+    const commName = (comm as any)?.name || 'Unknown';
+    const commType = (comm as any)?.type ? ` (${(comm as any).type})` : '';
+    const gradeOrWet = grade ? `(${grade})` : (gradingType && gradingType !== 'Grading' ? `(${gradingType})` : '');
+    
+    return `${commName}${commType}${gradeOrWet}`;
+  };
+
+  const outwardSummaryMap = new Map<string, { quantityKg: number, bagsCount: number, jin: number, mixed: number, totalBags: number }>();
+  outwardsDocs.forEach((o: any) => {
+    const inwardIdStr = (o.inwardId?._id || o.inwardId)?.toString();
+    if (inwardIdStr) {
+      const current = outwardSummaryMap.get(inwardIdStr) || { quantityKg: 0, bagsCount: 0, jin: 0, mixed: 0, totalBags: 0 };
+      const bags = o.bagsCount || 0;
+      const jin = o.jin || 0;
+      const mixed = o.mixed || 0;
+      const totalBags = o.totalBags || (bags + jin + mixed);
+      outwardSummaryMap.set(inwardIdStr, {
+        quantityKg: current.quantityKg + (o.quantityKg || 0),
+        bagsCount: current.bagsCount + bags,
+        jin: current.jin + jin,
+        mixed: current.mixed + mixed,
+        totalBags: current.totalBags + totalBags
+      });
     }
   });
 
@@ -92,14 +159,9 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
   const entries: any[] = [];
   const activeStocksMap = new Map<string, any>();
   const transactions: any[] = [];
-  
-  // We need to fetch all inwards related to outwards to correctly show outward transactions.
-  const allInwardsMap = new Map<string, any>();
-  activeInwards.forEach(inward => allInwardsMap.set(inward._id.toString(), inward));
 
-  // Fetch previous owners via ColdTransfer
-  const activeInwardIds = activeInwards.map(i => i._id);
-  const transfers = await ColdTransfer.find({ newInwardId: { $in: activeInwardIds } })
+  const inwardIds = allStackInwards.map(i => i._id);
+  const transfers = await ColdTransfer.find({ newInwardId: { $in: inwardIds } })
     .populate('fromClientId', 'name')
     .lean();
     
@@ -110,8 +172,11 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     }
   });
 
-  activeInwards.forEach(inward => {
-    let remainingOutQty = outwardMap.get(inward._id.toString()) || 0;
+  allStackInwards.forEach(inward => {
+    const inwardIdStr = inward._id.toString();
+    const outData = outwardSummaryMap.get(inwardIdStr) || { quantityKg: 0, bagsCount: 0, jin: 0, mixed: 0, totalBags: 0 };
+    
+    let remainingOutQty = outData.quantityKg;
     let stackAllocated = 0;
     let allocBagsCount = 0;
     let stackAvailable = 0;
@@ -135,11 +200,11 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
           occupied += allocAvailable;
           currentStockList.push({
             clientId: inward.clientId?._id?.toString(),
-            clientName: (inward.clientId as any)?.name || 'Unknown',
+            clientName: getResolvedClientName(inward),
             commodityId: inward.commodityId?._id?.toString(),
-            commodityName: (inward.commodityId as any)?.name || 'Unknown',
+            commodityName: getResolvedCommodityDisplay(inward),
             quantity: allocAvailable,
-            unit: inward.unit,
+            unit: inward.unit || 'KG',
             stockType: (inward.clientId as any)?.clientType === 'PURCHASE' ? 'Purchase' : (alloc.stockType || 'Self')
           });
         }
@@ -147,26 +212,23 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     });
 
     if (stackAllocated > 0) {
-      const type = (inward.commodityId as any)?.type ? ` (${(inward.commodityId as any).type})` : '';
-      const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
-      const commodityDisplay = `${(inward.commodityId as any)?.name || 'Unknown'}${type}${gradeOrWet}`;
-      const clientNameDisplay = (inward.clientId as any)?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown';
+      const commodityDisplay = getResolvedCommodityDisplay(inward);
+      const clientNameDisplay = getResolvedClientName(inward);
 
-      // Record inward transaction
       transactions.push({
-        id: inward._id.toString(),
-        date: inward.createdAt || inward.date,
+        id: inwardIdStr,
+        createdAt: inward.createdAt || inward.date,
+        date: inward.date || inward.createdAt,
         type: 'INWARD',
-        receiptNo: inward.weighbridgeSlipNo || (inward as any).receiptNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`,
+        receiptNo: inward.weighbridgeSlipNo || (inward as any).receiptNo || `INW-${inwardIdStr.slice(-6).toUpperCase()}`,
         commodity: commodityDisplay,
         quantity: stackAllocated,
         client: clientNameDisplay
       });
 
       if (stackAvailable > 0) {
-
         entries.push({
-          _id: inward._id.toString(),
+          _id: inwardIdStr,
           receiptNo: (inward as any).receiptNo || inward.weighbridgeSlipNo,
           date: inward.date,
           clientName: clientNameDisplay,
@@ -174,67 +236,52 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
           qrId: inward.qrId,
         });
 
-        // Compute remaining bags for activeStocks
-        // Note: For simplicity, we deduct outQty mostly from quantity. Outward bags deduction requires outward documents check.
-        // We will process outward documents next to accurately update activeStocksMap bags.
-        activeStocksMap.set(inward._id.toString(), {
-          id: inward._id.toString(),
-          client: (inward.clientId as any)?.name || 'Unknown',
+        const remLargeBags = Math.max(0, allocBagsCount - outData.bagsCount);
+        const remSmallBags = Math.max(0, (inward.jin || 0) - outData.jin);
+        const remMixedBags = Math.max(0, (inward.mixed || 0) - outData.mixed);
+        const remTotalBags = Math.max(0, (allocBagsCount + (inward.jin || 0) + (inward.mixed || 0)) - outData.totalBags);
+
+        activeStocksMap.set(inwardIdStr, {
+          id: inwardIdStr,
+          client: clientNameDisplay,
           farmer: inward.farmerName || '-',
           commodity: commodityDisplay,
-          quantity: stackAllocated, // We'll subtract outwards below
+          quantity: stackAvailable,
           truckNo: inward.truckNo || '-',
           date: inward.createdAt || inward.date,
           referencePersons: inward.referencePersons && inward.referencePersons.length > 0 
             ? inward.referencePersons.map((rp: any) => rp.name).join(', ') 
             : '-',
-          previousOwner: previousOwnerMap.get(inward._id.toString()) || '-',
-          largeBags: allocBagsCount || 0,
-          smallBags: inward.jin || 0,
-          mixedBags: inward.mixed || 0,
-          totalBags: (allocBagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0),
+          previousOwner: previousOwnerMap.get(inwardIdStr) || '-',
+          largeBags: remLargeBags,
+          smallBags: remSmallBags,
+          mixedBags: remMixedBags,
+          totalBags: remTotalBags,
         });
       }
     }
   });
 
   outwardsDocs.forEach((outward: any) => {
-    if (outward.inwardId) {
-      const idStr = outward.inwardId.toString();
-      const inward = allInwardsMap.get(idStr);
-      
-      let commodityDisplay = 'Unknown';
-      let clientNameDisplay = 'Unknown';
-      
-      if (inward) {
-        const type = inward.commodityId?.type ? ` (${inward.commodityId.type})` : '';
-        const gradeOrWet = inward.grade ? `(${inward.grade})` : (inward.gradingType && inward.gradingType !== 'Grading' ? `(${inward.gradingType})` : '');
-        commodityDisplay = `${(inward.commodityId as any)?.name || 'Unknown'}${type}${gradeOrWet}`;
-        clientNameDisplay = (inward.clientId as any)?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown';
-      }
+    const inwardIdStr = (outward.inwardId?._id || outward.inwardId)?.toString();
+    const linkedInward = inwardIdStr ? allInwardsMap.get(inwardIdStr) : null;
+    
+    const clientNameDisplay = getResolvedClientName(outward, linkedInward);
+    const commodityDisplay = getResolvedCommodityDisplay(outward, linkedInward);
 
-      transactions.push({
-        id: outward._id.toString(),
-        date: outward.createdAt || outward.date,
-        type: 'OUTWARD',
-        receiptNo: outward.weighbridgeSlipNo || `OUT-${outward._id.toString().slice(-6).toUpperCase()}`,
-        commodity: commodityDisplay,
-        quantity: outward.quantityKg,
-        client: clientNameDisplay
-      });
-
-      if (activeStocksMap.has(idStr)) {
-        const stock = activeStocksMap.get(idStr);
-        stock.quantity -= outward.quantityKg;
-        stock.largeBags -= outward.bagsCount || 0;
-        stock.smallBags -= outward.jin || 0;
-        stock.mixedBags -= outward.mixed || 0;
-        stock.totalBags -= outward.totalBags || ((outward.bagsCount || 0) + (outward.jin || 0) + (outward.mixed || 0));
-      }
-    }
+    transactions.push({
+      id: outward._id.toString(),
+      createdAt: outward.createdAt || outward.date,
+      date: outward.date || outward.createdAt,
+      type: 'OUTWARD',
+      receiptNo: outward.weighbridgeSlipNo || `OUT-${outward._id.toString().slice(-6).toUpperCase()}`,
+      commodity: commodityDisplay,
+      quantity: outward.quantityKg,
+      client: clientNameDisplay
+    });
   });
 
-  transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  transactions.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
 
   // Group currentStockList by Client + Commodity + StockType
   const groupedStock = new Map();

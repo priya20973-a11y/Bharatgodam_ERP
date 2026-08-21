@@ -9,6 +9,24 @@ import { toast } from 'react-hot-toast';
 import { generateColdClientInvoicePreview, saveColdClientInvoice } from '@/app/actions/cold-invoice-actions';
 import { generateColdInvoiceHTML } from '@/lib/invoice/cold-invoice-pdf';
 
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
+  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
+  "Ladakh", "Lakshadweep", "Puducherry"
+];
+
+const TAX_GROUPS = [
+  'Non-GST Supply',
+  'GST 5%',
+  'GST 12%',
+  'GST 18%',
+  'GST 28%',
+];
+
 interface ColdInvoiceGeneratorProps {
   warehouses: any[];
   clients: any[];
@@ -23,6 +41,9 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
   const [outwardDropdownOpen, setOutwardDropdownOpen] = useState(false);
   const [additionalCharges, setAdditionalCharges] = useState<{name: string, amount: number}[]>([]);
   const [outwards, setOutwards] = useState<any[]>([]);
+  const [taxGroup, setTaxGroup] = useState('GST 18%');
+  const [billingState, setBillingState] = useState('');
+  const [adjustment, setAdjustment] = useState<number | undefined>(undefined);
   
   const [preview, setPreview] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -128,45 +149,31 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     const finalTotalAmount = preview.totalAmount + additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
     
     try {
-      const selectedOutwards = outwards.filter(o => selectedOutwardIds.includes(o._id?.toString()));
-      let invoiceFrom = new Date();
-      let invoiceTo = new Date();
-      if (selectedOutwards.length > 0) {
-        const dates = selectedOutwards.map(o => new Date(o.date));
-        invoiceFrom = new Date(Math.min(...dates.map(d => d.getTime())));
-        invoiceTo = new Date(Math.max(...dates.map(d => d.getTime())));
-      }
-
       const savedInvoice = await saveColdClientInvoice({
         warehouseId,
         clientId,
-        fromDate: invoiceFrom,
-        toDate: invoiceTo,
+        fromDate: new Date(Math.min(...preview.items.map((i: any) => new Date(i.inwardDate).getTime()))),
+        toDate: new Date(),
         items: preview.items,
         additionalCharges,
-        totalAmount: finalTotalAmount
+        taxGroup,
+        billingState,
+        adjustment,
+        totalAmount: preview.totalAmount + additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) + (adjustment || 0)
       });
-      
       const client = clients.find(c => c._id === clientId);
       const warehouse = warehouses.find(w => w._id === warehouseId);
       
-      const html = generateColdInvoiceHTML(savedInvoice, client, warehouse, userDetails, userDetails.coldLanguage || 'en');
+      const html = generateColdInvoiceHTML({ ...savedInvoice, taxGroup, billingState, adjustment }, client, warehouse, userDetails, userDetails.coldLanguage || 'en');
       
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      
-      iframe.contentWindow?.document.open();
-      iframe.contentWindow?.document.write(html);
-      iframe.contentWindow?.document.close();
-      
-      setTimeout(() => {
-        if (iframe.contentWindow) {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        }
-        setTimeout(() => document.body.removeChild(iframe), 2000);
-      }, 500);
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.open();
+        newWindow.document.write(html);
+        newWindow.document.close();
+      } else {
+        toast.error('Please allow popups to view the invoice');
+      }
       
       toast.success('Invoice generated successfully');
       setPreview(null);
@@ -177,6 +184,51 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
       setGenerating(false);
     }
   };
+
+  const warehouse = warehouses.find(w => w._id === warehouseId);
+  const client = clients.find(c => c._id === clientId);
+
+  const basicTotal = (preview?.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  
+  const companyGst = warehouse?.gstin?.trim().toUpperCase();
+  const customerGstin = client?.gstin?.trim().toUpperCase();
+  
+  let cgstAmount = 0;
+  let sgstAmount = 0;
+  let igstAmount = 0;
+  let totalTaxAmount = 0;
+  
+  const gstRateMatch = taxGroup.match(/\d+/);
+  const gstRate = gstRateMatch ? Number(gstRateMatch[0]) : 0;
+  
+  const hasValidGst = companyGst && companyGst !== 'NA' && companyGst !== 'UNREGISTERED' && !companyGst.includes('UNREGISTERED');
+  
+  if (gstRate > 0 && hasValidGst) {
+    totalTaxAmount = (basicTotal * gstRate) / 100;
+    
+    let isInterState = false;
+    
+    const wState = warehouse?.state?.toLowerCase().trim() || userDetails?.state?.toLowerCase().trim() || '';
+    const bState = (billingState && billingState !== 'null_val') 
+      ? billingState.toLowerCase().trim() 
+      : (client?.state?.toLowerCase().trim() || '');
+
+    if (wState && bState) {
+      isInterState = wState !== bState;
+    } else if (customerGstin && customerGstin !== 'NA' && companyGst && companyGst !== 'NA') {
+      isInterState = customerGstin.substring(0, 2) !== companyGst.substring(0, 2);
+    }
+    
+    if (isInterState) {
+      igstAmount = totalTaxAmount;
+    } else {
+      cgstAmount = totalTaxAmount / 2;
+      sgstAmount = totalTaxAmount / 2;
+    }
+  }
+  
+  const finalTotal = basicTotal + totalTaxAmount + (adjustment || 0);
+  const netAmount = finalTotal;
 
   return (
     <div className="space-y-6">
@@ -324,7 +376,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
             </div>
             <div className="text-right">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estimated Total</div>
-              <div className="text-2xl font-extrabold text-indigo-700">₹{(preview.totalAmount + additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)).toFixed(2)}</div>
+              <div className="text-2xl font-extrabold text-indigo-700">₹{netAmount.toFixed(2)}</div>
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto pt-6">
@@ -360,9 +412,60 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
             
             {/* Outward selection moved to top dropdown (multi-select) */}
             <div className="mt-6 border-t pt-4">
+              {/* Tax & Adjustment Section (Mimicking Dry Storage) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-white p-4 rounded-lg border border-slate-200">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Billing State (Optional)</label>
+                  <Select value={billingState} onValueChange={setBillingState}>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Select Billing State..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      <SelectItem value="null_val">None / Default</SelectItem>
+                      {INDIAN_STATES.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-600">Tax Group</label>
+                  <Select value={taxGroup} onValueChange={setTaxGroup}>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Select Tax Group..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      {TAX_GROUPS.map((group) => (
+                        <SelectItem key={group} value={group}>
+                          {group}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-slate-200 mt-4 mb-6">
+                {/* Adjustment */}
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-600">Adjustment (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={adjustment ?? ''}
+                    onChange={(e) => setAdjustment(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="e.g. -500 or 1000"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-semibold">Additional Charges</h3>
-                <div className="flex gap-2">
+                <div className="flex gap-4 items-center">
                   <Button variant="outline" size="sm" onClick={() => setAdditionalCharges([...additionalCharges, {name: '', amount: 0}])}>
                     + Add Charge
                   </Button>
@@ -410,12 +513,54 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                   </div>
                 </div>
               ))}
+
+              {/* Tax Summary Breakdown */}
+              {(totalTaxAmount > 0 || (adjustment !== undefined && adjustment !== 0)) && (
+                <div className="mt-4 flex flex-col items-end border-t pt-4 text-sm">
+                  <div className="w-64 space-y-2">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Basic Total:</span>
+                      <span className="font-medium">₹{basicTotal.toFixed(2)}</span>
+                    </div>
+                    {cgstAmount > 0 && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>CGST ({gstRate / 2}%):</span>
+                        <span className="font-medium">₹{cgstAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {sgstAmount > 0 && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>SGST ({gstRate / 2}%):</span>
+                        <span className="font-medium">₹{sgstAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {igstAmount > 0 && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>IGST ({gstRate}%):</span>
+                        <span className="font-medium">₹{igstAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {adjustment !== undefined && adjustment !== 0 && (
+                      <div className="flex justify-between text-slate-600 mt-1">
+                        <span>Adjustment:</span>
+                        <span className="font-medium">
+                          {adjustment > 0 ? '+' : ''}₹{adjustment.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t w-64">
+                    <span>Estimated Total:</span>
+                    <span>₹{netAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
             
           </CardContent>
           <CardFooter className="flex justify-end bg-slate-50 p-4">
             <Button onClick={handleGenerate} disabled={generating} className="bg-indigo-600 hover:bg-indigo-700">
-              {generating ? 'Generating...' : 'Save & Print Invoice'}
+              {generating ? 'Generating...' : 'View/Open Invoice'}
             </Button>
           </CardFooter>
         </Card>

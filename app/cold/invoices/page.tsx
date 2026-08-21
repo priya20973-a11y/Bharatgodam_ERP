@@ -29,6 +29,13 @@ export default async function ColdInvoicesPage() {
     phoneNumber: user?.phoneNumber || session.user.phoneNumber,
     address: user?.address || session.user.warehouseLocation || '',
     coldLanguage: user?.coldLanguage || (session.user as any).coldLanguage || 'en',
+    state: user?.state || (session.user as any).state || '',
+    bankDetails: {
+      bankName: user?.bankName || '',
+      accountNo: user?.bankAccountNumber || '',
+      ifsc: user?.bankIfsc || '',
+      branch: user?.bankBranch || '',
+    },
   };
 
   return (

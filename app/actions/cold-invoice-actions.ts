@@ -100,7 +100,16 @@ export async function generateColdClientInvoicePreview(
       }
     }
 
-    const rateApplied = Number(o.unitRate || o.rateApplied || 0);
+    let rateApplied = Number(o.unitRate || o.rateApplied || 0);
+    if (rateApplied === 0 && rent > 0 && commodity.priceType !== 'Different Price') {
+      const unit = (commodity.unit || 'KG').toUpperCase();
+      const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+      if (isKg && quantityKg > 0) {
+        rateApplied = Number((rent / quantityKg).toFixed(4));
+      } else if (!isKg && totalBags > 0) {
+        rateApplied = Number((rent / totalBags).toFixed(4));
+      }
+    }
 
     items.push({
       outwardId: o._id.toString(),
@@ -165,6 +174,22 @@ export async function saveColdClientInvoice(data: any) {
   }, session);
 
   const invoice = await ColdInvoice.create(doc);
+  
+  // Force update to bypass Mongoose strict mode schema caching in Next.js dev server
+  if (data.taxGroup || data.billingState || data.adjustment !== undefined) {
+    await ColdInvoice.updateOne(
+      { _id: invoice._id }, 
+      { $set: { 
+          taxGroup: data.taxGroup || 'Non-GST Supply', 
+          billingState: data.billingState || '',
+          adjustment: data.adjustment || 0
+        } 
+      }
+    );
+    invoice.taxGroup = data.taxGroup || 'Non-GST Supply';
+    invoice.billingState = data.billingState || '';
+    invoice.adjustment = data.adjustment || 0;
+  }
 
   // Link any referenced outwards to this invoice for traceability
   try {

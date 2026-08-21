@@ -291,7 +291,16 @@ export default function StaffManagement() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {MODULES.map(mod => (
                           <tr key={mod.id}>
-                            <td className="px-4 py-2 text-sm font-medium text-gray-900">{t(`staff.modules.${mod.key}` as any)}</td>
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                              {(() => {
+                                const translated = t(`staff.modules.${mod.key}` as any);
+                                if (translated && !translated.startsWith('staff.modules.')) {
+                                  return translated;
+                                }
+                                if (mod.key === 'stockShifting') return 'Stock Shifting';
+                                return mod.key;
+                              })()}
+                            </td>
                             {ACTIONS.map(act => {
                               const isChecked = !!(formData.permissions[mod.id]?.[act]);
                               return (

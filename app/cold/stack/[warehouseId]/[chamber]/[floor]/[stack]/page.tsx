@@ -170,7 +170,8 @@ export default async function StackDetailsPage({ params }: { params: Promise<{ w
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Created Date</th>
+                  <th className="px-4 py-3 font-medium">Transaction Date</th>
                   <th className="px-4 py-3 font-medium">Type</th>
                   <th className="px-4 py-3 font-medium">Receipt No</th>
                   <th className="px-4 py-3 font-medium text-right">Quantity</th>
@@ -180,7 +181,8 @@ export default async function StackDetailsPage({ params }: { params: Promise<{ w
               <tbody className="divide-y">
                 {data.transactions.map((tItem: any, i: number) => (
                   <tr key={`${tItem.id}-${i}`} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">{new Date(tItem.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{tItem.createdAt ? new Date(tItem.createdAt).toLocaleDateString('en-GB') : '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{tItem.date ? new Date(tItem.date).toLocaleDateString('en-GB') : '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
                         tItem.type === 'INWARD' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'

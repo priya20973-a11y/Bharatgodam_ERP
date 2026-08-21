@@ -20,30 +20,44 @@ export async function getColdOutwards() {
     .populate('warehouseId', 'name warehouseId')
     .sort({ date: -1, createdAt: -1 });
     
-  // Group by batchId
-  const grouped: Record<string, any> = {};
-  const result: any[] = [];
+  const groups: any[] = [];
   
   for (const out of JSON.parse(JSON.stringify(outwards))) {
-    const key = out.batchId || out._id;
-    if (!grouped[key]) {
-      grouped[key] = {
+    let existingGroup = null;
+    
+    if (out.batchId) {
+      existingGroup = groups.find(g => g.batchId === out.batchId);
+    } else {
+      const outTime = new Date(out.createdAt).getTime();
+      existingGroup = groups.find(g => {
+        if (g.batchId) return false;
+        
+        const gClientId = g.clientId?._id?.toString() || g.clientId?.toString();
+        const oClientId = out.clientId?._id?.toString() || out.clientId?.toString();
+        if (gClientId !== oClientId) return false;
+        
+        const gTime = new Date(g.createdAt).getTime();
+        return Math.abs(gTime - outTime) <= 60000;
+      });
+    }
+
+    if (existingGroup) {
+      existingGroup.items.push(out);
+      existingGroup.quantityKg += out.quantityKg;
+      existingGroup.bagsCount += out.bagsCount;
+      existingGroup.isBatch = true;
+    } else {
+      groups.push({
         ...out,
         items: [out],
-        // Aggregate totals for the row display
         quantityKg: out.quantityKg,
         bagsCount: out.bagsCount,
         isBatch: !!out.batchId
-      };
-      result.push(grouped[key]);
-    } else {
-      grouped[key].items.push(out);
-      grouped[key].quantityKg += out.quantityKg;
-      grouped[key].bagsCount += out.bagsCount;
+      });
     }
   }
     
-  return result;
+  return groups;
 }
 
 export async function getStackAvailableClientStock(
@@ -537,7 +551,7 @@ export async function createBatchColdOutwards(payload: any) {
 
       const outward = await ColdOutward.create(appendOwnership({
         ...item,
-        batchId: payload.batchId || payload.batchId,
+        batchId: payload.batchId || batchId,
         date: outDate,
         totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
         rentRs,

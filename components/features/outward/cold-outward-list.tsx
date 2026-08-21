@@ -23,30 +23,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const { t, formatNumber } = useColdTranslation();
 
   const groupedOutwards = useMemo(() => {
-    const groups: any[] = [];
-    outwards.forEach(w => {
-      // Find an existing group where the client is the same and the createdAt time is within 1 minute
-      const wTime = w.createdAt ? new Date(w.createdAt).getTime() : 0;
-      const existingGroup = wTime > 0 ? groups.find(g => {
-        const gClientId = g.clientId?._id?.toString() || g.clientId?.toString();
-        const wClientId = w.clientId?._id?.toString() || w.clientId?.toString();
-        if (gClientId !== wClientId) return false;
-        
-        const gTime = g.createdAt ? new Date(g.createdAt).getTime() : 0;
-        return Math.abs(gTime - wTime) <= 60000;
-      }) : null;
-
-      if (existingGroup && !w.batchId) {
-        existingGroup.items = existingGroup.items || [ { ...existingGroup } ];
-        existingGroup.items.push(...(w.items || [w]));
-        existingGroup.quantityKg += w.quantityKg || 0;
-        existingGroup.bagsCount += w.bagsCount || 0;
-        existingGroup.isBatch = true;
-      } else {
-        groups.push({ ...w, items: w.items ? [...w.items] : undefined });
-      }
-    });
-    return groups;
+    return outwards;
   }, [outwards]);
 
   const exportCsv = () => {

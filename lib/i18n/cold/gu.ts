@@ -562,7 +562,8 @@ export const gu: Dictionary = {
       reports: 'રિપોર્ટ',
       clientMaster: 'ગ્રાહક માસ્ટર',
       floorMapping: 'ફ્લોર મેપિંગ',
-      ownershipTransfer: 'માલિકી બદલી'
+      ownershipTransfer: 'માલિકી બદલી',
+      stockShifting: 'સ્ટોક ફેરબદલ'
     },
     actionsList: {
       view: 'જુઓ',

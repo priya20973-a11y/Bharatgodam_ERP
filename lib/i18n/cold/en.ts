@@ -558,6 +558,7 @@ export const en: Dictionary = {
       clientMaster: 'Client Master',
       floorMapping: 'Floor Mapping',
       ownershipTransfer: 'Ownership Transfer',
+      stockShifting: 'Stock Shifting',
       environmentRecords: 'Cold Environment'
     },
     actionsList: {

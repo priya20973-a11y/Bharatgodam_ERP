@@ -54,7 +54,11 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
       ],
       floorNo,
       ...tenantFilter
-    }).lean();
+    })
+      .populate('clientId', 'name clientType')
+      .populate('commodityId', 'name type')
+      .populate('inwardId')
+      .lean();
 
     // Fetch previous owners via ColdTransfer
     const inwardIds = inwards.map((i: any) => i._id);
@@ -100,10 +104,10 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
     // Map outwards by inwardId -> total outward quantity
     const outwardMap = new Map<string, number>();
     outwards.forEach((o: any) => {
-      if (o.inwardId) {
-        const idStr = o.inwardId.toString();
-        const current = outwardMap.get(idStr) || 0;
-        outwardMap.set(idStr, current + (o.quantityKg || 0));
+      const inwardIdStr = (o.inwardId?._id || o.inwardId)?.toString();
+      if (inwardIdStr) {
+        const current = outwardMap.get(inwardIdStr) || 0;
+        outwardMap.set(inwardIdStr, current + (o.quantityKg || 0));
       }
     });
 
@@ -143,9 +147,9 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
               const receiptNo = inward.weighbridgeSlipNo || `INW-${inwardIdStr.slice(-6).toUpperCase()}`;
               s.receiptNos.add(receiptNo);
               
-              if (inward.farmerName) s.clients.add(inward.farmerName);
-              else if (inward.referencePersons && inward.referencePersons.length > 0) {
-                inward.referencePersons.forEach((rp: any) => s.clients.add(rp.name));
+              const resolvedClientName = inward.clientId?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown';
+              if (resolvedClientName && resolvedClientName !== 'Unknown') {
+                s.clients.add(resolvedClientName);
               }
 
               const type = inward.commodityId?.type ? ` (${inward.commodityId.type})` : '';
@@ -157,7 +161,7 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
 
               s.records.push({
                 inwardId: inwardIdStr,
-                clientName: inward.clientId?.name || 'Unknown',
+                clientName: resolvedClientName,
                 farmerName: inward.farmerName || '-',
                 referencePerson: inward.referencePersons && inward.referencePersons.length > 0 ? inward.referencePersons.map((rp: any) => rp.name).join(', ') : '-',
                 commodity: commodityDisplay,

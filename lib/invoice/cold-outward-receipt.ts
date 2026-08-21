@@ -500,27 +500,27 @@ export function generateColdOutwardReceiptHTML(
         <div class="qty-line">
           <div class="label">${t.qtyLarge}</div>
           <div class="value">${bags}</div>
-          <div class="unit">${unitStr}</div>
+          <div class="unit"></div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtySmall}</div>
           <div class="value">${jin}</div>
-          <div class="unit">${unitStr}</div>
+          <div class="unit"></div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyMixed}</div>
           <div class="value">${mixed}</div>
-          <div class="unit">${unitStr}</div>
+          <div class="unit"></div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyPlusMinus}</div>
           <div class="value">${plusMinusStr}</div>
-          <div class="unit">${unitStr}</div>
+          <div class="unit"></div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyTotal}</div>
           <div class="value">${totalBags}</div>
-          <div class="unit">${unitStr}</div>
+          <div class="unit"></div>
         </div>
         <div class="qty-line">
           <div class="label">${t.qtyOther}</div>

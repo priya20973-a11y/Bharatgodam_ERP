@@ -28,6 +28,9 @@ export interface IColdInvoice extends Document {
   items: IColdInvoiceItem[];
   additionalCharges?: { name: string; amount: number }[];
   totalAmount: number;
+  taxGroup?: string;
+  billingState?: string;
+  adjustment?: number;
   status: 'ACTIVE' | 'PAID' | 'OVERDUE';
   generatedAt: Date;
   userId?: mongoose.Types.ObjectId;
@@ -70,6 +73,9 @@ const ColdInvoiceSchema: Schema = new Schema(
       }
     ],
     totalAmount: { type: Number, default: 0 },
+    taxGroup: { type: String, default: 'Non-GST Supply' },
+    billingState: { type: String, default: '' },
+    adjustment: { type: Number, default: 0 },
     status: { type: String, enum: ['ACTIVE', 'PAID', 'OVERDUE'], default: 'ACTIVE' },
     generatedAt: { type: Date, default: Date.now },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },

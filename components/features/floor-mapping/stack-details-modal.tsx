@@ -233,7 +233,8 @@ export default function StackDetailsModal({ isOpen, onClose, warehouseId, chambe
                   <table className="min-w-full divide-y divide-slate-300">
                     <thead className="bg-slate-100">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">{t('inward.dateHeader')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Created Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Transaction Date</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Type</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">Receipt</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">{t('inward.quantityHeader')}</th>
@@ -243,7 +244,8 @@ export default function StackDetailsModal({ isOpen, onClose, warehouseId, chambe
                     <tbody className="bg-white divide-y divide-slate-200 text-sm text-slate-800 font-medium">
                       {data.transactions.map((tItem: any) => (
                         <tr key={tItem.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 whitespace-nowrap">{new Date(tItem.date).toLocaleDateString('en-GB')}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{tItem.createdAt ? new Date(tItem.createdAt).toLocaleDateString('en-GB') : '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{tItem.date ? new Date(tItem.date).toLocaleDateString('en-GB') : '-'}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
                               tItem.type === 'INWARD' ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'
