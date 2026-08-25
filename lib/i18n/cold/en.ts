@@ -8,7 +8,7 @@ export const en: Dictionary = {
     profile: 'Profile',
     clientMaster: 'Client Master',
     clientLedger: 'Client Ledger',
-    warehouse: 'Warehouse',
+    warehouse: 'Warehouse master',
     commodities: 'Commodities',
     unitMaster: 'Unit Master',
     purchase: 'Purchase',
