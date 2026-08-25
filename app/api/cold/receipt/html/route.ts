@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
               floorNo: floorName,
               stackNo: a.stackNo,
               quantityKg: a.allocatedWeight,
+              bagsCount: a.bagsCount,
               stockType: isPurchaseClient ? 'Purchase' : (a.stockType || 'Self'),
               isStockShifting: isShifted,
             };

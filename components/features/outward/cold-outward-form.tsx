@@ -13,6 +13,7 @@ import { getDynamicUnitLabel } from '@/lib/utils';
 import OutwardQRScannerModal from './outward-qr-scanner-modal';
 import StackQRScannerModal from '@/components/features/inward/stack-qr-scanner-modal';
 import { parseStackQrString, verifyStackMatch, getUniqueInwardStacks, isSingleStackAllocMatch, InwardStackLocation } from '@/lib/utils/stack-qr-parser';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 const formatLocation = (alloc: any, inwardId: string) => {
   const chamber = alloc.chamberName || alloc.chamberNo;
@@ -270,6 +271,69 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       if (code) {
         handleQrScanSuccess(code);
       }
+    } else if (prefillData?.receiptNo) {
+      const fetchByReceipt = async () => {
+        setIsResolvingQr(true);
+        try {
+          const { searchColdInwardByReceipt } = await import('@/app/actions/cold-inward-actions');
+          const inward = await searchColdInwardByReceipt(prefillData.receiptNo);
+          if (inward) {
+            const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
+            const isGradingFromInward = inward.gradingApplied === true;
+
+            const initialStackSelections: Record<string, any> = {};
+            if (inward.stackAllocations && inward.stackAllocations.length > 1) {
+              inward.stackAllocations.forEach((alloc: any) => {
+                const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+                initialStackSelections[allocKey] = {
+                  selected: true,
+                  outwardWeight: alloc.allocatedWeight,
+                  bagsCount: alloc.bagsCount || null,
+                  jin: null,
+                  mixed: null
+                };
+              });
+            }
+
+            const inwardId = inward.uniqueKey || inward._id;
+
+            const newItem = {
+              inwardId,
+              inward,
+              grade: inward.grade || '',
+              bagsCount: inward.bagsCount || null,
+              jin: inward.jin || null,
+              mixed: inward.mixed || null,
+              plusMinus: '-',
+              grossWeight: inward.quantityKg || null,
+              emptyWeight: 0,
+              gradingApplied: isGradingFromInward ? true : false,
+              gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
+              gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
+              verifyStockWithQr: false,
+              verified: false,
+              verifiedStacks: {},
+              verificationError: null,
+              stackSelections: initialStackSelections,
+            };
+
+            setClientId(inward.clientId?._id || inward.clientId);
+            setAvailableInwards(prev => {
+              const exists = prev.some((i: any) => i.uniqueKey === inwardId || i._id === inwardId);
+              return exists ? prev : [inward, ...prev];
+            });
+            setSelectedItems([newItem]);
+            toast.success(`Loaded details for Receipt ${prefillData.receiptNo}`);
+          } else {
+            toast.error('Inward not found or no available stock.');
+          }
+        } catch (error: any) {
+          toast.error(error.message || 'Error loading inward by receipt.');
+        } finally {
+          setIsResolvingQr(false);
+        }
+      };
+      fetchByReceipt();
     }
   }, [prefillData]);
 
@@ -718,7 +782,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                     const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
                     const stackSel = item.stackSelections?.[allocKey] || { selected: false, outwardWeight: alloc.availableQty, bagsCount: alloc.bagsCount, jin: 0, mixed: 0 };
                     const warehouseName = item.inward.warehouseId?.name || 'Warehouse';
-                    const locationLabel = `${warehouseName} → ${alloc.chamberName || `Chamber ${alloc.chamberNo}`} / ${alloc.floorName || `Floor ${alloc.floorNo}`} / ${alloc.stackName || `Stack ${alloc.stackNo}`}`;
+                    const locationLabel = `${warehouseName} → ${alloc.chamberName || formatChamberName(null, alloc.chamberNo)} / ${alloc.floorName || formatFloorName(null, alloc.floorNo)} / ${alloc.stackName || `Stack ${alloc.stackNo}`}`;
 
                     return (
                       <div key={allocKey} className={`p-3 rounded-md border transition-all ${stackSel.selected ? 'bg-white border-indigo-400 shadow-2xs ring-1 ring-indigo-300' : 'bg-slate-50 border-slate-200 opacity-70'}`}>

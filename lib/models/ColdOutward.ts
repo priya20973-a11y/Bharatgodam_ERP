@@ -12,6 +12,7 @@ export interface IColdOutward extends Document {
   clientId: mongoose.Types.ObjectId;
   clientModel?: string;
   commodityId: mongoose.Types.ObjectId;
+  receiptNumber?: string;
   warehouseId: mongoose.Types.ObjectId;
   chamberName: string;
   chamberNo?: number;
@@ -72,6 +73,7 @@ const ColdOutwardSchema: Schema = new Schema(
     clientId: { type: Schema.Types.ObjectId, refPath: 'clientModel', required: true },
     clientModel: { type: String, enum: ['Client', 'ColdWarehouse'], default: 'Client' },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
+    receiptNumber: { type: String, required: false },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     chamberName: { type: String, required: true },
     chamberNo: { type: Number, required: false },

@@ -35,6 +35,7 @@ export interface IColdInward extends Document {
   remainingQuantityKg?: number;
   remainingBagsCount?: number;
   qrId?: string;
+  receiptNumber?: string;
   grade?: string; // Large, Small, Mixed
   gradingType?: string; // Grading, Wet
   gradingApplied?: boolean;
@@ -67,6 +68,9 @@ export interface IColdInward extends Document {
   batchId?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
+  villageName?: string;
+  largeBag?: number;
+  smallBag?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -107,6 +111,7 @@ const ColdInwardSchema: Schema = new Schema(
     remainingQuantityKg: { type: Number, required: false },
     remainingBagsCount: { type: Number, required: false },
     qrId: { type: String, unique: true, sparse: true },
+    receiptNumber: { type: String, required: false },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
     gradingType: { type: String, required: false },
     gradingApplied: { type: Boolean, required: false },
@@ -139,6 +144,9 @@ const ColdInwardSchema: Schema = new Schema(
     batchId: { type: String, required: false },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
+    villageName: { type: String, required: false },
+    largeBag: { type: Number, required: false },
+    smallBag: { type: Number, required: false },
   },
   { timestamps: true }
 );

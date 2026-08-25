@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Package, TrendingUp, AlertTriangle, Building2, Loader2, RefreshCw, ChevronDown } from 'lucide-react';
 import { formatWeight } from '@/lib/utils'; // Make sure this formats Kg properly if needed, usually handles numbers
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 interface CommodityData {
   commodityName: string;
@@ -235,7 +236,7 @@ export default function ColdWarehouseInventory() {
                 <option value="">All Chambers</option>
                 {chambers.map((chamber) => (
                   <option key={chamber.chamberNo} value={chamber.chamberNo}>
-                    {chamber.name || `Chamber ${chamber.chamberNo}`}
+                    {chamber.name || formatChamberName(null, chamber.chamberNo)}
                   </option>
                 ))}
               </select>
@@ -253,7 +254,7 @@ export default function ColdWarehouseInventory() {
                 <option value="">All Floors</option>
                 {floors.map((floor) => (
                   <option key={floor.floorNo} value={floor.floorNo}>
-                    {floor.name || `Floor ${floor.floorNo}`}
+                    {floor.name || formatFloorName(null, floor.floorNo)}
                   </option>
                 ))}
               </select>

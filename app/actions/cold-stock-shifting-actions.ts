@@ -5,6 +5,8 @@ import ColdStockShifting from '@/lib/models/ColdStockShifting';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdOutward from '@/lib/models/ColdOutward';
+import '@/lib/models/Client';
+import '@/lib/models/ColdCommodity';
 import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } from '@/lib/ownership';
 import { hasPermission } from '@/lib/permissions';
 import { revalidatePath } from 'next/cache';

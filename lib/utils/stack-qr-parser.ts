@@ -1,3 +1,4 @@
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 export interface ParsedStackQr {
   warehouseId: string | null;
   chamber: string;
@@ -93,8 +94,8 @@ export function getUniqueInwardStacks(inwardItem: any): InwardStackLocation[] {
     const key = `${cClean}_${fClean}_${sClean}`;
 
     if (!map.has(key)) {
-      const displayChamber = (typeof cName === 'string' && cName.toLowerCase().startsWith('chamber')) ? cName : `Chamber ${cName}`;
-      const displayFloor = (typeof fNo === 'string' && fNo.toLowerCase().startsWith('floor')) ? fNo : `Floor ${fNo}`;
+      const displayChamber = (typeof cName === 'string' && cName.toLowerCase().startsWith('chamber')) ? cName : formatChamberName(null, cName);
+      const displayFloor = (typeof fNo === 'string' && fNo.toLowerCase().startsWith('floor')) ? fNo : formatFloorName(null, fNo);
       const displayStack = (typeof sNo === 'string' && sNo.toLowerCase().startsWith('stack')) ? sNo : `Stack ${sNo}`;
 
       map.set(key, {

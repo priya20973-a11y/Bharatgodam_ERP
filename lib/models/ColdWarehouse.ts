@@ -1,5 +1,13 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface IReceiptConfig {
+  numberingType: 'GLOBAL' | 'CHAMBER_WISE';
+  prefix?: string;
+  startingNumber: number;
+  numberPadding?: number;
+  suffix?: string;
+}
+
 export interface IReferencePerson {
   name: string;
   mobile: string;
@@ -73,6 +81,13 @@ export interface IColdWarehouse extends Document {
   gridCols?: number;
   customLayout?: ICustomStackMapping[];
 
+  // Receipt Numbering Configuration
+  receiptConfig?: {
+    inward: IReceiptConfig;
+    outward: IReceiptConfig;
+    invoice: IReceiptConfig;
+  };
+
   referencePersons: IReferencePerson[];
   status: 'ACTIVE' | 'INACTIVE';
   chambers: IColdChamber[];
@@ -144,6 +159,30 @@ const ColdWarehouseSchema: Schema = new Schema(
     chamberFloorsConfig: [Number],
     floorStacksConfig: { type: Schema.Types.Mixed, required: false },
     customStackCapacities: { type: Schema.Types.Mixed, required: false },
+    
+    receiptConfig: {
+      inward: {
+        numberingType: { type: String, enum: ['GLOBAL', 'CHAMBER_WISE'], default: 'GLOBAL' },
+        prefix: { type: String, required: false },
+        startingNumber: { type: Number, required: true, default: 1 },
+        numberPadding: { type: Number, required: false },
+        suffix: { type: String, required: false }
+      },
+      outward: {
+        numberingType: { type: String, enum: ['GLOBAL', 'CHAMBER_WISE'], default: 'GLOBAL' },
+        prefix: { type: String, required: false },
+        startingNumber: { type: Number, required: true, default: 1 },
+        numberPadding: { type: Number, required: false },
+        suffix: { type: String, required: false }
+      },
+      invoice: {
+        numberingType: { type: String, enum: ['GLOBAL', 'CHAMBER_WISE'], default: 'GLOBAL' },
+        prefix: { type: String, required: false },
+        startingNumber: { type: Number, required: true, default: 1 },
+        numberPadding: { type: Number, required: false },
+        suffix: { type: String, required: false }
+      }
+    },
     
     aadhaarNo: { type: String, required: false },
     panNo: { type: String, required: false },

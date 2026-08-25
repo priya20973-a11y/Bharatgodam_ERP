@@ -9,6 +9,7 @@ import { hasPermission } from '@/lib/permissions';
 import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { differenceInDays } from 'date-fns';
+import { generateReceiptNumber } from '@/lib/receipt-generator';
 
 export async function generateColdClientInvoicePreview(
   warehouseId: string,
@@ -166,10 +167,12 @@ export async function saveColdClientInvoice(data: any) {
   const session = await requireSession();
 
   const invoiceId = `CIN-${Date.now().toString().slice(-6)}`;
+  const invoiceReceiptNumber = await generateReceiptNumber(data.warehouseId, 'invoice');
 
   const doc = appendOwnership({
     ...data,
     invoiceId,
+    receiptNumber: invoiceReceiptNumber,
     status: 'ACTIVE'
   }, session);
 

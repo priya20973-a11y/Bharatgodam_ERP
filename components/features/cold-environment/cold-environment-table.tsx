@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 export default function ColdEnvironmentTable({ records, warehouses }: { records: any[], warehouses: any[] }) {
   const [isMounted, setIsMounted] = useState(false);
@@ -27,7 +28,7 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
         const n = (r.notes || '').replace(/,/g, '');
         const co2Val = r.co2 !== undefined && r.co2 !== null ? r.co2 : '';
         
-        let floorName = `Floor ${r.floorNo}`;
+        let floorName = formatFloorName(null, r.floorNo);
         const wh = warehouses.find(wh => wh._id === (r.warehouseId?._id || r.warehouseId));
         if (wh) {
           const chamber = (wh.chambers || []).find((ch: any) => ch.name === r.chamberName);
@@ -93,11 +94,11 @@ export default function ColdEnvironmentTable({ records, warehouses }: { records:
 
   const getFloorName = (whId: string, chamberName: string, floorNo: number) => {
     const wh = warehouses.find(w => w._id === (typeof whId === 'object' ? (whId as any)._id : whId));
-    if (!wh) return `Floor ${floorNo}`;
+    if (!wh) return formatFloorName(null, floorNo);
     const chamber = (wh.chambers || []).find((c: any) => c.name === chamberName);
-    if (!chamber) return `Floor ${floorNo}`;
+    if (!chamber) return formatFloorName(null, floorNo);
     const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
-    return floor ? floor.name : `Floor ${floorNo}`;
+    return floor ? floor.name : formatFloorName(null, floorNo);
   };
 
   return (

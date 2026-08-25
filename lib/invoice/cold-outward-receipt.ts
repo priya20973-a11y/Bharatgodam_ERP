@@ -18,9 +18,11 @@ export function generateColdOutwardReceiptHTML(
   const dateStr = firstData.date ? format(new Date(firstData.date), 'dd-MM-yyyy') : '';
   const dateFormatted = formatNum(dateStr);
 
-  const receiptNo = firstData.batchId 
-    ? firstData.batchId.slice(-4).toUpperCase() 
-    : (firstData.receiptNo ? firstData.receiptNo.toString() : (firstData._id ? firstData._id.toString().slice(-4).toUpperCase() : ''));
+  const receiptNo = firstData.receiptNumber
+    ? firstData.receiptNumber.toString()
+    : (firstData.batchId 
+      ? firstData.batchId.slice(-4).toUpperCase() 
+      : (firstData.receiptNo ? firstData.receiptNo.toString() : (firstData._id ? firstData._id.toString().slice(-4).toUpperCase() : '')));
   const receiptNoFormatted = formatNum(receiptNo);
 
   const clientName = firstData.clientId?.name || '';

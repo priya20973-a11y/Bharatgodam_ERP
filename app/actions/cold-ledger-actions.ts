@@ -7,6 +7,7 @@ import ColdCommodity from '@/lib/models/ColdCommodity';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import { hasPermission } from '@/lib/permissions';
 import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
+import { formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
 
 export async function getColdClientLedger(clientId: string) {
   await connectToDatabase();
@@ -23,21 +24,21 @@ export async function getColdClientLedger(clientId: string) {
 
   const inwards = await ColdInward.find({ clientId, ...tenantFilter })
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name')
+    .populate('warehouseId', 'name chambers')
     .lean();
 
   const outwards = await ColdOutward.find({ clientId, ...tenantFilter })
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name')
+    .populate('warehouseId', 'name chambers')
     .lean();
 
   const { default: ColdTransfer } = await import('@/lib/models/ColdTransfer');
   const transfers = await ColdTransfer.find({
-    $or: [{ fromClientId: clientId }, { toClientId: clientId }],
+    $and: [{ $or: [{ fromClientId: clientId }, { toClientId: clientId }] }],
     ...tenantFilter
   })
     .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name')
+    .populate('warehouseId', 'name chambers')
     .populate('fromClientId', 'name')
     .populate('toClientId', 'name')
     .lean();
@@ -61,18 +62,18 @@ export async function getColdClientLedger(clientId: string) {
       locationStr = t.stackAllocations.map((a: any) => {
         const cName = a.chamberName || a.chamberNo;
         const fName = getFloorName(t.warehouseId, cName, a.floorNo);
-        return `C${cName}.F${fName}.S${a.stackNo ?? '-'}`;
+        return `${formatChamberDisplay(cName, cName)}/${formatFloorDisplay(fName, a.floorNo)}/S${a.stackNo ?? '-'}`;
       }).join(', ');
     } else if (t.type === 'OWNERSHIP TRANSFER' && t.stackAllocations && t.stackAllocations.length > 0) {
       locationStr = t.stackAllocations.map((a: any) => {
         const cName = a.chamberName || a.chamberNo;
         const fName = getFloorName(t.warehouseId, cName, a.floorNo);
-        return `C${cName}.F${fName}.S${a.stackNo ?? '-'}`;
+        return `${formatChamberDisplay(cName, cName)}/${formatFloorDisplay(fName, a.floorNo)}/S${a.stackNo ?? '-'}`;
       }).join(', ');
     } else {
       const cName = t.chamberName || t.chamberNo;
       const fName = getFloorName(t.warehouseId, cName, t.floorNo);
-      locationStr = `C${cName}.F${fName}.S${t.stackNo ?? '-'}`;
+      locationStr = `${formatChamberDisplay(cName, cName)}/${formatFloorDisplay(fName, t.floorNo)}/S${t.stackNo ?? '-'}`;
     }
 
     const getInwardNetWeight = (doc: any) => {

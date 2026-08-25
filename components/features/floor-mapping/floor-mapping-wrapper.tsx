@@ -8,6 +8,7 @@ import { getFloorInventory } from '@/app/actions/floor-mapping-actions';
 import FloorGrid from './floor-grid';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { QrCodeIcon } from 'lucide-react';
+import { formatChamberName, formatFloorName, formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
 
 export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] }) {
   const { t } = useColdTranslation();
@@ -86,10 +87,14 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
     const warehouseName = activeWarehouse?.name || '';
     
     // Extract stacks
-    const stacks = floorData.stacks.map((stack: any) => ({
-      stackNo: stack.stackNo,
-      name: stack.name
-    }));
+    const stacks = floorData.stacks.map((stack: any) => {
+      const c = formatChamberDisplay(floorData.chamberName || floorData.chamberNo, floorData.chamberNo);
+      const f = formatFloorDisplay(floorData.floorName, floorData.floorNo);
+      return {
+        stackNo: stack.stackNo,
+        name: `${c}/${f}/S${stack.stackNo}`
+      };
+    });
     
     if (stacks.length === 0) return;
     
@@ -130,7 +135,7 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
             <SelectContent>
               {activeWarehouse?.chambers?.map((c: any) => {
                 const val = (c.name || c.chamberNo).toString();
-                return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+                return <SelectItem key={c.chamberNo} value={val}>{c.name || formatChamberName(null, c.chamberNo)}</SelectItem>;
               })}
             </SelectContent>
           </Select>
@@ -147,7 +152,7 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
               <SelectTrigger className="flex-1"><SelectValue placeholder="Select Floor" /></SelectTrigger>
               <SelectContent>
                 {availableFloors.map((f: any) => (
-                  <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
+                  <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || formatFloorName(null, f.floorNo)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

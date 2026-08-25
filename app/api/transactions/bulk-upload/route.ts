@@ -77,7 +77,7 @@ interface ProcessResult {
 }
 
 async function parseCSV(text: string): Promise<BulkTransactionRow[]> {
-  const lines = text.trim().replace(/\r/g, '').split('\n');
+  const lines = text.trim().split(/\r\n|\n|\r/);
   if (lines.length < 2) {
     throw new Error('CSV file must contain header and at least one data row');
   }
@@ -87,13 +87,15 @@ async function parseCSV(text: string): Promise<BulkTransactionRow[]> {
   const headerLine = lines[0];
   const tabCount = (headerLine.match(/\t/g) || []).length;
   const commaCount = (headerLine.match(/,/g) || []).length;
+  const semicolonCount = (headerLine.match(/;/g) || []).length;
   
-  // Use tab if there are more tabs than commas, otherwise use comma
-  const delimiter = tabCount > commaCount ? '\t' : ',';
+  let delimiter = ',';
+  if (tabCount > commaCount && tabCount > semicolonCount) delimiter = '\t';
+  else if (semicolonCount > commaCount && semicolonCount > tabCount) delimiter = ';';
 
   const headers = headerLine
     .split(delimiter)
-    .map((h) => h.trim().toLowerCase());
+    .map((h) => h.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
 
   const requiredHeaders = ['type', 'clientname', 'commodityname', 'warehousename', 'quantitymt', 'bagscount', 'date'];
   const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));

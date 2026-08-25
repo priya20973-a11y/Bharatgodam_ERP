@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -14,6 +14,8 @@ import { Printer, Search, Download, Calendar as CalendarIcon, ChevronDown, Check
 import { getDynamicUnitLabel } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { Badge } from '@/components/ui/badge';
+import SearchInwardModal from './search-inward-modal';
 
 interface ColdOutwardListProps {
   outwards: any[];
@@ -21,6 +23,10 @@ interface ColdOutwardListProps {
 
 export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const { t, formatNumber } = useColdTranslation();
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   const groupedOutwards = useMemo(() => {
     return outwards;
@@ -51,8 +57,8 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
         ? w.items.map((item: any) => String(item.chamberName || item.chamberNo).replace(/^Chamber\s+/i, '')).join('; ')
         : String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
       const floor = w.isBatch && w.items && w.items.length > 1
-        ? w.items.map((item: any) => item.floorName || item.floorNo).join('; ')
-        : (w.floorName || w.floorNo || '-');
+        ? w.items.map((item: any) => (item.floorName && item.floorName.trim().toLowerCase() !== `floor ${item.floorNo}`) ? item.floorName : item.floorNo).join('; ')
+        : ((w.floorName && w.floorName.trim().toLowerCase() !== `floor ${w.floorNo}`) ? w.floorName : (w.floorNo || '-'));
       const stack = w.isBatch && w.items && w.items.length > 1
         ? w.items.map((item: any) => item.stackNo).join('; ')
         : (w.stackNo || '-');
@@ -83,11 +89,20 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => setIsSearchModalOpen(true)} variant="secondary" size="sm">
+          <Search className="mr-2 h-4 w-4" /> Search Inward
+        </Button>
         <Button onClick={exportCsv} variant="outline" size="sm">
           <Download className="mr-2 h-4 w-4" /> Export CSV
         </Button>
       </div>
+      
+      <SearchInwardModal 
+        isOpen={isSearchModalOpen} 
+        onClose={() => setIsSearchModalOpen(false)} 
+      />
+
       <div className="rounded-md border bg-white shadow-sm overflow-hidden">
       <Table>
         <TableHeader>
@@ -137,9 +152,12 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
 
               const displayFloor = w.isBatch && w.items && w.items.length > 1 ? (
                 <div className="flex flex-col gap-1">
-                  {w.items.map((item: any, i: number) => <div key={item._id || i}>{item.floorName || formatNumber(item.floorNo)}</div>)}
+                  {w.items.map((item: any, i: number) => {
+                     const isCustom = item.floorName && item.floorName.trim().toLowerCase() !== `floor ${item.floorNo}`;
+                     return <div key={item._id || i}>{isCustom ? item.floorName : formatNumber(item.floorNo)}</div>;
+                  })}
                 </div>
-              ) : (w.floorName || formatNumber(w.floorNo));
+              ) : ((w.floorName && w.floorName.trim().toLowerCase() !== `floor ${w.floorNo}`) ? w.floorName : formatNumber(w.floorNo));
 
               const displayStack = w.isBatch && w.items && w.items.length > 1 ? (
                 <div className="flex flex-col gap-1">

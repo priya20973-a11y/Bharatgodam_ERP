@@ -167,7 +167,7 @@ export async function getClients() {
 export async function createClient(data: {
   name: string;
   address: string;
-  clientType: 'FARMER' | 'FPO' | 'COMPANY';
+  clientType: 'FARMER' | 'FPO' | 'COMPANY' | 'PURCHASE';
   mobile: string;
   panNumber: string;
   aadharNumber: string;

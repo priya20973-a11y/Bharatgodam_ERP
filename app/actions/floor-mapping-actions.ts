@@ -144,7 +144,7 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
             if (allocAvailable > 0) {
               s.totalBags += (alloc.bagsCount || 0);
               
-              const receiptNo = inward.weighbridgeSlipNo || `INW-${inwardIdStr.slice(-6).toUpperCase()}`;
+              const receiptNo = inward.receiptNumber || inward.weighbridgeSlipNo || `INW-${inwardIdStr.slice(-6).toUpperCase()}`;
               s.receiptNos.add(receiptNo);
               
               const resolvedClientName = inward.clientId?.name || inward.farmerName || inward.referencePersons?.[0]?.name || 'Unknown';
@@ -214,8 +214,10 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
       success: true,
       data: {
         warehouseId,
-        chamberName,
+        chamberNo: chamber.chamberNo,
+        chamberName: chamber.name || chamberName,
         floorNo,
+        floorName: floor.name,
         stackLayout: floor.stackLayout || warehouse.stackLayout || 'ROW_WISE',
         gridRows: floor.gridRows || warehouse.gridRows,
         gridCols: floor.gridCols || warehouse.gridCols,

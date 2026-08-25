@@ -22,6 +22,7 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'ownershipTransfer', key: 'ownershipTransfer' },
   { id: 'stockShifting', key: 'stockShifting' },
   { id: 'environmentRecords', key: 'environmentRecords' },
+  { id: 'bulkUpload', key: 'bulkUpload' },
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'print', 'approve'];

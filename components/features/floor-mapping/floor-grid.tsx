@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Package, Users, Info, Download, QrCode } from 'lucide-react';
+import { formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
 import StackDetailsModal from './stack-details-modal';
 
 interface StackData {
@@ -152,7 +153,7 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                   className="absolute top-2 left-2 text-slate-400 hover:text-indigo-600 transition-colors z-10"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const stacksParam = JSON.stringify([{ stackNo: cell.stackNo, name: `C${actualChamberNo}/F${floorNo}/S${cell.stackNo}` }]);
+                    const stacksParam = JSON.stringify([{ stackNo: cell.stackNo, name: `${formatChamberDisplay(actualChamberNo, actualChamberNo)}/${formatFloorDisplay(floorData.floorName, floorNo)}/S${cell.stackNo}` }]);
                     window.open(`/print/stack-qr?warehouseId=${warehouseId}&chamberName=${actualChamberNo}&floorNo=${floorNo}&stacks=${encodeURIComponent(stacksParam)}`, '_blank');
                   }}
                   title="View / Print QR"

@@ -37,7 +37,10 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
     const chamber = warehouse.chambers.find((c: any) => c.name === chamberName || c.chamberNo === chamberName);
     if (!chamber) return floorNo ?? '-';
     const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
-    return floor ? floor.name : (floorNo ?? '-');
+    if (floor && floor.name && floor.name.trim().toLowerCase() !== `floor ${floorNo}`) {
+       return floor.name;
+    }
+    return floorNo ?? '-';
   };
 
   const exportCsv = () => {
@@ -45,6 +48,9 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
       t('inward.dateHeader') || 'Date',
       t('inward.clientNameHeader') || 'Client Name',
       'Farmer Name',
+      'Village Name',
+      'Large Bag',
+      'Small Bag',
       t('inward.commodityHeader') || 'Commodity',
       t('inward.warehouseHeader') || 'Warehouse',
       t('inward.chamberHeader') || 'Chamber',
@@ -59,6 +65,9 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
       const date = w.date ? format(new Date(w.date), 'dd MMM yyyy') : '-';
       const client = w.clientId?.name || '-';
       const farmer = w.farmerName || '-';
+      const village = w.villageName || '-';
+      const largeBag = w.largeBag || 0;
+      const smallBag = w.smallBag || 0;
       const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
       const warehouse = w.warehouseId?.name || '-';
       const chamber = w.stackAllocations?.map((s: any) => String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')).join('; ') || String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
@@ -67,7 +76,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
       const grade = w.gradingType || '-';
       const qty = w.quantityKg || 0;
       const bags = w.bagsCount || 0;
-      return [date, client, farmer, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
+      return [date, client, farmer, village, largeBag, smallBag, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
         .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
     
@@ -149,6 +158,7 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="font-medium text-slate-900">
                     {w.clientId?.name || '-'}
                     {w.farmerName && <div className="text-xs font-normal text-slate-500 mt-0.5">Farmer: {w.farmerName}</div>}
+                    {w.villageName && <div className="text-xs font-normal text-slate-500 mt-0.5">Village: {w.villageName}</div>}
                   </TableCell>
                   <TableCell className="text-slate-700">{commodityDisplay}</TableCell>
                   <TableCell className="text-slate-700">{w.warehouseId?.name || '-'}</TableCell>
@@ -165,7 +175,12 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                     {w.gradingType || '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)} {w.unit || w.commodityId?.unit || 'KG'}</TableCell>
-                  <TableCell className="text-right text-slate-700">{formatNumber(w.bagsCount)}</TableCell>
+                  <TableCell className="text-right text-slate-700">
+                    <div>{formatNumber(w.bagsCount)}</div>
+                    {(w.largeBag || w.smallBag) ? (
+                      <div className="text-xs text-slate-500 mt-0.5">L: {formatNumber(w.largeBag || 0)} | S: {formatNumber(w.smallBag || 0)}</div>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-right">
                     <a 
                       href={`/api/cold/receipt/html?id=${w._id}&type=inward`} 

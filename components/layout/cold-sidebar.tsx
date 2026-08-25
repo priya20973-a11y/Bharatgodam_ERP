@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers, ShoppingCart, Receipt } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers, ShoppingCart, Receipt, Calculator, Thermometer, Upload } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -29,6 +29,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Unit Master', translationKey: 'sidebar.unitMaster', href: '/cold/units', icon: Layers, adminOnly: true },
   { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
   { name: 'Inward Transaction', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
+  { name: 'Bulk Upload', translationKey: 'sidebar.bulkUpload', href: '/cold/bulk-upload', icon: Upload, module: 'inward' },
   { name: 'Outward Transaction', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
   { name: 'Ownership Transfer', translationKey: 'sidebar.transferOwnership', href: '/cold/transfers', icon: ArrowRightLeft, module: 'ownershipTransfer' },
   { name: 'Stock Shifting', translationKey: 'sidebar.stockShifting', href: '/cold/stock-shifting', icon: ArrowRightLeft, module: 'stockShifting' },

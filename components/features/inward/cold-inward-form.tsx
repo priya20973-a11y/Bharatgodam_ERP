@@ -14,6 +14,7 @@ import { useColdTranslation } from '@/components/providers/cold-language-provide
 import { Trash2, Plus, QrCode, Camera, Upload } from 'lucide-react';
 import { getDynamicUnitLabel } from '@/lib/utils';
 import StackQRScannerModal from './stack-qr-scanner-modal';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 interface ColdInwardFormProps {
   clients: any[];
@@ -1089,7 +1090,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                   (s.name && s.name.toLowerCase() === (stack.stackNo || '').toString().toLowerCase())
                 );
 
-                const floorName = floor?.name || (stack.floorNo ? `Floor ${stack.floorNo}` : '');
+                const floorName = floor?.name || (stack.floorNo ? formatFloorName(null, stack.floorNo) : '');
                 const stackName = stackObj ? (stackObj.name || `Stack ${stackObj.stackNo}`) : (stack.stackNo ? `Stack ${stack.stackNo}` : '');
                 
                 return (
@@ -1123,7 +1124,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                         <label className="text-xs font-medium text-slate-700">Chamber</label>
                         {allocationMode === 'SCAN_QR' ? (
                           <div className="h-8 text-xs px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-medium text-slate-700 flex items-center shadow-2xs truncate">
-                            {chamber ? (chamber.name || `Chamber ${chamber.chamberNo}`) : (stack.chamberNo || 'Chamber')}
+                            {chamber ? (chamber.name || formatChamberName(null, chamber.chamberNo)) : (stack.chamberNo || 'Chamber')}
                           </div>
                         ) : (
                           <SearchableSelect 
@@ -1131,7 +1132,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                             onValueChange={(v) => updateStackFields(cIdx, sIdx, { chamberNo: v, floorNo: '', stackNo: '' })}
                             options={(selectedWarehouse?.chambers || []).map((c: any) => {
                               const val = (c.name || c.chamberNo).toString();
-                              return { value: val, label: c.name || `Chamber ${c.chamberNo}` };
+                              return { value: val, label: c.name || formatChamberName(null, c.chamberNo) };
                             })}
                             placeholder="Chamber"
                             className="h-8 text-xs font-normal"
@@ -1143,7 +1144,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                         <label className="text-xs font-medium text-slate-700">Floor</label>
                         {allocationMode === 'SCAN_QR' ? (
                           <div className="h-8 text-xs px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-md font-medium text-slate-700 flex items-center shadow-2xs truncate">
-                            {floor ? (floor.name || `Floor ${floor.floorNo}`) : (stack.floorNo || 'Floor')}
+                            {floor ? (floor.name || formatFloorName(null, floor.floorNo)) : (stack.floorNo || 'Floor')}
                           </div>
                         ) : (
                           <SearchableSelect 
@@ -1152,7 +1153,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                             disabled={!stack.chamberNo}
                             options={(chamber?.floors || []).map((f: any) => {
                               const val = (f.name || f.floorNo).toString();
-                              return { value: val, label: f.name || `Floor ${f.floorNo}` };
+                              return { value: val, label: f.name || formatFloorName(null, f.floorNo) };
                             })}
                             placeholder="Floor"
                             className="h-8 text-xs font-normal border-slate-300 bg-slate-50"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ColdOutwardList from './cold-outward-list';
 import ColdOutwardForm from './cold-outward-form';
@@ -22,7 +22,13 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
   const router = useRouter();
   const { t } = useColdTranslation();
   const [outwards, setOutwards] = useState(initialOutwards);
-  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || !!searchParams?.qr || !!searchParams?.qrId || !!searchParams?.transferId);
+  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || !!searchParams?.qr || !!searchParams?.qrId || !!searchParams?.transferId || !!searchParams?.receiptNo);
+
+  useEffect(() => {
+    if (searchParams?.action === 'add' || searchParams?.receiptNo) {
+      setIsAdding(true);
+    }
+  }, [searchParams]);
 
   const refreshData = async () => {
     try {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 export default function ColdEnvironmentRecent({ records, warehouses }: { records: any[], warehouses?: any[] }) {
   const router = useRouter();
@@ -27,13 +28,13 @@ export default function ColdEnvironmentRecent({ records, warehouses }: { records
   };
 
   const getFloorName = (whId: string, chamberName: string, floorNo: number) => {
-    if (!warehouses) return `Floor ${floorNo}`;
+    if (!warehouses) return formatFloorName(null, floorNo);
     const wh = warehouses.find(w => w._id === (typeof whId === 'object' ? (whId as any)._id : whId));
-    if (!wh) return `Floor ${floorNo}`;
+    if (!wh) return formatFloorName(null, floorNo);
     const chamber = (wh.chambers || []).find((c: any) => c.name === chamberName);
-    if (!chamber) return `Floor ${floorNo}`;
+    if (!chamber) return formatFloorName(null, floorNo);
     const floor = (chamber.floors || []).find((f: any) => f.floorNo === floorNo);
-    return floor ? floor.name : `Floor ${floorNo}`;
+    return floor ? floor.name : formatFloorName(null, floorNo);
   };
 
   const filteredRecords = records.filter((r: any) => {

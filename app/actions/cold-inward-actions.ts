@@ -8,6 +8,7 @@ import ColdCommodity from '@/lib/models/ColdCommodity';
 import ColdInwardDraft from '@/lib/models/ColdInwardDraft';
 import Client from '@/lib/models/Client';
 import ColdTransfer from '@/lib/models/ColdTransfer';
+import { generateReceiptNumber } from '@/lib/receipt-generator';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
@@ -147,6 +148,26 @@ export async function getColdInwards() {
   });
 
   return JSON.parse(JSON.stringify(processedInwards));
+}
+
+export async function checkExistingReceiptNumber(receiptNumber: string) {
+  await connectToDatabase();
+  const existing = await ColdInward.findOne({ receiptNumber }).lean();
+  return !!existing;
+}
+
+export async function searchColdInwardByReceipt(receiptNo: string) {
+  if (!receiptNo || typeof receiptNo !== 'string') return null;
+  
+  // Reuse the robust getColdInwards function to get all inwards with their available quantities pre-calculated
+  const allInwards = await getColdInwards();
+  
+  // Find the matching receipt number
+  const matchedInward = allInwards.find((inward: any) => 
+    String(inward.receiptNumber).trim() === receiptNo.trim()
+  );
+  
+  return matchedInward || null;
 }
 
 export async function getColdInwardById(id: string) {
@@ -557,6 +578,8 @@ export async function createColdInward(data: any) {
     const commodity = await ColdCommodity.findOne({ _id: data.commodityId, ...getTenantFilter(session) }).lean();
     const unit = commodity?.unit || 'KG';
 
+    const inwardReceiptNumber = await generateReceiptNumber(data.warehouseId, 'inward', data.chamberName || data.chamberNo?.toString());
+
     const inward = await ColdInward.create(appendOwnership({
       ...data,
       unit,
@@ -564,6 +587,7 @@ export async function createColdInward(data: any) {
       remainingBagsCount: data.bagsCount,
       status: 'Active',
       qrId: crypto.randomUUID(),
+      receiptNumber: inwardReceiptNumber,
       qualityEntries: data.qualityEntries || [],
       date: data.date ? new Date(data.date) : new Date(),
     }, session));
@@ -786,6 +810,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         kataBharati: client.kataBharati,
         marko: client.marko,
         farmerName: client.farmerName,
+        villageName: client.villageName,
+        largeBag: client.largeBag,
+        smallBag: client.smallBag,
         farmerId: client.farmerId,
         referencePersons: client.referencePersons,
         warehouseId: data.warehouseId,
@@ -800,8 +827,12 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         selfBagsCount: isPurchaseClient ? 0 : (client.stockType === 'Both' ? (client.selfBagsCount ?? derivedSelfBags) : (client.selfBagsCount ?? totalAllocatedBags)),
       };
       
+      const firstChamberName = stackAllocations.length > 0 ? stackAllocations[0].chamberName : undefined;
+      const inwardReceiptNumber = await generateReceiptNumber(data.warehouseId, 'inward', firstChamberName);
+      
       const inward = await ColdInward.create(appendOwnership({
         ...inwardData,
+        receiptNumber: inwardReceiptNumber,
         date: data.common.date ? new Date(data.common.date) : new Date(),
       }, session));
       

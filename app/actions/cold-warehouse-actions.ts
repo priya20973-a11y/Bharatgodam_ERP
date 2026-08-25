@@ -2,6 +2,7 @@
 
 import connectToDatabase from '@/lib/mongoose';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
+import ReceiptSequence from '@/lib/models/ReceiptSequence';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, isAdmin, getWarehouseFilter } from '@/lib/ownership';
@@ -227,6 +228,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
   floorNames: string[];
   bufferCapacity?: number;
   customStackCapacities?: Record<string, number>;
+  receiptConfig?: any;
 }>) {
   await connectToDatabase();
   try {
@@ -251,7 +253,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
       const duplicate = await ColdWarehouse.findOne({
         ...ownerFilter,
         name: data.name,
-        _id: { $ne: id }
+        _id: { $ne: new mongoose.Types.ObjectId(id) }
       });
       if (duplicate) {
         return { success: false, error: 'Cold Warehouse name already exists for this WSP.' };
@@ -269,7 +271,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
       const duplicateId = await ColdWarehouse.findOne({
         ...ownerFilter,
         warehouseId: data.warehouseId.trim(),
-        _id: { $ne: id }
+        _id: { $ne: new mongoose.Types.ObjectId(id) }
       });
       if (duplicateId) {
         return { success: false, error: 'Warehouse ID already exists.' };
@@ -296,6 +298,26 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     }
     if (data.sameStackLayoutPerFloor !== undefined) {
       warehouse.sameStackLayoutPerFloor = data.sameStackLayoutPerFloor;
+    }
+    if (data.receiptConfig !== undefined) {
+      // Validate against existing sequences
+      for (const type of ['inward', 'outward', 'invoice']) {
+        const config = data.receiptConfig[type];
+        if (config) {
+          const sequences = await ReceiptSequence.find({ 
+            warehouseId: new mongoose.Types.ObjectId(id), 
+            type: type.toUpperCase() as "INWARD" | "OUTWARD" | "INVOICE"
+          });
+          for (const seq of sequences) {
+            // Prevent lowering sequence if we are switching to global or staying same
+            if (config.startingNumber <= seq.lastNumber) {
+              return { success: false, error: `Cannot lower starting number for ${type}. Current last number is ${seq.lastNumber}.` };
+            }
+          }
+        }
+      }
+      warehouse.receiptConfig = data.receiptConfig;
+      warehouse.markModified('receiptConfig');
     }
     if (data.bufferCapacity !== undefined) warehouse.bufferCapacity = data.bufferCapacity;
     if (data.chambers && Array.isArray(data.chambers)) {

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { getDynamicUnitLabel } from '@/lib/utils';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 interface ColdEditTransactionModalProps {
   isOpen: boolean;
@@ -280,7 +281,7 @@ export default function ColdEditTransactionModal({
                       <SelectContent>
                         {selectedWarehouse?.chambers?.map((c: any) => {
                           const val = (c.name || c.chamberNo).toString();
-                          return <SelectItem key={c.chamberNo} value={val}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>;
+                          return <SelectItem key={c.chamberNo} value={val}>{c.name || formatChamberName(null, c.chamberNo)}</SelectItem>;
                         })}
                       </SelectContent>
                     </Select>
@@ -291,7 +292,7 @@ export default function ColdEditTransactionModal({
                       <SelectTrigger><SelectValue placeholder="Floor" /></SelectTrigger>
                       <SelectContent>
                         {selectedChamber?.floors?.map((f: any) => (
-                          <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || `Floor ${f.floorNo}`}</SelectItem>
+                          <SelectItem key={f.floorNo} value={f.floorNo.toString()}>{f.name || formatFloorName(null, f.floorNo)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

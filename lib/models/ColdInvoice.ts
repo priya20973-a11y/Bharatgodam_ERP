@@ -21,6 +21,7 @@ export interface IColdInvoiceItem {
 
 export interface IColdInvoice extends Document {
   invoiceId: string;
+  receiptNumber?: string;
   clientId: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   fromDate: Date;
@@ -42,6 +43,7 @@ export interface IColdInvoice extends Document {
 const ColdInvoiceSchema: Schema = new Schema(
   {
     invoiceId: { type: String, required: true, unique: true },
+    receiptNumber: { type: String, required: false },
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'Warehouse', required: true },
     fromDate: { type: Date, required: true },

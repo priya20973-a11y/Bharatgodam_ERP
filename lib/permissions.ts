@@ -16,7 +16,8 @@ export type PermissionModule =
   | 'floorMapping'
   | 'ownershipTransfer'
   | 'environmentRecords'
-  | 'stockShifting';
+  | 'stockShifting'
+  | 'bulkUpload';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'print' | 'approve';
 

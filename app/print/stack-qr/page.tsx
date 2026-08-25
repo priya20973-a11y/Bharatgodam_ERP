@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { getStackDetails } from '@/app/actions/cold-stack-actions';
+import { formatChamberDisplay } from '@/lib/utils/cold-naming';
 
 function PrintStackQRsContent() {
   const searchParams = useSearchParams();
@@ -76,9 +77,8 @@ function PrintStackQRsContent() {
               <div className="text-xs font-bold text-slate-500 mb-1 truncate w-full text-center">{warehouseName || 'Warehouse'}</div>
               <img src={qr.dataUrl} alt={`QR for Stack ${qr.stackNo}`} className="w-32 h-32 mb-2" />
               <div className="text-center font-bold text-slate-800 text-lg tracking-wide whitespace-nowrap">
-                C{chamberName}/F{floorNo}/S{qr.stackNo}
+                {qr.name || `${formatChamberDisplay(chamberName, chamberName)}/F${floorNo}/S${qr.stackNo}`}
               </div>
-              {qr.name && <div className="text-xs text-slate-500 mt-1">{qr.name}</div>}
             </div>
           ))}
         </div>

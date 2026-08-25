@@ -18,8 +18,8 @@ export function generateColdTransactionReceiptHTML(
   const dateStr = data.date ? format(new Date(data.date), 'dd/MM/yyyy') : '';
   const dateFormatted = formatNum(dateStr);
 
-  // Use sequential inward number if available, else fallback to slice of ID
-  const receiptNo = data.receiptNo ? data.receiptNo.toString() : data._id.toString().slice(-4).toUpperCase();
+  // Use generated receiptNumber if available, fallback to legacy receiptNo or _id slice
+  const receiptNo = data.receiptNumber ? data.receiptNumber.toString() : (data.receiptNo ? data.receiptNo.toString() : data._id.toString().slice(-4).toUpperCase());
   const receiptNoFormatted = formatNum(receiptNo);
 
   const clientName = data.clientId?.name || '';
@@ -459,7 +459,7 @@ export function generateColdTransactionReceiptHTML(
             <th>${l.chamberNoLabel}</th>
             <th>${l.floorNoLabel}</th>
             <th>${l.stackNoLabel}</th>
-            <th>${l.netWeightLabel}</th>
+            <th>${(l.noOfBags || 'No. of Bags').replace(':', '')}</th>
           </tr>
           ${data.stacksInfo && data.stacksInfo.length > 0 ? 
             data.stacksInfo.map((s: any) => `
@@ -468,7 +468,7 @@ export function generateColdTransactionReceiptHTML(
               <td>${formatNum(s.chamberNo)}</td>
               <td>${formatNum(s.floorNo)}</td>
               <td>${formatNum(s.stackNo)}${s.isStockShifting ? ' (Stock Shifting)' : ''}</td>
-              <td>${formatNum(s.quantityKg)} ${unitStr}</td>
+              <td>${formatNum(s.bagsCount || s.allocatedBags || 0)}</td>
             </tr>
             `).join('')
           : `
@@ -477,7 +477,7 @@ export function generateColdTransactionReceiptHTML(
               <td>${chamber}</td>
               <td>${floor}</td>
               <td>${stack}${data.isStockShifting ? ' (Stock Shifting)' : ''}</td>
-              <td>${netWeight}</td>
+              <td>${totalBags}</td>
             </tr>
           `}
         </table>

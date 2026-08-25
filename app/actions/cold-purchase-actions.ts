@@ -96,7 +96,7 @@ export async function getPurchaseStock(warehouseId: string) {
             if (available > 0) {
               purchaseStockList.push({
                 inwardId: inward._id.toString(),
-                receiptNo: inward.weighbridgeSlipNo || inward.receiptNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`,
+                receiptNo: inward.receiptNumber || inward.weighbridgeSlipNo || inward.receiptNo || `INW-${inward._id.toString().slice(-6).toUpperCase()}`,
                 date: inward.createdAt || inward.date,
                 clientName: clientNameDisplay,
                 farmerName: inward.farmerName || '-',

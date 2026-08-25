@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { Trash2, Plus, Layers, Hash, CheckCircle, Tag, Grid, Weight } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 interface ColdWarehouseFormProps {
   onSuccess: () => void;
@@ -188,6 +189,12 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
   });
   const [termsAndConditions, setTermsAndConditions] = useState(initialData?.termsAndConditions || '');
 
+  const [receiptConfig, setReceiptConfig] = useState<any>(initialData?.receiptConfig || {
+    inward: { numberingType: 'GLOBAL', prefix: '', startingNumber: 1, numberPadding: 4, suffix: '' },
+    outward: { numberingType: 'GLOBAL', prefix: '', startingNumber: 1, numberPadding: 4, suffix: '' },
+    invoice: { numberingType: 'GLOBAL', prefix: '', startingNumber: 1, numberPadding: 4, suffix: '' }
+  });
+
   // Sync chamberFloorsConfig array when noOfChambers changes
   useEffect(() => {
     if (!isEdit) {
@@ -342,8 +349,8 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         for (let f = 1; f <= floorsCount; f++) {
           const layout = getFloorLayout(c, f);
           const stacksCount = getStackCountForFloor(c, f);
-          const cName = chamberCustomNames[c] || `Chamber ${c}`;
-          const fName = floorCustomNames[`${c}-${f}`] || `Floor ${f}`;
+          const cName = formatChamberName(chamberCustomNames[c], c);
+          const fName = formatFloorName(floorCustomNames[`${c}-${f}`], f);
 
           if (['ROW_WISE', 'COLUMN_WISE', 'REVERSE_ROW_WISE', 'REVERSE_COLUMN_WISE', 'CUSTOM'].includes(layout.stackLayout)) {
             if (!layout.gridRows || !layout.gridCols || layout.gridRows * layout.gridCols < stacksCount) {
@@ -373,6 +380,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
 
       const payload = {
         ...formData,
+        receiptConfig,
         sameFloorsPerChamber,
         chamberFloorsConfig: sameFloorsPerChamber ? undefined : chamberFloorsConfig,
         sameStacksPerFloor,
@@ -393,12 +401,12 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         termsAndConditions,
         chambers: isEdit ? initialData.chambers.map((c: any, cIdx: number) => ({
           ...c,
-          name: chamberCustomNames[cIdx + 1] && chamberCustomNames[cIdx + 1].trim() !== '' ? chamberCustomNames[cIdx + 1].trim() : `Chamber ${cIdx + 1}`,
+          name: chamberCustomNames[cIdx + 1] && chamberCustomNames[cIdx + 1].trim() !== '' ? chamberCustomNames[cIdx + 1].trim() : formatChamberName(null, cIdx + 1),
           floors: c.floors?.map((f: any, fIdx: number) => {
             const fLayout = getFloorLayout(cIdx + 1, fIdx + 1);
             return {
               ...f,
-              name: floorCustomNames[`${cIdx + 1}-${fIdx + 1}`] && floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() !== '' ? floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() : `Floor ${fIdx + 1}`,
+              name: floorCustomNames[`${cIdx + 1}-${fIdx + 1}`] && floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() !== '' ? floorCustomNames[`${cIdx + 1}-${fIdx + 1}`].trim() : formatFloorName(null, fIdx + 1),
               stackLayout: fLayout.stackLayout,
               gridRows: fLayout.gridRows,
               gridCols: fLayout.gridCols,
@@ -669,6 +677,82 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         </div>
       </div>
 
+      {/* Receipt Configuration */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-6">
+        <h4 className="font-semibold text-base text-indigo-900 border-b pb-2 flex items-center gap-2">
+          <Tag className="w-5 h-5 text-indigo-600" />
+          Receipt & Invoice Numbering Configuration
+        </h4>
+        <div className="grid grid-cols-1 gap-6">
+          {['inward', 'outward', 'invoice'].map((type) => (
+            <div key={type} className="p-4 border rounded-md bg-slate-50 space-y-4">
+              <h5 className="font-semibold text-sm capitalize">{type} Numbering</h5>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Numbering Type</label>
+                  <Select
+                    value={receiptConfig[type].numberingType}
+                    onValueChange={(val) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], numberingType: val}})}
+                    disabled={type === 'invoice'}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GLOBAL">Global (Warehouse Level)</SelectItem>
+                      {type !== 'invoice' && <SelectItem value="CHAMBER_WISE">Chamber Wise</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Prefix</label>
+                  <Input 
+                    value={receiptConfig[type].prefix} 
+                    onChange={(e) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], prefix: e.target.value}})} 
+                    placeholder={type === 'inward' ? 'INW-' : type === 'outward' ? 'OUT-' : 'INV-'} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Starting Number *</label>
+                  <ColdNumberInput 
+                    required
+                    min="1"
+                    value={receiptConfig[type].startingNumber} 
+                    onChange={(val) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], startingNumber: Math.max(1, parseInt(val) || 1)}})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Number Padding</label>
+                  <ColdNumberInput 
+                    min="1"
+                    max="10"
+                    value={receiptConfig[type].numberPadding} 
+                    onChange={(val) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], numberPadding: Math.max(1, parseInt(val) || 1)}})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Suffix</label>
+                  <Input 
+                    value={receiptConfig[type].suffix} 
+                    onChange={(e) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], suffix: e.target.value}})} 
+                    placeholder="/24-25" 
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-slate-600 bg-indigo-50 p-2 rounded border border-indigo-100 flex items-center gap-2">
+                <strong>Preview:</strong> 
+                <span className="font-mono text-indigo-700 bg-white px-2 py-0.5 rounded border">
+                  {receiptConfig[type].prefix}
+                  {String(receiptConfig[type].startingNumber).padStart(receiptConfig[type].numberPadding || 1, '0')}
+                  {receiptConfig[type].suffix}
+                </span>
+                {receiptConfig[type].numberingType === 'CHAMBER_WISE' && (
+                  <span className="text-xs text-amber-600 ml-2">(Maintained separately per chamber)</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Chamber -> Floor -> Stack Hierarchy Configuration */}
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-6">
         <h4 className="font-semibold text-base text-indigo-900 border-b pb-2 flex items-center gap-2">
@@ -738,7 +822,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                 {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => (
                   <div key={cIdx} className="space-y-1 bg-white p-3 rounded border">
                     <label className="text-xs font-semibold text-slate-700">
-                      {chamberCustomNames[cIdx + 1] ? chamberCustomNames[cIdx + 1] : `Chamber ${cIdx + 1}`} → No. of Floors
+                      {chamberCustomNames[cIdx + 1] ? chamberCustomNames[cIdx + 1] : formatChamberName(null, cIdx + 1)} → No. of Floors
                     </label>
                     <ColdNumberInput 
                       required 
@@ -807,7 +891,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
                 const cNo = cIdx + 1;
                 const floorsCount = getFloorCountForChamber(cNo);
-                const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+                const cName = formatChamberName(chamberCustomNames[cNo], cNo);
 
                 return (
                   <div key={cNo} className="bg-white p-3 rounded border space-y-2">
@@ -817,7 +901,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                         const fNo = fIdx + 1;
                         const key = `${cNo}-${fNo}`;
                         const currentVal = floorStacksConfig[key] !== undefined ? floorStacksConfig[key] : (formData.noOfStacks || 1);
-                        const fName = floorCustomNames[key] || `Floor ${fNo}`;
+                        const fName = formatFloorName(floorCustomNames[key], fNo);
 
                         return (
                           <div key={fNo} className="space-y-1 bg-slate-50 p-2.5 rounded border">
@@ -950,7 +1034,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               <SelectContent>
                 {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => (
                   <SelectItem key={cIdx + 1} value={(cIdx + 1).toString()}>
-                    {chamberCustomNames[cIdx + 1] || `Chamber ${cIdx + 1}`}
+                    {formatChamberName(chamberCustomNames[cIdx + 1], cIdx + 1)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -970,7 +1054,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
               <SelectContent>
                 {Array.from({ length: getFloorCountForChamber(overrideChamber) }).map((_, fIdx) => (
                   <SelectItem key={fIdx + 1} value={(fIdx + 1).toString()}>
-                    {floorCustomNames[`${overrideChamber}-${fIdx + 1}`] || `Floor ${fIdx + 1}`}
+                    {formatFloorName(floorCustomNames[`${overrideChamber}-${fIdx + 1}`], fIdx + 1)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1017,8 +1101,8 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {Object.entries(customStackCapacities).map(([key, cap]) => {
                 const [c, f, s] = key.split('-');
-                const cName = chamberCustomNames[Number(c)] || `Chamber ${c}`;
-                const fName = floorCustomNames[`${c}-${f}`] || `Floor ${f}`;
+                const cName = formatChamberName(chamberCustomNames[Number(c)], c);
+                const fName = formatFloorName(floorCustomNames[`${c}-${f}`], f);
 
                 return (
                   <div key={key} className="flex justify-between items-center p-2 bg-amber-50 border border-amber-200 rounded-md text-xs">
@@ -1095,7 +1179,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
 
                   <div className="space-y-2 pt-1">
                     <label className="text-xs font-semibold text-slate-600 block">
-                      Floors in {chamberCustomNames[cNo] || `Chamber ${cNo}`}:
+                      Floors in {formatChamberName(chamberCustomNames[cNo], cNo)}:
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {Array.from({ length: floorsCount }).map((_, fIdx) => {
@@ -1283,7 +1367,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
             {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
               const cNo = cIdx + 1;
               const floorsCount = getFloorCountForChamber(cNo);
-              const cName = chamberCustomNames[cNo] || `Chamber ${cNo}`;
+              const cName = formatChamberName(chamberCustomNames[cNo], cNo);
 
               return (
                 <div key={cNo} className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-4">
@@ -1294,7 +1378,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                   <div className="space-y-6">
                     {Array.from({ length: floorsCount }).map((_, fIdx) => {
                       const fNo = fIdx + 1;
-                      const fName = floorCustomNames[`${cNo}-${fNo}`] || `Floor ${fNo}`;
+                      const fName = formatFloorName(floorCustomNames[`${cNo}-${fNo}`], fNo);
                       const layout = getFloorLayout(cNo, fNo);
                       const stacksCount = getStackCountForFloor(cNo, fNo);
 

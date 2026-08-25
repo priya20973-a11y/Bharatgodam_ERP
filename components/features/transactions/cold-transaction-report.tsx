@@ -20,6 +20,7 @@ import { toast } from 'react-hot-toast';
 import { deleteColdTransaction } from '@/app/actions/cold-transaction-report-actions';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import ColdEditTransactionModal from './cold-edit-transaction-modal';
+import { formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
 
 interface ColdTransactionReportProps {
   initialTransactions: any[];
@@ -268,7 +269,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                             href={`/cold/floor-mapping?warehouseId=${txn.warehouse?._id}&chamberNo=${s.chamberNo || s.chamberName}&floorNo=${s.floorNo}&stackNo=${s.stackNo}`}
                             className="hover:text-blue-600 hover:underline transition-colors block text-[11px]"
                           >
-                            C{String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')}.F{s.floorName || s.floorNo}.S{s.stackNo}
+                            {formatChamberDisplay(s.chamberName || s.chamberNo, s.chamberNo)}.{formatFloorDisplay(s.floorName || s.floorNo, s.floorNo)}.S{s.stackNo}
                             {s.allocatedWeight ? ` (${s.allocatedWeight} KG${s.bagsCount ? `, ${s.bagsCount} bags` : ''})` : ''}
                           </Link>
                         ))
@@ -277,7 +278,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                           href={`/cold/floor-mapping?warehouseId=${txn.warehouse?._id}&chamberNo=${txn.chamberNo}&floorNo=${txn.floorNo}&stackNo=${txn.stackNo}`}
                           className="hover:text-blue-600 hover:underline transition-colors block text-[11px]"
                         >
-                          C{txn.chamberNo}.F{txn.floorNo}.S{txn.stackNo}
+                          {formatChamberDisplay(txn.chamberName || txn.chamberNo, txn.chamberNo)}.{formatFloorDisplay(txn.floorName || txn.floorNo, txn.floorNo)}.S{txn.stackNo}
                         </Link>
                       )}
                     </div>

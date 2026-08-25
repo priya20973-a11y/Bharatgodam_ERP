@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { ArrowRightLeft, Loader2, Plus, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 interface ColdStockShiftingFormProps {
   clients: any[];
@@ -51,8 +52,8 @@ const resolveFloorName = (warehouse: any, chamberNameOrNo: any, floorNo: any): s
 
 const getFloorLabel = (warehouse: any, chamberNameOrNo: any, floorNo: any, floorName?: string): string => {
   const name = floorName || resolveFloorName(warehouse, chamberNameOrNo, floorNo);
-  if (!name) return floorNo ? `Floor ${floorNo}` : 'Floor';
-  return isNaN(Number(name)) ? name : `Floor ${name}`;
+  if (!name) return floorNo ? formatFloorName(null, floorNo) : 'Floor';
+  return isNaN(Number(name)) ? name : formatFloorName(null, name);
 };
 
 export default function ColdStockShiftingForm({ clients, warehouses, onSuccess }: ColdStockShiftingFormProps) {
@@ -445,7 +446,7 @@ export default function ColdStockShiftingForm({ clients, warehouses, onSuccess }
 
             <div className="space-y-3">
               {sourceRows.map((src) => {
-                const displayChamber = src.chamberName || (src.chamberNo ? `Chamber ${src.chamberNo}` : 'Chamber');
+                const displayChamber = src.chamberName || (src.chamberNo ? formatChamberName(null, src.chamberNo) : 'Chamber');
                 const wh = warehouses.find((w) => w._id === src.warehouseId);
                 const displayFloor = getFloorLabel(wh, src.chamberName || src.chamberNo, src.floorNo, src.floorName);
                 return (
@@ -577,7 +578,7 @@ export default function ColdStockShiftingForm({ clients, warehouses, onSuccess }
                           <SelectTrigger className="h-9 text-xs bg-white"><SelectValue placeholder="Chamber" /></SelectTrigger>
                           <SelectContent>
                             {chambers.map((c: any) => (
-                              <SelectItem key={c.name} value={c.name}>{c.name || `Chamber ${c.chamberNo}`}</SelectItem>
+                              <SelectItem key={c.name} value={c.name}>{c.name || formatChamberName(null, c.chamberNo)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -593,7 +594,7 @@ export default function ColdStockShiftingForm({ clients, warehouses, onSuccess }
                           <SelectTrigger className="h-9 text-xs bg-white"><SelectValue placeholder="Floor" /></SelectTrigger>
                           <SelectContent>
                             {floors.map((f: any) => {
-                              const flDisplay = f.name || (f.floorNo ? `Floor ${f.floorNo}` : 'Floor');
+                              const flDisplay = f.name || (f.floorNo ? formatFloorName(null, f.floorNo) : 'Floor');
                               return (
                                 <SelectItem key={f.floorNo} value={f.floorNo.toString()}>
                                   {flDisplay}

@@ -25,7 +25,7 @@ export function generateColdInvoiceHTML(
   const refPersonEmail = warehouse?.referencePersons?.[0]?.email || warehouse?.userEmail || '';
 
   // Invoice Number & Dates
-  const invoiceNo = invoice.invoiceId || invoice.invoiceNo || (invoice._id ? `CIN-${String(invoice._id).slice(-6).toUpperCase()}` : 'CIN-000000');
+  const invoiceNo = invoice.receiptNumber ? invoice.receiptNumber.toString() : (invoice.invoiceId || invoice.invoiceNo || (invoice._id ? `CIN-${String(invoice._id).slice(-6).toUpperCase()}` : 'CIN-000000'));
 
   const rawDate = invoice.createdAt || invoice.generatedAt || invoice.date;
   const invoiceDateStr = rawDate ? format(new Date(rawDate), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy');

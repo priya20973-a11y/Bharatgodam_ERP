@@ -5,10 +5,12 @@ import ColdOutward from '@/lib/models/ColdOutward';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdTransfer from '@/lib/models/ColdTransfer';
 import ColdCommodity from '@/lib/models/ColdCommodity';
+import { generateReceiptNumber } from '@/lib/receipt-generator';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
+import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 
 export async function getColdOutwards() {
   await connectToDatabase();
@@ -232,7 +234,7 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
         let finalChamberName = alloc.chamberName;
-        let finalFloorName = `Floor ${alloc.floorNo}`;
+        let finalFloorName = formatFloorName(null, alloc.floorNo);
         let finalStackName = `Stack ${alloc.stackNo}`;
         
         if (inward.warehouseId && inward.warehouseId.chambers) {
@@ -392,8 +394,11 @@ export async function createColdOutward(data: any) {
 
     if (data.grade === '') delete data.grade;
 
+    const outwardReceiptNumber = await generateReceiptNumber(data.warehouseId, 'outward', data.chamberName || data.chamberNo?.toString());
+
     const outward = await ColdOutward.create(appendOwnership({
       ...data,
+      receiptNumber: outwardReceiptNumber,
       totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
       clientModel: data.clientModel || 'Client',
       serviceType: data.serviceType,
@@ -431,6 +436,10 @@ export async function createBatchColdOutwards(payload: any) {
 
     const batchId = new mongoose.Types.ObjectId().toString();
     const createdOutwards = [];
+
+    const firstItem = payload.items[0];
+    const warehouseId = firstItem.warehouseId || payload.warehouseId;
+    const batchReceiptNumber = await generateReceiptNumber(warehouseId, 'outward', firstItem.chamberName || firstItem.chamberNo?.toString());
 
     for (const item of payload.items) {
       if (!item.inwardId) {
@@ -551,6 +560,7 @@ export async function createBatchColdOutwards(payload: any) {
 
       const outward = await ColdOutward.create(appendOwnership({
         ...item,
+        receiptNumber: batchReceiptNumber,
         batchId: payload.batchId || batchId,
         date: outDate,
         totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
