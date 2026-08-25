@@ -59,6 +59,9 @@ export default function Sidebar({ session }: SidebarProps) {
   
   // Filter WSP items based on permissions
   const filteredWspNavItems = wspNavItems.filter(item => {
+    // Explicitly ensure Client Master is visible
+    if (item.moduleId === 'clientMaster') return true;
+    
     if (item.moduleId) {
       return hasWspPermission(session, item.moduleId);
     }

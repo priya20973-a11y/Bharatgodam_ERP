@@ -294,33 +294,12 @@ export async function POST(request: Request) {
 
     const result = await db.collection('clients').insertOne(client);
 
-    const credentials = await createClientUserAccount(
-      db,
-      nameValue,
-      String(type),
-      mobile,
-      address,
-      gstNumber,
-      providedEmail || undefined
-    );
-
-    await db.collection('clients').updateOne(
-      { _id: result.insertedId },
-      { $set: { userId: credentials.userId, userEmail: credentials.userEmail, email: providedEmail || credentials.userEmail } }
-    );
-
     return NextResponse.json({
       success: true,
       message: 'Client created successfully',
       client: {
         id: result.insertedId.toString(),
         ...client,
-        userId: credentials.userId,
-        userEmail: credentials.userEmail,
-      },
-      credentials: {
-        email: credentials.userEmail,
-        password: credentials.password,
       }
     });
 

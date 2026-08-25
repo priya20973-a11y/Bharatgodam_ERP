@@ -250,38 +250,13 @@ export async function createClient(data: {
 
     if (isColdStorage) {
       revalidatePath('/cold/clients');
-      return {
-        success: true,
-        data: JSON.parse(JSON.stringify(client)),
-      };
+    } else {
+      revalidatePath('/dashboard/clients');
     }
 
-    const db = await getDb();
-    const credentials = await createClientUserAccount(
-      db,
-      nameValue,
-      data.clientType,
-      data.mobile,
-      data.address,
-      data.gstNumber,
-      (data as any).email
-    );
-
-    const updatedClient = await Client.findByIdAndUpdate(
-      client._id,
-      { userId: credentials.userId, userEmail: credentials.userEmail, email: (data as any).email || credentials.userEmail },
-      { new: true }
-    );
-
-    const responseClient = updatedClient ? JSON.parse(JSON.stringify(updatedClient)) : JSON.parse(JSON.stringify(client));
-    revalidatePath('/dashboard/clients');
     return {
       success: true,
-      data: responseClient,
-      credentials: {
-        email: credentials.userEmail,
-        password: credentials.password,
-      },
+      data: JSON.parse(JSON.stringify(client)),
     };
   } catch (error: unknown) {
     const message = error instanceof Error && /duplicate key/i.test(error.message)

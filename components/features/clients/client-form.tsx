@@ -159,15 +159,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
         : await createClient(payload as any, isColdStorage);
 
       if (res.success) {
-        if (!client && 'credentials' in res && res.credentials) {
-          const credentials = res.credentials as { email: string; password: string };
-          toast.success('Client registered');
-          window.alert(
-            `Client account created successfully.\n\nLogin Email: ${credentials.email}\nPassword: ${credentials.password}`
-          );
-        } else {
-          toast.success(client ? t('clients.clientUpdated') : t('clients.clientRegistered'));
-        }
+        toast.success(client ? t('clients.clientUpdated') : t('clients.clientRegistered'));
         onSuccess(res.data);
       } else {
         toast.error(res.error || t('common.error'));

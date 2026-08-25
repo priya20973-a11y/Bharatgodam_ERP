@@ -33,7 +33,8 @@ export async function requireWspPagePermission(moduleId: WspModuleId) {
     const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
     const perms = dbUser?.wspPermissions || {};
     
-    if (perms[moduleId] === false) {
+    // Explicitly allow clientMaster even if it's set to false in the database
+    if (perms[moduleId] === false && moduleId !== 'clientMaster') {
       // Find the first permitted module to avoid redirect loops
       const availableModules = Object.keys(WSP_MODULE_PATHS) as WspModuleId[];
       const firstPermitted = availableModules.find(id => perms[id] !== false);
@@ -59,7 +60,7 @@ export async function requireWspActionPermission(moduleId: WspModuleId) {
   if (role === 'WSP' && user.storagePlan !== 'COLD' && !user.isStaff) {
     const db = await getDb();
     const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
-    if (dbUser?.wspPermissions && dbUser.wspPermissions[moduleId] === false) {
+    if (dbUser?.wspPermissions && dbUser.wspPermissions[moduleId] === false && moduleId !== 'clientMaster') {
       throw new Error(`403_FORBIDDEN: Unauthorized access to module ${moduleId}`);
     }
   }
