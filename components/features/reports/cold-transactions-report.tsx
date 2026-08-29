@@ -39,6 +39,7 @@ interface TransactionRecord {
   warehouseName: string;
   warehouseId: string;
   quantityKg: number;
+  netWeightLoss?: number;
   unit?: string;
   bagsCount?: number;
   chamberNo?: string;
@@ -207,6 +208,15 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
       },
     },
     {
+      accessorKey: 'netWeightLoss',
+      header: 'Net Loss (KG)',
+      cell: ({ row }) => {
+        const value = row.getValue('netWeightLoss');
+        if (typeof value !== 'number' || value === 0) return <span className="text-slate-400">—</span>;
+        return <span className="font-medium text-red-600">{value.toFixed(2)}</span>;
+      },
+    },
+    {
       accessorKey: 'stockType',
       header: 'Stock Type',
       cell: ({ row }) => {
@@ -319,6 +329,7 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
         'Commodity': item.commodityName,
         'Warehouse': item.warehouseName,
         'Qty': `${item.quantityKg} ${item.unit || 'KG'}`,
+        'Net Loss': item.netWeightLoss || '',
         'Chamber No': item.chamberNo || '',
         'Floor No': item.floorNo || '',
         'Stack No': item.stackNo || '',

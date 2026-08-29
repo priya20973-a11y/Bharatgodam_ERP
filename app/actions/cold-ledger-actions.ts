@@ -116,6 +116,7 @@ export async function getColdClientLedger(clientId: string) {
         grossWeight: t.grossWeight || 0,
         emptyWeight: t.emptyWeight || 0,
         plusMinus: null,
+        netWeightLoss: null,
         totalBags: t.bagsCount,
         createdAt: t.createdAt,
         isPurchaseStock
@@ -169,6 +170,7 @@ export async function getColdClientLedger(clientId: string) {
       grossWeight: t.grossWeight || 0,
       emptyWeight: t.emptyWeight || 0,
       plusMinus: t.type === 'OUTWARD' ? (t.plusMinus || 0) : null,
+      netWeightLoss: t.type === 'OUTWARD' ? (t.netWeightLoss || null) : null,
       totalBags: t.totalBags || t.bagsCount,
       createdAt: t.createdAt,
       isPurchaseStock,

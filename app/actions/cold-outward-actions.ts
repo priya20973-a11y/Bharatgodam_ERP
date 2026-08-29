@@ -11,6 +11,7 @@ import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
+import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 
 export async function getColdOutwards() {
   await connectToDatabase();
@@ -291,8 +292,9 @@ export async function createColdOutward(data: any) {
       return { success: false, error: 'Cannot create outward: Inward ID is required.' };
     }
 
+    let inward: any = null;
     if (data.inwardId) {
-      const inward = await ColdInward.findById(data.inwardId);
+      inward = await ColdInward.findById(data.inwardId);
       if (!inward) {
         return { success: false, error: 'Cannot create outward: Inward not found.' };
       }
@@ -330,6 +332,7 @@ export async function createColdOutward(data: any) {
 
     let rentRs = 0;
     let rentReason = '';
+    let rentBreakdown: any = null;
     const commodity = await ColdCommodity.findById(data.commodityId);
     const outDate = data.date ? new Date(data.date) : new Date();
     
@@ -367,7 +370,7 @@ export async function createColdOutward(data: any) {
 
         // Rent Calculation
         const unit = (commodity.unit || 'KG').toUpperCase();
-        const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
 
         if (isKg) {
           if (commodity.priceType === 'Different Price') {
@@ -384,6 +387,26 @@ export async function createColdOutward(data: any) {
           } else {
             rentRs = totalBags * baseUnitRate;
           }
+        }
+
+        if (commodity.rentType === 'Per Month') {
+          const perMonthResult = calculatePerMonthRent({
+            inwardDate: inward.date,
+            outwardDate: outDate,
+            seasonalPrices: commodity.seasonalPrices,
+            priceType: commodity.priceType || 'Same Price',
+            unit: commodity.unit || 'KG',
+            rentCalculationOn: commodity.rentCalculationOn,
+            gradingType: commodity.gradingType,
+            quantityKg: Number(data.quantityKg) || 0,
+            bagsLarge: Number(data.bagsCount) || 0,
+            bagsSmall: Number(data.jin) || 0,
+            bagsMixed: Number(data.mixed) || 0,
+            totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+          });
+          rentRs = perMonthResult.totalRent;
+          rentBreakdown = perMonthResult.monthBreakdown;
+          if (!rentReason) rentReason = perMonthResult.rentReason;
         }
       } else {
         rentReason = 'Seasonal price not found for date';
@@ -411,8 +434,10 @@ export async function createColdOutward(data: any) {
       gradingCharge: data.gradingCharge,
       rentRs,
       rentReason,
+      rentBreakdown,
       unitRate: data.unitRate,
       date: outDate,
+      netWeightLoss: data.netWeightLoss,
       unit: commodity?.unit || 'KG',
     }, session));
     
@@ -446,8 +471,9 @@ export async function createBatchColdOutwards(payload: any) {
         return { success: false, error: 'Cannot create outward: Inward ID is required for all items.' };
       }
 
+      let inward: any = null;
       if (item.inwardId) {
-        const inward = await ColdInward.findById(item.inwardId);
+        inward = await ColdInward.findById(item.inwardId);
         if (!inward) {
           return { success: false, error: 'Cannot create outward: Inward not found.' };
         }
@@ -485,6 +511,7 @@ export async function createBatchColdOutwards(payload: any) {
 
       let rentRs = 0;
       let rentReason = '';
+      let rentBreakdown: any = null;
       const commodity = await ColdCommodity.findById(item.commodityId);
       const outDate = payload.date ? new Date(payload.date) : new Date();
       
@@ -514,7 +541,7 @@ export async function createBatchColdOutwards(payload: any) {
           }
 
           const unit = (commodity.unit || 'KG').toUpperCase();
-          const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+          const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
 
           if (isKg) {
             let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
@@ -549,6 +576,26 @@ export async function createBatchColdOutwards(payload: any) {
               rentRs = totalBags * baseUnitRate;
             }
           }
+
+          if (commodity.rentType === 'Per Month') {
+            const perMonthResult = calculatePerMonthRent({
+              inwardDate: inward.date,
+              outwardDate: outDate,
+              seasonalPrices: commodity.seasonalPrices,
+              priceType: commodity.priceType || 'Same Price',
+              unit: commodity.unit || 'KG',
+              rentCalculationOn: commodity.rentCalculationOn,
+              gradingType: commodity.gradingType,
+              quantityKg: Number(item.quantityKg) || 0,
+              bagsLarge: Number(item.bagsCount) || 0,
+              bagsSmall: Number(item.jin) || 0,
+              bagsMixed: Number(item.mixed) || 0,
+              totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
+            });
+            rentRs = perMonthResult.totalRent;
+            rentBreakdown = perMonthResult.monthBreakdown;
+            if (!rentReason) rentReason = perMonthResult.rentReason;
+          }
         } else {
           rentReason = 'Seasonal price not found for date';
         }
@@ -566,10 +613,13 @@ export async function createBatchColdOutwards(payload: any) {
         totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
         rentRs,
         rentReason,
+        rentBreakdown,
         clientId: payload.clientId,
         clientModel: payload.clientModel || 'Client',
         truckNo: payload.truckNo,
+        vehicleType: payload.vehicleType,
         weighbridgeSlipNo: payload.weighbridgeSlipNo,
+        weighbridgeCharge: payload.weighbridgeCharge,
         grossWeight: payload.grossWeight,
         emptyWeight: payload.emptyWeight,
         kataBharati: payload.kataBharati,
@@ -584,6 +634,7 @@ export async function createBatchColdOutwards(payload: any) {
         gradingChargeType: item.gradingChargeType,
         gradingRate: item.gradingRate,
         gradingCharge: item.gradingCharge,
+        netWeightLoss: item.netWeightLoss,
         unit: commodity?.unit || 'KG',
       }, session));
       createdOutwards.push(outward);

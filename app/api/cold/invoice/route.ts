@@ -35,12 +35,12 @@ export async function GET(request: Request) {
     if (type === 'INWARD') {
       transaction = await ColdInward.findOne({ _id: id, ...tenantFilter })
         .populate('clientId')
-        .populate('commodityId')
+        .populate('commodityId', 'name unit rentCalculationOn seasonalPrices priceType')
         .populate('warehouseId');
     } else {
       transaction = await ColdOutward.findOne({ _id: id, ...tenantFilter })
         .populate('clientId')
-        .populate('commodityId')
+        .populate('commodityId', 'name unit rentCalculationOn seasonalPrices priceType')
         .populate('warehouseId');
     }
 

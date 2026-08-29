@@ -10,6 +10,7 @@ import { hasPermission } from '@/lib/permissions';
 import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import { getStackAvailableCapacity } from './cold-inward-actions';
 import mongoose from 'mongoose';
+import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 export async function getColdTransactions() {
   await connectToDatabase();
   const session = await requireSession();
@@ -17,20 +18,20 @@ export async function getColdTransactions() {
 
   const inwards = await ColdInward.find(tenantFilter)
     .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType')
+    .populate('commodityId', 'name type gradingType rentCalculationOn')
     .populate('warehouseId', 'name warehouseId chambers')
     .lean();
 
   const outwards = await ColdOutward.find(tenantFilter)
     .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType')
+    .populate('commodityId', 'name type gradingType rentCalculationOn')
     .populate('warehouseId', 'name warehouseId chambers')
     .lean();
 
   const transfers = await ColdTransfer.find(tenantFilter)
     .populate('fromClientId', 'name clientType')
     .populate('toClientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType')
+    .populate('commodityId', 'name type gradingType rentCalculationOn')
     .populate('warehouseId', 'name warehouseId chambers')
     .lean();
 
@@ -116,6 +117,7 @@ export async function getColdTransactions() {
       floorNo: processedAllocations.map((s: any) => s.floorName || s.floorNo).join('; '),
       stackNo: processedAllocations.map((s: any) => s.stackNo).join('; '),
       quantityKg: t.quantityKg,
+      netWeightLoss: t.netWeightLoss,
       bagsCount: t.totalBags !== undefined ? t.totalBags : t.bagsCount,
       grade: t.grade,
       gradingType: t.gradingType || t.commodityId?.gradingType,
@@ -384,7 +386,7 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
           }
 
           const unit = (commodity.unit || 'KG').toUpperCase();
-          const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+          const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
 
           if (isKg) {
             let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
@@ -418,6 +420,25 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
             } else {
               rentRs = totalBags * baseUnitRate;
             }
+          }
+
+          if (commodity.rentType === 'Per Month') {
+            const perMonthResult = calculatePerMonthRent({
+              inwardDate: inward.date,
+              outwardDate: outwardDate,
+              seasonalPrices: commodity.seasonalPrices,
+              priceType: commodity.priceType || 'Same Price',
+              unit: commodity.unit || 'KG',
+              rentCalculationOn: commodity.rentCalculationOn,
+              gradingType: commodity.gradingType,
+              quantityKg: Number(data.quantityKg) || 0,
+              bagsLarge: Number(data.bagsCount) || 0,
+              bagsSmall: Number(data.jin) || 0,
+              bagsMixed: Number(data.mixed) || 0,
+              totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+            });
+            rentRs = perMonthResult.totalRent;
+            if (!rentReason) rentReason = perMonthResult.rentReason;
           }
         } else {
           rentReason = 'Seasonal price not found for date';

@@ -70,6 +70,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [remarks, setRemarks] = useState('');
   const [note, setNote] = useState('');
   const [truckNo, setTruckNo] = useState('');
+  const [vehicleType, setVehicleType] = useState('Truck');
+  const [vehicleTypeOther, setVehicleTypeOther] = useState('');
+  const [weighbridgeSlipNo, setWeighbridgeSlipNo] = useState('');
+  const [weighbridgeCharge, setWeighbridgeCharge] = useState<number | ''>('');
 
   // Selected Inwards
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
@@ -235,6 +239,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           jin: inward.jin || null,
           mixed: inward.mixed || null,
           plusMinus: '-',
+          netWeightLoss: null,
           grossWeight: inward.availableQty || null,
           emptyWeight: 0,
           gradingApplied: isGradingFromInward ? true : false,
@@ -305,6 +310,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               jin: inward.jin || null,
               mixed: inward.mixed || null,
               plusMinus: '-',
+              netWeightLoss: null,
               grossWeight: inward.quantityKg || null,
               emptyWeight: 0,
               gradingApplied: isGradingFromInward ? true : false,
@@ -375,6 +381,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         jin: inward.jin || null,
         mixed: inward.mixed || null,
         plusMinus: '-',
+        netWeightLoss: null,
         grossWeight: null,
         emptyWeight: null,
         gradingApplied: isGradingFromInward ? true : false,
@@ -506,6 +513,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             jin: deductSmallBags,
             mixed: deductMixedBags,
             plusMinus: Number(item.plusMinus) || 0,
+            netWeightLoss: Number(item.netWeightLoss) || 0,
             totalBags: deductTotalBags,
             weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
             grossWeight: outwardWeight,
@@ -590,6 +598,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             jin: deductSmallBags,
             mixed: deductMixedBags,
             plusMinus: Number(item.plusMinus) || 0,
+            netWeightLoss: Number(item.netWeightLoss) || 0,
             totalBags: deductTotalBags,
             weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
             grossWeight: grossWeightPart,
@@ -614,6 +623,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         clientModel,
         date,
         truckNo,
+        vehicleType: vehicleType === 'Other' ? vehicleTypeOther : vehicleType,
+        weighbridgeSlipNo,
+        weighbridgeCharge: weighbridgeCharge === '' ? undefined : weighbridgeCharge,
         remarks,
         note,
         items: itemsPayload
@@ -731,6 +743,32 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           <Input value={truckNo} onChange={(e) => setTruckNo(e.target.value)} />
         </div>
         <div className="space-y-2">
+          <label className="text-sm font-medium">Vehicle Type</label>
+          <select
+            value={vehicleType}
+            onChange={(e) => setVehicleType(e.target.value)}
+            className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white"
+          >
+            <option value="Truck">Truck</option>
+            <option value="Tempo">Tempo</option>
+            <option value="Pickup">Pickup</option>
+            <option value="Trailer">Trailer</option>
+            <option value="Container">Container</option>
+            <option value="Other">Other</option>
+          </select>
+          {vehicleType === 'Other' && (
+            <Input className="mt-2" placeholder="Specify Vehicle Type" value={vehicleTypeOther} onChange={(e) => setVehicleTypeOther(e.target.value)} />
+          )}
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Weighbridge No.</label>
+          <Input value={weighbridgeSlipNo} onChange={(e) => setWeighbridgeSlipNo(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Weighbridge Charge</label>
+          <ColdNumberInput min="0" value={weighbridgeCharge} onChange={(val) => setWeighbridgeCharge(val ? Number(val) : '')} />
+        </div>
+        <div className="space-y-2">
           <label className="text-sm font-medium">{t('outward.remarks')}</label>
           <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} />
         </div>
@@ -772,9 +810,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                   <h5 className="font-bold text-indigo-950 text-sm flex items-center gap-2">
                     Select Stack for Outward
                   </h5>
-                  <span className="text-xs font-semibold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full">
-                    {item.inward.availableAllocations.length} Stacks Available
-                  </span>
+                  <div className="flex gap-4">
+                    <span className="text-xs font-semibold text-indigo-800 bg-indigo-100 px-2 py-1 rounded-full flex items-center">
+                      {item.inward.availableAllocations.length} Stacks Available
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -1026,7 +1066,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                               <div className="text-xs font-medium text-slate-800">
                                 <span className="font-bold text-slate-900">{stackObj.displayName}</span>
                                 {stackObj.allocatedWeight !== undefined && (
-                                  <span className="text-slate-500 ml-1.5">({stackObj.allocatedWeight} KG)</span>
+                                  <span className="text-slate-500 ml-1.5">({stackObj.allocatedWeight} {item.inward.unit || item.inward.commodityId?.unit || 'KG'})</span>
                                 )}
                               </div>
                             </div>

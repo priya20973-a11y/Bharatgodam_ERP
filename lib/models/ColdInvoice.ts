@@ -6,6 +6,7 @@ export interface IColdInvoiceItem {
   outwardDate?: Date;
   commodityId: mongoose.Types.ObjectId;
   commodityName: string;
+  hsnCode?: string;
   quantityKg: number;
   outwardKg: number;
   balanceKg: number;
@@ -55,6 +56,7 @@ const ColdInvoiceSchema: Schema = new Schema(
         outwardDate: Date,
         commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity' },
         commodityName: String,
+        hsnCode: String,
         quantityKg: Number,
         outwardKg: Number,
         balanceKg: Number,

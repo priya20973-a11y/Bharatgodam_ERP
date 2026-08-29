@@ -88,6 +88,7 @@ export function generateColdInvoiceHTML(
       srNo: idx + 1,
       commodityName: it.commodityName || it.commodity || 'Commodity',
       sacCode: it.sacCode || '998612',
+      hsnCode: it.hsnCode || '',
       inwardDate: inwardDateFormatted,
       outwardDate: outwardDateFormatted,
       inwardKg: inKg,
@@ -591,7 +592,28 @@ export function generateColdInvoiceHTML(
             <td class="text-center font-semibold">${item.srNo}</td>
             <td>
               <div class="font-bold">${item.commodityName}</div>
+              ${item.hsnCode ? `<div style="font-size: 7.5pt; color: #15803d; margin-top: 2px; font-weight: 600;">HSN: ${item.hsnCode}</div>` : ''}
               ${item.calculationPath ? `<div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">${item.calculationPath}</div>` : ''}
+              ${item.monthBreakdown && item.monthBreakdown.length > 0 ? `
+              <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 7.5pt;">
+                <thead>
+                  <tr style="background: #f8fafc;">
+                    <th style="padding: 2px 5px; border: 1px solid #e2e8f0; text-align: left;">Month</th>
+                    <th style="padding: 2px 5px; border: 1px solid #e2e8f0; text-align: right;">Rate (₹)</th>
+                    <th style="padding: 2px 5px; border: 1px solid #e2e8f0; text-align: right;">Amount (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${item.monthBreakdown.map((b: any) => `
+                  <tr>
+                    <td style="padding: 1px 5px; border: 1px solid #e2e8f0;">${b.month}</td>
+                    <td style="padding: 1px 5px; border: 1px solid #e2e8f0; text-align: right;">${formatNumber(b.rate, 2)}</td>
+                    <td style="padding: 1px 5px; border: 1px solid #e2e8f0; text-align: right;">${formatNumber(b.amount, 2)}</td>
+                  </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              ` : ''}
             </td>
             <td class="text-center">${item.inwardDate}</td>
             <td class="text-center">${item.outwardDate}</td>

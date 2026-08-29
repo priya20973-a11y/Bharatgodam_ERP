@@ -118,6 +118,11 @@ export default function ColdCommodityListWrapper({ initialCommodities }: Props) 
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">
                     {commodity.unit}
                   </span>
+                  {commodity.hsnCode && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
+                      HSN: {commodity.hsnCode}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } 
 import mongoose from 'mongoose';
 import { differenceInDays } from 'date-fns';
 import { generateReceiptNumber } from '@/lib/receipt-generator';
+import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 
 export async function generateColdClientInvoicePreview(
   warehouseId: string,
@@ -40,7 +41,7 @@ export async function generateColdClientInvoicePreview(
   }
 
   const outwards = await ColdOutward.find(outwardsQuery)
-    .populate('commodityId')
+    .populate('commodityId', 'name unit rentCalculationOn seasonalPrices priceType')
     .populate({
       path: 'inwardId',
       populate: { path: 'commodityId' }
@@ -78,7 +79,7 @@ export async function generateColdClientInvoicePreview(
       const pricePerKg = seasonalPrice?.pricePerKg || 0;
 
       const unit = (commodity.unit || 'KG').toUpperCase();
-      const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+      const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
 
       if (isKg) {
         if (commodity.priceType === 'Different Price') {
@@ -99,12 +100,32 @@ export async function generateColdClientInvoicePreview(
           rent = totalBags * pricePerKg;
         }
       }
+
+      if (commodity.rentType === 'Per Month') {
+        const perMonthResult = calculatePerMonthRent({
+          inwardDate: inwDate,
+          outwardDate: outDate,
+          seasonalPrices: commodity.seasonalPrices,
+          priceType: commodity.priceType || 'Same Price',
+          unit: commodity.unit || 'KG',
+          rentCalculationOn: commodity.rentCalculationOn,
+          gradingType: (commodity as any).gradingType,
+          quantityKg,
+          bagsLarge,
+          bagsSmall,
+          bagsMixed,
+          totalBags,
+        });
+        rent = perMonthResult.totalRent;
+        (o as any)._monthBreakdown = perMonthResult.monthBreakdown;
+        (o as any)._rentReason = perMonthResult.rentReason;
+      }
     }
 
     let rateApplied = Number(o.unitRate || o.rateApplied || 0);
     if (rateApplied === 0 && rent > 0 && commodity.priceType !== 'Different Price') {
       const unit = (commodity.unit || 'KG').toUpperCase();
-      const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
+      const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
       if (isKg && quantityKg > 0) {
         rateApplied = Number((rent / quantityKg).toFixed(4));
       } else if (!isKg && totalBags > 0) {
@@ -119,7 +140,8 @@ export async function generateColdClientInvoicePreview(
       inwardDate: inwDate.toISOString(),
       outwardDate: outDate.toISOString(),
       commodityId: commodity._id.toString(),
-      commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : ''),
+      commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : '') + (commodity.rentType === 'Per Month' ? ' (Per Month)' : ''),
+      hsnCode: commodity.hsnCode || '',
       quantityKg: inward?.quantityKg || quantityKg,
       outwardKg: quantityKg,
       balanceKg: Math.max(0, (inward?.quantityKg || quantityKg) - quantityKg),
@@ -130,7 +152,8 @@ export async function generateColdClientInvoicePreview(
       days: 0,
       rateApplied,
       subtotal: rent,
-      calculationPath: o.rentReason || ''
+      calculationPath: (o as any)._rentReason || o.rentReason || '',
+      monthBreakdown: (o as any)._monthBreakdown || o.rentBreakdown || null
     });
 
     totalAmount += rent;
@@ -138,11 +161,20 @@ export async function generateColdClientInvoicePreview(
 
   let gradingAmount = 0;
   let wetAmount = 0;
+  let weighbridgeAmount = 0;
+  let weighbridgeSlips: string[] = [];
 
   for (const o of outwards) {
     if (o.serviceType === 'Grading' && (o.serviceAmount || 0) > 0) gradingAmount += (o.serviceAmount || 0);
     if (o.serviceType === 'Wet' && (o.serviceAmount || 0) > 0) wetAmount += (o.serviceAmount || 0);
     if (o.gradingApplied && (o.gradingCharge || 0) > 0) gradingAmount += (o.gradingCharge || 0);
+    
+    if (o.weighbridgeCharge !== undefined && o.weighbridgeCharge !== null && o.weighbridgeCharge > 0) {
+      weighbridgeAmount += o.weighbridgeCharge;
+      if (o.weighbridgeSlipNo && !weighbridgeSlips.includes(o.weighbridgeSlipNo)) {
+        weighbridgeSlips.push(o.weighbridgeSlipNo);
+      }
+    }
   }
 
   const autoCharges = [];
@@ -151,6 +183,12 @@ export async function generateColdClientInvoicePreview(
   }
   if (wetAmount > 0) {
     autoCharges.push({ name: 'Wet Charges', amount: wetAmount });
+  }
+  if (weighbridgeAmount > 0) {
+    const name = weighbridgeSlips.length > 0 
+      ? `Weighbridge Charge (No: ${weighbridgeSlips.join(', ')})`
+      : 'Weighbridge Charge';
+    autoCharges.push({ name, amount: weighbridgeAmount });
   }
 
   return {

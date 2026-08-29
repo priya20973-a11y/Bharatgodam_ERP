@@ -24,7 +24,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
 
   const [name, setName] = useState('');
   const [type, setType] = useState('');
+  const [hsnCode, setHsnCode] = useState(initialData?.hsnCode || '');
   const [unit, setUnit] = useState(initialData?.unit || '');
+  const [rentCalculationOn, setRentCalculationOn] = useState<string>('Kg');
+  const [rentType, setRentType] = useState<string>('One Time');
   const [qualityParameters, setQualityParameters] = useState<{name: string, lowerLimit: number, upperLimit: number}[]>([]);
   const [gradingChargeType, setGradingChargeType] = useState<'Per Bag' | 'Per Kg' | ''>('');
   const [gradingChargeRate, setGradingChargeRate] = useState<number | ''>('');
@@ -51,7 +54,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     if (initialData && isOpen) {
       setName(initialData.name || '');
       setType(initialData.type || '');
+      setHsnCode(initialData.hsnCode || '');
       setUnit(initialData.unit || 'KG');
+      setRentCalculationOn(initialData.rentCalculationOn || 'Kg');
+      setRentType(initialData.rentType || 'One Time');
       setQualityParameters(initialData.qualityParameters || []);
       setGradingChargeType(initialData.gradingCharge?.type || '');
       setGradingChargeRate(initialData.gradingCharge?.defaultRate ?? '');
@@ -64,7 +70,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
     } else if (isOpen) {
       setName('');
       setType('');
+      setHsnCode('');
       setUnit('KG');
+      setRentCalculationOn('Kg');
+      setRentType('One Time');
       setQualityParameters([]);
       setGradingChargeType('');
       setGradingChargeRate('');
@@ -146,6 +155,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         name: name.trim().toUpperCase(),
         type: type.trim(),
         unit: unit,
+        rentCalculationOn: (unit.toUpperCase() === 'KG' || unit.toUpperCase() === 'KILOGRAM' || unit.toUpperCase() === 'KGS') ? rentCalculationOn : undefined,
+        rentType,
+        hsnCode: hsnCode.trim() || undefined,
         qualityParameters,
         gradingCharge: gradingChargeType ? { type: gradingChargeType, defaultRate: Number(gradingChargeRate) || 0 } : undefined,
         priceType: priceType || undefined,
@@ -231,7 +243,18 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">HSN Code</label>
+                <input
+                  type="text"
+                  placeholder="Optional HSN Code"
+                  value={hsnCode}
+                  onChange={(e) => setHsnCode(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white uppercase transition-all outline-none"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-1">
                 <label className="text-sm font-semibold text-slate-700">{t('commodities.unitConstraint')} <span className="text-red-500">*</span></label>
                 <select
                   value={unit}
@@ -244,6 +267,32 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                   {availableUnits.map(u => (
                     <option key={u._id} value={u.code}>{u.code} ({u.name})</option>
                   ))}
+                </select>
+              </div>
+
+              {(unit.toUpperCase() === 'KG' || unit.toUpperCase() === 'KILOGRAM' || unit.toUpperCase() === 'KGS') && (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Calculate Rent According To</label>
+                  <select
+                    value={rentCalculationOn}
+                    onChange={(e) => setRentCalculationOn(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                  >
+                    <option value="Kg">Kg</option>
+                    <option value="Bag">Bag</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Rent Type</label>
+                <select
+                  value={rentType}
+                  onChange={(e) => setRentType(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
+                >
+                  <option value="One Time">One Time</option>
+                  <option value="Per Month">Per Month</option>
                 </select>
               </div>
 

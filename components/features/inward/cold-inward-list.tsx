@@ -174,9 +174,12 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="text-slate-700">
                     {w.gradingType || '-'}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)} {w.unit || w.commodityId?.unit || 'KG'}</TableCell>
+                  <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)} KG</TableCell>
                   <TableCell className="text-right text-slate-700">
-                    <div>{formatNumber(w.bagsCount)}</div>
+                    <div>
+                      {formatNumber(w.bagsCount)}
+                      {(w.unit || w.commodityId?.unit) && (w.unit || w.commodityId?.unit) !== 'KG' ? ` ${w.unit || w.commodityId?.unit}` : ''}
+                    </div>
                     {(w.largeBag || w.smallBag) ? (
                       <div className="text-xs text-slate-500 mt-0.5">L: {formatNumber(w.largeBag || 0)} | S: {formatNumber(w.smallBag || 0)}</div>
                     ) : null}

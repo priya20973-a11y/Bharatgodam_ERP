@@ -751,15 +751,15 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t bg-slate-100 p-4 rounded-md">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-blue-600">Gross Qty (KG) *</label>
+            <label className="text-sm font-medium text-blue-600">Gross Qty ({commonUnit}) *</label>
             <ColdNumberInput min="0" step="0.01" value={common.grossWeight ?? ''} onChange={(v) => setCommon({ ...common, grossWeight: v ? Number(v) : null })} />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-orange-600">Empty Qty (KG) *</label>
+            <label className="text-sm font-medium text-orange-600">Empty Qty ({commonUnit}) *</label>
             <ColdNumberInput min="0" step="0.01" value={common.emptyWeight ?? ''} onChange={(v) => setCommon({ ...common, emptyWeight: v ? Number(v) : null })} />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-green-700">Net Qty (KG)</label>
+            <label className="text-sm font-medium text-green-700">Net Qty ({commonUnit})</label>
             <div className="px-3 py-2 border rounded-md bg-white font-bold text-slate-700">
               {((Number(common.grossWeight) || 0) - (Number(common.emptyWeight) || 0)).toFixed(2)}
             </div>

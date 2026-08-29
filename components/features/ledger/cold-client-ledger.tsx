@@ -67,7 +67,8 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Inward</TableHead>
                 <TableHead className="text-right">Outward</TableHead>
-                <TableHead className="text-right">Net Wt. Change</TableHead>
+                <TableHead className="text-right">Net Loss</TableHead>
+                <TableHead className="text-right">Net Wt. Loss</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead className="text-right">Bags Balance</TableHead>
               </TableRow>
@@ -178,6 +179,9 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                       </TableCell>
                       <TableCell className="text-right text-slate-600 font-medium">
                         {tx.type === 'OUTWARD' && tx.plusMinus !== null ? cleanFormatNum(tx.plusMinus) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600 font-medium">
+                        {tx.type === 'OUTWARD' && tx.netWeightLoss ? cleanFormatNum(tx.netWeightLoss) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-bold text-slate-900">
                         {cleanFormatNum(runningBalance)}

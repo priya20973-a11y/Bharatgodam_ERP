@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
 import { getDynamicUnitLabel } from '@/lib/utils';
+import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
@@ -45,34 +46,71 @@ export function generateColdOutwardReceiptHTML(
   
   // Recalculate rent dynamically using Seasonal Unit Rate from Commodity Master if available
   let activeUnitRateUsed = 0;
-  const rawRentRs = outwards.reduce((acc, curr) => {
-    let activeUnitRate = curr.unitRate || 0;
-    const commodity = firstData.commodityId;
-    
-    // Dynamically fetch from Commodity Master's Seasonal Rate
-    if (commodity && commodity.seasonalPrices && commodity.seasonalPrices.length > 0) {
-      const outDate = curr.date ? new Date(curr.date) : new Date();
-      const outTime = outDate.getTime();
-      const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
-      if (commodity.priceType === 'Different Price') {
-        activeUnitRate = season.priceLarge || activeUnitRate;
-      } else {
-        activeUnitRate = season.pricePerKg || activeUnitRate;
-      }
+  let perMonthBreakdown: any[] | null = null;
+  const commodity = firstData.commodityId;
+  const rawRentRs = (() => {
+    // For Per Month commodities, use the shared calculatePerMonthRent function
+    if (commodity?.rentType === 'Per Month' && commodity?.seasonalPrices?.length > 0) {
+      // Get total quantities across all outwards
+      const totalQuantityKg = outwards.reduce((acc, curr) => acc + (curr.quantityKg || 0), 0);
+      const totalBagsLarge = outwards.reduce((acc, curr) => acc + (curr.bagsCount || 0), 0);
+      const totalBagsSmall = outwards.reduce((acc, curr) => acc + (curr.jin || 0), 0);
+      const totalBagsMixed = outwards.reduce((acc, curr) => acc + (curr.mixed || 0), 0);
+      const totalBagsAll = outwards.reduce((acc, curr) => acc + (curr.totalBags || 0), 0);
+
+      // Use inward date from first outward's inwardId, or outward date as fallback
+      const inwDate = firstData.inwardId?.date ? new Date(firstData.inwardId.date) : (firstData.date ? new Date(firstData.date) : new Date());
+      const outDate = firstData.date ? new Date(firstData.date) : new Date();
+
+      const perMonthResult = calculatePerMonthRent({
+        inwardDate: inwDate,
+        outwardDate: outDate,
+        seasonalPrices: commodity.seasonalPrices,
+        priceType: commodity.priceType || 'Same Price',
+        unit: commodity.unit || unitStr,
+        rentCalculationOn: commodity.rentCalculationOn,
+        gradingType: commodity.gradingType,
+        quantityKg: totalQuantityKg,
+        bagsLarge: totalBagsLarge,
+        bagsSmall: totalBagsSmall,
+        bagsMixed: totalBagsMixed,
+        totalBags: totalBagsAll || (totalBagsLarge + totalBagsSmall + totalBagsMixed),
+      });
+      perMonthBreakdown = perMonthResult.monthBreakdown;
+      return perMonthResult.totalRent;
     }
 
-    if (activeUnitRate > 0) {
-      activeUnitRateUsed = activeUnitRate;
-      const unit = (unitStr || 'KG').toUpperCase();
-      const isKg = unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS';
-      if (isKg) {
-        return acc + ((curr.quantityKg || 0) * activeUnitRate);
-      } else {
-        return acc + ((curr.totalBags || 0) * activeUnitRate);
+    // For non-Per-Month commodities, keep the original calculation
+    return outwards.reduce((acc, curr) => {
+      let activeUnitRate = curr.unitRate || 0;
+
+      // Dynamically fetch from Commodity Master's Seasonal Rate
+      if (commodity && commodity.seasonalPrices && commodity.seasonalPrices.length > 0) {
+        const outDate = curr.date ? new Date(curr.date) : new Date();
+        const outTime = outDate.getTime();
+        const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
+        if (commodity.priceType === 'Different Price') {
+          activeUnitRate = season.priceLarge || activeUnitRate;
+        } else {
+          activeUnitRate = season.pricePerKg || activeUnitRate;
+        }
       }
-    }
-    return acc + (curr.rentRs || 0);
-  }, 0);
+
+      if (activeUnitRate > 0) {
+        activeUnitRateUsed = activeUnitRate;
+        const unit = (unitStr || 'KG').toUpperCase();
+        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity?.rentCalculationOn !== 'Bag';
+        let calculatedRent = 0;
+        if (isKg) {
+          calculatedRent = ((curr.quantityKg || 0) * activeUnitRate);
+        } else {
+          calculatedRent = ((curr.totalBags || 0) * activeUnitRate);
+        }
+        return acc + calculatedRent;
+      }
+      return acc + (curr.rentRs || 0);
+    }, 0);
+  })();
   const bags = formatNum(rawBags);
   const jin = formatNum(rawJin);
   const mixed = formatNum(rawMixed);
@@ -93,6 +131,8 @@ export function generateColdOutwardReceiptHTML(
   const rentRsDisplay = rawRentRs > 0 ? formatNum(rawRentRs.toFixed(2)) : '';
 
   const truckNo = formatNum(firstData.truckNo || '');
+  const vehicleType = firstData.vehicleType || '';
+  const vehicleDisplay = vehicleType ? `${vehicleType} ${truckNo}`.trim() : truckNo;
   const remarks = firstData.remarks || '';
   const note = firstData.note || '';
   const farmerName = firstData.farmerName ? (firstData.farmerId ? `${firstData.farmerName} - ${firstData.farmerId}` : firstData.farmerName) : '';
@@ -136,7 +176,9 @@ export function generateColdOutwardReceiptHTML(
     qtyOther: lang === 'gu' ? '(૬) અન્ય વિગત' : '(6) Other Details',
     managerSign: lang === 'gu' ? 'મેનેજર' : 'Manager',
     receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign',
-    farmerNameLabel: lang === 'gu' ? 'ખેડૂતનું નામ' : 'Farmer Name'
+    farmerNameLabel: lang === 'gu' ? 'ખેડૂતનું નામ' : 'Farmer Name',
+    weighbridgeLabel: lang === 'gu' ? 'વે-બ્રિજ નં.' : 'Weighbridge No.',
+    weighbridgeChargeLabel: lang === 'gu' ? 'વે-બ્રિજ ચાર્જ' : 'Weighbridge Charge'
   };
 
   return `
@@ -475,8 +517,20 @@ export function generateColdOutwardReceiptHTML(
         </div>
         <div class="receipt-line">
           <div class="label">${t.truckNoLabel}</div>
-          <div class="value" style="color:#333;">${truckNo}</div>
+          <div class="value" style="color:#333;">${vehicleDisplay}</div>
         </div>
+        ${firstData.weighbridgeSlipNo ? `
+        <div class="receipt-line">
+          <div class="label">${t.weighbridgeLabel}</div>
+          <div class="value" style="color:#333;">${formatNum(firstData.weighbridgeSlipNo)}</div>
+        </div>
+        ` : ''}
+        ${firstData.weighbridgeCharge !== undefined && firstData.weighbridgeCharge !== null ? `
+        <div class="receipt-line">
+          <div class="label">${t.weighbridgeChargeLabel}</div>
+          <div class="value" style="color:#333;">${formatNum(Number(firstData.weighbridgeCharge).toFixed(2))}</div>
+        </div>
+        ` : ''}
         <div class="receipt-line">
           <div class="label">${t.remarkLabel}</div>
           <div class="value" style="color:#333;">${remarks}</div>
@@ -485,6 +539,32 @@ export function generateColdOutwardReceiptHTML(
           <div class="label">${t.rentLabel}</div>
           <div class="value" style="color:#333;">${rentRsDisplay}</div>
         </div>
+        ${perMonthBreakdown && perMonthBreakdown.length > 0 ? `
+        <div style="margin-left: 10px; margin-bottom: 8px; font-size: 13px;">
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #7b1e28;">
+            <thead>
+              <tr style="background: #f5e6e8;">
+                <th style="padding: 3px 8px; border: 1px solid #7b1e28; text-align: left; font-size: 12px;">${lang === 'gu' ? 'મહિનો' : 'Month'}</th>
+                <th style="padding: 3px 8px; border: 1px solid #7b1e28; text-align: right; font-size: 12px;">${lang === 'gu' ? 'રેટ' : 'Rate (₹)'}</th>
+                <th style="padding: 3px 8px; border: 1px solid #7b1e28; text-align: right; font-size: 12px;">${lang === 'gu' ? 'રકમ' : 'Amount (₹)'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${perMonthBreakdown.map((b: any) => `
+              <tr>
+                <td style="padding: 2px 8px; border: 1px solid #ddd; font-size: 12px; color: #333;">${formatNum(b.month)}</td>
+                <td style="padding: 2px 8px; border: 1px solid #ddd; text-align: right; font-size: 12px; color: #333;">${formatNum(b.rate.toFixed(2))}</td>
+                <td style="padding: 2px 8px; border: 1px solid #ddd; text-align: right; font-size: 12px; color: #333;">${formatNum(b.amount.toFixed(2))}</td>
+              </tr>
+              `).join('')}
+              <tr style="background: #f5e6e8; font-weight: bold;">
+                <td colspan="2" style="padding: 3px 8px; border: 1px solid #7b1e28; font-size: 12px;">${lang === 'gu' ? 'કુલ' : 'Total'}</td>
+                <td style="padding: 3px 8px; border: 1px solid #7b1e28; text-align: right; font-size: 12px;">${formatNum(rawRentRs.toFixed(2))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
         ${hasGrading ? `
         <div class="receipt-line">
           <div class="label">${t.gradingChargeLabel} <br/><small>(${gradingChargeType} @ ${gradingRate})</small></div>

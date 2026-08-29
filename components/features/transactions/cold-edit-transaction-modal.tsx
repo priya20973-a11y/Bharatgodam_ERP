@@ -62,6 +62,8 @@ export default function ColdEditTransactionModal({
   const [mixed, setMixed] = useState<number | null>(null);
   const [plusMinus, setPlusMinus] = useState<string | number | null>('-');
   const [truckNo, setTruckNo] = useState('');
+  const [vehicleType, setVehicleType] = useState('Truck');
+  const [vehicleTypeOther, setVehicleTypeOther] = useState('');
   const [weighbridgeSlipNo, setWeighbridgeSlipNo] = useState('');
   const [grossWeight, setGrossWeight] = useState<number | null>(null);
   const [emptyWeight, setEmptyWeight] = useState<number | null>(null);
@@ -120,6 +122,18 @@ export default function ColdEditTransactionModal({
         setPlusMinus(txn.plusMinus !== undefined && txn.plusMinus !== null ? txn.plusMinus : '-');
       }
       setTruckNo(txn.truckNo || '');
+      if (txn.vehicleType) {
+        if (['Truck', 'Tempo', 'Pickup', 'Trailer', 'Container'].includes(txn.vehicleType)) {
+          setVehicleType(txn.vehicleType);
+          setVehicleTypeOther('');
+        } else {
+          setVehicleType('Other');
+          setVehicleTypeOther(txn.vehicleType);
+        }
+      } else {
+        setVehicleType('Truck');
+        setVehicleTypeOther('');
+      }
       setWeighbridgeSlipNo(txn.weighbridgeSlipNo || '');
       setGrossWeight(txn.grossWeight);
       setEmptyWeight(txn.emptyWeight);
@@ -193,6 +207,7 @@ export default function ColdEditTransactionModal({
         mixed: Number(mixed) || 0,
         totalBags: calcTotalBags,
         truckNo,
+        vehicleType: vehicleType === 'Other' ? vehicleTypeOther : vehicleType,
         weighbridgeSlipNo,
         grossWeight: Number(grossWeight) || 0,
         emptyWeight: Number(emptyWeight) || 0,
@@ -360,6 +375,24 @@ export default function ColdEditTransactionModal({
               <div className="space-y-2">
                 <label className="text-sm font-medium">Truck No.</label>
                 <Input value={truckNo} onChange={(e) => setTruckNo(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Vehicle Type</label>
+                <select
+                  value={vehicleType}
+                  onChange={(e) => setVehicleType(e.target.value)}
+                  className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white"
+                >
+                  <option value="Truck">Truck</option>
+                  <option value="Tempo">Tempo</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Trailer">Trailer</option>
+                  <option value="Container">Container</option>
+                  <option value="Other">Other</option>
+                </select>
+                {vehicleType === 'Other' && (
+                  <Input className="mt-2" placeholder="Specify Vehicle Type" value={vehicleTypeOther} onChange={(e) => setVehicleTypeOther(e.target.value)} />
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Slip No.</label>

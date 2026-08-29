@@ -23,6 +23,7 @@ export interface IColdOutward extends Document {
   quantityKg: number; // Net Weight
   bagsCount: number; // Bags
   unit?: string;
+  netWeightLoss?: number;
   grade?: string; // Large, Small, Mixed
   serviceType?: string; // None, Grading, Wet
   serviceChargeType?: string; // Per Bag, Per Kg
@@ -39,9 +40,11 @@ export interface IColdOutward extends Document {
   plusMinus?: number;
   totalBags?: number;
   truckNo?: string;
+  vehicleType?: string;
   farmerName?: string;
   farmerId?: string;
   weighbridgeSlipNo?: string;
+  weighbridgeCharge?: number;
   grossWeight?: number;
   emptyWeight?: number;
   kataBharati?: number;
@@ -84,6 +87,7 @@ const ColdOutwardSchema: Schema = new Schema(
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
     unit: { type: String, default: 'KG' },
+    netWeightLoss: { type: Number, required: false, min: 0 },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
     serviceType: { type: String, enum: ['None', 'Grading', 'Wet'], required: false, default: 'None' },
     serviceChargeType: { type: String, enum: ['Per Bag', 'Per Kg'], required: false },
@@ -100,9 +104,11 @@ const ColdOutwardSchema: Schema = new Schema(
     plusMinus: { type: Number, required: false, default: 0 },
     totalBags: { type: Number, required: false },
     truckNo: { type: String, required: false },
+    vehicleType: { type: String, required: false },
     farmerName: { type: String, required: false },
     farmerId: { type: String, required: false },
     weighbridgeSlipNo: { type: String, required: false },
+    weighbridgeCharge: { type: Number, required: false },
     grossWeight: { type: Number, required: false },
     emptyWeight: { type: Number, required: false },
     kataBharati: { type: Number, required: false },
@@ -111,6 +117,7 @@ const ColdOutwardSchema: Schema = new Schema(
     note: { type: String, required: false },
     rentRs: { type: Number, required: false },
     rentReason: { type: String, required: false },
+    rentBreakdown: { type: Schema.Types.Mixed, required: false },
     unitRate: { type: Number, required: false },
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
