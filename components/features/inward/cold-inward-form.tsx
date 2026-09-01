@@ -619,12 +619,6 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
             ), { duration: 6000 });
           }
           onSuccess();
-        } else if (res.requireConfirmation) {
-          if (window.confirm(res.error || 'Stack capacity exceeded. Use buffer capacity?')) {
-            submitData(true);
-          } else {
-            setLoading(false);
-          }
         } else {
           toast.error(res.error || 'Failed to create inwards');
           setLoading(false);

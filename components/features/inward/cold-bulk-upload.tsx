@@ -282,6 +282,28 @@ export function ColdBulkInwardUpload({
                 )}
               </div>
             )}
+
+            {(result.warnings?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="text-sm font-medium text-slate-700 hover:text-slate-900"
+                >
+                  {showDetails ? 'Hide' : 'Show'} Warning Details
+                </button>
+                {showDetails && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    <ul className="space-y-2">
+                      {result.warnings?.map((warning, index) => (
+                        <li key={`warning-${index}`}>
+                          {warning}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

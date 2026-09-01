@@ -240,6 +240,7 @@ export async function POST(request: NextRequest) {
     const warehouseMap = buildLookupMap(warehouses);
 
     const errors: Array<{ row: number; error: string }> = [];
+    const warnings: string[] = [];
     let successCount = 0;
     const groupedReceipts = new Map<string, any>();
 
@@ -279,20 +280,52 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const chamberNo = Number(row.chamberNo);
-        const floorNo = Number(row.floorNo);
-        const stackNo = Number(row.stackNo);
+        const rawChamber = (row.chamberNo || '').trim();
+        const rawFloor = (row.floorNo || '').trim();
+        const rawStack = (row.stackNo || '').trim();
+        
+        const chamberNo = Number(rawChamber);
+        const floorNo = Number(rawFloor);
+        const stackNo = Number(rawStack);
         const allocatedWeight = Number(row.allocatedWeight);
         const bagsCount = Number(row.allocatedBagsCount || 0);
+        
+        const warehouse = warehouses.find((w: any) => w._id.toString() === warehouseId.toString());
 
+        let finalChamberNo: any = chamberNo;
+        let finalChamberName = rawChamber;
         if (Number.isNaN(chamberNo) || chamberNo <= 0) {
-          throw new Error('ChamberNo must be a positive number');
+          const isCustomChamber = warehouse?.chambers?.some((c: any) => 
+            c.name && c.name.toString().trim().toLowerCase() === rawChamber.toLowerCase()
+          );
+          if (!isCustomChamber) {
+            throw new Error('ChamberNo must be a positive number or a valid custom chamber name');
+          }
+          finalChamberNo = rawChamber; // pass string
         }
+
+        let finalFloorNo: any = floorNo;
+        let finalFloorName = rawFloor;
         if (Number.isNaN(floorNo) || floorNo <= 0) {
-          throw new Error('FloorNo must be a positive number');
+          const isCustomFloor = warehouse?.chambers?.some((c: any) => 
+            c.floors?.some((f: any) => f.name && f.name.toString().trim().toLowerCase() === rawFloor.toLowerCase())
+          );
+          if (!isCustomFloor) {
+            throw new Error('FloorNo must be a positive number or a valid custom floor name');
+          }
+          finalFloorNo = rawFloor; // pass string
         }
+
+        let finalStackNo: any = stackNo;
+        let finalStackName = rawStack;
         if (Number.isNaN(stackNo) || stackNo <= 0) {
-          throw new Error('StackNo must be a positive number');
+          const isCustomStack = warehouse?.chambers?.some((c: any) => 
+            c.floors?.some((f: any) => f.stacks?.some((s: any) => s.name && s.name.toString().trim().toLowerCase() === rawStack.toLowerCase()))
+          );
+          if (!isCustomStack) {
+            throw new Error('StackNo must be a positive number or a valid custom stack name');
+          }
+          finalStackNo = rawStack; // pass string
         }
         if (!Number.isFinite(allocatedWeight) || allocatedWeight <= 0) {
           throw new Error('AllocatedWeight must be greater than zero');
@@ -325,6 +358,7 @@ export async function POST(request: NextRequest) {
 
         if (!groupedReceipts.has(receiptKey)) {
           groupedReceipts.set(receiptKey, {
+            rowNums: [],
             warehouseId: warehouseId.toString(),
             common: {
               date: dateKey,
@@ -367,10 +401,14 @@ export async function POST(request: NextRequest) {
         }
 
         const groupedReceipt = groupedReceipts.get(receiptKey);
+        groupedReceipt.rowNums.push(rowNum);
         groupedReceipt.clients[0].stacks.push({
-          chamberNo,
-          floorNo,
-          stackNo,
+          chamberNo: finalChamberNo,
+          chamberName: finalChamberName,
+          floorNo: finalFloorNo,
+          floorName: finalFloorName,
+          stackNo: finalStackNo,
+          stackName: finalStackName,
           allocatedWeight,
           allocatedBags: bagsCount,
         });
@@ -389,7 +427,14 @@ export async function POST(request: NextRequest) {
     for (const groupedReceipt of groupedReceipts.values()) {
       const result = await createColdInwardBulk(groupedReceipt);
       if (!result?.success) {
-        throw new Error(result?.error || 'Failed to create inward transaction');
+        errors.push({ 
+          row: groupedReceipt.rowNums && groupedReceipt.rowNums.length > 0 ? groupedReceipt.rowNums[0] : 0, 
+          error: result?.error || 'Failed to create inward transaction' 
+        });
+        continue;
+      }
+      if (result?.warning) {
+        warnings.push(result.warning);
       }
       successCount += 1;
     }
@@ -400,7 +445,7 @@ export async function POST(request: NextRequest) {
       successCount,
       errorCount: errors.length,
       errors,
-      warnings: [],
+      warnings,
     });
   } catch (error: any) {
     console.error('[Cold Bulk Upload] Failed:', error);

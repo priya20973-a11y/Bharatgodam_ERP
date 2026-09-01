@@ -554,6 +554,7 @@ export async function createColdInward(data: any) {
         return { success: false, requireConfirmation: true, error: 'Stack capacity exceeded. Use buffer capacity?' };
       }
       warning = "Buffer capacity used.";
+      data.remarks = data.remarks ? `${data.remarks} | Buffer Capacity Used` : 'Buffer Capacity Used';
     }
 
     const dbClient = await Client.findOne({ _id: data.clientId, ...getTenantFilter(session) }).lean();
@@ -703,14 +704,12 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         const newTotalWeight = currentStackWeight + (Number(stack.allocatedWeight) || 0);
         
         if (newTotalWeight > maxAllowedCapacity) {
-          return { success: false, error: 'Allocation quantity cannot exceed available weight.' };
+          return { success: false, error: 'Maximum capacity exceeded.' };
         }
 
         if (newTotalWeight > availableStackCapacity && newTotalWeight <= maxAllowedCapacity) {
-          if (!data.confirmed) {
-            return { success: false, requireConfirmation: true, error: 'Stack capacity exceeded. Use buffer capacity?' };
-          }
           warnings.push(`Buffer capacity used in Chamber ${stack.chamberName || stack.chamberNo}, Stack ${stack.stackNo}.`);
+          client.usedBufferCapacity = true;
         }
         
         stackAllocatedWeight.set(stackKey, newTotalWeight);
@@ -809,6 +808,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         emptyWeight: client.emptyWeight || 0,
         kataBharati: client.kataBharati,
         marko: client.marko,
+        remarks: client.usedBufferCapacity 
+          ? (data.common.remarks ? `${data.common.remarks} | Buffer Capacity Used` : 'Buffer Capacity Used')
+          : data.common.remarks,
         farmerName: client.farmerName,
         villageName: client.villageName,
         largeBag: client.largeBag,

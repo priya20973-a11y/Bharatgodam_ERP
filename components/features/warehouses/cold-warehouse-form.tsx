@@ -693,12 +693,11 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                   <Select
                     value={receiptConfig[type].numberingType}
                     onValueChange={(val) => setReceiptConfig({...receiptConfig, [type]: {...receiptConfig[type], numberingType: val}})}
-                    disabled={type === 'invoice'}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="GLOBAL">Global (Warehouse Level)</SelectItem>
-                      {type !== 'invoice' && <SelectItem value="CHAMBER_WISE">Chamber Wise</SelectItem>}
+                      <SelectItem value="CHAMBER_WISE">Chamber Wise</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
