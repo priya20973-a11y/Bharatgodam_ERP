@@ -327,12 +327,8 @@ export async function GET(request: Request) {
             }
 
             const rate = Number(entry.ratePerMTPerDay ?? 10);
-            
-            // Use stored rent if available (ignoring days per new flat rent rule), else fallback to generic calculation for legacy
-            let rent = entry.rentCalculated;
-            if (rent === undefined || rent === null) {
-              rent = entry.quantityMT * rate;
-            }
+           
+            const rent = entry.quantityMT * rate * days;
 
             if (Number.isNaN(rent) || rent <= 0) {
               return null;
@@ -369,11 +365,8 @@ export async function GET(request: Request) {
 
             const rate = Number(entry.ratePerMTPerDay ?? 10);
 
-            // Use stored rent if available (ignoring days per new flat rent rule), else fallback to generic calculation for legacy
-            let rent = entry.rentCalculated;
-            if (rent === undefined || rent === null) {
-              rent = entry.quantityMT * rate;
-            }
+            // ALWAYS calculate based on actual storage-period days for Revenue Split (ignoring DB flat rent per user request)
+            const rent = entry.quantityMT * rate * days;
 
             if (Number.isNaN(rent) || rent <= 0) {
               return null;
