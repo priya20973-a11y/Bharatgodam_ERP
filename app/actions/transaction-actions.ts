@@ -186,7 +186,7 @@ export async function validateOutwardStock(
   session?: mongoose.ClientSession
 ): Promise<void> {
   await connectToDatabase();
-  
+
   // Normalize date properly depending on type, avoiding UTC shifting if it's already a Date
   let targetDateStr;
   if (typeof outwardDateStr === 'string') {
@@ -198,7 +198,7 @@ export async function validateOutwardStock(
     const d = String(outwardDateStr.getUTCDate()).padStart(2, '0');
     targetDateStr = `${y}-${m}-${d}`;
   }
-  
+
   const parts = targetDateStr.split('-');
   const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
 
@@ -225,53 +225,53 @@ export async function validateOutwardStock(
     return `${y}-${m}-${day}`;
   };
 
-  const firstInwardDateStr = inwards.length > 0 
-      ? inwards.map((i: any) => getIsoDateStr(i.date)).sort()[0] 
-      : null;
+  const firstInwardDateStr = inwards.length > 0
+    ? inwards.map((i: any) => getIsoDateStr(i.date)).sort()[0]
+    : null;
 
   if (!firstInwardDateStr || targetDateStr < firstInwardDateStr) {
-      throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is 0 MT.`);
+    throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is 0 MT.`);
   }
 
   let availableStockOnDate = 0;
   for (const inv of inwards) {
     if (getIsoDateStr(inv.date) <= targetDateStr) {
-       availableStockOnDate += inv.quantityMT;
+      availableStockOnDate += inv.quantityMT;
     }
   }
   for (const out of outwards) {
     if (getIsoDateStr(out.date) <= targetDateStr) {
-       availableStockOnDate -= out.quantityMT;
+      availableStockOnDate -= out.quantityMT;
     }
   }
 
   availableStockOnDate = Math.round(availableStockOnDate * 10000) / 10000;
 
   if (quantityMT > availableStockOnDate) {
-      throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is ${availableStockOnDate} MT.`);
+    throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is ${availableStockOnDate} MT.`);
   }
 
   // Check historical negative balance
   const dateBalances = new Map<string, number>();
   for (const inv of inwards) {
-     const d = getIsoDateStr(inv.date);
-     dateBalances.set(d, (dateBalances.get(d) || 0) + inv.quantityMT);
+    const d = getIsoDateStr(inv.date);
+    dateBalances.set(d, (dateBalances.get(d) || 0) + inv.quantityMT);
   }
   for (const out of outwards) {
-     const d = getIsoDateStr(out.date);
-     dateBalances.set(d, (dateBalances.get(d) || 0) - out.quantityMT);
+    const d = getIsoDateStr(out.date);
+    dateBalances.set(d, (dateBalances.get(d) || 0) - out.quantityMT);
   }
   dateBalances.set(targetDateStr, (dateBalances.get(targetDateStr) || 0) - quantityMT);
 
   const sortedDates = Array.from(dateBalances.keys()).sort();
   let runningBalance = 0;
   for (const d of sortedDates) {
-     runningBalance += dateBalances.get(d)!;
-     if (runningBalance < -0.0001) {
-         const dParts = d.split('-');
-         const dFormatted = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
-         throw new Error(`Transaction would cause stock to become negative on ${dFormatted}.`);
-     }
+    runningBalance += dateBalances.get(d)!;
+    if (runningBalance < -0.0001) {
+      const dParts = d.split('-');
+      const dFormatted = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
+      throw new Error(`Transaction would cause stock to become negative on ${dFormatted}.`);
+    }
   }
 }
 
@@ -910,6 +910,9 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
     const commodities = await db.collection('commodities').find({
       _id: { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) }
     }).toArray();
+    const clients = await db.collection('clients').find({
+      _id: { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) }
+    }).toArray();
 
     const outwardFilter: any = {
       ...(Object.keys(ownershipFilter).length > 0 ? ownershipFilter : (session ? tenantFilter : {})),
@@ -945,6 +948,8 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
       c._id.toString(),
       c.ratePerMtPerDay ?? (c.ratePerMtMonth ? c.ratePerMtMonth / 30 : 10)
     ]));
+    const commodityMap = new Map(commodities.map(c => [c._id.toString(), c.name]));
+    const clientMap = new Map(clients.map(c => [c._id.toString(), c.name]));
 
     // Group by warehouse, then by month
     const warehouseRevenueData = new Map<string, any>();
@@ -1007,11 +1012,13 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         keyToWarehouseId.set(ledgerKey, warehouseIdStr);
       }
       entriesByKey.get(ledgerKey)?.push({
+        originalEntry: entry,
         startDate,
         endDate,
         quantity,
         remainingQuantity: quantity,
-        dailyRate
+        dailyRate,
+        revenueByMonth: new Map<string, number>()
       });
     }
 
@@ -1063,7 +1070,13 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         const monthlyRevenue = sortedEntries.reduce((sum, entry) => {
           if (entry.remainingQuantity <= 0) return sum;
           if (entry.startDate <= currentDate && currentDate <= entry.endDate) {
-            return sum + entry.remainingQuantity * entry.dailyRate;
+            const dailyRentForEntry = entry.remainingQuantity * entry.dailyRate;
+
+            const monthKey = getMonthKey(currentDate);
+            const currentEntryMonthCharge = entry.revenueByMonth.get(monthKey) || 0;
+            entry.revenueByMonth.set(monthKey, currentEntryMonthCharge + dailyRentForEntry);
+
+            return sum + dailyRentForEntry;
           }
           return sum;
         }, 0);
@@ -1108,6 +1121,59 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
       })
       .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
 
+    const ledgerPeriods: any[] = [];
+    for (const [ledgerKey, ledgerEntries] of entriesByKey.entries()) {
+      const warehouseIdStr = keyToWarehouseId.get(ledgerKey)!;
+      for (const processedEntry of ledgerEntries) {
+        if (!processedEntry.revenueByMonth) continue;
+
+        const originalEntry = processedEntry.originalEntry;
+        if (!originalEntry) continue;
+
+        const clientIdStr = originalEntry.clientId?.toString() || '';
+        const commodityIdStr = originalEntry.commodityId?.toString() || '';
+
+        processedEntry.revenueByMonth.forEach((rentAmount: number, monthKey: string) => {
+          if (!month || month === 'ALL' || monthKey === month) {
+            // Reconstruct the start and end dates for this specific month
+            const [yearStr, monthStr] = monthKey.split('-');
+            const year = parseInt(yearStr);
+            const monthIdx = parseInt(monthStr) - 1;
+
+            const monthStart = new Date(Date.UTC(year, monthIdx, 1));
+            const monthEnd = new Date(Date.UTC(year, monthIdx + 1, 0));
+
+            const clampedStart = processedEntry.startDate > monthStart ? processedEntry.startDate : monthStart;
+            const clampedEnd = processedEntry.endDate < monthEnd ? processedEntry.endDate : monthEnd;
+
+            // Calculate days for the CSV column using the same start/end, but wait, the true day count is how many days it was active in that month.
+            // Since we generated revenue daily, we can just compute it.
+            const days = Math.floor((clampedEnd.getTime() - clampedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+            ledgerPeriods.push({
+              id: originalEntry._id?.toString() || '',
+              clientName: clientMap.get(clientIdStr) || 'Unknown',
+              clientId: clientIdStr,
+              warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown',
+              warehouseId: warehouseIdStr,
+              commodityName: commodityMap.get(commodityIdStr) || 'Unknown',
+              commodityId: commodityIdStr,
+              periodStart: clampedStart.toISOString().split('T')[0],
+              periodEnd: clampedEnd.toISOString().split('T')[0],
+              daysOccupied: days,
+              quantityMT: originalEntry.quantityMT,
+              bagsCount: originalEntry.bagsCount ?? originalEntry.bags,
+              gatePass: originalEntry.gatePass || originalEntry.gatepass || '',
+              ratePerMTPerDay: processedEntry.dailyRate,
+              rentTotal: Math.round(rentAmount * 100) / 100,
+              status: originalEntry.status || 'COMPLETED',
+              month: monthKey,
+            });
+          }
+        });
+      }
+    }
+
     // Calculate overall summary from filtered data
     const totalRevenue = warehouseRevenue.reduce((sum, row) => sum + row.totalRevenue, 0);
     const ownerEarnings = Math.round(totalRevenue * 0.6 * 100) / 100;
@@ -1124,14 +1190,16 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
     return {
       summary,
-      warehouseRevenue
+      warehouseRevenue,
+      ledgerPeriods
     };
   } catch (error: any) {
     console.error('[getClientRevenueAnalytics] Error:', error?.message || error);
     if (error?.stack) console.error(error.stack);
     return {
       summary: { totalRevenue: 0, ownerEarnings: 0, platformCommissions: 0 },
-      warehouseRevenue: []
+      warehouseRevenue: [],
+      ledgerPeriods: []
     };
   }
 }
