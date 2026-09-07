@@ -49,15 +49,19 @@ export async function GET(request: NextRequest) {
     let chambers = selectedWarehouse.chambers.map((c: any) => ({ chamberNo: c.chamberNo, name: c.name }));
     let floors: any[] = [];
     
-    let activeChamber = requestedChamberNo ? selectedWarehouse.chambers.find((c: any) => (c.name || c.chamberNo.toString()) === requestedChamberNo) : null;
+    let activeChamber = requestedChamberNo 
+      ? selectedWarehouse.chambers.find((c: any) => 
+          c.chamberNo?.toString() === requestedChamberNo || c.name === requestedChamberNo
+        ) 
+      : null;
     let activeFloor = requestedFloorNo && activeChamber ? activeChamber.floors.find((f: any) => f.floorNo === requestedFloorNo) : null;
 
     if (activeFloor) {
-      totalCapacity = activeFloor.stacks.reduce((acc: number, stack: any) => acc + (stack.capacity || 0), 0);
+      totalCapacity = activeFloor.stacks.reduce((acc: number, stack: any) => acc + (stack.capacity || selectedWarehouse.stackCapacity || 0), 0);
       floors = activeChamber?.floors.map((f: any) => ({ floorNo: f.floorNo, name: f.name })) || [];
     } else if (activeChamber) {
       totalCapacity = activeChamber.floors.reduce((fAcc: number, f: any) => 
-        fAcc + f.stacks.reduce((sAcc: number, stack: any) => sAcc + (stack.capacity || 0), 0)
+        fAcc + f.stacks.reduce((sAcc: number, stack: any) => sAcc + (stack.capacity || selectedWarehouse.stackCapacity || 0), 0)
       , 0);
       floors = activeChamber.floors.map((f: any) => ({ floorNo: f.floorNo, name: f.name }));
     } else {
@@ -67,18 +71,32 @@ export async function GET(request: NextRequest) {
     // 4. Query Inwards & Outwards based on filters
     const filterQuery: any = { warehouseId: selectedWarehouse._id };
     if (activeChamber) {
+      const chamberNames = [
+        activeChamber.name,
+        activeChamber.chamberNo?.toString(),
+        `Chamber ${activeChamber.chamberNo}`
+      ].filter(Boolean);
+
       filterQuery.$or = [
-        { 'stackAllocations.chamberName': activeChamber.name || activeChamber.chamberNo?.toString() },
-        { 'stackAllocations.chamberNo': activeChamber.chamberNo }
+        { 'stackAllocations.chamberName': { $in: chamberNames } },
+        { 'stackAllocations.chamberNo': activeChamber.chamberNo },
+        { 'stackAllocations.chamberNo': activeChamber.chamberNo?.toString() }
       ];
     }
     if (activeFloor) filterQuery['stackAllocations.floorNo'] = activeFloor.floorNo;
 
     const outwardFilterQuery: any = { warehouseId: selectedWarehouse._id };
     if (activeChamber) {
+      const chamberNames = [
+        activeChamber.name,
+        activeChamber.chamberNo?.toString(),
+        `Chamber ${activeChamber.chamberNo}`
+      ].filter(Boolean);
+
       outwardFilterQuery.$or = [
-        { chamberName: activeChamber.name || activeChamber.chamberNo?.toString() },
-        { chamberNo: activeChamber.chamberNo }
+        { chamberName: { $in: chamberNames } },
+        { chamberNo: activeChamber.chamberNo },
+        { chamberNo: activeChamber.chamberNo?.toString() }
       ];
     }
     if (activeFloor) outwardFilterQuery.floorNo = activeFloor.floorNo;

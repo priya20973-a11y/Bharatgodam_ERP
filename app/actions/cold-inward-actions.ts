@@ -766,11 +766,13 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
           allocatedWeight: Number(s.allocatedWeight) || 0,
           bagsCount: Number(s.allocatedBags) || 0,
           stockType: isPurchaseClient ? 'Purchase' : (s.stockType || 'Self'),
+          isStockShifting: s.isStockShifting || false,
+          rowId: s.rowId || undefined,
         };
       });
       
       const totalQuantity = stackAllocations.reduce((sum: number, s: any) => sum + s.allocatedWeight, 0);
-      const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + s.bagsCount, 0);
+      const totalAllocatedBags = stackAllocations.reduce((sum: number, s: any) => sum + (s.bagsCount || 0), 0);
       const derivedSelfWeight = stackAllocations
         .filter((s: any) => s.stockType === 'Self')
         .reduce((sum: number, s: any) => sum + (Number(s.allocatedWeight) || 0), 0);
@@ -813,6 +815,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
           : data.common.remarks,
         farmerName: client.farmerName,
         villageName: client.villageName,
+        lotNo: client.lotNo,
         largeBag: client.largeBag,
         smallBag: client.smallBag,
         farmerId: client.farmerId,

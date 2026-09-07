@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const csvContent = `\uFEFFType,ClientName,CommodityName,WarehouseName,Date,TruckNo,WeighbridgeSlipNo,Seed,TableLabel,Marko,FarmerName,VillageName,ReferencePersonName,GrossWeight,EmptyWeight,SelfPurchase,LargeBag,SmallBag,TotalBags,NetWeight,ChamberNo,FloorNo,StackNo,AllocatedWeight,AllocatedBagsCount,Grading,Remarks\nINWARD,Sample Client,Sample Commodity,Sample Cold Warehouse,2026-03-02,GH-12,WB-101,Sample Seed,Table-01,MR-88,Farmer Name,Sample Village,Reference Person,1300,100,Self,8,4,12,1200,1,1,1,1200,10,Y,Sample inward entry`;
+    const csvContent = `\uFEFFType,ClientName,CommodityName,Variety,WarehouseName,Date,TruckNo,WeighbridgeSlipNo,Seed,TableLabel,Marko,FarmerName,VillageName,ReferencePersonName,GrossWeight,EmptyWeight,SelfPurchase,LargeBag,SmallBag,TotalBags,NetWeight,ChamberNo,FloorNo,StackNo,AllocatedWeight,AllocatedBagsCount,Grading,Remarks\nINWARD,Sample Client,Sample Commodity,Sample Variety,Sample Cold Warehouse,2026-03-02,GH-12,WB-101,Sample Seed,Table-01,MR-88,Farmer Name,Sample Village,Reference Person,1300,100,Self,8,4,12,1200,1,1,1,1200,10,Y,Sample inward entry`;
 
     return new NextResponse(csvContent, {
       status: 200,

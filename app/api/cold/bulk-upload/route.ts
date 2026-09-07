@@ -3,6 +3,7 @@ import { createColdInwardBulk } from '@/app/actions/cold-inward-actions';
 import Client from '@/lib/models/Client';
 import ColdCommodity from '@/lib/models/ColdCommodity';
 import ColdWarehouse from '@/lib/models/ColdWarehouse';
+import ColdInward from '@/lib/models/ColdInward';
 import connectToDatabase from '@/lib/mongoose';
 import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 
@@ -10,6 +11,7 @@ interface BulkColdInwardRow {
   type: string;
   clientName: string;
   commodityName: string;
+  variety: string;
   warehouseName: string;
   date: string;
   truckNo: string;
@@ -19,6 +21,7 @@ interface BulkColdInwardRow {
   marko: string;
   farmerName: string;
   villageName: string;
+  lotNo: string;
   referencePersonName: string;
   grossWeight: string;
   emptyWeight: string;
@@ -128,7 +131,7 @@ async function parseCSV(text: string): Promise<BulkColdInwardRow[]> {
   else if (semicolonCount > commaCount && semicolonCount > tabCount) delimiter = ';';
 
   const headers = headerLine.split(delimiter).map((h) => h.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-  const requiredHeaders = ['type', 'clientname', 'commodityname', 'warehousename', 'date', 'truckno', 'weighbridgeslipno', 'seed', 'tablelabel', 'marko', 'farmername', 'villagename', 'referencepersonname', 'grossweight', 'emptyweight', 'selfpurchase', 'largebag', 'smallbag', 'totalbags', 'netweight', 'chamberno', 'floorno', 'stackno', 'allocatedweight', 'allocatedbagscount'];
+  const requiredHeaders = ['type', 'clientname', 'commodityname', 'variety', 'warehousename', 'date', 'truckno', 'weighbridgeslipno', 'seed', 'tablelabel', 'marko', 'farmername', 'villagename', 'referencepersonname', 'grossweight', 'emptyweight', 'selfpurchase', 'largebag', 'smallbag', 'totalbags', 'netweight', 'chamberno', 'floorno', 'stackno', 'allocatedweight', 'allocatedbagscount'];
   
   // Make some headers optional if they are not strictly required for the system to function
   // But since we are not modifying existing functionality, we'll keep checking them
@@ -158,6 +161,7 @@ async function parseCSV(text: string): Promise<BulkColdInwardRow[]> {
       type: typeValue || 'INWARD',
       clientName: (row.clientname || '').trim(),
       commodityName: (row.commodityname || '').trim(),
+      variety: (row.variety || '').trim(),
       warehouseName: (row.warehousename || '').trim(),
       date: (row.date || '').trim(),
       truckNo: (row.truckno || '').trim(),
@@ -167,6 +171,7 @@ async function parseCSV(text: string): Promise<BulkColdInwardRow[]> {
       marko: (row.marko || '').trim(),
       farmerName: (row.farmername || '').trim(),
       villageName: (row.villagename || '').trim(),
+      lotNo: (row.lotno || row.lot_no || row.lot || '').trim(),
       referencePersonName: (row.referencepersonname || row.referenceperson || '').trim(),
       grossWeight: (row.grossweight || row.gross_weight || '').trim(),
       emptyWeight: (row.emptyweight || row.empty_weight || '').trim(),
@@ -243,14 +248,32 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = [];
     let successCount = 0;
     const groupedReceipts = new Map<string, any>();
+    const processedRowIds = new Set<string>();
 
     for (let i = 0; i < rows.length; i++) {
       const rowNum = i + 2;
       const row = rows[i];
 
       try {
+        if (!row.variety) {
+          throw new Error('Variety is required.');
+        }
+
         const clientId = findMasterByName(row.clientName, clientMap, clients);
-        const commodityId = findMasterByName(row.commodityName, commodityMap, commodities);
+        
+        let commodityId = undefined;
+        if (row.commodityName && row.variety) {
+          const normalizedCommodityName = normalizeName(row.commodityName);
+          const normalizedVariety = normalizeName(row.variety);
+          
+          const matchedCommodity = commodities.find((c: any) => {
+             return normalizeName(c.name) === normalizedCommodityName && normalizeName(c.type) === normalizedVariety;
+          });
+          if (matchedCommodity) {
+             commodityId = matchedCommodity._id;
+          }
+        }
+
         let warehouseId = findMasterByName(row.warehouseName, warehouseMap, warehouses);
 
         if (!warehouseId) {
@@ -266,8 +289,17 @@ export async function POST(request: NextRequest) {
           throw new Error(`Client "${row.clientName}" not found`);
         }
         if (!commodityId) {
-          throw new Error(`Commodity "${row.commodityName}" not found`);
+          throw new Error(`Commodity "${row.commodityName}" with Variety "${row.variety}" not found`);
         }
+
+        const client = clients.find((c: any) => c._id.toString() === clientId?.toString());
+        if (client && client.commodityIds && client.commodityIds.length > 0) {
+           const hasAccess = client.commodityIds.some((id: any) => id.toString() === commodityId.toString());
+           if (!hasAccess) {
+             throw new Error(`Variety ${row.variety} is not assigned to this client.`);
+           }
+        }
+
         if (!warehouseId) {
           const availableWarehouses = warehouses
             .slice(0, 10)
@@ -339,7 +371,7 @@ export async function POST(request: NextRequest) {
         const normalizedGradingFlag = (row.grading || '').trim().toUpperCase();
         const gradingType = normalizedGradingFlag === 'Y' || normalizedGradingFlag === 'YES' || normalizedGradingFlag === 'TRUE' ? 'Grading' : '';
         const normalizedPurchaseValue = (row.selfPurchase || '').trim().toLowerCase();
-        const purchaseType = normalizedPurchaseValue === 'purchase' || normalizedPurchaseValue === 'p' ? 'purchase' : normalizedPurchaseValue === 'self' || normalizedPurchaseValue === 's' ? 'self' : 'self';
+        const stockType = normalizedPurchaseValue === 'purchase' || normalizedPurchaseValue === 'p' ? 'Purchase' : normalizedPurchaseValue === 'self' || normalizedPurchaseValue === 's' ? 'Self' : 'Self';
         const largeBag = Number(row.largeBag || 0);
         const smallBag = Number(row.smallBag || 0);
         const grossWeight = Number(row.grossWeight || allocatedWeight || 0);
@@ -355,6 +387,21 @@ export async function POST(request: NextRequest) {
           (row.truckNo || '').trim(),
           (row.weighbridgeSlipNo || '').trim(),
         ].join('|');
+
+        const rowId = `bulkinw|${receiptKey}|${finalChamberNo}|${finalFloorNo}|${finalStackNo}`;
+
+        if (processedRowIds.has(rowId)) {
+          warnings.push(`Row ${rowNum}: Duplicate row within upload - skipped`);
+          continue;
+        }
+
+        const isDbDuplicate = await ColdInward.exists({ 'stackAllocations.rowId': rowId });
+        if (isDbDuplicate) {
+          warnings.push(`Row ${rowNum}: Duplicate row already exists in database - skipped`);
+          continue;
+        }
+
+        processedRowIds.add(rowId);
 
         if (!groupedReceipts.has(receiptKey)) {
           groupedReceipts.set(receiptKey, {
@@ -372,7 +419,7 @@ export async function POST(request: NextRequest) {
               emptyWeight,
               totalBags,
               netWeight,
-              purchaseType,
+              stockType,
               sameCommodity: true,
               commodityId: commodityId.toString(),
             },
@@ -386,13 +433,14 @@ export async function POST(request: NextRequest) {
               marko: row.marko || '',
               farmerName: row.farmerName || '',
               villageName: row.villageName || '',
+              lotNo: row.lotNo || '',
               grossWeight,
               emptyWeight,
               largeBag,
               smallBag,
               totalBags,
               netWeight,
-              purchaseType,
+              stockType,
               stacks: [],
               qualityReadings: [],
               referencePersons: row.referencePersonName ? [{ name: row.referencePersonName }] : [],
@@ -411,6 +459,8 @@ export async function POST(request: NextRequest) {
           stackName: finalStackName,
           allocatedWeight,
           allocatedBags: bagsCount,
+          stockType,
+          rowId,
         });
 
         if (row.referencePersonName) {

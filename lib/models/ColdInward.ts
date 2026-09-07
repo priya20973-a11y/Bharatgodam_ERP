@@ -69,6 +69,7 @@ export interface IColdInward extends Document {
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   villageName?: string;
+  lotNo?: string;
   largeBag?: number;
   smallBag?: number;
   createdAt: Date;
@@ -98,6 +99,7 @@ const ColdInwardSchema: Schema = new Schema(
       bagsCount: { type: Number, required: false, min: 0 },
       stockType: { type: String, enum: ['Self', 'Purchase'], required: false },
       isStockShifting: { type: Boolean, default: false },
+      rowId: { type: String, required: false },
     }],
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
@@ -145,11 +147,14 @@ const ColdInwardSchema: Schema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     villageName: { type: String, required: false },
+    lotNo: { type: String, required: false },
     largeBag: { type: Number, required: false },
     smallBag: { type: Number, required: false },
   },
   { timestamps: true }
 );
+
+ColdInwardSchema.index({ 'stackAllocations.rowId': 1 }, { unique: true, sparse: true });
 
 if (mongoose.models.ColdInward) {
   delete mongoose.models.ColdInward;

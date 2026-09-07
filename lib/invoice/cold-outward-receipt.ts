@@ -155,6 +155,7 @@ export function generateColdOutwardReceiptHTML(
     mo: 'Mo.',
     titleBox: lang === 'gu' ? 'ગેટ પાસ' : 'GATE PASS',
     receiptNoLabel: lang === 'gu' ? 'પાવતી નં.' : 'Receipt No.',
+    markoLabel: lang === 'gu' ? 'માર્કો' : 'Marko',
     dateLabel: lang === 'gu' ? 'તા.' : 'Date',
     nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name,',
     addressLabel: lang === 'gu' ? 'સરનામું' : 'Address',
@@ -484,9 +485,10 @@ export function generateColdOutwardReceiptHTML(
     
     <div class="col-header">
       <div style="width: 48%; display: flex; justify-content: space-between;">
-        <span style="width: 50%;">${t.detailsHeader}</span>
-        <span style="width: 25%; text-align: center;">${t.bagsHeader}</span>
-        <span style="width: 25%; text-align: center;">${t.weightHeader}</span>
+        <span style="width: 40%;">${t.detailsHeader}</span>
+        <span style="width: 20%; text-align: center;">${t.markoLabel}</span>
+        <span style="width: 20%; text-align: center;">${t.bagsHeader}</span>
+        <span style="width: 20%; text-align: center;">${t.weightHeader}</span>
       </div>
       <div style="width: 48%;"></div>
     </div>
@@ -497,6 +499,7 @@ export function generateColdOutwardReceiptHTML(
         <div class="receipt-line">
           <div class="label">${t.receiptNoLabel}</div>
           <div class="value">${o.inwardId ? (o.inwardId.receiptNo ? o.inwardId.receiptNo.toString() : o.inwardId._id.toString().slice(-4).toUpperCase()) : (o.weighbridgeSlipNo || '')}</div>
+          <div class="value-small text-center">${o.inwardId ? (o.inwardId.marko || '') : ''}</div>
           <div class="value-small text-center">${formatNum(o.totalBags || 0)}</div>
           <div class="value-small text-center">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
         </div>
@@ -507,11 +510,13 @@ export function generateColdOutwardReceiptHTML(
           <div class="value"></div>
           <div class="value-small"></div>
           <div class="value-small"></div>
+          <div class="value-small"></div>
         </div>
         `).join('')}
         <div class="receipt-line">
           <div class="label">${t.totalLabel}</div>
           <div class="value" style="border-bottom: none;"></div>
+          <div class="value-small" style="text-align:center; color:#333;"></div>
           <div class="value-small" style="text-align:center; color:#333;">${totalBags}</div>
           <div class="value-small" style="text-align:center; color:#333;">${netWeight}</div>
         </div>

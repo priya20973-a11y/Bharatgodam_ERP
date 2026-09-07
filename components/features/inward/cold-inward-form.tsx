@@ -136,6 +136,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       selfQuantityKg: null,
       selfBagsCount: null,
       marko: '',
+      lotNo: '',
       farmerName: '',
       farmerId: '',
       kataBharati: 0,
@@ -862,7 +863,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-md mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-md mb-4">
               {!common.sameCommodity ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">{t('inward.commodityVariety')} *</label>
@@ -909,6 +910,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               <div className="space-y-2">
                 <label className="text-sm font-medium">Farmer ID</label>
                 <Input value={client.farmerId || ''} onChange={(e) => updateClient(cIdx, 'farmerId', e.target.value)} className="bg-white" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Village Name</label>
+                <Input value={client.villageName || ''} onChange={(e) => updateClient(cIdx, 'villageName', e.target.value)} className="bg-white" />
               </div>
             </div>
 
@@ -961,6 +966,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
               <div className="space-y-2">
                 <label className="text-sm font-medium">Marko</label>
                 <Input value={client.marko} onChange={(e) => updateClient(cIdx, 'marko', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Lot No.</label>
+                <Input value={client.lotNo || ''} onChange={(e) => updateClient(cIdx, 'lotNo', e.target.value)} />
               </div>
             </div>
 

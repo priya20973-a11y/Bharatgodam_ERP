@@ -129,7 +129,13 @@ export default async function ColdTransactionsReportWrapper() {
       quantityKg: t.quantityKg || 0,
       unit: t.unit || t.commodity?.unit || 'KG',
       bagsCount: t.bagsCount || 0,
+      stockType: t.stockType || '',
+      purchaseQuantityKg: t.direction === 'INWARD' ? (t.stockType === 'Purchase' ? t.quantityKg : (t.stockType === 'Both' ? t.purchaseQuantityKg : undefined)) : undefined,
+      selfQuantityKg: t.direction === 'INWARD' ? (t.stockType === 'Purchase' ? undefined : (t.stockType === 'Both' ? t.selfQuantityKg : t.quantityKg)) : undefined,
       chamberNo: (() => {
+        if (t.direction === 'INWARD' && t.stackAllocations && Array.isArray(t.stackAllocations)) {
+          return Array.from(new Set(t.stackAllocations.map((s: any) => s.chamberName || s.chamberNo))).filter(Boolean).join(', ');
+        }
         if (!t.chamberNo && !t.chamberName) return '';
         if (t.isBatch && t.items) {
           return t.items.map((item: any) => item.chamberName || item.chamberNo).join(', ');
@@ -137,6 +143,9 @@ export default async function ColdTransactionsReportWrapper() {
         return t.chamberName || t.chamberNo || '';
       })(),
       floorNo: (() => {
+        if (t.direction === 'INWARD' && t.stackAllocations && Array.isArray(t.stackAllocations)) {
+          return Array.from(new Set(t.stackAllocations.map((s: any) => s.floorName || s.floorNo))).filter(Boolean).join(', ');
+        }
         if (!t.floorNo) {
           if (t.isBatch && t.items) {
             return t.items.map((item: any) => item.floorName || item.floorNo).join(', ');
@@ -148,7 +157,12 @@ export default async function ColdTransactionsReportWrapper() {
         const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(t.floorNo));
         return floor?.name || t.floorNo;
       })(),
-      stackNo: t.stackNo || '',
+      stackNo: (() => {
+        if (t.direction === 'INWARD' && t.stackAllocations && Array.isArray(t.stackAllocations)) {
+          return Array.from(new Set(t.stackAllocations.map((s: any) => s.stackName || s.stackNo))).filter(Boolean).join(', ');
+        }
+        return t.stackNo || '';
+      })(),
       lotNo: t.lotNo || '',
       gatePass: t.gatePass || '',
       status: t.status || 'COMPLETED',

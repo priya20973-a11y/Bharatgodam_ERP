@@ -124,6 +124,10 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
               <span className="font-semibold text-slate-800">{inward.receiptNo || 'N/A'}</span>
             </div>
             <div>
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Marko</span>
+              <span className="font-semibold text-slate-800">{inward.marko || 'N/A'}</span>
+            </div>
+            <div>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Inward Date</span>
               <span className="font-semibold text-slate-800 flex items-center">
                 <CalendarIcon className="w-3 h-3 mr-1 text-slate-400" />
@@ -136,7 +140,13 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
             </div>
             <div>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Farmer Name</span>
-              <span className="font-semibold text-slate-800">{inward.farmerName || 'N/A'}</span>
+              <span className="font-semibold text-slate-800">
+                {inward.farmerName ? (inward.farmerId ? `${inward.farmerName} - ${inward.farmerId}` : inward.farmerName) : 'N/A'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Village Name</span>
+              <span className="font-semibold text-slate-800">{inward.villageName || 'N/A'}</span>
             </div>
             <div className="col-span-2">
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Reference Person(s)</span>

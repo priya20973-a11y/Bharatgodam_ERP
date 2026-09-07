@@ -172,6 +172,60 @@ export function generateColdTransactionReceiptHTML(
       position: relative;
     }
     
+    body.duplicate-mode @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    @media print {
+      body.duplicate-mode {
+        margin: 0;
+        padding: 0;
+      }
+    }
+    
+    body.duplicate-mode #receipt-wrapper {
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
+      padding: 0;
+      background: white;
+      box-sizing: border-box;
+      
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10mm;
+      
+      overflow: hidden;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    body.duplicate-mode .rotate-wrapper {
+      position: relative;
+      width: 195mm;
+      height: 135mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    body.duplicate-mode .receipt-container {
+      width: 148mm !important;
+      height: 210mm !important;
+      min-height: 210mm !important;
+      margin: 0 !important;
+      
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform-origin: center center;
+      transform: translate(-50%, -50%) rotate(-90deg) scale(0.92) !important;
+      
+      box-sizing: border-box;
+    }
+    
     .print-banner {
       background-color: #333;
       color: #fff;
@@ -372,26 +426,31 @@ export function generateColdTransactionReceiptHTML(
   <div class="print-banner hide-on-print">
     Press Ctrl+P (or ⌘+P on Mac) to print this receipt.
     <br/>
+    <label style="cursor: pointer; margin-right: 20px; font-weight: bold; background: #fff; color: #333; padding: 2px 8px; border-radius: 4px;">
+      <input type="checkbox" id="duplicateReceiptCb" onchange="toggleDuplicate()"> Duplicate Receipt (A4)
+    </label>
     <button onclick="window.print()" style="margin-top:10px; padding: 5px 15px; cursor:pointer;">Print Now</button>
   </div>
   
-  <div class="receipt-container">
-    <div class="header-top">
-      <div>Mo.${mobile}</div>
-    </div>
-    
-    <div class="header-main">
-      <div class="logo-area">
-        ${logoUrl
-      ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
-      : ``}
-      </div>
-      <div class="title-area">
-        <div class="main-title">${warehouseName}</div>
-        <div class="sub-title">${warehouseAddress}</div>
-      </div>
-      ${qrDataUrl ? `<div style="width: 60px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto;" alt="QR Code" /></div>` : ''}
-    </div>
+  <div id="receipt-wrapper">
+    <div class="rotate-wrapper" id="original-receipt-wrapper">
+      <div class="receipt-container" id="original-receipt">
+        <div class="header-top">
+          <div>Mo.${mobile}</div>
+        </div>
+        
+        <div class="header-main">
+          <div class="logo-area">
+            ${logoUrl
+          ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
+          : ``}
+          </div>
+          <div class="title-area">
+            <div class="main-title">${warehouseName}</div>
+            <div class="sub-title">${warehouseAddress}</div>
+          </div>
+          ${qrDataUrl ? `<div style="width: 60px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto;" alt="QR Code" /></div>` : ''}
+        </div>
     
     <div class="badge-container">
       <div class="badge">${title}</div>
@@ -440,6 +499,11 @@ export function generateColdTransactionReceiptHTML(
           <div class="form-label">${l.markoLabel}</div>
           <div class="form-value">${marko}</div>
         </div>
+        ${data.lotNo ? `
+        <div class="form-row">
+          <div class="form-label">Lot No.</div>
+          <div class="form-value">${data.lotNo}</div>
+        </div>` : ''}
         <div class="form-row">
           <div class="form-label">${l.tractorTruckNoLabel}</div>
           <div class="form-value">${truckNo}</div>
@@ -530,11 +594,36 @@ export function generateColdTransactionReceiptHTML(
       ${l.conditionsBox}
     </div>
     
-    <div class="signatures">
-      <div>${l.depositorSignature} <span class="signature-line"></span></div>
-      <div style="margin-right:20px;">${l.managerSignature} <span class="signature-line"></span></div>
+      <div class="signatures">
+        <div>${l.depositorSignature} <span class="signature-line"></span></div>
+        <div style="margin-right:20px;">${l.managerSignature} <span class="signature-line"></span></div>
+      </div>
     </div>
   </div>
+  </div>
+  
+  <script>
+    function toggleDuplicate() {
+      const cb = document.getElementById('duplicateReceiptCb');
+      const wrapper = document.getElementById('receipt-wrapper');
+      const originalWrapper = document.getElementById('original-receipt-wrapper');
+      const existingDuplicate = document.getElementById('duplicate-receipt-wrapper');
+      
+      if (cb.checked) {
+        document.body.classList.add('duplicate-mode');
+        if (!existingDuplicate) {
+          const clone = originalWrapper.cloneNode(true);
+          clone.id = 'duplicate-receipt-wrapper';
+          wrapper.appendChild(clone);
+        }
+      } else {
+        document.body.classList.remove('duplicate-mode');
+        if (existingDuplicate) {
+          existingDuplicate.remove();
+        }
+      }
+    }
+  </script>
 </body>
 </html>
   `;

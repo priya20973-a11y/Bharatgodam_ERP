@@ -188,6 +188,9 @@ export function ColdBulkInwardUpload({
                 <strong>CommodityName:</strong> Must match an existing cold commodity.
               </li>
               <li>
+                <strong>Variety:</strong> Required. Must match the commodity's variety assigned to the client.
+              </li>
+              <li>
                 <strong>WarehouseName:</strong> Must match an existing cold warehouse.
               </li>
               <li>
