@@ -6,6 +6,7 @@ import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import ColdInward from '@/lib/models/ColdInward';
 import connectToDatabase from '@/lib/mongoose';
 import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
+import { logActivity } from '@/lib/cold-logger';
 
 interface BulkColdInwardRow {
   type: string;
@@ -487,6 +488,16 @@ export async function POST(request: NextRequest) {
         warnings.push(result.warning);
       }
       successCount += 1;
+    }
+
+    if (successCount > 0) {
+      await logActivity({
+        actionType: 'CREATE',
+        module: 'Bulk Upload',
+        description: `Bulk uploaded ${successCount} inward transaction(s)`,
+        storageType: 'Cold Storage',
+        sessionFallback: session
+      });
     }
 
     return NextResponse.json({

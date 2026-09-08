@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers, ShoppingCart, Receipt, Calculator, Thermometer, Upload } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Menu, X, Settings, Package, Box, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Globe, Grid, ArrowRightLeft, Layers, ShoppingCart, Receipt, Calculator, Thermometer, Upload, Activity } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import type { Session } from 'next-auth';
@@ -37,6 +37,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Client Ledger', translationKey: 'sidebar.clientLedger', href: '/cold/ledger', icon: FileText, module: 'ledger' },
   { name: 'Invoices', translationKey: 'sidebar.invoices', href: '/cold/invoices', icon: Receipt, module: 'invoice' },
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
+  { name: 'Activity Log', translationKey: 'sidebar.activityLog', href: '/cold/activity-log', icon: Activity, adminOnly: true },
   { name: 'Language', translationKey: 'sidebar.language', href: '/cold/language', icon: Globe },
 ];
 

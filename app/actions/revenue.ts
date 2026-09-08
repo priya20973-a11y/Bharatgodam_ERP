@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { calculateDistribution } from '@/lib/distribution-engine';
 import { ObjectId } from 'mongodb';
 import { WAREHOUSE_CONFIG, WarehouseRevenue, RevenueDistributionData } from '@/lib/revenue-types';
+import { logActivity } from '@/lib/cold-logger';
 
 const aggregateRevenueData = async (userId: string, month: number, year: number): Promise<RevenueDistributionData> => {
     const db = await getDb();
@@ -132,4 +133,17 @@ export async function ensureWarehousesExist() {
       { upsert: true }
     );
   }
+}
+
+export async function logRevenueExportAction() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return;
+
+  await logActivity({
+    actionType: 'OTHER',
+    module: 'Revenue Split',
+    description: 'Export CSV',
+    storageType: 'Dry Storage',
+    sessionFallback: session,
+  });
 }

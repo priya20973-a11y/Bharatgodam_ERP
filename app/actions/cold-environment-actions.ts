@@ -6,6 +6,7 @@ import ColdWarehouse from '@/lib/models/ColdWarehouse';
 import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import { hasPermission } from '@/lib/permissions';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function createColdEnvironmentRecord(data: any) {
   await connectToDatabase();
@@ -16,6 +17,16 @@ export async function createColdEnvironmentRecord(data: any) {
   }
 
   const record = await ColdEnvironmentRecord.create(appendOwnership(data, session));
+  
+  await logColdActivity({
+    actionType: 'CREATE',
+    module: 'Environmental Record',
+    recordId: record._id.toString(),
+    description: `Added new environmental record`,
+    newValue: JSON.parse(JSON.stringify(record)),
+    sessionFallback: session
+  });
+
   revalidatePath('/cold/environment-records');
   revalidatePath('/cold/dashboard');
   return JSON.parse(JSON.stringify(record));
@@ -81,9 +92,23 @@ export async function updateColdEnvironmentRecord(id: string, data: any) {
   }
 
   const query = { _id: id, ...getTenantFilter(session) };
+  
+  const oldRecord = await ColdEnvironmentRecord.findOne(query);
+  const previousValue = oldRecord ? JSON.parse(JSON.stringify(oldRecord)) : null;
+
   const record = await ColdEnvironmentRecord.findOneAndUpdate(query, data, { new: true });
   
   if (!record) throw new Error('Record not found or unauthorized');
+
+  await logColdActivity({
+    actionType: 'UPDATE',
+    module: 'Environmental Record',
+    recordId: record._id.toString(),
+    description: `Updated environmental record`,
+    previousValue,
+    newValue: JSON.parse(JSON.stringify(record)),
+    sessionFallback: session
+  });
 
   revalidatePath('/cold/environment-records');
   revalidatePath('/cold/dashboard');
@@ -99,9 +124,22 @@ export async function deleteColdEnvironmentRecord(id: string) {
   }
 
   const query = { _id: id, ...getTenantFilter(session) };
+  
+  const recordToDelete = await ColdEnvironmentRecord.findOne(query);
+  const previousValue = recordToDelete ? JSON.parse(JSON.stringify(recordToDelete)) : null;
+
   const record = await ColdEnvironmentRecord.findOneAndDelete(query);
   
   if (!record) throw new Error('Record not found or unauthorized');
+
+  await logColdActivity({
+    actionType: 'DELETE',
+    module: 'Environmental Record',
+    recordId: id,
+    description: `Deleted environmental record`,
+    previousValue,
+    sessionFallback: session
+  });
 
   revalidatePath('/cold/environment-records');
   revalidatePath('/cold/dashboard');

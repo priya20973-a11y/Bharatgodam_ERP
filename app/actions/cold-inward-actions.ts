@@ -14,6 +14,7 @@ import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import { logColdActivity } from '@/lib/cold-logger';
 
 function isSameStack(a: any, b: any): boolean {
   if (!a || !b) return false;
@@ -593,6 +594,15 @@ export async function createColdInward(data: any) {
       date: data.date ? new Date(data.date) : new Date(),
     }, session));
     
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Inward',
+      recordId: inward._id.toString(),
+      description: `Created Inward Receipt: ${inwardReceiptNumber}`,
+      newValue: JSON.parse(JSON.stringify(inward)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/inward');
     return { success: true, data: JSON.parse(JSON.stringify(inward)), warning };
   } catch (error: any) {
@@ -842,6 +852,15 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
       }, session));
       
       createdInwards.push(inward);
+      
+      await logColdActivity({
+        actionType: 'CREATE',
+        module: 'Bulk Upload',
+        recordId: inward._id.toString(),
+        description: `Created Inward Receipt (Bulk): ${inwardReceiptNumber}`,
+        newValue: JSON.parse(JSON.stringify(inward)),
+        sessionFallback: session
+      });
       
       if (!clientReceiptMap[client.clientId]) {
         clientReceiptMap[client.clientId] = [];

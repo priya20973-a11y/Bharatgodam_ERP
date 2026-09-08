@@ -9,6 +9,7 @@ import { appendOwnership, getTenantFilter, requireSession, isAdmin } from '@/lib
 import { getDb } from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
+import { logActivity } from '@/lib/cold-logger';
 
 export async function getWarehouses(options?: { includeInactive?: boolean }) {
   await connectToDatabase();
@@ -88,6 +89,17 @@ export async function createWarehouse(data: {
       occupiedCapacity: 0,
       status: 'ACTIVE',
     }, session));
+    
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Warehouse Master',
+      recordId: warehouse._id.toString(),
+      description: `Created warehouse: ${warehouse.name}`,
+      newValue: warehouse,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/warehouses');
     return { success: true, data: JSON.parse(JSON.stringify(warehouse)) };
   } catch (error: any) {
@@ -152,6 +164,22 @@ export async function updateWarehouse(id: string, data: Partial<{
       data,
       { new: true }
     );
+
+    if (!updatedWarehouse) {
+      throw new Error('Warehouse not found or could not be updated');
+    }
+    
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Warehouse Master',
+      recordId: id,
+      description: `Updated warehouse: ${updatedWarehouse.name}`,
+      previousValue: warehouse,
+      newValue: updatedWarehouse,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/warehouses');
     return { success: true, data: JSON.parse(JSON.stringify(updatedWarehouse)) };
   } catch (error: any) {
@@ -179,6 +207,15 @@ export async function toggleWarehouseStatus(id: string) {
 
     warehouse.status = nextStatus;
     await warehouse.save();
+
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Warehouse Master',
+      recordId: id,
+      description: `Toggled warehouse status: ${warehouse.name} to ${nextStatus}`,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
 
     revalidatePath('/dashboard/warehouses');
     return { success: true, data: JSON.parse(JSON.stringify(warehouse)) };
@@ -221,6 +258,17 @@ export async function deleteWarehouse(id: string) {
     }
 
     await Warehouse.findByIdAndDelete(id);
+
+    await logActivity({
+      actionType: 'DELETE',
+      module: 'Warehouse Master',
+      recordId: id,
+      description: `Deleted warehouse: ${warehouse.name}`,
+      previousValue: warehouse,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/warehouses');
     return { success: true };
   } catch (error: any) {

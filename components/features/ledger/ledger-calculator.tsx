@@ -9,6 +9,7 @@ import { PaymentHistory } from './payment-history';
 import { MatchedRecordsHeader } from './matched-records-header';
 import { Download, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { logClientLedgerExportAction } from '@/app/actions/client-ledger';
 
 interface InvoiceAdjustmentItem {
   id?: string;
@@ -161,7 +162,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     fetchLedger();
   }, [clientId]);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!ledgerData) {
       toast.error('No data to export');
       return;
@@ -237,6 +238,9 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     a.download = `ledger-${clientId}-${datePart}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    await logClientLedgerExportAction();
+    
     toast.success('Ledger exported successfully');
   };
 

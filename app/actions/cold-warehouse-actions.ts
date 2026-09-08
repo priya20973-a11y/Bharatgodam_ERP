@@ -8,6 +8,7 @@ import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, isAdmin, getWarehouseFilter } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import mongoose from 'mongoose';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getColdWarehouses(options?: { includeInactive?: boolean }) {
   await connectToDatabase();
@@ -205,6 +206,15 @@ export async function createColdWarehouse(data: {
     warehouse.warehouseId = `CWH-${warehouse._id.toString().slice(-4).toUpperCase()}`;
     await warehouse.save();
 
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Warehouse Master',
+      recordId: warehouse._id.toString(),
+      description: `Created warehouse: ${warehouse.name}`,
+      newValue: JSON.parse(JSON.stringify(warehouse)),
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/warehouses');
     return { success: true, data: JSON.parse(JSON.stringify(warehouse)) };
   } catch (error: any) {
@@ -240,6 +250,8 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     if (!warehouse) {
       throw new Error('Cold Warehouse not found');
     }
+
+    const previousValue = JSON.parse(JSON.stringify(warehouse));
 
     if (data.name) {
       const email = session.user.email?.trim().toLowerCase() || null;
@@ -369,6 +381,17 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     }
 
     await warehouse.save();
+
+    await logColdActivity({
+      actionType: 'UPDATE',
+      module: 'Warehouse Master',
+      recordId: warehouse._id.toString(),
+      description: `Updated warehouse: ${warehouse.name}`,
+      previousValue,
+      newValue: JSON.parse(JSON.stringify(warehouse)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/dashboard/warehouses');
     return { success: true };
   } catch (error: any) {
@@ -389,6 +412,14 @@ export async function toggleColdWarehouseStatus(id: string) {
 
     warehouse.status = warehouse.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
     await warehouse.save();
+
+    await logColdActivity({
+      actionType: 'UPDATE',
+      module: 'Warehouse Master',
+      recordId: warehouse._id.toString(),
+      description: `Changed warehouse status to ${warehouse.status}`,
+      sessionFallback: session
+    });
 
     revalidatePath('/dashboard/warehouses');
     return { success: true, data: JSON.parse(JSON.stringify(warehouse)) };
@@ -412,8 +443,20 @@ export async function deleteColdWarehouse(id: string) {
       throw new Error('Cold Warehouse not found');
     }
 
+    const previousValue = JSON.parse(JSON.stringify(warehouse));
+
     // For now, simple delete, can add checking logic for existing stock later
     await ColdWarehouse.findByIdAndDelete(id);
+
+    await logColdActivity({
+      actionType: 'DELETE',
+      module: 'Warehouse Master',
+      recordId: id,
+      description: `Deleted warehouse: ${warehouse.name}`,
+      previousValue,
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/warehouses');
     return { success: true };
   } catch (error: any) {

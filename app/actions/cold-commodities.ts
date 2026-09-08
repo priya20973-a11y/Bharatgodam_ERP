@@ -8,6 +8,7 @@ import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function fetchColdCommodities() {
   await connectToDatabase();
@@ -134,6 +135,15 @@ export async function addColdCommodity(data: { name: string; type: string; unit?
       seasonalPrices: data.seasonalPrices
     }, session));
     
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Commodities',
+      recordId: item._id.toString(),
+      description: `Added new commodity: ${nameVal}`,
+      newValue: JSON.parse(JSON.stringify(item)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/commodities');
     console.log('Successfully saved cold commodity:', item._id);
     return { success: true, data: JSON.parse(JSON.stringify(item)) };
@@ -179,6 +189,9 @@ export async function updateColdCommodity(id: string, data: { name: string; type
       return { success: false, error: 'Commodity name and type already exists for this WSP. Please use a different name or type.' };
     }
 
+    const oldItem = await ColdCommodity.findOne({ _id: id, ...getTenantFilter(session) });
+    const previousValue = oldItem ? JSON.parse(JSON.stringify(oldItem)) : null;
+
     const item = await ColdCommodity.findOneAndUpdate(
       { _id: id, ...getTenantFilter(session) },
       { 
@@ -196,6 +209,20 @@ export async function updateColdCommodity(id: string, data: { name: string; type
       { new: true }
     );
     
+    if (!item) {
+      return { success: false, error: 'Commodity not found or could not be updated' };
+    }
+
+    await logColdActivity({
+      actionType: 'UPDATE',
+      module: 'Commodities',
+      recordId: item._id.toString(),
+      description: `Updated commodity: ${nameVal}`,
+      previousValue,
+      newValue: JSON.parse(JSON.stringify(item)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/commodities');
     return { success: true, data: JSON.parse(JSON.stringify(item)) };
   } catch (error: any) {
@@ -212,6 +239,10 @@ export async function deleteColdCommodity(id: string) {
     const session = await requireSession();
     if (!hasPermission(session, 'commodity', 'delete')) throw new Error('Forbidden: Insufficient permissions');
 
+    const commodityToDelete = await ColdCommodity.findOne({ _id: id, ...getTenantFilter(session) });
+    if (!commodityToDelete) throw new Error('Commodity not found');
+    const previousValue = JSON.parse(JSON.stringify(commodityToDelete));
+
     // Check if the commodity is referenced by any Client record
     // We check `coldCommodityIds` or similar when we implement Client Master for Cold Storage, 
     // but for now we'll check standard commodityIds just in case they are shared, though they shouldn't be.
@@ -225,6 +256,16 @@ export async function deleteColdCommodity(id: string) {
     }
 
     await ColdCommodity.findOneAndDelete({ _id: id, ...getTenantFilter(session) });
+
+    await logColdActivity({
+      actionType: 'DELETE',
+      module: 'Commodities',
+      recordId: id,
+      description: `Deleted commodity: ${commodityToDelete.name}`,
+      previousValue,
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/commodities');
     return { success: true };
   } catch (error: any) {

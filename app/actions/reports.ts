@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import { buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
 import type { IDetailedBooking, IClient, IInvoiceMaster, IInvoiceLineItem, IWarehouse } from '@/types/schemas';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
+import { logActivity } from '@/lib/cold-logger';
 
 export interface ReportFilter {
   startDate?: string;
@@ -1148,6 +1149,22 @@ export async function recordPayment(
     }, session);
 
     const result = await db.collection('payments').insertOne(payment);
+    
+    let storageType: 'Cold Storage' | 'Dry Storage' = 'Dry Storage';
+    const client = await db.collection('clients').findOne({ _id: clientObjectId });
+    if (client?.isColdStorage) {
+      storageType = 'Cold Storage';
+    }
+
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Payments',
+      recordId: result.insertedId.toString(),
+      description: `Recorded payment of ₹${amount} for client ${clientId}`,
+      storageType,
+      sessionFallback: session
+    });
+    
     return { success: true, paymentId: result.insertedId.toString() };
   } catch (error: any) {
     console.error('[recordPayment] Error:', error);
@@ -1224,5 +1241,22 @@ export async function getClientBalance(clientId: string) {
   } catch (error: any) {
     console.error('[getClientBalance] Error:', error);
     return { success: false, message: error.message || 'Failed to calculate balance' };
+  }
+}
+
+export async function logTransactionsExportCSV() {
+  try {
+    const session = await requireSession();
+    await logActivity({
+      actionType: 'OTHER',
+      module: 'Transactions Report',
+      description: 'Export CSV: User exported Transactions Report data to CSV.',
+      storageType: 'Dry Storage',
+      sessionFallback: session,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[logTransactionsExportCSV] Error:', error);
+    return { success: false };
   }
 }

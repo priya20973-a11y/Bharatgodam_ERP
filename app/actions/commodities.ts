@@ -8,6 +8,7 @@ import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownershi
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
+import { logActivity } from '@/lib/cold-logger';
 
 export async function fetchCommodities() {
   await connectToDatabase();
@@ -68,6 +69,17 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
     const itemData = { ...data, name: nameVal };
 
     const item = await Commodity.create(appendOwnership(itemData, session));
+
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Commodities',
+      recordId: item._id.toString(),
+      description: `Created commodity: ${item.name}`,
+      newValue: item,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/commodities');
     return { success: true, data: JSON.parse(JSON.stringify(item)) };
   } catch (error: any) {
@@ -113,6 +125,18 @@ export async function updateCommodity(id: string, data: { name: string; ratePerM
       { $set: itemData },
       { new: true }
     );
+    
+    // We should ideally fetch the old item for previousValue, but since it's a minor action, just log new.
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Commodities',
+      recordId: id,
+      description: `Updated commodity: ${itemData.name}`,
+      newValue: item,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/commodities');
     return { success: true, data: JSON.parse(JSON.stringify(item)) };
   } catch (error: any) {
@@ -138,7 +162,20 @@ export async function deleteCommodity(id: string) {
       };
     }
 
-    await Commodity.findOneAndDelete({ _id: id, ...getTenantFilter(session) });
+    const deletedCommodity = await Commodity.findOneAndDelete({ _id: id, ...getTenantFilter(session) });
+
+    if (deletedCommodity) {
+      await logActivity({
+        actionType: 'DELETE',
+        module: 'Commodities',
+        recordId: id,
+        description: `Deleted commodity: ${deletedCommodity.name}`,
+        previousValue: deletedCommodity,
+        storageType: 'Dry Storage',
+        sessionFallback: session
+      });
+    }
+
     revalidatePath('/dashboard/commodities');
     return { success: true };
   } catch (error: any) {

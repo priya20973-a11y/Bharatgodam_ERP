@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
+import { logActivity } from '@/lib/cold-logger';
 
 async function createTransactionSession() {
   const dbConnection = await connectToDatabase();
@@ -430,6 +431,16 @@ export async function processInward(data: {
       await session.commitTransaction();
     }
 
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Inward',
+      recordId: newInward._id.toString(),
+      description: `Inward transaction created for client ${client.name}`,
+      newValue: JSON.parse(JSON.stringify(newInward)),
+      storageType: data.isColdStorage ? 'Cold Storage' : 'Dry Storage',
+      sessionFallback: authSession
+    });
+
     // Revalidation
     revalidatePath('/dashboard/inward');
     revalidatePath('/dashboard/warehouses');
@@ -675,6 +686,17 @@ export async function processOutward(data: {
       await session.commitTransaction();
       console.log('[processOutward] transaction committed');
     }
+
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Outward',
+      recordId: newOutward._id.toString(),
+      description: `Outward transaction created for client ${client.name}`,
+      newValue: JSON.parse(JSON.stringify(newOutward)),
+      storageType: data.isColdStorage ? 'Cold Storage' : 'Dry Storage',
+      sessionFallback: authSession
+    });
+
     revalidatePath('/dashboard/outward');
     revalidatePath('/dashboard/warehouses');
     revalidatePath('/dashboard/ledger');
@@ -1049,9 +1071,34 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         eventsByDate.get(dateKey)?.push(event);
       });
 
-      let currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        const currentKey = formatDateKey(currentDate);
+      const boundaryDates = new Set<number>();
+      
+      for (const entry of sortedEntries) {
+        boundaryDates.add(entry.startDate.getTime());
+        boundaryDates.add(entry.endDate.getTime() + 86400000); 
+      }
+      for (const event of outwardEvents) {
+        boundaryDates.add(event.date.getTime());
+      }
+      
+      let currentMonthStart = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
+      while (currentMonthStart <= endDate) {
+        boundaryDates.add(currentMonthStart.getTime());
+        currentMonthStart.setUTCMonth(currentMonthStart.getUTCMonth() + 1);
+      }
+      
+      const sortedBoundaries = Array.from(boundaryDates).sort((a, b) => a - b);
+      
+      for (let i = 0; i < sortedBoundaries.length - 1; i++) {
+        const periodStartMs = sortedBoundaries[i];
+        const periodEndMs = sortedBoundaries[i + 1];
+        
+        if (periodStartMs > endDate.getTime()) break;
+        if (periodStartMs < startDate.getTime()) continue;
+        
+        const periodStart = new Date(periodStartMs);
+        
+        const currentKey = formatDateKey(periodStart);
         const events = eventsByDate.get(currentKey) || [];
         let remainingOutwardQuantity = events.reduce((sum, event) => sum + event.quantity, 0);
 
@@ -1059,36 +1106,39 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
           for (const entry of sortedEntries) {
             if (remainingOutwardQuantity <= 0) break;
             if (entry.remainingQuantity <= 0) continue;
-            if (entry.startDate <= currentDate && currentDate <= entry.endDate) {
+            if (entry.startDate.getTime() <= periodStartMs && periodStartMs <= entry.endDate.getTime()) {
               const reduceQty = Math.min(entry.remainingQuantity, remainingOutwardQuantity);
               entry.remainingQuantity -= reduceQty;
               remainingOutwardQuantity -= reduceQty;
             }
           }
         }
-
-        const monthlyRevenue = sortedEntries.reduce((sum, entry) => {
-          if (entry.remainingQuantity <= 0) return sum;
-          if (entry.startDate <= currentDate && currentDate <= entry.endDate) {
-            const dailyRentForEntry = entry.remainingQuantity * entry.dailyRate;
-
-            const monthKey = getMonthKey(currentDate);
-            const currentEntryMonthCharge = entry.revenueByMonth.get(monthKey) || 0;
-            entry.revenueByMonth.set(monthKey, currentEntryMonthCharge + dailyRentForEntry);
-
-            return sum + dailyRentForEntry;
+        
+        const daysInPeriod = Math.round((periodEndMs - periodStartMs) / 86400000);
+        
+        if (daysInPeriod > 0) {
+          const monthKey = getMonthKey(periodStart);
+          let periodRevenue = 0;
+          
+          for (const entry of sortedEntries) {
+            if (entry.remainingQuantity <= 0) continue;
+            if (entry.startDate.getTime() <= periodStartMs && periodStartMs <= entry.endDate.getTime()) {
+              const dailyRentForEntry = entry.remainingQuantity * entry.dailyRate;
+              const rentForPeriod = dailyRentForEntry * daysInPeriod;
+              
+              periodRevenue += rentForPeriod;
+              
+              const currentEntryMonthCharge = entry.revenueByMonth.get(monthKey) || 0;
+              entry.revenueByMonth.set(monthKey, currentEntryMonthCharge + rentForPeriod);
+            }
           }
-          return sum;
-        }, 0);
-
-        if (monthlyRevenue > 0) {
-          const monthKey = getMonthKey(currentDate);
-          const currentMonthCharge = warehouseData.monthlyCharges.get(monthKey) || 0;
-          warehouseData.monthlyCharges.set(monthKey, currentMonthCharge + monthlyRevenue);
-          warehouseData.totalRevenue += monthlyRevenue;
+          
+          if (periodRevenue > 0) {
+            const currentMonthCharge = warehouseData.monthlyCharges.get(monthKey) || 0;
+            warehouseData.monthlyCharges.set(monthKey, currentMonthCharge + periodRevenue);
+            warehouseData.totalRevenue += periodRevenue;
+          }
         }
-
-        currentDate = addDays(currentDate, 1);
       }
 
       if (!warehouseRevenueData.has(warehouseIdStr)) {

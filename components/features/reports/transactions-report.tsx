@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getClientOptions, getWarehouseOptions } from '@/app/actions/reports';
+import { getClientOptions, getWarehouseOptions, logTransactionsExportCSV } from '@/app/actions/reports';
 import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
@@ -582,7 +582,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     getFilteredRowModel: getFilteredRowModel(),
   });
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
     try {
       if (reportType === 'statement' && statementData) {
         const exportData = statementData.rows.map(row => {
@@ -616,6 +616,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
         XLSX.writeFile(workbook, `Statement_${new Date().toISOString().split('T')[0]}.csv`);
         toast.success('CSV exported successfully');
+        await logTransactionsExportCSV();
         return;
       }
       const exportData = filteredTransactions.map((item) => ({
@@ -649,6 +650,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
       XLSX.writeFile(workbook, `Transactions_${new Date().toISOString().split('T')[0]}.csv`);
       toast.success('CSV exported successfully');
+      await logTransactionsExportCSV();
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Failed to export CSV');

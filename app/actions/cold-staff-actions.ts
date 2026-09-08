@@ -5,6 +5,7 @@ import { requireSession } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { hasPermission } from '@/lib/permissions';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getStaffList() {
   const session = await requireSession();
@@ -63,6 +64,17 @@ export async function createStaff(data: any) {
     updatedAt: new Date()
   });
 
+  const newStaff = { _id: result.insertedId, fullName: data.fullName, email: data.email, role: 'STAFF' };
+
+  await logColdActivity({
+    actionType: 'CREATE',
+    module: 'Staff Permission',
+    recordId: result.insertedId.toString(),
+    description: `Added new staff member: ${data.fullName}`,
+    newValue: newStaff,
+    sessionFallback: session
+  });
+
   return { success: true, id: result.insertedId.toString() };
 }
 
@@ -80,6 +92,7 @@ export async function updateStaff(id: string, data: any) {
   if (!staff) {
     throw new Error('Staff not found');
   }
+  const previousValue = { ...staff };
 
   const updateData: any = {
     fullName: data.fullName,
@@ -102,6 +115,16 @@ export async function updateStaff(id: string, data: any) {
     { $set: updateData }
   );
 
+  await logColdActivity({
+    actionType: 'UPDATE',
+    module: 'Staff Permission',
+    recordId: id,
+    description: `Updated staff member: ${updateData.fullName || staff.fullName}`,
+    previousValue,
+    newValue: { ...previousValue, ...updateData },
+    sessionFallback: session
+  });
+
   return { success: true };
 }
 
@@ -113,10 +136,25 @@ export async function toggleStaffStatus(id: string, status: string) {
   }
 
   const db = await getDb();
+  const staff = await db.collection('users').findOne({ _id: new ObjectId(id), wspId: session.user.id });
+  
   await db.collection('users').updateOne(
     { _id: new ObjectId(id), wspId: session.user.id },
     { $set: { status, updatedAt: new Date() } }
   );
+
+  if (staff) {
+    await logColdActivity({
+      actionType: 'UPDATE',
+      module: 'Staff Permission',
+      recordId: id,
+      description: `Changed staff status to ${status}: ${staff.fullName}`,
+      previousValue: staff,
+      newValue: { ...staff, status },
+      sessionFallback: session
+    });
+  }
+
   return { success: true };
 }
 
@@ -128,7 +166,22 @@ export async function deleteStaff(id: string) {
   }
 
   const db = await getDb();
+  
+  const staffToDelete = await db.collection('users').findOne({ _id: new ObjectId(id), wspId: session.user.id });
+  if (!staffToDelete) throw new Error('Staff not found');
+  const previousValue = { ...staffToDelete };
+
   await db.collection('users').deleteOne({ _id: new ObjectId(id), wspId: session.user.id });
+
+  await logColdActivity({
+    actionType: 'DELETE',
+    module: 'Staff Permission',
+    recordId: id,
+    description: `Deleted staff member: ${staffToDelete.fullName}`,
+    previousValue,
+    sessionFallback: session
+  });
+
   return { success: true };
 }
 
@@ -140,10 +193,23 @@ export async function resetStaffPassword(id: string, newPassword: string) {
   }
 
   const db = await getDb();
+  const staff = await db.collection('users').findOne({ _id: new ObjectId(id), wspId: session.user.id });
+
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await db.collection('users').updateOne(
     { _id: new ObjectId(id), wspId: session.user.id },
     { $set: { password: hashedPassword, updatedAt: new Date() } }
   );
+
+  if (staff) {
+    await logColdActivity({
+      actionType: 'UPDATE',
+      module: 'Staff Permission',
+      recordId: id,
+      description: `Reset password for staff: ${staff.fullName}`,
+      sessionFallback: session
+    });
+  }
+
   return { success: true };
 }

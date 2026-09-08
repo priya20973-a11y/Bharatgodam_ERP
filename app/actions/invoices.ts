@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { calculateLedger, Transaction, Payment, LedgerSummary, LedgerEntry } from '@/lib/ledger-engine';
 import { getTenantFilterForMongo, isAdmin, requireSession } from '@/lib/ownership';
 import type { ILogisticsBooking } from '@/types/schemas';
+import { logActivity } from '@/lib/cold-logger';
 
 /**
  * Notify revenue distribution system with retry logic and timeout
@@ -314,6 +315,15 @@ export async function updateInvoiceStatus(invoiceId: string, newStatus: string) 
     );
 
     // Forces Next.js to immediately refetch and redraw the server-rendered table
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Invoices',
+      recordId: invoiceId,
+      description: `Updated invoice status to ${newStatus}`,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/invoices');
     revalidatePath('/dashboard');
     return { success: true };
@@ -418,6 +428,15 @@ export async function updateInvoicePayment(invoiceId: string, additionalPayment:
         // Don't fail the payment update if revenue notification fails
       }
     }
+    
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Invoices',
+      recordId: invoiceId,
+      description: `Recorded payment of ₹${additionalPayment} for invoice`,
+      storageType: 'Dry Storage',
+      sessionFallback: session
+    });
 
     revalidatePath('/dashboard/invoices');
     revalidatePath('/dashboard');

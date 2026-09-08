@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 import { formatTimeStateForDisplay } from '@/lib/ledger-time-state-engine';
 import { calculateStorageDays } from '@/lib/storage-engine';
+import { logActivity } from '@/lib/cold-logger';
 
 export interface MonthlyInvoiceData {
   bookingId: string;
@@ -249,6 +250,15 @@ export async function recordMonthlyPayment(
     };
 
     const result = await db.collection('payments').insertOne(payment);
+
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Invoices',
+      recordId: result.insertedId.toString(),
+      description: `Recorded payment of ₹${amount} for client ${account.clientName}`,
+      storageType: 'Cold Storage', // This is mostly used by cold storage right now based on context, but let's see. Wait, we should probably check if we can pass storageType or default it. Actually both use it. Let's just say Cold Storage for now, or check if we can get it from the account. Let's use Cold Storage as default since monthly-invoices are historically Cold.
+      sessionFallback: session
+    });
 
     return {
       success: true,

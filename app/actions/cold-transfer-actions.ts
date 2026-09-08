@@ -12,6 +12,7 @@ import { getTenantFilter, requireSession, appendOwnership } from '@/lib/ownershi
 import { getDb } from '@/lib/mongodb';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 import { hasPermission } from '@/lib/permissions';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getAvailableInwardsForTransfer(clientId: string, transferType: 'Self' | 'Purchase' = 'Self') {
   await connectToDatabase();
@@ -305,6 +306,15 @@ export async function createOwnershipTransfer(data: {
 
     const transfer = await ColdTransfer.create(appendOwnership(transferData, session));
 
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Ownership Transfer',
+      recordId: transfer._id.toString(),
+      description: `Ownership transferred (Purchase): ${data.transferWeight} Kg`,
+      newValue: JSON.parse(JSON.stringify(transfer)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/dashboard');
     revalidatePath('/cold/transfers');
     revalidatePath('/cold/inward');
@@ -349,6 +359,15 @@ export async function createOwnershipTransfer(data: {
     };
 
     const transfer = await ColdTransfer.create(appendOwnership(transferData, session));
+
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Ownership Transfer',
+      recordId: transfer._id.toString(),
+      description: `Ownership transferred: ${data.transferWeight} Kg`,
+      newValue: JSON.parse(JSON.stringify(transfer)),
+      sessionFallback: session
+    });
 
     revalidatePath('/cold/dashboard');
     revalidatePath('/cold/transfers');

@@ -4,6 +4,7 @@ import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { findInvoiceMasterByIdentifier, buildMonthlyInvoiceFromLedger, buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
+import { logActivity } from '@/lib/cold-logger';
 
 const taxAdjustmentSchema = z.object({
   invoiceId: z.string().min(1),
@@ -192,6 +193,24 @@ export async function POST(request: NextRequest) {
         { $set: updateFields }
       );
     }
+
+    let storageType: 'Cold Storage' | 'Dry Storage' = 'Dry Storage';
+    const invClientId = invoiceMaster?.clientId || invoiceDoc?.clientId || clientId;
+    if (invClientId) {
+      const client = await db.collection('clients').findOne({ _id: ObjectId.isValid(invClientId) ? new ObjectId(invClientId) : invClientId });
+      if (client?.isColdStorage) {
+        storageType = 'Cold Storage';
+      }
+    }
+
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Client Invoices',
+      recordId: parsed.invoiceId,
+      description: `Saved tax adjustments and billing state for invoice ${parsed.invoiceId}`,
+      storageType,
+      sessionFallback: session
+    });
 
     return NextResponse.json({
       success: true,

@@ -11,6 +11,7 @@ import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-l
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
 import { validateOutwardStock } from '@/app/actions/transaction-actions';
 import mongoose from 'mongoose';
+import { logActivity } from '@/lib/cold-logger';
 
 interface BulkTransactionRow {
   type: 'INWARD' | 'OUTWARD';
@@ -582,6 +583,16 @@ export async function POST(request: NextRequest) {
       warnings: warnings.length > 0 ? warnings : undefined,
     };
     
+    if (successCount > 0) {
+      await logActivity({
+        actionType: 'CREATE',
+        module: 'Bulk Upload',
+        description: `Bulk uploaded ${successCount} transaction(s)`,
+        storageType: 'Dry Storage',
+        sessionFallback: session
+      });
+    }
+
     console.log(`[Bulk Upload] Returning result:`, result);
     return NextResponse.json(result, { status: errors.length === 0 ? 200 : 207 });
   } catch (error: unknown) {

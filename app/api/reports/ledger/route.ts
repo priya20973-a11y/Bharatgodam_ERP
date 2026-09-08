@@ -147,6 +147,21 @@ export async function POST(req: Request) {
 
     const result = await db.collection('payments').insertOne(paymentDocument);
 
+    try {
+      const { logActivity } = await import('@/lib/cold-logger');
+      await logActivity({
+        actionType: 'CREATE',
+        module: 'Client Ledger',
+        recordId: result.insertedId.toString(),
+        description: `Add Payment: Added payment of ₹${amount} for client ${clientName || accountId || 'Unknown'}`,
+        newValue: paymentDocument,
+        storageType: 'Dry Storage',
+        sessionFallback: session
+      });
+    } catch (logError) {
+      console.error('Failed to log payment creation:', logError);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -186,7 +201,26 @@ export async function DELETE(req: Request) {
     const db = await getDb();
 
     if (paymentId) {
+      const paymentToDelete = await db.collection('payments').findOne({ _id: new ObjectId(paymentId) });
       const deleteResult = await db.collection('payments').deleteOne({ _id: new ObjectId(paymentId) });
+      
+      if (deleteResult.deletedCount && paymentToDelete) {
+        try {
+          const { logActivity } = await import('@/lib/cold-logger');
+          await logActivity({
+            actionType: 'DELETE',
+            module: 'Client Ledger',
+            recordId: paymentId,
+            description: `Remove Payment: Removed payment of ₹${paymentToDelete.amount} for client ${paymentToDelete.clientName || paymentToDelete.accountId || 'Unknown'}`,
+            previousValue: paymentToDelete,
+            storageType: 'Dry Storage',
+            sessionFallback: session
+          });
+        } catch (logError) {
+          console.error('Failed to log payment deletion:', logError);
+        }
+      }
+      
       return NextResponse.json(
         {
           success: true,
@@ -218,7 +252,27 @@ export async function DELETE(req: Request) {
       ];
     }
 
+    const paymentsToDelete = await db.collection('payments').find(filter).toArray();
     const deleteResult = await db.collection('payments').deleteMany(filter);
+
+    if (deleteResult.deletedCount && paymentsToDelete.length > 0) {
+      try {
+        const { logActivity } = await import('@/lib/cold-logger');
+        for (const payment of paymentsToDelete) {
+          await logActivity({
+            actionType: 'DELETE',
+            module: 'Client Ledger',
+            recordId: payment._id?.toString(),
+            description: `Remove Payment: Removed payment of ₹${payment.amount} for client ${payment.clientName || payment.accountId || 'Unknown'} (Bulk remove)`,
+            previousValue: payment,
+            storageType: 'Dry Storage',
+            sessionFallback: session
+          });
+        }
+      } catch (logError) {
+        console.error('Failed to log bulk payment deletion:', logError);
+      }
+    }
 
     return NextResponse.json(
       {

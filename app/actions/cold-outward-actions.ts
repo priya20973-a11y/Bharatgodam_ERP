@@ -12,6 +12,7 @@ import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } 
 import mongoose from 'mongoose';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getColdOutwards() {
   await connectToDatabase();
@@ -441,6 +442,15 @@ export async function createColdOutward(data: any) {
       unit: commodity?.unit || 'KG',
     }, session));
     
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Outward',
+      recordId: outward._id.toString(),
+      description: `Created Outward Receipt: ${outwardReceiptNumber}`,
+      newValue: JSON.parse(JSON.stringify(outward)),
+      sessionFallback: session
+    });
+
     revalidatePath('/cold/outward');
     revalidatePath('/cold/floor-mapping');
     revalidatePath('/cold/inward');
@@ -638,6 +648,15 @@ export async function createBatchColdOutwards(payload: any) {
         unit: commodity?.unit || 'KG',
       }, session));
       createdOutwards.push(outward);
+      
+      await logColdActivity({
+        actionType: 'CREATE',
+        module: 'Bulk Upload',
+        recordId: outward._id.toString(),
+        description: `Created Outward Receipt (Batch): ${batchReceiptNumber}`,
+        newValue: JSON.parse(JSON.stringify(outward)),
+        sessionFallback: session
+      });
     }
     
     revalidatePath('/cold/outward');

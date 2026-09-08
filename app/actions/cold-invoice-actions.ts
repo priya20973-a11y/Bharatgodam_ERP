@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import { differenceInDays } from 'date-fns';
 import { generateReceiptNumber } from '@/lib/receipt-generator';
 import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export async function generateColdClientInvoicePreview(
   warehouseId: string,
@@ -240,6 +241,22 @@ export async function saveColdClientInvoice(data: any) {
     }
   } catch (err) {
     console.error('Failed to link outwards to saved cold invoice:', err);
+  }
+
+  try {
+    const client = await mongoose.model('Client').findById(data.clientId).lean() as any;
+    const clientName = client ? client.name : 'Unknown';
+
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Invoices',
+      recordId: invoice._id.toString(),
+      description: `Invoice ${invoiceReceiptNumber} created for ${clientName}.`,
+      newValue: JSON.parse(JSON.stringify(invoice)),
+      sessionFallback: session
+    });
+  } catch (logErr) {
+    console.error('Failed to log invoice activity:', logErr);
   }
 
   return JSON.parse(JSON.stringify(invoice));

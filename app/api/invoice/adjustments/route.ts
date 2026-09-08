@@ -4,6 +4,7 @@ import { requireSession, getTenantFilterForMongo, appendOwnershipForMongo } from
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { findInvoiceMasterByIdentifier, buildMonthlyInvoiceFromLedger, buildMonthlyInvoiceFromTransactions } from '@/app/api/invoice/utils';
+import { logActivity } from '@/lib/cold-logger';
 
 const adjustmentPayloadSchema = z.object({
   invoiceId: z.string().min(1),
@@ -296,6 +297,23 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+    let storageType: 'Cold Storage' | 'Dry Storage' = 'Dry Storage';
+    const invClientId = finalInvoiceMaster?.clientId || invoiceDoc?.clientId || clientId;
+    if (invClientId) {
+      const client = await db.collection('clients').findOne({ _id: ObjectId.isValid(invClientId) ? new ObjectId(invClientId) : invClientId });
+      if (client?.isColdStorage) {
+        storageType = 'Cold Storage';
+      }
+    }
+
+    await logActivity({
+      actionType: 'UPDATE',
+      module: 'Client Invoices',
+      recordId: parsed.invoiceId,
+      description: `Saved additional charges totaling ${chargeTotal} for invoice ${parsed.invoiceId}`,
+      storageType,
+      sessionFallback: session
+    });
 
     return NextResponse.json({
       success: true,

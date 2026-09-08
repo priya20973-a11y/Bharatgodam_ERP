@@ -11,6 +11,7 @@ import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/owner
 import { getStackAvailableCapacity } from './cold-inward-actions';
 import mongoose from 'mongoose';
 import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { logColdActivity } from '@/lib/cold-logger';
 export async function getColdTransactions() {
   await connectToDatabase();
   const session = await requireSession();
@@ -241,6 +242,8 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
       const inward = await ColdInward.findOne({ _id: id, ...tenantFilter });
       if (!inward) throw new Error('Transaction not found');
 
+      const previousValue = JSON.parse(JSON.stringify(inward));
+
       const outwardExists = await ColdOutward.exists({
         clientId: inward.clientId,
         commodityId: inward.commodityId,
@@ -303,9 +306,21 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
       inward.totalBags = (inward.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0);
       
       await inward.save();
+
+      await logColdActivity({
+        actionType: 'UPDATE',
+        module: 'Report',
+        recordId: inward._id.toString(),
+        description: `Transaction updated from Report`,
+        previousValue,
+        newValue: JSON.parse(JSON.stringify(inward)),
+        sessionFallback: session
+      });
     } else {
       const outward = await ColdOutward.findOne({ _id: id, ...tenantFilter });
       if (!outward) throw new Error('Transaction not found');
+
+      const previousValue = JSON.parse(JSON.stringify(outward));
 
       // Fetch the related inward based on inwardId or the matching stack details
       let inward;
@@ -451,6 +466,16 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
       outward.rentRs = rentRs;
       outward.rentReason = rentReason;
       await outward.save();
+
+      await logColdActivity({
+        actionType: 'UPDATE',
+        module: 'Report',
+        recordId: outward._id.toString(),
+        description: `Transaction updated from Report`,
+        previousValue,
+        newValue: JSON.parse(JSON.stringify(outward)),
+        sessionFallback: session
+      });
     }
 
     revalidatePath('/cold/transactions-report');

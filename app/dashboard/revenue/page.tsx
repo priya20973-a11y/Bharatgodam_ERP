@@ -7,6 +7,7 @@ import { Wallet, TrendingUp, HandCoins, Filter, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
+import { logRevenueExportAction } from '@/app/actions/revenue';
 
 export default function RevenueDashboard() {
   const [data, setData] = useState<{ summary: any; warehouseRevenue: any[] } | null>(null);
@@ -128,7 +129,7 @@ export default function RevenueDashboard() {
     return formatMonthLabel(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
   };
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
     try {
       type MonthlyCharges = Record<string, number>;
 
@@ -229,6 +230,9 @@ export default function RevenueDashboard() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      
+      await logRevenueExportAction();
+      
       toast.success('Revenue CSV exported successfully');
     } catch (error) {
       console.error('Revenue CSV export failed:', error);

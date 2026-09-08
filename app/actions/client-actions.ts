@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { appendOwnership, getTenantFilter, requireSession } from '@/lib/ownership';
 import { getDb } from '@/lib/mongodb';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
+import { logActivity } from '@/lib/cold-logger';
 
 const DEFAULT_CLIENT_PASSWORD = '123456';
 
@@ -248,6 +249,16 @@ export async function createClient(data: {
 
     const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey }, session));
 
+    await logActivity({
+      actionType: 'CREATE',
+      module: 'Client Master',
+      recordId: client._id.toString(),
+      description: `Added new client: ${client.name}`,
+      newValue: JSON.parse(JSON.stringify(client)),
+      storageType: isColdStorage ? 'Cold Storage' : 'Dry Storage',
+      sessionFallback: session
+    });
+
     if (isColdStorage) {
       revalidatePath('/cold/clients');
     } else {
@@ -351,11 +362,27 @@ export async function updateClient(id: string, data: Partial<{
       }
     }
 
+    const oldClient = await Client.findOne({ _id: id, ...getTenantFilter(session) });
+    const previousValue = oldClient ? JSON.parse(JSON.stringify(oldClient)) : null;
+
     const client = await Client.findOneAndUpdate(
       { _id: id, ...getTenantFilter(session) },
       data,
       { new: true }
     );
+
+    if (client) {
+      await logActivity({
+        actionType: 'UPDATE',
+        module: 'Client Master',
+        recordId: client._id.toString(),
+        description: `Updated client: ${client.name}`,
+        previousValue,
+        newValue: JSON.parse(JSON.stringify(client)),
+        storageType: isColdStorage ? 'Cold Storage' : 'Dry Storage',
+        sessionFallback: session
+      });
+    }
 
     if (client && !isColdStorage) {
       const userUpdate: any = { updatedAt: new Date() };
@@ -405,7 +432,7 @@ export async function updateClient(id: string, data: Partial<{
   }
 }
 
-export async function deleteClient(id: string) {
+export async function deleteClient(id: string, isColdStorage: boolean = false) {
   await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
@@ -432,7 +459,22 @@ export async function deleteClient(id: string) {
       };
     }
 
+    const clientToDelete = await Client.findOne({ _id: id, ...getTenantFilter(session) });
+    if (!clientToDelete) throw new Error('Client not found');
+    const previousValue = JSON.parse(JSON.stringify(clientToDelete));
+
     await Client.findOneAndDelete({ _id: id, ...getTenantFilter(session) });
+
+    await logActivity({
+      actionType: 'DELETE',
+      module: 'Client Master',
+      recordId: id,
+      description: `Deleted client: ${clientToDelete.name}`,
+      previousValue,
+      storageType: isColdStorage ? 'Cold Storage' : 'Dry Storage',
+      sessionFallback: session
+    });
+
     revalidatePath('/dashboard/clients');
     return { success: true };
   } catch (error: any) {

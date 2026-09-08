@@ -7,6 +7,7 @@ import { differenceInCalendarDays, isLastDayOfMonth } from 'date-fns';
 import type { IInvoiceMaster, IInvoiceLineItem } from '@/types/schemas';
 import { generateStoragePeriods, type Transaction } from '@/lib/storage-engine';
 import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
+import { logActivity } from '@/lib/cold-logger';
 
 export interface ClientMonthlyLedgerRow {
   commodity: string;
@@ -687,3 +688,17 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
     } as ClientMonthlyLedgerResult,
   };
 }
+
+export async function logClientLedgerExportAction() {
+  const session = await requireSession();
+  if (!session?.user) return;
+
+  await logActivity({
+    actionType: 'OTHER',
+    module: 'Client ledger',
+    description: 'Export CSV',
+    storageType: 'Dry Storage',
+    sessionFallback: session,
+  });
+}
+

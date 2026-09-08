@@ -11,6 +11,7 @@ import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } 
 import { hasPermission } from '@/lib/permissions';
 import { revalidatePath } from 'next/cache';
 import mongoose from 'mongoose';
+import { logColdActivity } from '@/lib/cold-logger';
 
 export interface ISourceAllocInput {
   warehouseId: string;
@@ -346,6 +347,15 @@ export async function createColdStockShifting(data: {
     );
 
     const newShifting = await ColdStockShifting.create(shiftingData);
+
+    await logColdActivity({
+      actionType: 'CREATE',
+      module: 'Stock Shifting',
+      recordId: newShifting._id.toString(),
+      description: `Stock shifted: ${totalSourceWeight} Kg`,
+      newValue: JSON.parse(JSON.stringify(newShifting)),
+      sessionFallback: session
+    });
 
     revalidatePath('/cold/floor-mapping');
     revalidatePath('/cold/stock-shifting');
