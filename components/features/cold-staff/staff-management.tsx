@@ -23,6 +23,7 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'stockShifting', key: 'stockShifting' },
   { id: 'environmentRecords', key: 'environmentRecords' },
   { id: 'bulkUpload', key: 'bulkUpload' },
+  { id: 'receiptConfiguration', key: 'receiptConfiguration' },
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'print', 'approve'];
@@ -299,6 +300,7 @@ export default function StaffManagement() {
                                   return translated;
                                 }
                                 if (mod.key === 'stockShifting') return 'Stock Shifting';
+                                if (mod.key === 'receiptConfiguration') return 'Receipt Configuration';
                                 return mod.key;
                               })()}
                             </td>

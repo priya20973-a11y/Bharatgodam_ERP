@@ -418,7 +418,7 @@ export default function TemplateDesigner({ warehouses }: TemplateDesignerProps) 
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Available Fields */}
-        <div className="w-64 border-r bg-white p-4 overflow-y-auto shrink-0 flex flex-col gap-2">
+        <div className="w-64 border-r bg-white p-4 overflow-y-auto shrink-0 flex flex-col gap-2 relative z-10">
           <h3 className="font-semibold text-sm text-slate-500 mb-2 uppercase">Available Fields</h3>
           <div className="space-y-1">
             {currentAvailableFields.map(field => {
@@ -440,35 +440,46 @@ export default function TemplateDesigner({ warehouses }: TemplateDesignerProps) 
         </div>
 
           {/* Center - Canvas */}
-        <div className="flex-1 bg-slate-200 overflow-auto p-8 flex justify-center relative">
+        <div className="flex-1 bg-slate-200 overflow-auto p-4 md:p-8 relative">
           {loading ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
             </div>
           ) : (
-            <div 
-              style={{
-                // Scale container visually so it fits inside the flex-1 area
-                // Assuming typical screen width, 800px max width is a good baseline
-                transform: `scale(${Math.max(0.2, Math.min(1, 800 / ((paperWidth || 210) * 3.78)))})`,
-                transformOrigin: 'top center',
-                width: `${paperWidth}mm`,
-                height: `${paperHeight}mm`,
-                flexShrink: 0
-              }}
-            >
+            <div className="w-max mx-auto min-w-full flex justify-center items-start">
               <div 
-                ref={canvasRef}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                className="bg-white shadow-xl relative w-full h-full"
                 style={{
-                  backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
-                  backgroundSize: 'contain',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
+                  // The layout wrapper takes the exact scaled dimensions
+                  width: `calc(${paperWidth}mm * ${Math.max(0.2, Math.min(1, 800 / ((paperWidth || 210) * 3.78)))})`,
+                  height: `calc(${paperHeight}mm * ${Math.max(0.2, Math.min(1, 800 / ((paperWidth || 210) * 3.78)))})`,
+                  flexShrink: 0,
+                  position: 'relative'
                 }}
               >
+                <div 
+                  style={{
+                    // The inner element is unscaled in layout but visually scaled
+                    transform: `scale(${Math.max(0.2, Math.min(1, 800 / ((paperWidth || 210) * 3.78)))})`,
+                    transformOrigin: 'top left',
+                    width: `${paperWidth}mm`,
+                    height: `${paperHeight}mm`,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0
+                  }}
+                >
+                  <div 
+                    ref={canvasRef}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    className="bg-white shadow-xl relative w-full h-full"
+                    style={{
+                      backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+                      backgroundSize: '100% 100%',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }}
+                  >
                 {fields.map((field) => (
                   <div
                     key={field._id || field.key}
@@ -501,11 +512,13 @@ export default function TemplateDesigner({ warehouses }: TemplateDesignerProps) 
                 )}
               </div>
             </div>
+            </div>
+            </div>
           )}
         </div>
 
         {/* Right Sidebar - Properties */}
-        <div className="w-80 border-l bg-white p-4 overflow-y-auto shrink-0 flex flex-col gap-6">
+        <div className="w-80 border-l bg-white p-4 overflow-y-auto shrink-0 flex flex-col gap-6 relative z-10">
           
           <div className="space-y-4">
             <h3 className="font-semibold text-sm text-slate-500 uppercase">Background Image</h3>

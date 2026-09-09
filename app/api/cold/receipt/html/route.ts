@@ -16,6 +16,8 @@ import { ObjectId } from 'mongodb';
 import crypto from 'crypto';
 
 import { hasPermission } from '@/lib/permissions';
+import { generateColdDynamicReceiptHTML } from '@/lib/invoice/cold-dynamic-receipt';
+import ReceiptTemplate from '@/lib/models/ReceiptTemplate';
 
 export async function GET(request: NextRequest) {
   try {
@@ -186,47 +188,36 @@ export async function GET(request: NextRequest) {
     
     const lang = (session.user as any)?.coldLanguage === 'gu' ? 'gu' : 'en';
     
+    // Fetch dynamic template for this warehouse
+    let dynamicTemplate = null;
+    if (warehouseData?._id) {
+      dynamicTemplate = await ReceiptTemplate.findOne({
+        warehouseId: warehouseData._id,
+        receiptType: type
+      }).lean();
+    }
+
     let html = '';
-    if (type === 'inward') {
-      let qrDataUrl = '';
-      if (!transaction.qrId) {
-        const newQrId = crypto.randomUUID();
-        await ColdInward.updateOne({ _id: transaction._id }, { $set: { qrId: newQrId } });
-        data.qrId = newQrId;
-        transaction.qrId = newQrId;
+    
+    if (dynamicTemplate) {
+      if (type === 'outward' && batchData && batchData.length > 0) {
+        html = batchData.map((tx: any) => generateColdDynamicReceiptHTML(tx, dynamicTemplate, type)).join('<div style="page-break-after: always;"></div>');
+      } else {
+        html = generateColdDynamicReceiptHTML(data, dynamicTemplate, type);
       }
-      const QRCode = require('qrcode');
-      const scanUrl = `${request.nextUrl.origin}/qr/inward/${data.qrId}`;
-      qrDataUrl = await QRCode.toDataURL(scanUrl);
-      html = generateColdTransactionReceiptHTML(data, type, userDetails, lang, qrDataUrl);
-    } else if (type === 'outward') {
-      html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
-    } else if (type === 'transfer') {
-      const QRCode = require('qrcode');
-      let host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
-      if (host.includes('localhost') || host.includes('127.0.0.1')) {
-        const os = require('os');
-        const nets = os.networkInterfaces();
-        let lanIp = '';
-        for (const name of Object.keys(nets)) {
-          for (const net of nets[name] || []) {
-            if (net.family === 'IPv4' && !net.internal) {
-              lanIp = net.address;
-              break;
-            }
-          }
-          if (lanIp) break;
+    } else {
+      // Fallback to existing standard templates
+      if (type === 'inward') {
+        html = generateColdTransactionReceiptHTML(data, 'inward', userDetails, lang);
+      } else if (type === 'outward') {
+        if (batchData && batchData.length > 0) {
+          html = batchData.map((tx: any) => generateColdOutwardReceiptHTML(tx, userDetails, lang)).join('<div style="page-break-after: always;"></div>');
+        } else {
+          html = generateColdOutwardReceiptHTML(data, userDetails, lang);
         }
-        if (lanIp) {
-          const port = host.split(':')[1] || '3000';
-          host = `${lanIp}:${port}`;
-        }
+      } else if (type === 'transfer') {
+        html = generateColdTransferReceiptHTML(data, userDetails, lang);
       }
-      const protocol = request.headers.get('x-forwarded-proto') || (request.nextUrl.protocol ? request.nextUrl.protocol.replace(':', '') : 'http');
-      const origin = `${protocol}://${host}`;
-      const scanUrl = `${origin}/qr/transfer/${data._id}`;
-      const qrDataUrl = await QRCode.toDataURL(scanUrl);
-      html = generateColdTransferReceiptHTML(data, userDetails, lang, qrDataUrl);
     }
     
     return new NextResponse(html, {

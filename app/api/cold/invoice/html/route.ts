@@ -5,6 +5,8 @@ import '@/lib/models/Client';
 import '@/lib/models/ColdWarehouse';
 import { generateColdInvoiceHTML } from '@/lib/invoice/cold-invoice-pdf';
 import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
+import { generateColdDynamicReceiptHTML } from '@/lib/invoice/cold-dynamic-receipt';
+import ReceiptTemplate from '@/lib/models/ReceiptTemplate';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,13 +45,28 @@ export async function GET(request: NextRequest) {
       coldLanguage: (session.user as any).coldLanguage || 'en',
     };
 
-    const html = generateColdInvoiceHTML(
-      invoice,
-      client,
-      warehouse,
-      userDetails,
-      userDetails.coldLanguage
-    );
+    let html = '';
+    
+    // Fetch dynamic template for invoice
+    let dynamicTemplate = null;
+    if (warehouse?._id) {
+      dynamicTemplate = await ReceiptTemplate.findOne({
+        warehouseId: warehouse._id,
+        receiptType: 'invoice'
+      }).lean();
+    }
+
+    if (dynamicTemplate) {
+      html = generateColdDynamicReceiptHTML(invoice, dynamicTemplate, 'invoice');
+    } else {
+      html = generateColdInvoiceHTML(
+        invoice,
+        client,
+        warehouse,
+        userDetails,
+        userDetails.coldLanguage
+      );
+    }
 
     const printableHtml = html.replace(
       '<body>',

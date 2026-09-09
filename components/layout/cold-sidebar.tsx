@@ -39,6 +39,7 @@ const coldNavItems: NavItem[] = [
   { name: 'Staff Permissions', translationKey: 'sidebar.staff', href: '/cold/staff', icon: Users, module: 'staff' },
   { name: 'Activity Log', translationKey: 'sidebar.activityLog', href: '/cold/activity-log', icon: Activity, adminOnly: true },
   { name: 'Language', translationKey: 'sidebar.language', href: '/cold/language', icon: Globe },
+  { name: 'Receipt Configuration', translationKey: 'sidebar.receiptConfiguration', href: '/cold/receipt-templates', icon: Settings, module: 'receiptConfiguration' },
 ];
 
 interface SidebarProps {

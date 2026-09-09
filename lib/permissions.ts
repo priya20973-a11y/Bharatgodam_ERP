@@ -17,7 +17,8 @@ export type PermissionModule =
   | 'ownershipTransfer'
   | 'environmentRecords'
   | 'stockShifting'
-  | 'bulkUpload';
+  | 'bulkUpload'
+  | 'receiptConfiguration';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'print' | 'approve';
 
