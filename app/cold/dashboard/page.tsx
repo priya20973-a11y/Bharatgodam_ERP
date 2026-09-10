@@ -505,7 +505,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/30">
-            <ColdTransactionsReportWrapper />
+            <ColdTransactionsReportWrapper isDashboard={true} />
           </div>
         </div>
       </div>

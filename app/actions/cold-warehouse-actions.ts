@@ -9,6 +9,7 @@ import { appendOwnership, getTenantFilter, requireSession, isAdmin, getWarehouse
 import { getDb } from '@/lib/mongodb';
 import mongoose from 'mongoose';
 import { logColdActivity } from '@/lib/cold-logger';
+import { getMultipleStackCapacities } from './cold-inward-actions';
 
 export async function getColdWarehouses(options?: { includeInactive?: boolean }) {
   await connectToDatabase();
@@ -237,6 +238,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
   chambers: any[];
   floorNames: string[];
   bufferCapacity?: number;
+  stackCapacity?: number;
   customStackCapacities?: Record<string, number>;
   receiptConfig?: any;
 }>) {
@@ -313,9 +315,12 @@ export async function updateColdWarehouse(id: string, data: Partial<{
     }
     if (data.receiptConfig !== undefined) {
       // Validate against existing sequences
-      for (const type of ['inward', 'outward', 'invoice']) {
+      for (const type of ['inward', 'outward', 'invoice'] as const) {
         const config = data.receiptConfig[type];
-        if (config) {
+        const existingConfig = warehouse.receiptConfig?.[type];
+
+        // Only validate if the starting number has actually been changed
+        if (config && (!existingConfig || Number(config.startingNumber) !== Number(existingConfig.startingNumber))) {
           const sequences = await ReceiptSequence.find({ 
             warehouseId: new mongoose.Types.ObjectId(id), 
             type: type.toUpperCase() as "INWARD" | "OUTWARD" | "INVOICE"
@@ -347,9 +352,30 @@ export async function updateColdWarehouse(id: string, data: Partial<{
       });
     }
 
+    if (data.stackCapacity !== undefined) warehouse.stackCapacity = data.stackCapacity;
     if (data.customStackCapacities !== undefined) {
       warehouse.customStackCapacities = data.customStackCapacities;
       warehouse.markModified('customStackCapacities');
+    }
+
+    if (data.stackCapacity !== undefined || data.customStackCapacities !== undefined) {
+      const reqList: any[] = [];
+      warehouse.chambers.forEach((chamber: any, cIdx: number) => {
+        const cNo = chamber.chamberNo || (cIdx + 1);
+        chamber.floors.forEach((floor: any, fIdx: number) => {
+          const fNo = floor.floorNo || (fIdx + 1);
+          floor.stacks.forEach((stack: any, sIdx: number) => {
+            reqList.push({
+              warehouseId: id,
+              chamberNo: cNo,
+              floorNo: fNo,
+              stackNo: stack.stackNo
+            });
+          });
+        });
+      });
+
+      const stackStats = await getMultipleStackCapacities(reqList);
 
       warehouse.chambers.forEach((chamber: any, cIdx: number) => {
         const cNo = chamber.chamberNo || (cIdx + 1);
@@ -358,12 +384,24 @@ export async function updateColdWarehouse(id: string, data: Partial<{
           floor.stacks.forEach((stack: any, sIdx: number) => {
             const keyByStackNo = `${cNo}-${fNo}-${stack.stackNo}`;
             const keyByIndex = `${cNo}-${fNo}-${sIdx + 1}`;
-            const override = data.customStackCapacities?.[keyByStackNo] !== undefined
-              ? data.customStackCapacities[keyByStackNo]
-              : data.customStackCapacities?.[keyByIndex];
+            
+            const customCaps = warehouse.customStackCapacities || {};
+            let override: any = undefined;
+            if (typeof (customCaps as any).get === 'function') {
+               override = (customCaps as any).get(keyByStackNo) !== undefined ? (customCaps as any).get(keyByStackNo) : (customCaps as any).get(keyByIndex);
+            } else {
+               override = (customCaps as any)[keyByStackNo] !== undefined ? (customCaps as any)[keyByStackNo] : (customCaps as any)[keyByIndex];
+            }
 
-            if (override !== undefined && Number(override) > 0) {
-              stack.capacity = Number(override);
+            const sCapacity = override !== undefined && Number(override) > 0 ? Number(override) : warehouse.stackCapacity;
+
+            if (sCapacity !== undefined && Number(sCapacity) > 0) {
+               const statKey = `${id}-${cNo}-${fNo}-${stack.stackNo}`;
+               const stats = stackStats[statKey];
+               if (stats && stats.occupied > Number(sCapacity)) {
+                 throw new Error(`Stack Capacity for Chamber ${chamber.name || cNo}, Floor ${floor.name || fNo}, Stack ${stack.stackNo} cannot be less than the currently occupied quantity (${stats.occupied} KG).`);
+               }
+               stack.capacity = Number(sCapacity);
             }
           });
         });

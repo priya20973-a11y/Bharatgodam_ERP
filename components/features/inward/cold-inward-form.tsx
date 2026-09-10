@@ -51,6 +51,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     weighbridgeSlipNo: prefillData?.common?.weighbridgeSlipNo || '',
     seed: prefillData?.common?.seed || '',
     tableLabel: prefillData?.common?.tableLabel || '',
+    cipc: prefillData?.common?.cipc || '',
     remarks: prefillData?.common?.remarks || '',
     note: prefillData?.common?.note || '',
     grossWeight: prefillData?.common?.grossWeight || null,
@@ -725,7 +726,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t">
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('inward.truckNo')}</label>
             <Input value={common.truckNo} onChange={(e) => setCommon({ ...common, truckNo: e.target.value })} />
@@ -741,6 +742,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('inward.tableLabel')}</label>
             <Input value={common.tableLabel} onChange={(e) => setCommon({ ...common, tableLabel: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">CIPC</label>
+            <Input value={common.cipc} onChange={(e) => setCommon({ ...common, cipc: e.target.value })} placeholder="Optional" />
           </div>
         </div>
 

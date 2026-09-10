@@ -81,6 +81,8 @@ export function mapTransactionToTemplate(transaction: any, receiptType: 'inward'
     }
 
     result.remarks = transaction.remarks || transaction.note || '';
+    result.cipc = transaction.cipc || '';
+    result.lotNo = transaction.lotNo || '';
 
     // Invoice Specific Fields
     if (receiptType === 'invoice') {

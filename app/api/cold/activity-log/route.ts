@@ -15,8 +15,9 @@ export async function GET(req: Request) {
     await connectToDatabase();
     
     const { searchParams } = new URL(req.url);
+    const isExport = searchParams.get('export') === 'true';
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = isExport ? 100000 : parseInt(searchParams.get('limit') || '50', 10);
     const skip = (page - 1) * limit;
 
     const moduleFilter = searchParams.get('module');

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   useReactTable,
   getCoreRowModel,
@@ -24,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 
@@ -54,9 +55,10 @@ interface TransactionRecord {
 interface ColdTransactionsReportProps {
   transactions: TransactionRecord[];
   isAdmin?: boolean;
+  isDashboard?: boolean;
 }
 
-export default function ColdTransactionsReport({ transactions, isAdmin = false }: ColdTransactionsReportProps) {
+export default function ColdTransactionsReport({ transactions, isAdmin = false, isDashboard = false }: ColdTransactionsReportProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     chamberNo: true,
@@ -66,12 +68,13 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
     bagsCount: true,
     gatePass: false,
   });
-  
+
   const [globalFilter, setGlobalFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [chamberFilter, setChamberFilter] = useState('ALL');
   const [monthFilter, setMonthFilter] = useState('ALL');
-  
+
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 20,
@@ -85,7 +88,7 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
   };
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((item) => {
+    const finalFiltered = transactions.filter((item) => {
       const matchesClient =
         clientFilter === 'ALL' ||
         item.clientId === clientFilter ||
@@ -94,11 +97,20 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
         warehouseFilter === 'ALL' ||
         item.warehouseId === warehouseFilter ||
         item.warehouseName === warehouseFilter;
+      const matchesChamber =
+        chamberFilter === 'ALL' ||
+        (item.chamberNo && item.chamberNo.split(',').map(c => c.trim()).includes(chamberFilter));
       const itemMonth = extractTransactionMonth(item.date);
       const matchesMonth = monthFilter === 'ALL' || itemMonth === monthFilter;
-      return matchesClient && matchesWarehouse && matchesMonth;
+      const matchesGlobal =
+        !globalFilter ||
+        item.clientName.toLowerCase().includes(globalFilter.toLowerCase()) ||
+        item.commodityName.toLowerCase().includes(globalFilter.toLowerCase()) ||
+        item.warehouseName.toLowerCase().includes(globalFilter.toLowerCase());
+      return matchesClient && matchesWarehouse && matchesChamber && matchesMonth && matchesGlobal;
     });
-  }, [transactions, clientFilter, warehouseFilter, monthFilter]);
+    return isDashboard ? finalFiltered.slice(0, 5) : finalFiltered;
+  }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, globalFilter, isDashboard]);
 
   const monthDropdownOptions = useMemo(() => {
     const uniqueMonths = Array.from(
@@ -134,6 +146,25 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
     options.sort((a, b) => a.label.localeCompare(b.label));
     return [{ label: 'All Warehouses', value: 'ALL' }, ...options];
   }, [transactions]);
+
+  const handleWarehouseChange = (value: string) => {
+    setWarehouseFilter(value);
+    setChamberFilter('ALL');
+  };
+
+  const chamberDropdownOptions = useMemo(() => {
+    if (warehouseFilter === 'ALL') return [];
+    const uniqueChambers = new Set<string>();
+    transactions.forEach(t => {
+      if (t.warehouseId === warehouseFilter && t.chamberNo) {
+        const chambers = t.chamberNo.split(',').map(c => c.trim()).filter(Boolean);
+        chambers.forEach(c => uniqueChambers.add(c));
+      }
+    });
+    const options = Array.from(uniqueChambers).map(c => ({ label: c.replace(/^Chamber\s+/i, ''), value: c }));
+    options.sort((a, b) => a.value.localeCompare(b.value));
+    return [{ label: 'All Chambers', value: 'ALL' }, ...options];
+  }, [transactions, warehouseFilter]);
 
   const columns = useMemo<ColumnDef<TransactionRecord>[]>(() => [
     {
@@ -379,101 +410,121 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
       </div>
 
       {/* Search */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
-        <div className="grid gap-4 lg:grid-cols-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Client</label>
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="font-semibold text-slate-700 w-full">
-                <SelectValue placeholder="All Clients" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientDropdownOptions.map((client) => (
-                  <SelectItem key={client.value} value={client.value} className="font-medium">
-                    {client.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {!isDashboard && (
+        <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-5">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Client</label>
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="font-semibold text-slate-700 w-full">
+                  <SelectValue placeholder="All Clients" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientDropdownOptions.map((client) => (
+                    <SelectItem key={client.value} value={client.value} className="font-medium">
+                      {client.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Warehouse</label>
-            <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="font-semibold text-slate-700 w-full">
-                <SelectValue placeholder="All Warehouses" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouseDropdownOptions.map((warehouse) => (
-                  <SelectItem key={warehouse.value} value={warehouse.value} className="font-medium">
-                    {warehouse.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Warehouse</label>
+              <Select value={warehouseFilter} onValueChange={handleWarehouseChange}>
+                <SelectTrigger className="font-semibold text-slate-700 w-full">
+                  <SelectValue placeholder="All Warehouses" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouseDropdownOptions.map((warehouse) => (
+                    <SelectItem key={warehouse.value} value={warehouse.value} className="font-medium">
+                      {warehouse.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="font-semibold text-slate-700 w-full">
-                <SelectValue placeholder="All Months" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthDropdownOptions.map((month) => (
-                  <SelectItem key={month.value} value={month.value} className="font-medium">
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Chamber</label>
+              <Select value={chamberFilter} onValueChange={setChamberFilter} disabled={warehouseFilter === 'ALL'}>
+                <SelectTrigger className="font-semibold text-slate-700 w-full">
+                  <SelectValue placeholder="All Chambers" />
+                </SelectTrigger>
+                <SelectContent>
+                  {chamberDropdownOptions.map((chamber) => (
+                    <SelectItem key={chamber.value} value={chamber.value} className="font-medium">
+                      {chamber.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Search</label>
-            <Input
-              placeholder="Search by client, commodity..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-full font-medium"
-            />
-          </div>
-        </div>
-      </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Month</label>
+              <Select value={monthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger className="font-semibold text-slate-700 w-full">
+                  <SelectValue placeholder="All Months" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthDropdownOptions.map((month) => (
+                    <SelectItem key={month.value} value={month.value} className="font-medium">
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <p className="text-sm font-bold text-slate-500">
-            Showing <span className="text-slate-900">{table.getRowModel().rows.length}</span> of{' '}
-            <span className="text-slate-900">{transactions.length}</span> transactions
-          </p>
-          <div className="flex items-center gap-4">
-            <p className="text-xs text-slate-400">
-              Page {pagination.pageIndex + 1} of {table.getPageCount()}
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Search</label>
+              <Input
+                placeholder="Search by client, commodity..."
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="w-full font-medium"
+              />
             </div>
           </div>
         </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        {!isDashboard && (
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <p className="text-sm font-bold text-slate-500">
+              Showing <span className="text-slate-900">{table.getRowModel().rows.length}</span> of{' '}
+              <span className="text-slate-900">{transactions.length}</span> transactions
+            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-xs text-slate-400">
+                Page {pagination.pageIndex + 1} of {table.getPageCount()}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Table>
           <TableHeader>
@@ -507,6 +558,14 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false }
             )}
           </TableBody>
         </Table>
+
+        {isDashboard && (
+          <div className="p-4 border-t border-slate-100 flex justify-center bg-slate-50/50">
+            <Link href="/cold/transactions-report" className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm flex items-center gap-1 transition-colors">
+              View All Transactions <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -57,6 +57,7 @@ export interface IColdInward extends Document {
   marko?: string;
   remarks?: string;
   note?: string;
+  cipc?: string;
   qualityEntries?: {
     parameterName: string;
     value: number;
@@ -135,6 +136,7 @@ const ColdInwardSchema: Schema = new Schema(
     marko: { type: String, required: false },
     remarks: { type: String, required: false },
     note: { type: String, required: false },
+    cipc: { type: String, required: false },
     qualityEntries: [{
       parameterName: { type: String, required: true },
       value: { type: Number, required: true },

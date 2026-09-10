@@ -168,7 +168,7 @@ export default function FloorGrid({ floorData, highlightStackNo }: { floorData: 
                 <div className="text-center">
                   <span className="text-[10px] font-semibold opacity-60 uppercase tracking-wider block mb-0.5">Stack</span>
                   <span className="text-2xl font-bold block mb-0.5">{cell.stackNo}</span>
-                  <span className="text-[10px] font-semibold opacity-80 block mb-1">{cell.capacity?.toLocaleString() || 0} KG</span>
+                  <span className="text-[10px] font-semibold opacity-80 block mb-1">{Math.max(0, (cell.capacity || 0) - (cell.usedCapacity || 0)).toLocaleString()} KG Available</span>
                 </div>
 
                 <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${getStatusBadgeColor(cell.status)}`}>

@@ -175,8 +175,8 @@ export default function PrintFloorGrid({ floorData }: { floorData: any }) {
                   <div className="flex justify-between items-center mb-1 border-b border-black/10 pb-1">
                     <div>
                       <span className="font-bold text-lg">#{cell.stackNo}</span>
-                      {cell.capacity && (
-                        <span className="ml-1.5 text-[10px] font-mono text-slate-600">({cell.capacity.toLocaleString()} kg)</span>
+                      {cell.capacity !== undefined && (
+                        <span className="ml-1.5 text-[10px] font-mono text-slate-600">({Math.max(0, (cell.capacity || 0) - (cell.usedCapacity || 0)).toLocaleString()} kg Available)</span>
                       )}
                     </div>
                     <span className="font-semibold uppercase px-1.5 py-0.5 rounded text-[10px] bg-black/5">{cell.status}</span>

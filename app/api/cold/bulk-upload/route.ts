@@ -38,6 +38,7 @@ interface BulkColdInwardRow {
   allocatedBagsCount: string;
   grading: string;
   remarks: string;
+  cipc: string;
 }
 
 function escapeRegExp(value: string): string {
@@ -188,6 +189,7 @@ async function parseCSV(text: string): Promise<BulkColdInwardRow[]> {
       allocatedBagsCount: (row.allocatedbagscount || row.bagscount || row.bagscount || '0').trim(),
       grading: (row.grading || row.gradingflag || row.gradingtype || '').trim(),
       remarks: (row.remarks || '').trim(),
+      cipc: (row.cipc || '').trim(),
     });
   }
 
@@ -396,12 +398,6 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const isDbDuplicate = await ColdInward.exists({ 'stackAllocations.rowId': rowId });
-        if (isDbDuplicate) {
-          warnings.push(`Row ${rowNum}: Duplicate row already exists in database - skipped`);
-          continue;
-        }
-
         processedRowIds.add(rowId);
 
         if (!groupedReceipts.has(receiptKey)) {
@@ -423,6 +419,8 @@ export async function POST(request: NextRequest) {
               stockType,
               sameCommodity: true,
               commodityId: commodityId.toString(),
+              cipc: row.cipc || '',
+              lotNo: row.lotNo || '',
             },
             clients: [{
               clientId: clientId.toString(),
@@ -475,19 +473,75 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    for (const groupedReceipt of groupedReceipts.values()) {
-      const result = await createColdInwardBulk(groupedReceipt);
-      if (!result?.success) {
-        errors.push({ 
-          row: groupedReceipt.rowNums && groupedReceipt.rowNums.length > 0 ? groupedReceipt.rowNums[0] : 0, 
-          error: result?.error || 'Failed to create inward transaction' 
+    // Pre-fetch all duplicate rowIds from DB to avoid sequential queries
+    const allProcessedRowIds = Array.from(processedRowIds);
+    const existingDuplicates = await ColdInward.find({ 'stackAllocations.rowId': { $in: allProcessedRowIds } })
+      .select('stackAllocations.rowId')
+      .lean();
+    
+    const dbDuplicateSet = new Set<string>();
+    existingDuplicates.forEach((doc: any) => {
+      if (Array.isArray(doc.stackAllocations)) {
+        doc.stackAllocations.forEach((sa: any) => {
+          if (sa.rowId) dbDuplicateSet.add(sa.rowId);
         });
-        continue;
       }
-      if (result?.warning) {
-        warnings.push(result.warning);
+    });
+
+    const finalGroupedReceipts = new Map<string, any>();
+    
+    // Filter out duplicates and rebuild grouped receipts
+    for (const [receiptKey, groupedReceipt] of groupedReceipts.entries()) {
+      const client = groupedReceipt.clients[0];
+      const validStacks = client.stacks.filter((stack: any) => {
+        if (dbDuplicateSet.has(stack.rowId)) {
+          warnings.push(`Row with Stack ${stack.stackNo} already exists in database - skipped`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validStacks.length > 0) {
+        client.stacks = validStacks;
+        
+        // Recalculate summary totals
+        const totalGross = validStacks.reduce((sum: number, s: any) => sum + (Number(s.allocatedWeight) || 0), 0);
+        const totalBags = validStacks.reduce((sum: number, s: any) => sum + (Number(s.allocatedBags) || 0), 0);
+        
+        groupedReceipt.common.grossWeight = totalGross;
+        groupedReceipt.common.netWeight = totalGross - groupedReceipt.common.emptyWeight;
+        groupedReceipt.common.totalBags = totalBags;
+        
+        client.grossWeight = totalGross;
+        client.netWeight = totalGross - client.emptyWeight;
+        client.totalBags = totalBags;
+
+        finalGroupedReceipts.set(receiptKey, groupedReceipt);
       }
-      successCount += 1;
+    }
+
+    // Process grouped receipts in batches to prevent API timeouts
+    const receiptArray = Array.from(finalGroupedReceipts.values());
+    const BATCH_SIZE = 10;
+    
+    for (let i = 0; i < receiptArray.length; i += BATCH_SIZE) {
+      const batch = receiptArray.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(batch.map(r => createColdInwardBulk(r)));
+      
+      results.forEach((result, idx) => {
+        const groupedReceipt = batch[idx];
+        if (!result?.success) {
+          errors.push({ 
+            row: groupedReceipt.rowNums && groupedReceipt.rowNums.length > 0 ? groupedReceipt.rowNums[0] : 0, 
+            error: result?.error || 'Failed to create inward transaction' 
+          });
+        } else {
+          if (result?.warning) {
+            warnings.push(result.warning);
+          }
+          successCount += 1;
+        }
+      });
     }
 
     if (successCount > 0) {

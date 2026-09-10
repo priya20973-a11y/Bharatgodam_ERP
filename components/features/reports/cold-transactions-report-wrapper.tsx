@@ -5,7 +5,7 @@ import ColdTransactionsReport from './cold-transactions-report';
 import { getDb } from '@/lib/mongodb';
 import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
 
-export default async function ColdTransactionsReportWrapper() {
+export default async function ColdTransactionsReportWrapper({ isDashboard = false }: { isDashboard?: boolean } = {}) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -174,7 +174,7 @@ export default async function ColdTransactionsReportWrapper() {
     // Sort by date descending
     formattedTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return <ColdTransactionsReport transactions={formattedTransactions} isAdmin={isAdminUser} />;
+    return <ColdTransactionsReport transactions={formattedTransactions} isAdmin={isAdminUser} isDashboard={isDashboard} />;
   } catch (error) {
     console.error('Error fetching cold transactions:', error);
     return (

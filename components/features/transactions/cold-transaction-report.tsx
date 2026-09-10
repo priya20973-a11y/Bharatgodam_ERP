@@ -30,8 +30,10 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   const { t, formatNumber } = useColdTranslation();
   const [transactions, setTransactions] = useState(initialTransactions);
   const [search, setSearch] = useState('');
+  const [receiptSearch, setReceiptSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [chamberFilter, setChamberFilter] = useState('ALL');
   const [monthFilter, setMonthFilter] = useState('ALL');
 
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -41,12 +43,24 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   // Extract unique filters
   const clients = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.client?.name).filter(Boolean))), [initialTransactions]);
   const warehouses = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.warehouse?.name).filter(Boolean))), [initialTransactions]);
+  const chambers = useMemo(() => {
+    if (warehouseFilter === 'ALL') return [];
+    const uniqueChambers = new Set<string>();
+    initialTransactions.forEach(txn => {
+      if (txn.warehouse?.name === warehouseFilter && txn.chamberNo) {
+        const cList = txn.chamberNo.split(',').map((c: string) => c.trim()).filter(Boolean);
+        cList.forEach((c: string) => uniqueChambers.add(c));
+      }
+    });
+    return Array.from(uniqueChambers).sort();
+  }, [initialTransactions, warehouseFilter]);
   const months = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.date ? txn.date.substring(0, 7) : null).filter(Boolean))).sort().reverse(), [initialTransactions]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(txn => {
       if (clientFilter !== 'ALL' && txn.client?.name !== clientFilter) return false;
       if (warehouseFilter !== 'ALL' && txn.warehouse?.name !== warehouseFilter) return false;
+      if (chamberFilter !== 'ALL' && (!txn.chamberNo || !txn.chamberNo.split(',').map((c: string) => c.trim()).includes(chamberFilter))) return false;
       if (monthFilter !== 'ALL' && (!txn.date || !txn.date.startsWith(monthFilter))) return false;
       
       if (search) {
@@ -56,9 +70,15 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
         const typeMatch = txn.type?.toLowerCase().includes(query);
         if (!clientMatch && !commMatch && !typeMatch) return false;
       }
+      
+      if (receiptSearch) {
+        const rQuery = receiptSearch.toLowerCase().trim();
+        const rNum = String(txn.receiptNumber || '').toLowerCase();
+        if (!rNum || !rNum.includes(rQuery)) return false;
+      }
       return true;
     });
-  }, [transactions, clientFilter, warehouseFilter, monthFilter, search]);
+  }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, search, receiptSearch]);
 
   const handleDelete = async (id: string, type: string) => {
     if (type === 'OWNERSHIP TRANSFER') {
@@ -143,13 +163,23 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
           <Input
             placeholder={t('transactions.searchTransactions')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+          <Input
+            placeholder="Search Receipt No..."
+            value={receiptSearch}
+            onChange={(e) => setReceiptSearch(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -162,11 +192,19 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
           </SelectContent>
         </Select>
 
-        <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+        <Select value={warehouseFilter} onValueChange={(val) => { setWarehouseFilter(val); setChamberFilter('ALL'); }}>
           <SelectTrigger><SelectValue placeholder={t('transactions.allWarehouses')} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">{t('transactions.allWarehouses')}</SelectItem>
             {warehouses.map((w: any) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={chamberFilter} onValueChange={setChamberFilter} disabled={warehouseFilter === 'ALL'}>
+          <SelectTrigger><SelectValue placeholder="All Chambers" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Chambers</SelectItem>
+            {chambers.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
 

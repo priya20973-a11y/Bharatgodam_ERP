@@ -128,7 +128,8 @@ export async function getColdTransactions() {
       purchaseQuantityKg: t.clientId?.clientType === 'PURCHASE' ? t.quantityKg : t.purchaseQuantityKg,
       selfQuantityKg: t.clientId?.clientType === 'PURCHASE' ? 0 : t.selfQuantityKg,
       transferType: t.transferType,
-      remarks: t.remarks
+      remarks: t.remarks,
+      receiptNumber: t.receiptNumber || ''
     };
   }).filter((t: any) => {
     // Hide the automatically generated Inward/Outward for Ownership Transfers so they don't duplicate

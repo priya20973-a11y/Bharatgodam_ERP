@@ -480,6 +480,9 @@ export function generateColdTransactionReceiptHTML(
       <div class="form-value">${tableLabel}</div>
       <div class="form-label">${l.seedLabel}</div>
       <div class="form-value">${seed}</div>
+      ${data.cipc ? `
+      <div class="form-label">CIPC</div>
+      <div class="form-value">${data.cipc}</div>` : ''}
     </div>
     
     <div class="form-row">

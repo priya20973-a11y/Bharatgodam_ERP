@@ -717,7 +717,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                           className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         />
                         <span className="text-sm text-slate-700">
-                          {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name} ({(inw.availableAllocations || [{ chamberName: inw.chamberName, chamberNo: inw.chamberNo, floorName: inw.floorName, floorNo: inw.floorNo, stackName: inw.stackName, stackNo: inw.stackNo }]).map((a: any) => formatLocation(a, inw._id)).join(', ')}) - {inw.availableQty.toFixed(2)} {inw.unit || inw.commodityId?.unit || 'KG'} {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
+                          {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name}{inw.commodityId?.type ? ` (${inw.commodityId.type})` : ''} ({(inw.availableAllocations || [{ chamberName: inw.chamberName, chamberNo: inw.chamberNo, floorName: inw.floorName, floorNo: inw.floorNo, stackName: inw.stackName, stackNo: inw.stackNo }]).map((a: any) => formatLocation(a, inw._id)).join(', ')}) - {inw.availableQty.toFixed(2)} {inw.unit || inw.commodityId?.unit || 'KG'} {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
                         </span>
                       </div>
                     )
@@ -802,7 +802,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(item.inward?.availableQty) || 0).toFixed(2)} KG)</h4>
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name}{item.inward.commodityId?.type ? ` (${item.inward.commodityId.type})` : ''} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(item.inward?.availableQty) || 0).toFixed(2)} KG)</h4>
 
             {isMultiStack ? (
               <div className="mb-4 p-4 border border-indigo-200 rounded-lg bg-indigo-50/40 space-y-4">

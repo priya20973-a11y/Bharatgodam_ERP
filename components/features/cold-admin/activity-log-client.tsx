@@ -38,6 +38,83 @@ export default function ActivityLogClient() {
   // Modal state
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
+  // CSV Export State
+  const [exportMonth, setExportMonth] = useState('');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadCsv = async () => {
+    if (!exportMonth) {
+      toast.error('Please select a month to download logs');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const [year, month] = exportMonth.split('-').map(Number);
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0); // Last day of month
+
+      const query = new URLSearchParams({
+        export: 'true',
+      });
+
+      if (search) query.append('search', search);
+      if (moduleFilter) query.append('module', moduleFilter);
+      if (actionFilter) query.append('action', actionFilter);
+      if (storageType !== 'All') query.append('storageType', storageType);
+      
+      query.append('dateStart', startOfMonth.toISOString().split('T')[0]);
+      query.append('dateEnd', endOfMonth.toISOString().split('T')[0]);
+      query.append('sort', sort);
+
+      const res = await fetch(`/api/cold/activity-log?${query.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch logs for export');
+      
+      const data = await res.json();
+      if (!data.logs || data.logs.length === 0) {
+        toast.error('No logs found for the selected month matching current filters.');
+        return;
+      }
+
+      const escapeCSV = (str: any) => {
+        if (str === null || str === undefined) return '""';
+        const stringified = typeof str === 'object' ? JSON.stringify(str) : String(str);
+        return `"${stringified.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Date/Time', 'User Name', 'User Role', 'Action', 'Module', 'Storage Type', 'Record ID', 'Description', 'Previous Value', 'New Value'];
+      const rows = data.logs.map((log: Log) => [
+        format(new Date(log.createdAt), 'dd-MM-yyyy HH:mm:ss'),
+        escapeCSV(log.userName),
+        escapeCSV(log.userRole),
+        escapeCSV(log.actionType),
+        escapeCSV(log.module),
+        escapeCSV(log.storageType || 'Cold Storage'),
+        escapeCSV(log.recordId),
+        escapeCSV(log.description),
+        escapeCSV(log.previousValue),
+        escapeCSV(log.newValue)
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map((row: string[]) => row.join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `activity_logs_${exportMonth}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Logs downloaded successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Error exporting logs');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
@@ -176,14 +253,34 @@ export default function ActivityLogClient() {
           </button>
         </div>
 
-        <select
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 w-full xl:w-auto"
-          value={sort}
-          onChange={(e) => { setSort(e.target.value); setPage(1); }}
-        >
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-        </select>
+        <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto flex-wrap items-center mt-3 xl:mt-0">
+          <input
+            type="month"
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            value={exportMonth}
+            onChange={(e) => setExportMonth(e.target.value)}
+            title="Select Month for CSV Export"
+          />
+          <button
+            onClick={handleDownloadCsv}
+            disabled={downloading}
+            className="px-4 py-2 text-sm text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+          >
+            {downloading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download CSV
+          </button>
+          
+          <div className="w-px h-8 bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+
+          <select
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 w-full sm:w-auto"
+            value={sort}
+            onChange={(e) => { setSort(e.target.value); setPage(1); }}
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
+        </div>
       </div>
 
       {/* Table */}

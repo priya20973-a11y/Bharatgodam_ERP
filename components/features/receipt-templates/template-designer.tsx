@@ -28,6 +28,7 @@ const COMMON_FIELDS = [
 const INWARD_OUTWARD_FIELDS = [
   ...COMMON_FIELDS,
   { key: 'marko', label: 'Marko' },
+  { key: 'lotNo', label: 'Lot No' },
   { key: 'commodity', label: 'Commodity' },
   { key: 'variety', label: 'Variety' },
   { key: 'grade', label: 'Grade' },
@@ -43,6 +44,7 @@ const INWARD_OUTWARD_FIELDS = [
   { key: 'floorNo', label: 'Floor No' },
   { key: 'rackNo', label: 'Stack/Rack No' },
   { key: 'allocatedBags', label: 'Allocated Bags' },
+  { key: 'cipc', label: 'CIPC' },
 ];
 
 const INVOICE_FIELDS = [
