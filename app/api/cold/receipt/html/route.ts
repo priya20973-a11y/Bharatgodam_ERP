@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
         html = generateColdTransactionReceiptHTML(data, 'inward', userDetails, lang);
       } else if (type === 'outward') {
         if (batchData && batchData.length > 0) {
-          html = batchData.map((tx: any) => generateColdOutwardReceiptHTML(tx, userDetails, lang)).join('<div style="page-break-after: always;"></div>');
+          html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
         } else {
           html = generateColdOutwardReceiptHTML(data, userDetails, lang);
         }

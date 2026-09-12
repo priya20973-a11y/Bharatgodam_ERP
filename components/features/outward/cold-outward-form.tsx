@@ -890,6 +890,25 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                     );
                   })}
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-indigo-200">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-blue-600">Net Loss (KG)</label>
+                    <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-green-700">Net Weight (KG)</label>
+                    <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">{calcNetWeight.toFixed(2)}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-green-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'total')}</label>
+                    <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">{calcTotalBags.toFixed(2)}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'weight')}</label>
+                    <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">{calcKataBharati.toFixed(2)}</div>
+                  </div>
+                </div>
               </div>
             ) : (
               <>
