@@ -211,14 +211,8 @@ export async function GET(request: NextRequest) {
       if (type === 'inward') {
         let qrDataUrl = '';
         try {
-          const qrContent = JSON.stringify({
-            id: data._id,
-            r: data.receiptNumber || data.receiptNo || data._id.toString().slice(-4).toUpperCase(),
-            c: data.clientId?.name || '',
-            d: data.date,
-            w: data.quantityKg || 0,
-            t: 'inward'
-          });
+          const qrId = data.qrId || data._id;
+          const qrContent = `${request.nextUrl.origin}/qr/inward/${qrId}`;
           qrDataUrl = await QRCode.toDataURL(qrContent, { 
             margin: 1, 
             width: 300, 
