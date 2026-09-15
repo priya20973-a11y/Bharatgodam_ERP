@@ -50,6 +50,8 @@ interface TransactionRecord {
   gatePass?: string;
   status?: string;
   createdAt: string;
+  receiptNumber?: string;
+  weighbridgeSlipNo?: string;
 }
 
 interface ColdTransactionsReportProps {
@@ -67,6 +69,8 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
     lotNo: false,
     bagsCount: true,
     gatePass: false,
+    weighbridgeSlipNo: true,
+    receiptNumber: true,
   });
 
   const [globalFilter, setGlobalFilter] = useState('');
@@ -99,7 +103,7 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
         item.warehouseName === warehouseFilter;
       const matchesChamber =
         chamberFilter === 'ALL' ||
-        (item.chamberNo && item.chamberNo.split(',').map(c => c.trim()).includes(chamberFilter));
+        (item.chamberNo && item.chamberNo.split(/[;,]/).map(c => c.trim()).filter(Boolean).includes(chamberFilter));
       const itemMonth = extractTransactionMonth(item.date);
       const matchesMonth = monthFilter === 'ALL' || itemMonth === monthFilter;
       const matchesGlobal =
@@ -157,7 +161,7 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
     const uniqueChambers = new Set<string>();
     transactions.forEach(t => {
       if (t.warehouseId === warehouseFilter && t.chamberNo) {
-        const chambers = t.chamberNo.split(',').map(c => c.trim()).filter(Boolean);
+        const chambers = t.chamberNo.split(/[;,]/).map(c => c.trim()).filter(Boolean);
         chambers.forEach(c => uniqueChambers.add(c));
       }
     });
@@ -274,11 +278,29 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
       },
     },
     {
+      accessorKey: 'weighbridgeSlipNo',
+      header: 'Weighbridge Slip No',
+      cell: ({ row }) => {
+        const value = row.getValue('weighbridgeSlipNo');
+        return <span className="text-slate-700">{value ? String(value) : '—'}</span>;
+      },
+    },
+    {
+      accessorKey: 'receiptNumber',
+      header: 'Receipt No',
+      cell: ({ row }) => {
+        const value = row.getValue('receiptNumber');
+        return <span className="text-slate-700">{value ? String(value) : '—'}</span>;
+      },
+    },
+    {
       accessorKey: 'chamberNo',
       header: 'Chamber',
       cell: ({ row }) => {
         const value = row.getValue('chamberNo');
-        return <span>{value ? String(value) : '—'}</span>;
+        if (!value) return <span>—</span>;
+        const unique = Array.from(new Set(String(value).split(/[;,]/).map(c => c.trim()).filter(Boolean)));
+        return <span>{unique.join(', ')}</span>;
       },
     },
     {
@@ -361,7 +383,9 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
         'Warehouse': item.warehouseName,
         'Qty': `${item.quantityKg} ${item.unit || 'KG'}`,
         'Net Loss': item.netWeightLoss || '',
-        'Chamber No': item.chamberNo || '',
+        'Weighbridge Slip No': item.weighbridgeSlipNo || '-',
+        'Receipt No': item.receiptNumber || '-',
+        'Chamber No': item.chamberNo ? Array.from(new Set(item.chamberNo.split(/[;,]/).map(c => c.trim()).filter(Boolean))).join(', ') : '',
         'Floor No': item.floorNo || '',
         'Stack No': item.stackNo || '',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',

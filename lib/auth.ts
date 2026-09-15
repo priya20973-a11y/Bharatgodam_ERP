@@ -6,7 +6,7 @@ import { ObjectId } from 'mongodb';
 
 const nextAuthUrl =
   process.env.NEXTAUTH_URL ||
-  (process.env.VERCEL_URL ? getNextAuthUrlFromVercel() : undefined);
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 
 if (!process.env.NEXTAUTH_URL && nextAuthUrl) {

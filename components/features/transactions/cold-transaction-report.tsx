@@ -48,7 +48,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     const uniqueChambers = new Set<string>();
     initialTransactions.forEach(txn => {
       if (txn.warehouse?.name === warehouseFilter && txn.chamberNo) {
-        const cList = txn.chamberNo.split(',').map((c: string) => c.trim()).filter(Boolean);
+        const cList = txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean);
         cList.forEach((c: string) => uniqueChambers.add(c));
       }
     });
@@ -60,7 +60,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     return transactions.filter(txn => {
       if (clientFilter !== 'ALL' && txn.client?.name !== clientFilter) return false;
       if (warehouseFilter !== 'ALL' && txn.warehouse?.name !== warehouseFilter) return false;
-      if (chamberFilter !== 'ALL' && (!txn.chamberNo || !txn.chamberNo.split(',').map((c: string) => c.trim()).includes(chamberFilter))) return false;
+      if (chamberFilter !== 'ALL' && (!txn.chamberNo || !txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean).includes(chamberFilter))) return false;
       if (monthFilter !== 'ALL' && (!txn.date || !txn.date.startsWith(monthFilter))) return false;
       
       if (search) {
@@ -108,6 +108,8 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       t('transactions.commodityHeader'), 
       t('transactions.locationHeader'), 
       'Grade',
+      'Weighbridge Slip No',
+      'Receipt No',
       t('inward.chamberHeader'), 
       t('inward.floorHeader'), 
       t('inward.stackHeader'), 
@@ -136,7 +138,9 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
         `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
         txn.warehouse?.name || '',
         txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
-        txn.chamberNo,
+        txn.weighbridgeSlipNo || '-',
+        txn.receiptNumber || '-',
+        txn.chamberNo ? Array.from(new Set(txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean))).join(', ') : '',
         txn.floorNo,
         txn.stackNo,
         formatNumber(txn.quantityKg),
@@ -231,6 +235,8 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
               <TableHead className="font-semibold">{t('transactions.commodityHeader')}</TableHead>
               <TableHead className="font-semibold">{t('transactions.locationHeader')}</TableHead>
               <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
+              <TableHead className="font-semibold">Weighbridge Slip No</TableHead>
+              <TableHead className="font-semibold">Receipt No</TableHead>
               <TableHead className="text-right font-semibold">{t('transactions.qtyHeader')} (KG)</TableHead>
               <TableHead className="text-right font-semibold">Units</TableHead>
               <TableHead className="text-right font-semibold">{t('transactions.actionsHeader')}</TableHead>
@@ -323,6 +329,12 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                   </TableCell>
                   <TableCell className="text-slate-700 text-sm">
                     {txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-'}
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    {txn.weighbridgeSlipNo || '-'}
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    {txn.receiptNumber || '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium text-slate-900">{formatNumber(txn.quantityKg)}</TableCell>
                   <TableCell className="text-right text-slate-700">{formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))} {txn.commodity?.unit ? txn.commodity.unit : ''}</TableCell>

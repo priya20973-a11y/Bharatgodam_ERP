@@ -17,7 +17,7 @@ interface BulkUploadResponse {
   error?: string;
 }
 
-export function ClientBulkUpload({ onSuccess }: { onSuccess: () => void }) {
+export function ClientBulkUpload({ onSuccess, isColdStorage = false }: { onSuccess: () => void, isColdStorage?: boolean }) {
   const { t } = useColdTranslation();
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<BulkUploadResponse | null>(null);
@@ -63,6 +63,9 @@ export function ClientBulkUpload({ onSuccess }: { onSuccess: () => void }) {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+      if (isColdStorage) {
+        formData.append('isColdStorage', 'true');
+      }
 
       const response = await fetch('/api/clients/bulk-upload', {
         method: 'POST',

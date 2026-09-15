@@ -196,6 +196,151 @@ async function resolveInvoiceCompanyProfile(
     ifscCode: user.ifscCode || '',
     bankBranch: user.bankBranch || '',
     companyTermsAndConditions: user.termsAndConditions || '',
+    invoiceSequenceType: user.invoiceSequenceType || 'CONTINUOUS',
+    invoicePrefix: user.invoicePrefix || '',
+    invoiceSuffix: user.invoiceSuffix || '',
+    invoiceStartingNumber: user.invoiceStartingNumber || 1,
+    invoicePadding: user.invoicePadding || 4,
+  };
+}
+
+/**
+ * Fetch the WSP user's full invoice numbering configuration.
+ */
+async function getInvoiceNumberingConfig(
+  db: any,
+  tenantFilter: any
+): Promise<{
+  sequenceType: 'CONTINUOUS' | 'SEPARATE';
+  prefix: string;
+  suffix: string;
+  startingNumber: number;
+  padding: number;
+}> {
+  const defaults = {
+    sequenceType: 'CONTINUOUS' as const,
+    prefix: '',
+    suffix: '',
+    startingNumber: 1,
+    padding: 4,
+  };
+  try {
+    const userId =
+      tenantFilter?.userId ||
+      (Array.isArray(tenantFilter?.$or)
+        ? tenantFilter.$or.find((f: any) => f.userId)?.userId
+        : undefined);
+    if (!userId) return defaults;
+    const user = await db.collection('users').findOne({
+      _id: typeof userId === 'string' ? new ObjectId(userId) : userId,
+    });
+    if (!user) return defaults;
+    return {
+      sequenceType: user.invoiceSequenceType === 'SEPARATE' ? 'SEPARATE' : 'CONTINUOUS',
+      prefix: user.invoicePrefix || '',
+      suffix: user.invoiceSuffix || '',
+      startingNumber: Number(user.invoiceStartingNumber) || 1,
+      padding: Number(user.invoicePadding) || 4,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+/**
+ * Determine the document type for a new invoice based on the WSP's GST status.
+ * If the WSP GST is 'NA' or missing, the invoice is a Bill of Supply.
+ * Otherwise it defaults to Tax Invoice (tax can be adjusted later).
+ */
+function determineDocumentType(companyGst: string): 'TAX_INVOICE' | 'BILL_OF_SUPPLY' {
+  const gst = (companyGst || '').trim().toUpperCase();
+  if (!gst || gst === 'NA') {
+    return 'BILL_OF_SUPPLY';
+  }
+  return 'TAX_INVOICE';
+}
+
+/**
+ * Escape a string for use inside a regex pattern.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Generate the next invoice number, respecting the WSP's sequence type and custom format.
+ *
+ * Custom format: {prefix}{T|B (if separate)}{paddedSerial}{suffix}
+ * Default format (no custom fields): WSP/Month/Year/{paddedSerial}
+ *
+ * Only affects NEW invoices. Existing invoices keep their numbers.
+ */
+async function generateSequenceAwareInvoiceNumber(
+  db: any,
+  wspInitials: string,
+  month: string,
+  yearPart: string,
+  invoiceMonthString: string,
+  warehouseFilter: any,
+  tenantFilter: any,
+  config: {
+    sequenceType: 'CONTINUOUS' | 'SEPARATE';
+    prefix: string;
+    suffix: string;
+    startingNumber: number;
+    padding: number;
+  },
+  documentType: 'TAX_INVOICE' | 'BILL_OF_SUPPLY'
+): Promise<{ invoiceNumber: string; documentType: 'TAX_INVOICE' | 'BILL_OF_SUPPLY' }> {
+  const { sequenceType, prefix, suffix, startingNumber, padding } = config;
+
+  // Determine sequence key based on tenantFilter (usually contains userId)
+  // We need a persistent sequence for this specific WSP/userId.
+  const userId =
+    tenantFilter?.userId ||
+    (Array.isArray(tenantFilter?.$or)
+      ? tenantFilter.$or.find((f: any) => f.userId)?.userId
+      : null);
+
+  const sequenceIdentifier = sequenceType === 'SEPARATE' ? documentType : 'ALL';
+
+  const sequenceQuery = {
+    userId: userId ? (typeof userId === 'string' ? new ObjectId(userId) : userId) : 'DEFAULT',
+    sequenceType: sequenceIdentifier,
+    type: 'DRY_STORAGE_INVOICE'
+  };
+
+  // Find and increment the sequence atomically
+  const sequenceDoc = await db.collection('dry_invoice_sequences').findOneAndUpdate(
+    sequenceQuery,
+    { $inc: { lastNumber: 1 } },
+    { returnDocument: 'after', upsert: true }
+  );
+
+  let currentNumber = sequenceDoc?.value?.lastNumber || sequenceDoc?.lastNumber;
+
+  // If this is the very first invoice and a custom starting number is provided,
+  // set the sequence to that starting number if it's > 1.
+  if (currentNumber === 1 && startingNumber > 1) {
+    const updatedDoc = await db.collection('dry_invoice_sequences').findOneAndUpdate(
+      { ...sequenceQuery, lastNumber: 1 }, // Ensure we only update if it's still 1
+      { $set: { lastNumber: startingNumber } },
+      { returnDocument: 'after' }
+    );
+    if (updatedDoc?.value || updatedDoc?.lastNumber) {
+      currentNumber = startingNumber;
+    } else {
+      const latest = await db.collection('dry_invoice_sequences').findOne(sequenceQuery);
+      currentNumber = latest?.lastNumber || currentNumber;
+    }
+  }
+
+  const paddedSerial = String(currentNumber).padStart(padding, '0');
+  const invoiceNumber = `${prefix || ''}${paddedSerial}${suffix || ''}`;
+
+  return {
+    invoiceNumber,
+    documentType,
   };
 }
 
@@ -523,6 +668,7 @@ export async function buildMonthlyInvoiceFromTransactions(
   const invoiceMonthString = invoiceMonth;
 
   let invoiceNumber = existingMaster?.invoiceId || `INV/${month}/${yearPart}/00000`;
+  let documentType: 'TAX_INVOICE' | 'BILL_OF_SUPPLY' = existingMaster?.documentType || 'BILL_OF_SUPPLY';
   if (resolvedWarehouseId && resolvedWarehouse && !existingMaster) {
     const wspInitials =
       resolvedWarehouse.name
@@ -530,30 +676,23 @@ export async function buildMonthlyInvoiceFromTransactions(
         .map((word: string) => word.charAt(0).toUpperCase())
         .join('') || 'UNKNOWN';
 
-    const invoiceIdPattern = `^${wspInitials}/${month}/${yearPart}/\\d{5}$`;
-    const existingInvoices = await db
-      .collection('invoice_master')
-      .find({
-        ...buildWarehouseMatch(resolvedWarehouseId),
-        invoiceMonth: invoiceMonthString,
-        invoiceType: 'transaction',
-        invoiceId: { $regex: invoiceIdPattern },
-        ...tenantFilter,
-      })
-      .project({ invoiceId: 1 })
-      .toArray();
+    const numConfig = await getInvoiceNumberingConfig(db, tenantFilter);
+    const companyGst = (companyProfile as any)?.companyGst || '';
+    const docType = determineDocumentType(companyGst);
 
-    const maxSerial = existingInvoices.reduce(
-      (max: number, inv: any) => {
-        const match = inv.invoiceId?.match(/\/(\d{5})$/);
-        if (!match) return max;
-        return Math.max(max, Number(match[1]));
-      },
-      0
+    const result = await generateSequenceAwareInvoiceNumber(
+      db,
+      wspInitials,
+      month,
+      yearPart,
+      invoiceMonthString,
+      buildWarehouseMatch(resolvedWarehouseId),
+      tenantFilter,
+      numConfig,
+      docType
     );
-
-    const serial = String(maxSerial + 1).padStart(5, '0');
-    invoiceNumber = `${wspInitials}/${month}/${yearPart}/${serial}`;
+    invoiceNumber = result.invoiceNumber;
+    documentType = result.documentType;
   }
 
   const monthEnd = new Date(`${invoiceMonthString}-01`);
@@ -582,6 +721,7 @@ export async function buildMonthlyInvoiceFromTransactions(
       status: 'DRAFT',
       invoiceType: 'transaction',
       sourceType: 'transactions',
+      documentType,
       generatedAt: new Date(),
       dueDate: monthEnd.toISOString().split('T')[0],
       userId: userId
@@ -772,6 +912,7 @@ export async function buildMonthlyInvoiceFromLedger(
   const invoiceMonthString = invoiceMonth;
 
   let invoiceNumber = `INV/${month}/${yearPart}/00000`;
+  let documentType: 'TAX_INVOICE' | 'BILL_OF_SUPPLY' = 'BILL_OF_SUPPLY';
 
   if (resolvedWarehouseId && resolvedWarehouse) {
     const wspInitials =
@@ -782,33 +923,27 @@ export async function buildMonthlyInvoiceFromLedger(
         )
         .join('') || 'UNKNOWN';
 
-    const invoiceIdPattern = `^${wspInitials}/${month}/${yearPart}/\\d{5}$`;
+    const numConfig = await getInvoiceNumberingConfig(db, tenantFilter);
+    const companyGst = (companyProfile as any)?.companyGst || '';
+    const docType = determineDocumentType(companyGst);
 
-    const existingInvoices = await db
-      .collection('invoice_master')
-      .find({
-        ...(isMultipleWarehouses ? { warehouseIds: { $in: warehouseIdsArray.map(id => new ObjectId(id)) } } : { warehouseId: new ObjectId(resolvedWarehouseId) }),
-        invoiceMonth: invoiceMonthString,
-        invoiceId: { $regex: invoiceIdPattern },
-        ...tenantFilter,
-      })
-      .project({ invoiceId: 1 })
-      .toArray();
+    const warehouseFilter = isMultipleWarehouses
+      ? { warehouseIds: { $in: warehouseIdsArray.map(id => new ObjectId(id)) } }
+      : { warehouseId: new ObjectId(resolvedWarehouseId) };
 
-    const maxSerial = existingInvoices.reduce(
-      (max: number, inv: any) => {
-        const match = inv.invoiceId?.match(/\/(\d{5})$/);
-
-        if (!match) return max;
-
-        return Math.max(max, Number(match[1]));
-      },
-      0
+    const result = await generateSequenceAwareInvoiceNumber(
+      db,
+      wspInitials,
+      month,
+      yearPart,
+      invoiceMonthString,
+      warehouseFilter,
+      tenantFilter,
+      numConfig,
+      docType
     );
-
-    const serial = String(maxSerial + 1).padStart(5, '0');
-
-    invoiceNumber = `${wspInitials}/${month}/${yearPart}/${serial}`;
+    invoiceNumber = result.invoiceNumber;
+    documentType = result.documentType;
   }
 
   const monthEnd = new Date(`${invoiceMonthString}-01`);
@@ -833,6 +968,7 @@ export async function buildMonthlyInvoiceFromLedger(
       ledgerInvoice.summary.totalRent ?? 0
     ),
     status: 'DRAFT',
+    documentType,
     generatedAt: new Date(),
     dueDate: monthEnd.toISOString().split('T')[0],
     userId: userId

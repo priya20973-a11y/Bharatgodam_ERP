@@ -149,12 +149,13 @@ export async function GET(request: NextRequest) {
     // 6. Fetch Commodity Names
     const validCommodityIds = Array.from(commodityMap.values()).map(c => c.commodityId);
     const commoditiesData = await ColdCommodity.find({ _id: { $in: validCommodityIds } }).lean();
-    const commodityInfoMap = new Map(commoditiesData.map((c: any) => [c._id.toString(), { name: c.name, unit: c.unit || 'KG' }]));
+    const commodityInfoMap = new Map(commoditiesData.map((c: any) => [c._id.toString(), { name: c.name, type: c.type, unit: c.unit || 'KG' }]));
 
     const finalCommodities = Array.from(commodityMap.values()).map((c) => {
-      const info = commodityInfoMap.get(c.commodityId.toString()) || { name: 'Unknown Commodity', unit: 'KG' };
+      const info = commodityInfoMap.get(c.commodityId.toString()) || { name: 'Unknown Commodity', type: '', unit: 'KG' };
+      const displayName = info.type && info.type.trim() !== '' ? `${info.name} (${info.type})` : info.name;
       return {
-        commodityName: info.name,
+        commodityName: displayName,
         unit: info.unit,
         totalWeight: c.totalWeight,
         bookingCount: c.bookingCount

@@ -488,34 +488,48 @@ export async function createBatchColdOutwards(payload: any) {
           return { success: false, error: 'Cannot create outward: Inward not found.' };
         }
         
-        const outwards = await ColdOutward.aggregate([
-          { $match: { inwardId: inward._id } },
-          { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
-        ]);
-        const totalOutward = outwards[0]?.totalOut || 0;
-        const totalOutwardBags = outwards[0]?.totalBags || 0;
+        const dbRemainingKg = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null 
+          ? Number(inward.remainingQuantityKg) 
+          : Number(inward.quantityKg || 0);
+
+        const dbRemainingBags = inward.remainingBagsCount !== undefined && inward.remainingBagsCount !== null 
+          ? Number(inward.remainingBagsCount) 
+          : Number(inward.bagsCount || 0);
         
-        const currentRemaining = inward.quantityKg - totalOutward;
+        const currentRemaining = Math.max(0, dbRemainingKg);
+        const currentRemainingBags = Math.max(0, dbRemainingBags);
         
         if (currentRemaining <= 0) {
           if (inward.status !== 'Completed') {
             inward.status = 'Completed';
             inward.remainingQuantityKg = 0;
+            inward.remainingBagsCount = 0;
             await inward.save();
           }
           return { success: false, error: 'Cannot create outward: Inward is already completed.' };
         }
         
-        if (item.quantityKg > currentRemaining) {
+        const outwardQuantityKg = Number(item.quantityKg) || 0;
+        const outwardBagsCount = Number(item.bagsCount) || 0;
+        
+        if (outwardQuantityKg <= 0 || isNaN(outwardQuantityKg)) {
+           return { success: false, error: 'Cannot create outward: Outward quantity must be a valid number greater than 0.' };
+        }
+        
+        if (outwardQuantityKg > currentRemaining) {
           return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
         }
         
-        const remainingKg = currentRemaining - item.quantityKg;
-        const remainingBags = (inward.bagsCount - totalOutwardBags) - item.bagsCount;
+        const newRemaining = currentRemaining - outwardQuantityKg;
+        const remainingBags = currentRemainingBags - outwardBagsCount;
         
-        inward.remainingQuantityKg = Math.max(0, remainingKg);
-        inward.remainingBagsCount = Math.max(0, remainingBags);
+        inward.remainingQuantityKg = Math.max(0, newRemaining) || 0;
+        inward.remainingBagsCount = Math.max(0, remainingBags) || 0;
         inward.status = inward.remainingQuantityKg <= 0 ? 'Completed' : 'Partial';
+        
+        if (isNaN(inward.remainingQuantityKg) || inward.remainingQuantityKg == null) inward.remainingQuantityKg = 0;
+        if (isNaN(inward.remainingBagsCount) || inward.remainingBagsCount == null) inward.remainingBagsCount = 0;
+
         await inward.save();
       }
 

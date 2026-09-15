@@ -160,16 +160,32 @@ export function generateColdTransactionReceiptHTML(
         print-color-adjust: exact;
       }
       .hide-on-print { display: none !important; }
+      
+      /* Force everything to fit on one page */
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        page-break-inside: avoid;
+      }
+      
+      .receipt-container {
+        height: 210mm;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
     }
     
     .receipt-container { 
       width: 148mm; 
-      min-height: 210mm;
+      height: 210mm;
+      max-height: 210mm;
       margin: 0 auto; 
-      padding: 15px; 
+      padding: 12px; 
       background-color: #ffffff;
       border: 1px solid #ccc;
       position: relative;
+      box-sizing: border-box;
+      overflow: hidden;
     }
     
     body.duplicate-mode @page {
@@ -250,7 +266,7 @@ export function generateColdTransactionReceiptHTML(
       border: 2px solid #b89735;
       background: #fff;
       padding: 5px;
-      margin-bottom: 15px;
+      margin-bottom: 8px;
     }
     
     .logo-area {
@@ -272,12 +288,12 @@ export function generateColdTransactionReceiptHTML(
     .main-title {
       background-color: #d63333;
       color: #fff;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 700;
       padding: 2px 10px;
       display: inline-block;
       border-radius: 4px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     
     .sub-title {
@@ -288,16 +304,16 @@ export function generateColdTransactionReceiptHTML(
     
     .badge-container {
       text-align: center;
-      margin-bottom: 15px;
+      margin-bottom: 8px;
     }
     
     .badge {
       background-color: #557960;
       color: #fff;
       display: inline-block;
-      padding: 4px 20px;
+      padding: 2px 15px;
       border-radius: 20px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
     }
     
@@ -307,13 +323,13 @@ export function generateColdTransactionReceiptHTML(
       color: #d63333;
       font-weight: bold;
       font-size: 13px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
     
     .form-row {
       display: flex;
       align-items: flex-end;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       font-size: 13px;
       font-weight: 600;
       color: #9e2a2b;
@@ -335,7 +351,7 @@ export function generateColdTransactionReceiptHTML(
     .grid-container {
       display: flex;
       justify-content: space-between;
-      margin-top: 15px;
+      margin-top: 8px;
     }
     
     .left-grid {
@@ -350,13 +366,13 @@ export function generateColdTransactionReceiptHTML(
       width: 100%;
       border-collapse: collapse;
       border: 1px solid #8b5a2b;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       background-color: transparent;
     }
     
     .data-table td {
       border: 1px solid #8b5a2b;
-      padding: 6px;
+      padding: 4px;
       font-size: 13px;
       font-weight: 600;
     }
@@ -373,7 +389,7 @@ export function generateColdTransactionReceiptHTML(
     
     .stack-table th {
       border: 1px solid #8b5a2b;
-      padding: 6px;
+      padding: 4px;
       font-size: 13px;
       background: #fdfbf7;
       color: #9e2a2b;
@@ -387,7 +403,7 @@ export function generateColdTransactionReceiptHTML(
     }
     
     .footer-note {
-      margin-top: 20px;
+      margin-top: 10px;
       font-size: 12px;
       font-weight: 600;
       text-align: center;
@@ -397,18 +413,18 @@ export function generateColdTransactionReceiptHTML(
     .conditions-box {
       border: 1px solid #8b5a2b;
       border-radius: 10px;
-      padding: 8px;
+      padding: 5px;
       text-align: center;
       font-size: 12px;
       font-weight: 600;
-      margin-top: 15px;
+      margin-top: 10px;
       background-color: rgba(255, 255, 255, 0.4);
     }
     
     .signatures {
       display: flex;
       justify-content: space-between;
-      margin-top: 40px;
+      margin-top: 20px;
       font-size: 13px;
       color: #9e2a2b;
       font-weight: bold;

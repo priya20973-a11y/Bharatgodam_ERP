@@ -66,6 +66,11 @@ interface ProfileData {
   termsAndConditions?: string | null;
   isNewRegistration?: boolean;
   storageChargeSacCode?: string | null;
+  invoiceSequenceType?: string;
+  invoicePrefix?: string;
+  invoiceSuffix?: string;
+  invoiceStartingNumber?: number;
+  invoicePadding?: number;
 }
 
 const initialProfileForm = {
@@ -88,6 +93,11 @@ const initialProfileForm = {
   iecCode: '',
   termsAndConditions: '',
   storageChargeSacCode: '',
+  invoiceSequenceType: 'CONTINUOUS',
+  invoicePrefix: '',
+  invoiceSuffix: '',
+  invoiceStartingNumber: 1,
+  invoicePadding: 4,
 };
 
 const initialPasswordForm = {
@@ -153,6 +163,11 @@ export default function ProfilePage() {
         iecCode: data.user.iecCode || '',
         termsAndConditions: data.user.termsAndConditions || '',
         storageChargeSacCode: data.user.storageChargeSacCode || '',
+        invoiceSequenceType: data.user.invoiceSequenceType || 'CONTINUOUS',
+        invoicePrefix: data.user.invoicePrefix || '',
+        invoiceSuffix: data.user.invoiceSuffix || '',
+        invoiceStartingNumber: data.user.invoiceStartingNumber || 1,
+        invoicePadding: data.user.invoicePadding || 4,
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -595,6 +610,82 @@ export default function ProfilePage() {
               />
             </label>
 
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6">
+              <h3 className="font-semibold text-slate-800">Invoice Numbering Configuration</h3>
+              
+              <div className="grid gap-6 lg:grid-cols-2">
+                <label className="space-y-2 lg:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">Sequence Type</span>
+                  <select
+                    value={profileForm.invoiceSequenceType}
+                    onChange={(event) => setProfileForm({ ...profileForm, invoiceSequenceType: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="CONTINUOUS">Continuous Sequence (Tax Invoice & Bill of Supply share sequence)</option>
+                    <option value="SEPARATE">Separate Sequence (Tax Invoice & Bill of Supply independent)</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Prefix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.invoicePrefix}
+                    onChange={(event) => setProfileForm({ ...profileForm, invoicePrefix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. DS-"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Suffix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.invoiceSuffix}
+                    onChange={(event) => setProfileForm({ ...profileForm, invoiceSuffix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. -26"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Starting Number</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={profileForm.invoiceStartingNumber}
+                    onChange={(event) => setProfileForm({ ...profileForm, invoiceStartingNumber: Number(event.target.value) || 1 })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Padding / Number Length</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={profileForm.invoicePadding}
+                    onChange={(event) => setProfileForm({ ...profileForm, invoicePadding: Number(event.target.value) || 4 })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. 4 for 0001"
+                  />
+                </label>
+
+                <div className="lg:col-span-2 rounded-md bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-sm font-medium text-blue-900 mb-1">Live Preview</p>
+                  <p className="text-slate-700 font-mono text-sm">
+                    {profileForm.invoiceSequenceType === 'SEPARATE' && <span className="text-slate-500 mr-2">// Tax Invoice will automatically include a 'T' marker before the number</span>}
+                    <br/>
+                    {profileForm.invoicePrefix || ''}
+                    {profileForm.invoiceSequenceType === 'SEPARATE' ? 'T' : ''}
+                    {String(profileForm.invoiceStartingNumber).padStart(profileForm.invoicePadding || 4, '0')}
+                    {profileForm.invoiceSuffix || ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">IEC Code (Optional)</span>
               <input
@@ -710,6 +801,11 @@ export default function ProfilePage() {
                 iecCode: profile?.iecCode || '',
                 termsAndConditions: profile?.termsAndConditions || '',
                 storageChargeSacCode: profile?.storageChargeSacCode || '',
+                invoiceSequenceType: profile?.invoiceSequenceType || 'CONTINUOUS',
+                invoicePrefix: profile?.invoicePrefix || '',
+                invoiceSuffix: profile?.invoiceSuffix || '',
+                invoiceStartingNumber: profile?.invoiceStartingNumber || 1,
+                invoicePadding: profile?.invoicePadding || 4,
               });
               setMessage(null);
               setError(null);

@@ -68,7 +68,7 @@ export default function ClientListWrapper({ initialClients, initialCommodities, 
 
       {isBulkUploading && (
         <div className="mb-6">
-          <ClientBulkUpload onSuccess={refreshData} />
+          <ClientBulkUpload onSuccess={refreshData} isColdStorage={isColdStorage} />
         </div>
       )}
 

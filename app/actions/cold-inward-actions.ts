@@ -160,15 +160,19 @@ export async function checkExistingReceiptNumber(receiptNumber: string) {
 export async function searchColdInwardByReceipt(receiptNo: string) {
   if (!receiptNo || typeof receiptNo !== 'string') return null;
   
-  // Reuse the robust getColdInwards function to get all inwards with their available quantities pre-calculated
-  const allInwards = await getColdInwards();
+  await connectToDatabase();
+  const session = await requireSession();
   
-  // Find the matching receipt number
-  const matchedInward = allInwards.find((inward: any) => 
-    String(inward.receiptNumber).trim() === receiptNo.trim()
-  );
+  const inward = await ColdInward.findOne({ 
+    receiptNumber: { $regex: new RegExp(`^${receiptNo.trim()}$`, 'i') },
+    ...getTenantFilter(session)
+  })
+    .populate('clientId', 'name mobile')
+    .populate('commodityId', 'name type gradingType')
+    .populate('warehouseId', 'name')
+    .lean();
   
-  return matchedInward || null;
+  return inward ? JSON.parse(JSON.stringify(inward)) : null;
 }
 
 export async function getColdInwardById(id: string) {

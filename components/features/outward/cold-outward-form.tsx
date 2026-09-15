@@ -65,6 +65,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [isResolvingQr, setIsResolvingQr] = useState(false);
 
+  // Receipt Search State
+  const [searchReceiptNo, setSearchReceiptNo] = useState('');
+  const [isSearchingReceipt, setIsSearchingReceipt] = useState(false);
+
   // Common Editable fields
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [remarks, setRemarks] = useState('');
@@ -231,8 +235,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           });
         }
 
+        const inwardId = inward.uniqueKey || inward._id;
+        const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
+
         const newItem = {
-          inwardId: inward.uniqueKey || inward._id,
+          inwardId,
           inward,
           grade: inward.grade || '',
           bagsCount: inward.bagsCount || null,
@@ -240,7 +247,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           mixed: inward.mixed || null,
           plusMinus: '-',
           netWeightLoss: null,
-          grossWeight: inward.availableQty || null,
+          grossWeight: remainingQtyDb || null,
           emptyWeight: 0,
           gradingApplied: isGradingFromInward ? true : false,
           gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
@@ -286,18 +293,28 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
             const isGradingFromInward = inward.gradingApplied === true;
 
+            const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
+
             const initialStackSelections: Record<string, any> = {};
-            if (inward.stackAllocations && inward.stackAllocations.length > 1) {
-              inward.stackAllocations.forEach((alloc: any) => {
-                const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
-                initialStackSelections[allocKey] = {
-                  selected: true,
-                  outwardWeight: alloc.allocatedWeight,
-                  bagsCount: alloc.bagsCount || null,
-                  jin: null,
-                  mixed: null
-                };
-              });
+            if (inward.stackAllocations && inward.stackAllocations.length > 0) {
+              inward.availableAllocations = inward.stackAllocations.map((alloc: any) => ({
+                ...alloc,
+                availableQty: alloc.allocatedWeight,
+                bagsCount: alloc.bagsCount
+              }));
+              
+              if (inward.availableAllocations.length > 1) {
+                inward.availableAllocations.forEach((alloc: any) => {
+                  const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+                  initialStackSelections[allocKey] = {
+                    selected: true,
+                    outwardWeight: alloc.availableQty,
+                    bagsCount: alloc.bagsCount || null,
+                    jin: null,
+                    mixed: null
+                  };
+                });
+              }
             }
 
             const inwardId = inward.uniqueKey || inward._id;
@@ -311,7 +328,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               mixed: inward.mixed || null,
               plusMinus: '-',
               netWeightLoss: null,
-              grossWeight: inward.quantityKg || null,
+              grossWeight: remainingQtyDb || null,
               emptyWeight: 0,
               gradingApplied: isGradingFromInward ? true : false,
               gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
@@ -356,6 +373,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
     const commodity = commodities.find(c => c._id === (inward.commodityId?._id || inward.commodityId));
     const isGradingFromInward = inward.gradingApplied === true;
+    const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
 
     const initialStackSelections: Record<string, any> = {};
     if (inward.availableAllocations && inward.availableAllocations.length > 1) {
@@ -382,7 +400,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         mixed: inward.mixed || null,
         plusMinus: '-',
         netWeightLoss: null,
-        grossWeight: null,
+        grossWeight: remainingQtyDb || null,
         emptyWeight: null,
         gradingApplied: isGradingFromInward ? true : false,
         gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
@@ -529,7 +547,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         }
       } else {
         // Single stack receipt flow
-        const calcNetWeight = Number(item.grossWeight || 0) - Number(item.emptyWeight || 0);
+        const calcNetWeight = (Number(item.grossWeight || 0) - Number(item.emptyWeight || 0) - (Number(item.plusMinus) || 0));
         const calcTotalBags = Number(item.bagsCount || 0) + Number(item.jin || 0) + Number(item.mixed || 0);
 
         if (calcNetWeight <= 0) {
@@ -537,9 +555,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           return;
         }
 
-        const adjustedAvailableQty = item.inward.availableQty;
-        if (calcNetWeight > adjustedAvailableQty) {
-          toast.error(`Quantity exceeds capacity for inward ${item.inwardId.slice(-4)}`);
+        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null 
+          ? item.inward.remainingQuantityKg 
+          : (item.inward.quantityKg || 0);
+          
+        if (calcNetWeight > remainingQtyDb) {
+          toast.error(`Quantity exceeds available stock (${remainingQtyDb.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
           return;
         }
 
@@ -554,8 +575,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           const alloc = allocations[i];
           if (remainingNetWeight <= 0) break;
 
-          const isLastAlloc = i === allocations.length - 1 || remainingNetWeight <= alloc.availableQty;
-          const deductNetWeight = Math.min(remainingNetWeight, alloc.availableQty);
+          const allocAvailQty = allocations.length === 1 ? remainingQtyDb : (alloc.availableQty || 0);
+          const isLastAlloc = i === allocations.length - 1 || remainingNetWeight <= allocAvailQty;
+          const deductNetWeight = Math.min(remainingNetWeight, allocAvailQty);
 
           const ratio = deductNetWeight / calcNetWeight;
 
@@ -779,10 +801,14 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       </div>
 
       {selectedItems.map((item, index) => {
+        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null 
+          ? item.inward.remainingQuantityKg 
+          : (item.inward.quantityKg || 0);
+
         const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
         const calcNetWeight = isMultiStack
           ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
-          : (Number(item.grossWeight || 0) - Number(item.emptyWeight || 0));
+          : (Number(item.grossWeight || 0) - Number(item.emptyWeight || 0) - (Number(item.plusMinus) || 0));
         
         const calcTotalBags = isMultiStack
           ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? ((Number(s.bagsCount) || 0) + (Number(s.jin) || 0) + (Number(s.mixed) || 0)) : 0), 0)
@@ -802,7 +828,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name}{item.inward.commodityId?.type ? ` (${item.inward.commodityId.type})` : ''} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(item.inward?.availableQty) || 0).toFixed(2)} KG)</h4>
+            <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name}{item.inward.commodityId?.type ? ` (${item.inward.commodityId.type})` : ''} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(remainingQtyDb) || 0).toFixed(2)} KG)</h4>
 
             {isMultiStack ? (
               <div className="mb-4 p-4 border border-indigo-200 rounded-lg bg-indigo-50/40 space-y-4">

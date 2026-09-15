@@ -498,7 +498,7 @@ export function generateColdOutwardReceiptHTML(
         ${outwards.map(o => `
         <div class="receipt-line">
           <div class="label">${t.receiptNoLabel}</div>
-          <div class="value">${o.inwardId ? (o.inwardId.receiptNo ? o.inwardId.receiptNo.toString() : o.inwardId._id.toString().slice(-4).toUpperCase()) : (o.weighbridgeSlipNo || '')}</div>
+          <div class="value">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : o.inwardId._id.toString().slice(-4).toUpperCase()) : (o.weighbridgeSlipNo || '')}</div>
           <div class="value-small text-center">${o.inwardId ? (o.inwardId.marko || '') : ''}</div>
           <div class="value-small text-center">${formatNum(o.totalBags || 0)}</div>
           <div class="value-small text-center">${formatNum((o.quantityKg || 0).toFixed(2))}</div>

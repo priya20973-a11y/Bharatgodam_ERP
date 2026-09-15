@@ -46,7 +46,15 @@ export default function SearchInwardModal({ isOpen, onClose }: SearchInwardModal
   const handleSelect = () => {
     if (!searchResult) return;
     
-    if (searchResult.quantityKg <= 0 && searchResult.bagsCount <= 0) {
+    const remainingQty = searchResult.remainingQuantityKg !== undefined && searchResult.remainingQuantityKg !== null 
+      ? searchResult.remainingQuantityKg 
+      : (searchResult.quantityKg || 0);
+      
+    const remainingBags = searchResult.remainingBagsCount !== undefined && searchResult.remainingBagsCount !== null 
+      ? searchResult.remainingBagsCount 
+      : (searchResult.bagsCount || 0);
+
+    if (remainingQty <= 0 && remainingBags <= 0) {
       toast.error('This inward has no available stock left.');
       return;
     }
@@ -98,17 +106,24 @@ export default function SearchInwardModal({ isOpen, onClose }: SearchInwardModal
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Available Stock</span>
                 </div>
-                <div className="flex gap-4">
-                  <div>
-                    <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-500">{searchResult.quantityKg}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">KG</span>
-                  </div>
-                  <div>
-                    <span className="text-2xl font-bold text-slate-700 dark:text-slate-200">{searchResult.bagsCount}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">BAGS</span>
+                <div className="flex flex-col gap-2">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {(() => {
+                      const remainingQty = searchResult.remainingQuantityKg !== undefined && searchResult.remainingQuantityKg !== null 
+                        ? searchResult.remainingQuantityKg 
+                        : (searchResult.quantityKg || 0);
+                      const itemName = `${searchResult.commodityId?.name}${searchResult.commodityId?.type ? ` (${searchResult.commodityId.type})` : ''}`;
+                      const allocations = searchResult.stackAllocations && searchResult.stackAllocations.length > 0
+                        ? searchResult.stackAllocations
+                        : [{ chamberName: searchResult.chamberName, chamberNo: searchResult.chamberNo, floorName: searchResult.floorName, floorNo: searchResult.floorNo, stackName: searchResult.stackName, stackNo: searchResult.stackNo }];
+                      const locations = allocations.map((a: any) => {
+                        return `${a.chamberName || a.chamberNo || ''}/F${a.floorNo || ''}/S${a.stackNo || ''}`;
+                      }).join(', ');
+                      return `${itemName} - ${locations} (Available Weight: ${Number(remainingQty).toFixed(2)} KG)`;
+                    })()}
                   </div>
                 </div>
-                {(searchResult.quantityKg <= 0 && searchResult.bagsCount <= 0) && (
+                {((searchResult.remainingQuantityKg !== undefined && searchResult.remainingQuantityKg !== null ? searchResult.remainingQuantityKg : (searchResult.quantityKg || 0)) <= 0) && (
                   <p className="text-xs text-rose-500 dark:text-rose-400 mt-2 font-medium">No stock available for outward.</p>
                 )}
               </div>
@@ -117,7 +132,7 @@ export default function SearchInwardModal({ isOpen, onClose }: SearchInwardModal
                 className="w-full mt-4" 
                 onClick={handleSelect}
                 type="button"
-                disabled={searchResult.quantityKg <= 0 && searchResult.bagsCount <= 0}
+                disabled={(searchResult.remainingQuantityKg !== undefined && searchResult.remainingQuantityKg !== null ? searchResult.remainingQuantityKg : (searchResult.quantityKg || 0)) <= 0}
               >
                 Select for Outward
               </Button>

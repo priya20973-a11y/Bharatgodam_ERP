@@ -67,8 +67,8 @@ function validateClientData(data: {
   aadharNumber?: string;
   gstNumber?: string;
   commodityIds?: string[];
-}, isColdStorage: boolean = false) {
-  if (isColdStorage && (!data.commodityIds || data.commodityIds.length === 0)) {
+}, isColdStorage: boolean = false, isBulkUpload: boolean = false) {
+  if (isColdStorage && !isBulkUpload && (!data.commodityIds || data.commodityIds.length === 0)) {
     return 'Please assign at least one commodity to the client.';
   }
   if (data.mobile !== undefined) {
@@ -176,7 +176,7 @@ export async function createClient(data: {
   state?: string;
   commodityIds?: string[];
   email?: string;
-}, isColdStorage: boolean = false) {
+}, isColdStorage: boolean = false, isBulkUpload: boolean = false) {
   await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
@@ -184,7 +184,7 @@ export async function createClient(data: {
       return { success: false, error: 'State is required' };
     }
 
-    const validationError = validateClientData(data, isColdStorage);
+    const validationError = validateClientData(data, isColdStorage, isBulkUpload);
     if (validationError) {
       return { success: false, error: validationError };
     }
@@ -288,11 +288,11 @@ export async function updateClient(id: string, data: Partial<{
   gstNumber: string;
   state?: string;
   commodityIds?: string[];
-}>, isColdStorage: boolean = false) {
+}>, isColdStorage: boolean = false, isBulkUpload: boolean = false) {
   await requireWspActionPermission('clientMaster');
   await connectToDatabase();
   try {
-    const validationError = validateClientData(data as any, isColdStorage);
+    const validationError = validateClientData(data as any, isColdStorage, isBulkUpload);
     if (validationError) {
       return { success: false, error: validationError };
     }

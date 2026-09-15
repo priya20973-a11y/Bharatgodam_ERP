@@ -25,7 +25,17 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
   const stack = floor.stacks.find((s: any) => s.stackNo === stackNo);
   if (!stack) return { success: false, error: 'Stack not found' };
 
-  const totalCapacity = stack.capacity;
+  const customCapKey1 = `${chamber.chamberNo}-${floor.floorNo}-${stack.stackNo}`;
+  const customCapKey2 = `${chamber.name || chamber.chamberNo}-${floor.name || floor.floorNo}-${stack.stackNo}`;
+  let customCap: number | undefined = undefined;
+  if (warehouse.customStackCapacities) {
+    if (typeof (warehouse.customStackCapacities as any).get === 'function') {
+      customCap = (warehouse.customStackCapacities as any).get(customCapKey1) || (warehouse.customStackCapacities as any).get(customCapKey2);
+    } else {
+      customCap = (warehouse.customStackCapacities as any)[customCapKey1] || (warehouse.customStackCapacities as any)[customCapKey2];
+    }
+  }
+  const totalCapacity = Number(stack.capacity || customCap || warehouse.stackCapacity || 1000);
 
   const matchCriteria = {
     $and: [
@@ -294,8 +304,9 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     }
   });
 
-  const availableCapacity = Math.max(0, totalCapacity - occupied);
-  const status = occupied >= totalCapacity ? 'Full' : occupied > 0 ? 'Partial' : 'Empty';
+  const roundedOccupied = Math.round(occupied * 100) / 100;
+  const availableCapacity = Math.max(0, Math.round((totalCapacity - roundedOccupied) * 100) / 100);
+  const status = roundedOccupied >= totalCapacity - 0.01 ? 'Full' : roundedOccupied > 0 ? 'Partial' : 'Empty';
 
   return {
     success: true,
@@ -307,8 +318,8 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
       stackNo,
       totalCapacity,
       capacity: totalCapacity, // Aliased for compatibility
-      occupied,
-      usedCapacity: occupied, // Aliased for compatibility
+      occupied: roundedOccupied,
+      usedCapacity: roundedOccupied, // Aliased for compatibility
       availableCapacity,
       status,
       currentStock: Array.from(groupedStock.values()),

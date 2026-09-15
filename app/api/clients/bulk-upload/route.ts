@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/app/actions/client-actions';
+import { createClient, updateClient } from '@/app/actions/client-actions';
+import Client from '@/lib/models/Client';
+import { requireSession, getTenantFilter } from '@/lib/ownership';
+import connectToDatabase from '@/lib/mongoose';
 import * as XLSX from 'xlsx';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
+    const isColdStorage = formData.get('isColdStorage') === 'true';
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({
@@ -107,10 +111,43 @@ export async function POST(request: NextRequest) {
           email: row.email,
         };
 
-        const result = await createClient(dataToCreate, false);
+        let result;
+
+        if (isColdStorage) {
+          const mobileStr = (row.mobile || '').trim();
+          if (!mobileStr || mobileStr.toUpperCase() === 'NA') {
+            throw new Error('Mobile number is required for Cold Storage clients and cannot be NA');
+          }
+
+          await connectToDatabase();
+          const session = await requireSession();
+          
+          const existingClient = await Client.findOne({
+             mobile: mobileStr,
+             ...getTenantFilter(session)
+          });
+
+          if (existingClient) {
+            const dataToUpdate = { ...dataToCreate };
+            
+            // Preserve existing details unless uploaded data is specifically intended to update them
+            if (!row.pannumber) delete dataToUpdate.panNumber;
+            if (!row.aadharnumber) delete dataToUpdate.aadharNumber;
+            if (!row.gstnumber) delete dataToUpdate.gstNumber;
+            if (!row.email) delete dataToUpdate.email;
+            if (!row.state) delete dataToUpdate.state;
+            if (!row.address) delete dataToUpdate.address;
+            
+            result = await updateClient(existingClient._id.toString(), dataToUpdate, true, true);
+          } else {
+            result = await createClient(dataToCreate, true, true);
+          }
+        } else {
+          result = await createClient(dataToCreate, false, true);
+        }
 
         if (!result.success) {
-          throw new Error(result.error || 'Failed to create client');
+          throw new Error(result.error || 'Failed to process client');
         }
 
         successCount += 1;

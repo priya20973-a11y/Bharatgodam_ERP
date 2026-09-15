@@ -101,13 +101,14 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
       });
     });
 
-    // Map outwards by inwardId -> total outward quantity
+    // Map outwards by inwardId_stackNo -> total outward quantity
     const outwardMap = new Map<string, number>();
     outwards.forEach((o: any) => {
       const inwardIdStr = (o.inwardId?._id || o.inwardId)?.toString();
-      if (inwardIdStr) {
-        const current = outwardMap.get(inwardIdStr) || 0;
-        outwardMap.set(inwardIdStr, current + (o.quantityKg || 0));
+      if (inwardIdStr && o.stackNo) {
+        const key = `${inwardIdStr}_${o.stackNo}`;
+        const current = outwardMap.get(key) || 0;
+        outwardMap.set(key, current + (o.quantityKg || 0));
       }
     });
 
@@ -117,7 +118,6 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
     inwards.forEach((inward: any) => {
       if (!inward.stackAllocations) return;
       const inwardIdStr = inward._id.toString();
-      let remainingOutQty = remainingOutwardMap.get(inwardIdStr) || 0;
 
       inward.stackAllocations.forEach((alloc: any) => {
         const matchChamber = (
@@ -129,6 +129,9 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
         if (matchChamber && alloc.floorNo === floorNo) {
           const s = stacksMap.get(alloc.stackNo);
           if (s) {
+            const key = `${inwardIdStr}_${alloc.stackNo}`;
+            let remainingOutQty = remainingOutwardMap.get(key) || 0;
+            
             const allocWeight = alloc.allocatedWeight || 0;
             let allocAvailable = allocWeight;
 
@@ -136,7 +139,7 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
               const deduct = Math.min(allocAvailable, remainingOutQty);
               allocAvailable -= deduct;
               remainingOutQty -= deduct;
-              remainingOutwardMap.set(inwardIdStr, remainingOutQty);
+              remainingOutwardMap.set(key, remainingOutQty);
             }
 
             s.usedCapacity += allocAvailable;

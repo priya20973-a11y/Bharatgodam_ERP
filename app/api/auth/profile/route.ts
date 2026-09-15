@@ -41,6 +41,7 @@ export async function GET() {
         isNewRegistration: !!user.isNewRegistration,
         coldLanguage: user.coldLanguage || 'en',
         storageChargeSacCode: user.storageChargeSacCode || null,
+        invoiceSequenceType: user.invoiceSequenceType || 'CONTINUOUS',
       },
     });
   } catch (error: any) {
@@ -80,7 +81,12 @@ export async function PATCH(req: Request) {
       iecCode,
       termsAndConditions,
       coldLanguage,
-      storageChargeSacCode
+      storageChargeSacCode,
+      invoiceSequenceType,
+      invoicePrefix,
+      invoiceSuffix,
+      invoiceStartingNumber,
+      invoicePadding
     } = body;
 
     const db = await getDb();
@@ -206,6 +212,11 @@ export async function PATCH(req: Request) {
       if (iecCode !== undefined) updates.iecCode = trimmedIec || null;
       if (termsAndConditions !== undefined) updates.termsAndConditions = termsAndConditions || null;
       if (storageChargeSacCode !== undefined) updates.storageChargeSacCode = storageChargeSacCode || null;
+      if (invoiceSequenceType !== undefined) updates.invoiceSequenceType = invoiceSequenceType || 'CONTINUOUS';
+      if (invoicePrefix !== undefined) updates.invoicePrefix = invoicePrefix || '';
+      if (invoiceSuffix !== undefined) updates.invoiceSuffix = invoiceSuffix || '';
+      if (invoiceStartingNumber !== undefined) updates.invoiceStartingNumber = invoiceStartingNumber || 1;
+      if (invoicePadding !== undefined) updates.invoicePadding = invoicePadding || 4;
     }
     if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
@@ -237,6 +248,7 @@ export async function PATCH(req: Request) {
         id: user._id.toString(),
         fullName: user.fullName || '',
         email: user.email || '',
+        invoiceEmail: user.invoiceEmail || null,
         role: user.role || '',
         companyName: user.companyName || '',
         phoneNumber: user.phoneNumber || '',
@@ -251,10 +263,16 @@ export async function PATCH(req: Request) {
         bankBranch: user.bankBranch || null,
         companyLogo: user.companyLogo || null,
         panNumber: user.panNumber || null,
+        iecCode: user.iecCode || null,
         termsAndConditions: user.termsAndConditions || null,
         isNewRegistration: !!user.isNewRegistration,
         coldLanguage: user.coldLanguage || 'en',
         storageChargeSacCode: user.storageChargeSacCode || null,
+        invoiceSequenceType: user.invoiceSequenceType || 'CONTINUOUS',
+        invoicePrefix: user.invoicePrefix || '',
+        invoiceSuffix: user.invoiceSuffix || '',
+        invoiceStartingNumber: user.invoiceStartingNumber || 1,
+        invoicePadding: user.invoicePadding || 4,
       },
     });
   } catch (error: any) {

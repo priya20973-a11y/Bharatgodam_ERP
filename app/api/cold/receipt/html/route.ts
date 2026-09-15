@@ -18,6 +18,7 @@ import crypto from 'crypto';
 import { hasPermission } from '@/lib/permissions';
 import { generateColdDynamicReceiptHTML } from '@/lib/invoice/cold-dynamic-receipt';
 import ReceiptTemplate from '@/lib/models/ReceiptTemplate';
+import QRCode from 'qrcode';
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
     } else if (type === 'outward') {
       if (batchId) {
         transactions = await ColdOutward.find({ batchId, ...getTenantFilterForMongo(session) })
-          .populate('inwardId', 'receiptNo _id date')
+          .populate('inwardId', 'receiptNumber _id date marko')
           .populate('clientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
@@ -98,14 +99,14 @@ export async function GET(request: NextRequest) {
         }
       } else {
         transaction = await ColdOutward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
-          .populate('inwardId', 'receiptNo _id date')
+          .populate('inwardId', 'receiptNumber _id date marko')
           .populate('clientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transaction) {
           if (transaction.batchId) {
             transactions = await ColdOutward.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
-              .populate('inwardId', 'receiptNo _id date')
+              .populate('inwardId', 'receiptNumber _id date marko')
               .populate('clientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId');
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
               createdAt: { $gte: startTime, $lte: endTime },
               ...getTenantFilterForMongo(session)
             })
-              .populate('inwardId', 'receiptNo _id date')
+              .populate('inwardId', 'receiptNumber _id date marko')
               .populate('clientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId')
@@ -208,7 +209,21 @@ export async function GET(request: NextRequest) {
     } else {
       // Fallback to existing standard templates
       if (type === 'inward') {
-        html = generateColdTransactionReceiptHTML(data, 'inward', userDetails, lang);
+        let qrDataUrl = '';
+        try {
+          const qrContent = JSON.stringify({
+            id: data._id,
+            r: data.receiptNumber || data.receiptNo || data._id.toString().slice(-4).toUpperCase(),
+            c: data.clientId?.name || '',
+            d: data.date,
+            w: data.quantityKg || 0,
+            t: 'inward'
+          });
+          qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 1, width: 100 });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+        }
+        html = generateColdTransactionReceiptHTML(data, 'inward', userDetails, lang, qrDataUrl);
       } else if (type === 'outward') {
         if (batchData && batchData.length > 0) {
           html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);

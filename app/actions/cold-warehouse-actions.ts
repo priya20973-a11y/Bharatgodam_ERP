@@ -358,7 +358,7 @@ export async function updateColdWarehouse(id: string, data: Partial<{
       warehouse.markModified('customStackCapacities');
     }
 
-    if (data.stackCapacity !== undefined || data.customStackCapacities !== undefined) {
+    if (data.stackCapacity !== undefined || data.customStackCapacities !== undefined || data.bufferCapacity !== undefined) {
       const reqList: any[] = [];
       warehouse.chambers.forEach((chamber: any, cIdx: number) => {
         const cNo = chamber.chamberNo || (cIdx + 1);
@@ -394,12 +394,15 @@ export async function updateColdWarehouse(id: string, data: Partial<{
             }
 
             const sCapacity = override !== undefined && Number(override) > 0 ? Number(override) : warehouse.stackCapacity;
+            const bCapacity = warehouse.bufferCapacity || 0;
 
             if (sCapacity !== undefined && Number(sCapacity) > 0) {
                const statKey = `${id}-${cNo}-${fNo}-${stack.stackNo}`;
                const stats = stackStats[statKey];
-               if (stats && stats.occupied > Number(sCapacity)) {
-                 throw new Error(`Stack Capacity for Chamber ${chamber.name || cNo}, Floor ${floor.name || fNo}, Stack ${stack.stackNo} cannot be less than the currently occupied quantity (${stats.occupied} KG).`);
+               const totalUsableCapacity = Number(sCapacity) + Number(bCapacity);
+               
+               if (stats && stats.occupied > totalUsableCapacity) {
+                 throw new Error(`Total Usable Capacity (Stack + Buffer) for Chamber ${chamber.name || cNo}, Floor ${floor.name || fNo}, Stack ${stack.stackNo} cannot be less than the currently occupied quantity (${stats.occupied} KG).`);
                }
                stack.capacity = Number(sCapacity);
             }

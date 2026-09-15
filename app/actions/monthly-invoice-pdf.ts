@@ -127,43 +127,10 @@ async function getInvoiceNumber(invoice: MonthlyInvoiceData): Promise<string> {
     return invoice.invoiceNumber;
   }
 
-  if (!invoice.warehouseId) {
-    return 'INV/UNKNOWN/00000';
-  }
-
-  const db = await getDb();
-  const warehouse = await db.collection('warehouses').findOne({ _id: new ObjectId(invoice.warehouseId) });
-  if (!warehouse) {
-    return 'INV/UNKNOWN/00000';
-  }
-
-  const warehouseName = warehouse.name || 'UNKNOWN';
-  const wspInitials = warehouseName.split(' ').map((word: string) => word.charAt(0).toUpperCase()).join('');
-
-  const monthPart = formatBillingMonth(invoice.month);
-  const yearPart = invoice.year ? String(invoice.year).trim() : 'UNKNOWN';
-
-  const invoiceMonth = `${yearPart}-${normalizeMonthForInvoiceMonth(invoice.month)}`;
-
-  const query = {
-    warehouseId: new ObjectId(invoice.warehouseId),
-    invoiceMonth,
-    invoiceId: { $regex: `^${wspInitials}/${monthPart}/${yearPart}/\\d{5}$` }
-  };
-
-  const existingInvoices = await db.collection('invoice_master')
-    .find(query)
-    .project({ invoiceId: 1 })
-    .toArray();
-
-  const maxSerial = existingInvoices.reduce((max: number, inv: any) => {
-    const match = inv.invoiceId?.match(/\/(\d{5})$/);
-    if (!match) return max;
-    return Math.max(max, Number(match[1]));
-  }, 0);
-
-  const serial = String(maxSerial + 1).padStart(5, '0');
-  return `${wspInitials}/${monthPart}/${yearPart}/${serial}`;
+  // If the invoice number is missing, we don't generate a fake one on the fly here
+  // because the database is the single source of truth for global sequences.
+  // It should be generated at creation time.
+  return 'DRAFT-INVOICE';
 }
 
 function getTotalDue(invoice: MonthlyInvoiceData): number {
