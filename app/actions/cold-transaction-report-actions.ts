@@ -27,6 +27,7 @@ export async function getColdTransactions() {
     .populate('clientId', 'name clientType')
     .populate('commodityId', 'name type gradingType rentCalculationOn')
     .populate('warehouseId', 'name warehouseId chambers')
+    .populate('inwardId', 'lotNo')
     .lean();
 
   const transfers = await ColdTransfer.find(tenantFilter)
@@ -34,6 +35,7 @@ export async function getColdTransactions() {
     .populate('toClientId', 'name clientType')
     .populate('commodityId', 'name type gradingType rentCalculationOn')
     .populate('warehouseId', 'name warehouseId chambers')
+    .populate('originalInwardId', 'lotNo')
     .lean();
 
   const combined = [
@@ -130,7 +132,8 @@ export async function getColdTransactions() {
       transferType: t.transferType,
       remarks: t.remarks,
       receiptNumber: t.receiptNumber || '',
-      weighbridgeSlipNo: t.weighbridgeSlipNo || ''
+      weighbridgeSlipNo: t.weighbridgeSlipNo || '',
+      lotNo: t.type === 'INWARD' ? t.lotNo : (t.type === 'OUTWARD' ? t.inwardId?.lotNo : t.originalInwardId?.lotNo) || ''
     };
   }).filter((t: any) => {
     // Hide the automatically generated Inward/Outward for Ownership Transfers so they don't duplicate

@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     } else if (type === 'outward') {
       if (batchId) {
         transactions = await ColdOutward.find({ batchId, ...getTenantFilterForMongo(session) })
-          .populate('inwardId', 'receiptNumber _id date marko')
+          .populate('inwardId', 'receiptNumber _id date marko lotNo')
           .populate('clientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
@@ -99,14 +99,14 @@ export async function GET(request: NextRequest) {
         }
       } else {
         transaction = await ColdOutward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
-          .populate('inwardId', 'receiptNumber _id date marko')
+          .populate('inwardId', 'receiptNumber _id date marko lotNo')
           .populate('clientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transaction) {
           if (transaction.batchId) {
             transactions = await ColdOutward.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
-              .populate('inwardId', 'receiptNumber _id date marko')
+              .populate('inwardId', 'receiptNumber _id date marko lotNo')
               .populate('clientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId');
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
               createdAt: { $gte: startTime, $lte: endTime },
               ...getTenantFilterForMongo(session)
             })
-              .populate('inwardId', 'receiptNumber _id date marko')
+              .populate('inwardId', 'receiptNumber _id date marko lotNo')
               .populate('clientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId')
@@ -219,7 +219,11 @@ export async function GET(request: NextRequest) {
             w: data.quantityKg || 0,
             t: 'inward'
           });
-          qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 1, width: 100 });
+          qrDataUrl = await QRCode.toDataURL(qrContent, { 
+            margin: 1, 
+            width: 300, 
+            errorCorrectionLevel: 'H' 
+          });
         } catch (err) {
           console.error('Error generating QR code:', err);
         }

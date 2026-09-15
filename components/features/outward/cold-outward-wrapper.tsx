@@ -22,10 +22,10 @@ export default function ColdOutwardWrapper({ initialOutwards, clients, commoditi
   const router = useRouter();
   const { t } = useColdTranslation();
   const [outwards, setOutwards] = useState(initialOutwards);
-  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || !!searchParams?.qr || !!searchParams?.qrId || !!searchParams?.transferId || !!searchParams?.receiptNo);
+  const [isAdding, setIsAdding] = useState(searchParams?.action === 'add' || !!searchParams?.qr || !!searchParams?.qrId || !!searchParams?.transferId || !!searchParams?.receiptNo || !!searchParams?.lotNo);
 
   useEffect(() => {
-    if (searchParams?.action === 'add' || searchParams?.receiptNo) {
+    if (searchParams?.action === 'add' || searchParams?.receiptNo || searchParams?.lotNo) {
       setIsAdding(true);
     }
   }, [searchParams]);

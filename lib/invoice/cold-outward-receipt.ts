@@ -146,6 +146,7 @@ export function generateColdOutwardReceiptHTML(
   const hasGrading = outwards.some(o => o.gradingApplied);
   const gradingRate = outwards.find(o => o.gradingApplied)?.gradingRate || 0;
   const gradingChargeType = outwards.find(o => o.gradingApplied)?.gradingChargeType || '';
+  const hasLotNo = outwards.some(o => o.inwardId?.lotNo);
   
   // Custom strings based on language to match the image exactly
   const t = {
@@ -155,7 +156,9 @@ export function generateColdOutwardReceiptHTML(
     mo: 'Mo.',
     titleBox: lang === 'gu' ? 'ગેટ પાસ' : 'GATE PASS',
     receiptNoLabel: lang === 'gu' ? 'પાવતી નં.' : 'Receipt No.',
-    markoLabel: lang === 'gu' ? 'માર્કો' : 'Marko',
+    markoLabel: lang === 'gu' 
+      ? (hasLotNo ? 'માર્કો / લોટ નં.' : 'માર્કો') 
+      : (hasLotNo ? 'Marko / Lot No.' : 'Marko'),
     dateLabel: lang === 'gu' ? 'તા.' : 'Date',
     nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name,',
     addressLabel: lang === 'gu' ? 'સરનામું' : 'Address',
@@ -499,7 +502,7 @@ export function generateColdOutwardReceiptHTML(
         <div class="receipt-line">
           <div class="label">${t.receiptNoLabel}</div>
           <div class="value">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : o.inwardId._id.toString().slice(-4).toUpperCase()) : (o.weighbridgeSlipNo || '')}</div>
-          <div class="value-small text-center">${o.inwardId ? (o.inwardId.marko || '') : ''}</div>
+          <div class="value-small text-center">${o.inwardId ? ((o.inwardId.marko || '') + (o.inwardId.lotNo ? (o.inwardId.marko ? ' / ' : '') + o.inwardId.lotNo : '')) : ''}</div>
           <div class="value-small text-center">${formatNum(o.totalBags || 0)}</div>
           <div class="value-small text-center">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
         </div>

@@ -31,6 +31,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   const [transactions, setTransactions] = useState(initialTransactions);
   const [search, setSearch] = useState('');
   const [receiptSearch, setReceiptSearch] = useState('');
+  const [lotNoSearch, setLotNoSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
   const [chamberFilter, setChamberFilter] = useState('ALL');
@@ -76,9 +77,15 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
         const rNum = String(txn.receiptNumber || '').toLowerCase();
         if (!rNum || !rNum.includes(rQuery)) return false;
       }
+      
+      if (lotNoSearch) {
+        const lQuery = lotNoSearch.toLowerCase().trim();
+        const lNum = String(txn.lotNo || '').toLowerCase();
+        if (!lNum || !lNum.includes(lQuery)) return false;
+      }
       return true;
     });
-  }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, search, receiptSearch]);
+  }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, search, receiptSearch, lotNoSearch]);
 
   const handleDelete = async (id: string, type: string) => {
     if (type === 'OWNERSHIP TRANSFER') {
@@ -108,6 +115,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       t('transactions.commodityHeader'), 
       t('transactions.locationHeader'), 
       'Grade',
+      'Lot No',
       'Weighbridge Slip No',
       'Receipt No',
       t('inward.chamberHeader'), 
@@ -138,6 +146,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
         `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
         txn.warehouse?.name || '',
         txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
+        txn.lotNo || '-',
         txn.weighbridgeSlipNo || '-',
         txn.receiptNumber || '-',
         txn.chamberNo ? Array.from(new Set(txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean))).join(', ') : '',
@@ -167,7 +176,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
           <Input
@@ -184,6 +193,16 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
             placeholder="Search Receipt No..."
             value={receiptSearch}
             onChange={(e) => setReceiptSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+          <Input
+            placeholder="Search Lot No..."
+            value={lotNoSearch}
+            onChange={(e) => setLotNoSearch(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -235,6 +254,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
               <TableHead className="font-semibold">{t('transactions.commodityHeader')}</TableHead>
               <TableHead className="font-semibold">{t('transactions.locationHeader')}</TableHead>
               <TableHead className="font-semibold">{t('inward.grade')}</TableHead>
+              <TableHead className="font-semibold">Lot No.</TableHead>
               <TableHead className="font-semibold">Weighbridge Slip No</TableHead>
               <TableHead className="font-semibold">Receipt No</TableHead>
               <TableHead className="text-right font-semibold">{t('transactions.qtyHeader')} (KG)</TableHead>
@@ -329,6 +349,9 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                   </TableCell>
                   <TableCell className="text-slate-700 text-sm">
                     {txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-'}
+                  </TableCell>
+                  <TableCell className="text-slate-700 text-sm">
+                    {txn.lotNo || '-'}
                   </TableCell>
                   <TableCell className="text-slate-700 text-sm">
                     {txn.weighbridgeSlipNo || '-'}

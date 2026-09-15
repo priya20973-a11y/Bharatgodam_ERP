@@ -283,12 +283,17 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       if (code) {
         handleQrScanSuccess(code);
       }
-    } else if (prefillData?.receiptNo) {
-      const fetchByReceipt = async () => {
+    } else if (prefillData?.receiptNo || prefillData?.lotNo) {
+      const fetchBySearch = async () => {
         setIsResolvingQr(true);
         try {
-          const { searchColdInwardByReceipt } = await import('@/app/actions/cold-inward-actions');
-          const inward = await searchColdInwardByReceipt(prefillData.receiptNo);
+          const { searchColdInwardByReceipt, searchColdInwardByLotNo } = await import('@/app/actions/cold-inward-actions');
+          let inward;
+          if (prefillData.receiptNo) {
+            inward = await searchColdInwardByReceipt(prefillData.receiptNo);
+          } else if (prefillData.lotNo) {
+            inward = await searchColdInwardByLotNo(prefillData.lotNo);
+          }
           if (inward) {
             const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
             const isGradingFromInward = inward.gradingApplied === true;
@@ -346,19 +351,19 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               return exists ? prev : [inward, ...prev];
             });
             setSelectedItems([newItem]);
-            toast.success(`Loaded details for Receipt ${prefillData.receiptNo}`);
+            toast.success(`Loaded details for ${prefillData.receiptNo ? `Receipt ${prefillData.receiptNo}` : `Lot No ${prefillData.lotNo}`}`);
           } else {
             toast.error('Inward not found or no available stock.');
           }
         } catch (error: any) {
-          toast.error(error.message || 'Error loading inward by receipt.');
+          toast.error(error.message || 'Error loading inward details.');
         } finally {
           setIsResolvingQr(false);
         }
       };
-      fetchByReceipt();
+      fetchBySearch();
     }
-  }, [prefillData]);
+  }, [prefillData, commodities, clients]);
 
   const handleAddInward = (inwardId: string) => {
     if (!inwardId) return;

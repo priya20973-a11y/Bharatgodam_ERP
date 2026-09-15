@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { Badge } from '@/components/ui/badge';
 import SearchInwardModal from './search-inward-modal';
+import SearchLotModal from './search-lot-modal';
 
 interface ColdOutwardListProps {
   outwards: any[];
@@ -27,6 +28,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isSearchLotModalOpen, setIsSearchLotModalOpen] = useState(false);
 
   const groupedOutwards = useMemo(() => {
     return outwards;
@@ -90,6 +92,9 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
+        <Button onClick={() => setIsSearchLotModalOpen(true)} variant="secondary" size="sm">
+          <Search className="mr-2 h-4 w-4" /> Search Lot No
+        </Button>
         <Button onClick={() => setIsSearchModalOpen(true)} variant="secondary" size="sm">
           <Search className="mr-2 h-4 w-4" /> Search Inward
         </Button>
@@ -98,6 +103,10 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
         </Button>
       </div>
       
+      <SearchLotModal 
+        isOpen={isSearchLotModalOpen} 
+        onClose={() => setIsSearchLotModalOpen(false)} 
+      />
       <SearchInwardModal 
         isOpen={isSearchModalOpen} 
         onClose={() => setIsSearchModalOpen(false)} 

@@ -465,7 +465,7 @@ export function generateColdTransactionReceiptHTML(
             <div class="main-title">${warehouseName}</div>
             <div class="sub-title">${warehouseAddress}</div>
           </div>
-          ${qrDataUrl ? `<div style="width: 60px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto;" alt="QR Code" /></div>` : ''}
+          ${qrDataUrl ? `<div style="width: 85px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
         </div>
     
     <div class="badge-container">

@@ -175,6 +175,24 @@ export async function searchColdInwardByReceipt(receiptNo: string) {
   return inward ? JSON.parse(JSON.stringify(inward)) : null;
 }
 
+export async function searchColdInwardByLotNo(lotNo: string) {
+  if (!lotNo || typeof lotNo !== 'string') return null;
+  
+  await connectToDatabase();
+  const session = await requireSession();
+  
+  const inward = await ColdInward.findOne({ 
+    lotNo: { $regex: new RegExp(`^${lotNo.trim()}$`, 'i') },
+    ...getTenantFilter(session)
+  })
+    .populate('clientId', 'name mobile')
+    .populate('commodityId', 'name type gradingType')
+    .populate('warehouseId', 'name')
+    .lean();
+  
+  return inward ? JSON.parse(JSON.stringify(inward)) : null;
+}
+
 export async function getColdInwardById(id: string) {
   await connectToDatabase();
   const session = await requireSession();
