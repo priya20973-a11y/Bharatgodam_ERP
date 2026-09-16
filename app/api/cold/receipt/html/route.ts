@@ -173,6 +173,17 @@ export async function GET(request: NextRequest) {
       const totalOutwardKg = allOutwards.reduce((sum, out) => sum + (out.quantityKg || 0), 0);
       data.outwardWeight = data.quantityKg; // The weight being transferred is the outward weight from this transaction
       data.remainingWeight = Math.max(0, (data.originalInwardId.quantityKg || 0) - totalOutwardKg);
+      
+      // Map floor names for the receipt
+      if (data.stackAllocations) {
+        data.stackAllocations.forEach((a: any) => {
+          if (data.warehouseId?.chambers) {
+            const chamber = data.warehouseId.chambers.find((c: any) => c.chamberNo === parseInt(a.chamberNo || '1') || c.name === a.chamberName);
+            const floor = chamber?.floors?.find((f: any) => f.floorNo === parseInt(a.floorNo));
+            if (floor?.name) a.floorNo = floor.name;
+          }
+        });
+      }
     }
     
     const warehouseData = type === 'inward' ? data?.warehouseId : (batchData.length > 0 ? batchData[0].warehouseId : data?.warehouseId);
@@ -229,7 +240,19 @@ export async function GET(request: NextRequest) {
           html = generateColdOutwardReceiptHTML(data, userDetails, lang);
         }
       } else if (type === 'transfer') {
-        html = generateColdTransferReceiptHTML(data, userDetails, lang);
+        let qrDataUrl = '';
+        try {
+          const qrId = data._id;
+          const qrContent = `${request.nextUrl.origin}/qr/transfer/${qrId}`;
+          qrDataUrl = await QRCode.toDataURL(qrContent, { 
+            margin: 1, 
+            width: 300, 
+            errorCorrectionLevel: 'H' 
+          });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+        }
+        html = generateColdTransferReceiptHTML(data, userDetails, lang, qrDataUrl);
       }
     }
     
