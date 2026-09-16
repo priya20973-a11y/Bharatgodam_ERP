@@ -19,81 +19,97 @@ export default async function ColdTransactionsReportWrapper({ isDashboard = fals
     const startTime = Date.now();
     console.log('[ColdTransactionsReportWrapper] Starting DB queries...');
 
-    // The tenantFilter already handles the user boundaries.
-    const [inwards, outwards] = await Promise.all([
-      db.collection('coldinwards').aggregate([
-        { $match: tenantFilter },
-        { $sort: { inwardDate: -1, date: -1, createdAt: -1 } },
-        ...limitStage,
-        {
-          $lookup: {
-            from: 'clients',
-            localField: 'clientId',
-            foreignField: '_id',
-            as: 'client',
-          },
+    console.time('[Cold] inward query');
+    const inwardsStartTime = Date.now();
+
+    // Prevent querying the entire historical database when just showing the recent dashboard feed
+    const dateFilterStage = isDashboard ? [{
+      $match: {
+        createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } // Last 6 months
+      }
+    }] : [];
+
+    const inwards = await db.collection('coldinwards').aggregate([
+      { $match: tenantFilter },
+      ...dateFilterStage,
+      { $sort: { inwardDate: -1, date: -1, createdAt: -1 } },
+      ...limitStage,
+      {
+        $lookup: {
+          from: 'clients',
+          localField: 'clientId',
+          foreignField: '_id',
+          as: 'client',
         },
-        {
-          $lookup: {
-            from: 'coldcommodities',
-            localField: 'commodityId',
-            foreignField: '_id',
-            as: 'commodity',
-          },
+      },
+      {
+        $lookup: {
+          from: 'coldcommodities',
+          localField: 'commodityId',
+          foreignField: '_id',
+          as: 'commodity',
         },
-        {
-          $lookup: {
-            from: 'coldwarehouses',
-            localField: 'warehouseId',
-            foreignField: '_id',
-            as: 'warehouse',
-          },
+      },
+      {
+        $lookup: {
+          from: 'coldwarehouses',
+          localField: 'warehouseId',
+          foreignField: '_id',
+          as: 'warehouse',
         },
-        {
-          $addFields: {
-            client: { $arrayElemAt: ['$client', 0] },
-            commodity: { $arrayElemAt: ['$commodity', 0] },
-            warehouse: { $arrayElemAt: ['$warehouse', 0] },
-          },
+      },
+      {
+        $addFields: {
+          client: { $arrayElemAt: ['$client', 0] },
+          commodity: { $arrayElemAt: ['$commodity', 0] },
+          warehouse: { $arrayElemAt: ['$warehouse', 0] },
         },
-      ]).toArray(),
-      db.collection('coldoutwards').aggregate([
-        { $match: tenantFilter },
-        { $sort: { date: -1, actualOutwardDate: -1, createdAt: -1 } },
-        ...limitStage,
-        {
-          $lookup: {
-            from: 'clients',
-            localField: 'clientId',
-            foreignField: '_id',
-            as: 'client',
-          },
+      },
+    ]).toArray();
+    console.timeEnd('[Cold] inward query');
+    console.log(`[Cold] inward query took ${Date.now() - inwardsStartTime}ms. Records: ${inwards.length}`);
+
+    console.time('[Cold] outward query');
+    const outwardsStartTime = Date.now();
+    const outwards = await db.collection('coldoutwards').aggregate([
+      { $match: tenantFilter },
+      ...dateFilterStage,
+      { $sort: { date: -1, actualOutwardDate: -1, createdAt: -1 } },
+      ...limitStage,
+      {
+        $lookup: {
+          from: 'clients',
+          localField: 'clientId',
+          foreignField: '_id',
+          as: 'client',
         },
-        {
-          $lookup: {
-            from: 'coldcommodities',
-            localField: 'commodityId',
-            foreignField: '_id',
-            as: 'commodity',
-          },
+      },
+      {
+        $lookup: {
+          from: 'coldcommodities',
+          localField: 'commodityId',
+          foreignField: '_id',
+          as: 'commodity',
         },
-        {
-          $lookup: {
-            from: 'coldwarehouses',
-            localField: 'warehouseId',
-            foreignField: '_id',
-            as: 'warehouse',
-          },
+      },
+      {
+        $lookup: {
+          from: 'coldwarehouses',
+          localField: 'warehouseId',
+          foreignField: '_id',
+          as: 'warehouse',
         },
-        {
-          $addFields: {
-            client: { $arrayElemAt: ['$client', 0] },
-            commodity: { $arrayElemAt: ['$commodity', 0] },
-            warehouse: { $arrayElemAt: ['$warehouse', 0] },
-          },
+      },
+      {
+        $addFields: {
+          client: { $arrayElemAt: ['$client', 0] },
+          commodity: { $arrayElemAt: ['$commodity', 0] },
+          warehouse: { $arrayElemAt: ['$warehouse', 0] },
         },
-      ]).toArray()
-    ]);
+      },
+    ]).toArray();
+    console.timeEnd('[Cold] outward query');
+    console.log(`[Cold] outward query took ${Date.now() - outwardsStartTime}ms. Records: ${outwards.length}`);
     
     console.log(`[ColdTransactionsReportWrapper] DB queries took ${Date.now() - startTime}ms. Inwards: ${inwards.length}, Outwards: ${outwards.length}`);
 
