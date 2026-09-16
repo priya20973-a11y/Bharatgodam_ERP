@@ -5,21 +5,26 @@ import ColdTransactionsReport from './cold-transactions-report';
 import { getDb } from '@/lib/mongodb';
 import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
 
-export default async function ColdTransactionsReportWrapper({ isDashboard = false }: { isDashboard?: boolean } = {}) {
+export default async function ColdTransactionsReportWrapper({ isDashboard = false, tenantFilterOverride }: { isDashboard?: boolean; tenantFilterOverride?: any } = {}) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       throw new Error('Unauthorized');
     }
 
-    const tenantFilter = getTenantFilterForMongo(session);
+    const tenantFilter = tenantFilterOverride || getTenantFilterForMongo(session);
     const db = await getDb();
+    const limitStage = isDashboard ? [{ $limit: 50 }] : [];
+
+    const startTime = Date.now();
+    console.log('[ColdTransactionsReportWrapper] Starting DB queries...');
 
     // The tenantFilter already handles the user boundaries.
     const [inwards, outwards] = await Promise.all([
       db.collection('coldinwards').aggregate([
         { $match: tenantFilter },
         { $sort: { inwardDate: -1, date: -1, createdAt: -1 } },
+        ...limitStage,
         {
           $lookup: {
             from: 'clients',
@@ -55,6 +60,7 @@ export default async function ColdTransactionsReportWrapper({ isDashboard = fals
       db.collection('coldoutwards').aggregate([
         { $match: tenantFilter },
         { $sort: { date: -1, actualOutwardDate: -1, createdAt: -1 } },
+        ...limitStage,
         {
           $lookup: {
             from: 'clients',
@@ -88,6 +94,8 @@ export default async function ColdTransactionsReportWrapper({ isDashboard = fals
         },
       ]).toArray()
     ]);
+    
+    console.log(`[ColdTransactionsReportWrapper] DB queries took ${Date.now() - startTime}ms. Inwards: ${inwards.length}, Outwards: ${outwards.length}`);
 
     const normalizeDateValue = (dateValue: any) => {
       if (dateValue === undefined || dateValue === null) return '';

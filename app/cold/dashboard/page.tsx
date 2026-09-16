@@ -84,6 +84,9 @@ export default async function DashboardPage() {
   const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
   const previousYearEndStr = previousYearEnd.toISOString().slice(0, 10);
 
+  const t0 = Date.now();
+  console.log('[Dashboard] Starting analytics aggregation...');
+
   const [transactionAnalytics] = await db.collection('coldinwards').aggregate([
     {
       $match: Object.keys(transactionMatch).length ? transactionMatch : {}
@@ -296,6 +299,9 @@ export default async function DashboardPage() {
     }
   ]).toArray();
 
+  const t1 = Date.now();
+  console.log(`[Dashboard] Analytics aggregation took ${t1 - t0}ms`);
+
   const warehouseFilter = tenantFilter;
   const clientFilter = tenantFilter;
   const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
@@ -310,6 +316,7 @@ export default async function DashboardPage() {
       ]
     };
 
+  console.log('[Dashboard] Starting counts and secondary aggregations...');
   const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, coldInvoiceCount, activeCommodityCount] = await Promise.all([
     db.collection('coldinvoices').aggregate([
       { $match: { ...tenantFilter } },
@@ -320,6 +327,9 @@ export default async function DashboardPage() {
     db.collection('coldinvoices').countDocuments(invoiceFilter),
     db.collection('coldcommodities').countDocuments(tenantFilter)
   ]);
+
+  const t2 = Date.now();
+  console.log(`[Dashboard] Counts and secondary aggregations took ${t2 - t1}ms`);
 
   const invoiceCount = coldInvoiceCount ?? 0;
   const commodityCountValue = activeCommodityCount ?? 0;
@@ -505,7 +515,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/30">
-            <ColdTransactionsReportWrapper isDashboard={true} />
+            <ColdTransactionsReportWrapper isDashboard={true} tenantFilterOverride={tenantFilter} />
           </div>
         </div>
       </div>
