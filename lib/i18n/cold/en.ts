@@ -539,7 +539,7 @@ export const en: Dictionary = {
     update: 'Update',
     loadingStaff: 'Loading staff...',
     failedToLoad: 'Failed to load staff',
-    updatedSuccess: 'Staff updated successfully.',
+    updatedSuccess: 'Staff updated successfully',
     createdSuccess: 'Staff created successfully',
     failedToSave: 'Failed to save staff',
     deleteConfirm: 'Are you sure you want to delete this staff member?',
