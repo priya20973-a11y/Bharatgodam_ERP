@@ -7,12 +7,18 @@ import { getTenantFilterForMongo, appendOwnershipForMongo } from '@/lib/ownershi
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
+    
+    console.log("[AUTH] /api/warehouses");
+    console.log("[AUTH] session exists:", !!session);
+    console.log("[AUTH] user:", session?.user?.id);
+
     if (!session?.user) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
     const db = await getDb();
     const tenantFilter = getTenantFilterForMongo(session);
+    console.log("[AUTH] tenant:", JSON.stringify(tenantFilter));
 
     const warehouses = await db
       .collection('warehouses')

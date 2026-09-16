@@ -1103,6 +1103,11 @@ export async function DELETE(request: Request) {
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
+    
+    console.log("[AUTH] /api/transactions");
+    console.log("[AUTH] session exists:", !!session);
+    console.log("[AUTH] user:", session?.user?.id);
+
     if (!session?.user) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
@@ -1117,6 +1122,7 @@ export async function GET(request: Request) {
 
     const db = await getDb();
     const tenantFilter = getTenantFilterForMongo(session);
+    console.log("[AUTH] tenant:", JSON.stringify(tenantFilter));
 
     const warehouseDocs = await db.collection('warehouses')
       .find({ ...tenantFilter })

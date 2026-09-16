@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Warehouse, Commodity, Client, Transaction } from '@/types/client';
 
 interface WarehouseContextType {
@@ -37,9 +38,17 @@ export const WarehouseProvider: React.FC<WarehouseProviderProps> = ({ children }
   const [clients, setClients] = useState<Client[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { status } = useSession();
 
   // Load initial data from APIs
   useEffect(() => {
+    if (status !== 'authenticated') {
+      if (status === 'unauthenticated') {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     const loadInitialData = async () => {
       try {
         // Fetch each resource independently so one failure doesn't block the others
@@ -89,7 +98,7 @@ export const WarehouseProvider: React.FC<WarehouseProviderProps> = ({ children }
     };
 
     loadInitialData();
-  }, []);
+  }, [status]);
 
   const addWarehouse = (warehouseData: Omit<Warehouse, 'id'>) => {
     const newWarehouse: Warehouse = {
