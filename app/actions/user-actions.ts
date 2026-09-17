@@ -292,7 +292,7 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
     }
 
     // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await usersCollection.updateOne(
       { _id: objectId },

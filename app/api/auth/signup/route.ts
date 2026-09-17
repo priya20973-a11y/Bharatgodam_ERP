@@ -137,7 +137,7 @@ export async function POST(req: Request) {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create signup request
     const normalizedRole = (role || 'WSP').toString().toUpperCase();

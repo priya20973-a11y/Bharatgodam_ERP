@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     // Generate temporary password and set it
     const tempPassword = generateTemporaryPassword();
-    const hashed = await bcrypt.hash(tempPassword, 12);
+    const hashed = await bcrypt.hash(tempPassword, 10);
     await db.collection('users').updateOne({ _id: user._id }, { $set: { password: hashed, updatedAt: new Date() } });
 
     // NOTE: Ideally send email with temp password. For now return temp in response so UI can display instructions.

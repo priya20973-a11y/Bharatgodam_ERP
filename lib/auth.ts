@@ -26,8 +26,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
+        console.time('Login_Full_Authorize');
+        console.time('Login_GetDb');
         const db = await getDb();
+        console.timeEnd('Login_GetDb');
+
+        console.time('Login_FindUser');
         const user = await db.collection('users').findOne({ email: credentials.email });
+        console.timeEnd('Login_FindUser');
 
         if (!user) {
           throw new Error('No user found with this email');
@@ -38,10 +44,31 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Your account has been deactivated. Please contact administrator.');
         }
 
+        console.time('Login_BcryptCompare');
         const isValid = await bcrypt.compare(credentials.password, user.password);
+        console.timeEnd('Login_BcryptCompare');
 
         if (!isValid) {
           throw new Error('Invalid password');
+        }
+
+        // Lazy Re-hashing for passwords with high cost factor
+        try {
+          const parts = user.password.split('$');
+          if (parts.length >= 3) {
+            const cost = parseInt(parts[2], 10);
+            if (cost > 10) {
+              // Fire and forget, don't await this so we don't block login
+              bcrypt.hash(credentials.password, 10).then(newHash => {
+                db.collection('users').updateOne(
+                  { _id: user._id },
+                  { $set: { password: newHash } }
+                ).catch(e => console.error('Error updating rehashed password', e));
+              }).catch(e => console.error('Error rehashing password', e));
+            }
+          }
+        } catch (error) {
+          console.error('Error during lazy password rehash', error);
         }
 
         let userForSession = user;
@@ -55,6 +82,7 @@ export const authOptions: NextAuthOptions = {
           userForSession = parentWsp;
         }
 
+        console.timeEnd('Login_Full_Authorize');
         return {
           id: userForSession._id.toString(),
           email: userForSession.email,

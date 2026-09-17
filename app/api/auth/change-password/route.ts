@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     await db.collection('users').updateOne(
       { _id: new ObjectId(userId) },
       {

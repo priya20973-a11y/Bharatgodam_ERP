@@ -42,7 +42,10 @@ if (process.env.NODE_ENV === 'development') {
 
   if (!globalWithMongo._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+    globalWithMongo._mongoClientPromise = client.connect().catch(err => {
+      globalWithMongo._mongoClientPromise = undefined;
+      throw err;
+    });
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
@@ -57,7 +60,10 @@ if (process.env.NODE_ENV === 'development') {
  */
 export async function getDb(): Promise<Db> {
   if (!clientPromise) {
-    clientPromise = client.connect();
+    clientPromise = client.connect().catch(err => {
+      clientPromise = undefined;
+      throw err;
+    });
   }
   const connectedClient = await clientPromise;
   return connectedClient.db(dbName);

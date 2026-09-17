@@ -37,7 +37,7 @@ async function createClientUserAccount(db: any, clientName: string, clientType: 
   if (existing) {
     throw new Error('A user with that email already exists');
   }
-  const hashedPassword = await bcrypt.hash(DEFAULT_CLIENT_PASSWORD, 12);
+  const hashedPassword = await bcrypt.hash(DEFAULT_CLIENT_PASSWORD, 10);
   const userPayload = {
     fullName: clientName,
     email: loginEmail,
