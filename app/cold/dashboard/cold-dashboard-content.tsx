@@ -7,7 +7,6 @@ import { Box, Layers, Clock3, Building2, Users, Receipt, BookOpen, ArrowRight, T
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getTenantFilterForMongo, isAdmin, isWsp } from '@/lib/ownership';
-import ColdTransactionsReportWrapper from '@/components/features/reports/cold-transactions-report-wrapper';
 import ColdWarehouseInventory from '@/components/features/warehouse/cold-warehouse-inventory';
 import { en, gu } from '@/lib/i18n/cold/dictionaries';
 import { hasPermission } from '@/lib/permissions';
@@ -66,16 +65,6 @@ export default async function ColdDashboardContent({ session }: { session: any }
     ...warehouseMatch,
   };
 
-  const now = new Date();
-  const currentYearStart = new Date(now.getFullYear(), 0, 1);
-  const currentYearEnd = new Date(now.getFullYear() + 1, 0, 1);
-  const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
-  const previousYearEnd = new Date(now.getFullYear(), 0, 1);
-
-  const currentYearStartStr = currentYearStart.toISOString().slice(0, 10);
-  const currentYearEndStr = currentYearEnd.toISOString().slice(0, 10);
-  const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
-  const previousYearEndStr = previousYearEnd.toISOString().slice(0, 10);
 
   const t0 = Date.now();
   console.log('[Dashboard] Starting analytics aggregation...');
@@ -173,120 +162,6 @@ export default async function ColdDashboardContent({ session }: { session: any }
               }
             }
           }
-        ],
-        quarterTrendCurrent: [
-          {
-            $match: {
-              dateString: {
-                $gte: currentYearStartStr,
-                $lt: currentYearEndStr
-              }
-            }
-          },
-          {
-            $group: {
-              _id: {
-                $toString: {
-                  $ceil: {
-                    $divide: [
-                      {
-                        $month: {
-                          $cond: [
-                            { $eq: [{ $type: '$date' }, 'date'] },
-                            '$date',
-                            { $dateFromString: { dateString: '$date' } }
-                          ]
-                        }
-                      },
-                      3
-                    ]
-                  }
-                }
-              },
-              count: { $sum: 1 }
-            }
-          },
-          {
-            $project: {
-              _id: { $concat: ['Q', '$_id'] },
-              count: 1
-            }
-          },
-          { $sort: { _id: 1 } }
-        ],
-        quarterTrendPrevious: [
-          {
-            $match: {
-              dateString: {
-                $gte: previousYearStartStr,
-                $lt: previousYearEndStr
-              }
-            }
-          },
-          {
-            $group: {
-              _id: {
-                $toString: {
-                  $ceil: {
-                    $divide: [
-                      {
-                        $month: {
-                          $cond: [
-                            { $eq: [{ $type: '$date' }, 'date'] },
-                            '$date',
-                            { $dateFromString: { dateString: '$date' } }
-                          ]
-                        }
-                      },
-                      3
-                    ]
-                  }
-                }
-              },
-              count: { $sum: 1 }
-            }
-          },
-          {
-            $project: {
-              _id: { $concat: ['Q', '$_id'] },
-              count: 1
-            }
-          },
-          { $sort: { _id: 1 } }
-        ],
-        directionBreakdown: [
-          {
-            $group: {
-              _id: '$direction',
-              count: { $sum: 1 }
-            }
-          },
-          { $sort: { _id: 1 } }
-        ],
-        commodityBreakdown: [
-          {
-            $group: {
-              _id: '$commodityName',
-              totalMt: {
-                $sum: {
-                  $cond: [
-                    { $eq: ['$direction', 'INWARD'] },
-                    '$quantityMT',
-                    { $multiply: ['$quantityMT', -1] }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            $project: {
-              commodityName: '$_id',
-              totalMt: { $max: ['$totalMt', 0] },
-              _id: 0
-            }
-          },
-          { $match: { totalMt: { $gt: 0 } } },
-          { $sort: { totalMt: -1 } }
         ]
       }
     }
@@ -329,8 +204,6 @@ export default async function ColdDashboardContent({ session }: { session: any }
 
   const totalTransactions = transactionAnalytics?.totals?.[0]?.totalTransactions ?? 0;
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
-  const inwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'INWARD')?.count ?? 0;
-  const outwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'OUTWARD')?.count ?? 0;
   const totalNetWeightLoss = transactionAnalytics?.totalNetWeightLoss?.[0]?.totalLoss ?? 0;
 
 
@@ -476,41 +349,6 @@ export default async function ColdDashboardContent({ session }: { session: any }
         <ColdWarehouseInventory />
       </div>
 
-      {/* Live Transaction Report wrapper */}
-      <div className="rounded-3xl bg-white p-6 md:p-8 shadow-md shadow-slate-100/50 border border-slate-100/80">
-          <div className="mb-8 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
-                <h3 className="text-xl font-bold tracking-tight text-slate-900">{t.liveTransactionStream}</h3>
-              </div>
-              <p className="text-sm text-slate-500 mt-1.5 max-w-xl">
-                {t.realTimeTracking}
-              </p>
-            </div>
-
-            <div className="grid gap-4 grid-cols-3 xl:w-auto min-w-[320px] sm:min-w-[450px]">
-              <div className="rounded-2xl bg-indigo-50/50 p-4 border border-indigo-100/20 text-center transition-all hover:bg-indigo-50">
-                <p className="text-2xs font-extrabold uppercase tracking-[0.2em] text-slate-400">{t.inward}</p>
-                <p className="mt-2 text-2xl font-extrabold text-indigo-600 tracking-tight">{formatNumber(inwardTransactions, (session.user as any)?.coldLanguage)}</p>
-              </div>
-
-              <div className="rounded-2xl bg-purple-50/50 p-4 border border-purple-100/20 text-center transition-all hover:bg-purple-50">
-                <p className="text-2xs font-extrabold uppercase tracking-[0.2em] text-slate-400">{t.outward}</p>
-                <p className="mt-2 text-2xl font-extrabold text-purple-600 tracking-tight">{formatNumber(outwardTransactions, (session.user as any)?.coldLanguage)}</p>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200/60 text-center transition-all hover:bg-slate-100">
-                <p className="text-2xs font-extrabold uppercase tracking-[0.2em] text-slate-400">{t.totalStream}</p>
-                <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{formatNumber(totalTransactions, (session.user as any)?.coldLanguage)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/30">
-            <ColdTransactionsReportWrapper isDashboard={true} tenantFilterOverride={tenantFilter} />
-          </div>
-        </div>
       </div>
 
     </div>
