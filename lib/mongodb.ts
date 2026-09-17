@@ -31,7 +31,7 @@ const options = {
 };
 
 let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+let clientPromise: Promise<MongoClient> | undefined;
 
 if (process.env.NODE_ENV === 'development') {
   // In development mode, use a global variable so that the value
@@ -46,17 +46,20 @@ if (process.env.NODE_ENV === 'development') {
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  // In production mode, it's best to not use a global variable.
+  // In production mode, we DO NOT connect immediately at the module level.
+  // This prevents build-time execution of client.connect() during static analysis (which causes timeouts).
+  // Connection will be initialized lazily inside getDb().
   client = new MongoClient(uri, options);
-  clientPromise = client.connect();
 }
 
 /**
  * Utility function to quickly grab the database instance.
  */
 export async function getDb(): Promise<Db> {
+  if (!clientPromise) {
+    clientPromise = client.connect();
+  }
   const connectedClient = await clientPromise;
   return connectedClient.db(dbName);
 }
 
-export default clientPromise;
