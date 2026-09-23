@@ -57,6 +57,10 @@ const ColdTransferSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+ColdTransferSchema.index({ originalInwardId: 1 });
+ColdTransferSchema.index({ userId: 1, createdAt: -1 });
+ColdTransferSchema.index({ userEmail: 1, createdAt: -1 });
+
 if (mongoose.models.ColdTransfer) {
   delete mongoose.models.ColdTransfer;
 }

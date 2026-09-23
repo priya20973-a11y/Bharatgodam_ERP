@@ -134,6 +134,10 @@ const ColdOutwardSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+ColdOutwardSchema.index({ inwardId: 1 });
+ColdOutwardSchema.index({ userId: 1, date: -1, createdAt: -1 });
+ColdOutwardSchema.index({ userEmail: 1, date: -1, createdAt: -1 });
+
 if (mongoose.models.ColdOutward) {
   delete mongoose.models.ColdOutward;
 }

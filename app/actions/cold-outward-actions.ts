@@ -22,7 +22,8 @@ export async function getColdOutwards() {
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name warehouseId')
-    .sort({ date: -1, createdAt: -1 });
+    .sort({ date: -1, createdAt: -1 })
+    .lean();
     
   const groups: any[] = [];
   

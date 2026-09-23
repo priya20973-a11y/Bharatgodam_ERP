@@ -33,7 +33,11 @@ export function getTenantFilter(session: Session | null) {
 
   const email = normalizeEmail(session.user.email);
   if (email) {
-    filter.$or.push({ userEmail: { $regex: new RegExp(`^${escapeRegExp(email)}$`, 'i') } });
+    const originalEmail = session.user.email;
+    filter.$or.push({ userEmail: email });
+    if (originalEmail && originalEmail !== email) {
+      filter.$or.push({ userEmail: originalEmail });
+    }
   }
 
   return filter;

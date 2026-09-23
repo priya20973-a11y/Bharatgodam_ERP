@@ -1,7 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getDb } from '@/lib/mongodb';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { ObjectId } from 'mongodb';
 
 const nextAuthUrl =
@@ -12,6 +12,32 @@ const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 if (!process.env.NEXTAUTH_URL && nextAuthUrl) {
   process.env.NEXTAUTH_URL = nextAuthUrl;
 }
+
+const userProjection = {
+  _id: 1,
+  email: 1,
+  password: 1,
+  status: 1,
+  role: 1,
+  fullName: 1,
+  companyName: 1,
+  phoneNumber: 1,
+  address: 1,
+  warehouseLocation: 1,
+  gstNumber: 1,
+  bankName: 1,
+  bankAccountNumber: 1,
+  ifscCode: 1,
+  bankBranch: 1,
+  state: 1,
+  isNewRegistration: 1,
+  storagePlan: 1,
+  coldLanguage: 1,
+  permissions: 1,
+  assignedWarehouseIds: 1,
+  wspPermissions: 1,
+  wspId: 1,
+};
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -32,11 +58,14 @@ export const authOptions: NextAuthOptions = {
         console.timeEnd('Login_GetDb');
 
         console.time('Login_FindUser');
-        const user = await db.collection('users').findOne({ email: credentials.email });
+        const user = await db.collection('users').findOne(
+          { email: credentials.email },
+          { projection: userProjection }
+        );
         console.timeEnd('Login_FindUser');
 
         if (!user) {
-          throw new Error('No user found with this email');
+          throw new Error('Invalid email or password');
         }
 
         // Check if user is active
@@ -49,7 +78,7 @@ export const authOptions: NextAuthOptions = {
         console.timeEnd('Login_BcryptCompare');
 
         if (!isValid) {
-          throw new Error('Invalid password');
+          throw new Error('Invalid email or password');
         }
 
         // Lazy Re-hashing for passwords with high cost factor
@@ -75,7 +104,10 @@ export const authOptions: NextAuthOptions = {
         
         if (user.role === 'STAFF') {
           // If the user is STAFF, we authenticate them, but load the parent WSP for session data isolation
-          const parentWsp = await db.collection('users').findOne({ _id: new ObjectId(user.wspId) });
+          const parentWsp = await db.collection('users').findOne(
+            { _id: new ObjectId(user.wspId) },
+            { projection: userProjection }
+          );
           if (!parentWsp) {
             throw new Error('Parent WSP account not found. Please contact administrator.');
           }

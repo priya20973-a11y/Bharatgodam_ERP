@@ -13,7 +13,7 @@ import { logColdActivity } from '@/lib/cold-logger';
 export async function fetchColdCommodities() {
   await connectToDatabase();
   const session = await requireSession();
-  const items = await ColdCommodity.find({ ...getTenantFilter(session) }).sort({ name: 1 });
+  const items = await ColdCommodity.find({ ...getTenantFilter(session) }).sort({ name: 1 }).lean();
   const db = await getDb();
 
   const uniqueUserIds = [...new Set(items.map((item: any) => item.userId?.toString()).filter(Boolean))];

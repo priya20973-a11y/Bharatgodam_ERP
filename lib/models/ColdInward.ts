@@ -157,6 +157,10 @@ const ColdInwardSchema: Schema = new Schema(
 );
 
 ColdInwardSchema.index({ 'stackAllocations.rowId': 1 }, { unique: true, sparse: true });
+ColdInwardSchema.index({ userId: 1, date: -1, createdAt: -1 });
+ColdInwardSchema.index({ userEmail: 1, date: -1, createdAt: -1 });
+ColdInwardSchema.index({ warehouseId: 1, date: -1 });
+ColdInwardSchema.index({ clientId: 1, date: -1 });
 
 if (mongoose.models.ColdInward) {
   delete mongoose.models.ColdInward;

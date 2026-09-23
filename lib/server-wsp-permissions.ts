@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { WspModuleId } from './wsp-permissions';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { cache } from 'react';
 
 const WSP_MODULE_PATHS: Record<WspModuleId, string> = {
   dashboard: '/dashboard',
@@ -20,6 +21,20 @@ const WSP_MODULE_PATHS: Record<WspModuleId, string> = {
   ledger: '/dashboard/ledger'
 };
 
+export const getCachedWspPermissions = cache(async (userId: string) => {
+  try {
+    const db = await getDb();
+    const dbUser = await db.collection('users').findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { wspPermissions: 1 } }
+    );
+    return dbUser?.wspPermissions || {};
+  } catch (err) {
+    console.error('Error fetching wsp permissions:', err);
+    return {};
+  }
+});
+
 export async function requireWspPagePermission(moduleId: WspModuleId) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return redirect('/');
@@ -27,11 +42,9 @@ export async function requireWspPagePermission(moduleId: WspModuleId) {
   const user = session.user as any;
   const role = user.role?.toString().toUpperCase();
 
-  // Instant DB check for Dry Storage WSPs
+  // Instant check for Dry Storage WSPs using cached lookup
   if (role === 'WSP' && user.storagePlan !== 'COLD' && !user.isStaff) {
-    const db = await getDb();
-    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
-    const perms = dbUser?.wspPermissions || {};
+    const perms = await getCachedWspPermissions(user.id);
     
     // Explicitly allow clientMaster even if it's set to false in the database
     if (perms[moduleId] === false && moduleId !== 'clientMaster') {
@@ -56,11 +69,10 @@ export async function requireWspActionPermission(moduleId: WspModuleId) {
   const user = session.user as any;
   const role = user.role?.toString().toUpperCase();
 
-  // Instant DB check for Dry Storage WSPs
+  // Instant check for Dry Storage WSPs using cached lookup
   if (role === 'WSP' && user.storagePlan !== 'COLD' && !user.isStaff) {
-    const db = await getDb();
-    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
-    if (dbUser?.wspPermissions && dbUser.wspPermissions[moduleId] === false && moduleId !== 'clientMaster') {
+    const perms = await getCachedWspPermissions(user.id);
+    if (perms && perms[moduleId] === false && moduleId !== 'clientMaster') {
       throw new Error(`403_FORBIDDEN: Unauthorized access to module ${moduleId}`);
     }
   }

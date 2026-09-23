@@ -56,6 +56,7 @@ async function createCollections() {
   }
   await db.collection('commodities').createIndex({ userId: 1, name: 1 }, { unique: true });
   await db.collection('warehouses').createIndex({ name: 1 }, { unique: true });
+  await db.collection('users').createIndex({ email: 1 }, { unique: true });
 
   console.log('Indexes created');
 

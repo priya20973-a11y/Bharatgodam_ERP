@@ -19,7 +19,7 @@ export async function getWarehouses(options?: { includeInactive?: boolean }) {
     allowedStatuses.push('INACTIVE');
   }
   
-  const warehouses = await Warehouse.find({ status: { $in: allowedStatuses }, ...getTenantFilter(session) }).sort({ name: 1 });
+  const warehouses = await Warehouse.find({ status: { $in: allowedStatuses }, ...getTenantFilter(session) }).sort({ name: 1 }).lean();
   
   const db = await getDb();
   const uniqueUserIds = [...new Set(warehouses.map(w => w.userId?.toString()).filter(Boolean))];

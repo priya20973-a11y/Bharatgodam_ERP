@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import Sidebar from '@/components/layout/sidebar';
 
+import { getCachedWspPermissions } from '@/lib/server-wsp-permissions';
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -21,16 +23,10 @@ export default async function DashboardLayout({
     redirect('/cold/dashboard');
   }
 
-  // Inject fresh WSP permissions into the session from DB so the sidebar reflects changes immediately
+  // Inject fresh WSP permissions into the session from cached DB lookup
   const user = session.user as any;
   if (user.role === 'WSP' && user.storagePlan !== 'COLD' && !user.isStaff) {
-    const { getDb } = await import('@/lib/mongodb');
-    const { ObjectId } = await import('mongodb');
-    const db = await getDb();
-    const dbUser = await db.collection('users').findOne({ _id: new ObjectId(user.id) });
-    if (dbUser) {
-      user.wspPermissions = dbUser.wspPermissions || {};
-    }
+    user.wspPermissions = await getCachedWspPermissions(user.id);
   }
 
   return (

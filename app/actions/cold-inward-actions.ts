@@ -38,26 +38,70 @@ function isSameStack(a: any, b: any): boolean {
   return true;
 }
 
-export async function getColdInwards() {
+export async function getColdInwards(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  warehouseId?: string;
+  clientId?: string;
+  commodityId?: string;
+}) {
   await connectToDatabase();
   const session = await requireSession();
   
-  const inwards = await ColdInward.find({ 
+  const page = Math.max(1, Number(options?.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(options?.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const query: any = {
     ...getTenantFilter(session), 
     ...getWarehouseFilter(session),
     remarks: { $ne: 'Ownership Transfer In' }
-  })
-    .populate('clientId', 'name')
-    .populate('commodityId', 'name type')
-    .populate('warehouseId', 'name warehouseId chambers')
-    .sort({ date: -1, createdAt: -1 })
-    .lean();
+  };
+
+  if (options?.warehouseId) {
+    query.warehouseId = new mongoose.Types.ObjectId(options.warehouseId);
+  }
+  if (options?.clientId) {
+    query.clientId = new mongoose.Types.ObjectId(options.clientId);
+  }
+  if (options?.commodityId) {
+    query.commodityId = new mongoose.Types.ObjectId(options.commodityId);
+  }
+  if (options?.search && options.search.trim()) {
+    const s = options.search.trim();
+    query.$or = [
+      { receiptNumber: { $regex: s, $options: 'i' } },
+      { lotNo: { $regex: s, $options: 'i' } },
+      { farmerName: { $regex: s, $options: 'i' } },
+      { villageName: { $regex: s, $options: 'i' } },
+      { truckNo: { $regex: s, $options: 'i' } },
+    ];
+  }
+
+  const [total, inwards] = await Promise.all([
+    ColdInward.countDocuments(query),
+    ColdInward.find(query)
+      .populate('clientId', 'name')
+      .populate('commodityId', 'name type')
+      .populate('warehouseId', 'name warehouseId chambers')
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+  ]);
     
   const inwardIds = inwards.map(i => i._id);
   
   const [allOutwards, allTransfers] = await Promise.all([
-    ColdOutward.find({ inwardId: { $in: inwardIds } }).lean(),
-    ColdTransfer.find({ originalInwardId: { $in: inwardIds } }).lean()
+    ColdOutward.find(
+      { inwardId: { $in: inwardIds } },
+      { inwardId: 1, remarks: 1, quantityKg: 1, bagsCount: 1, chamberName: 1, chamberNo: 1, floorName: 1, floorNo: 1, stackName: 1, stackNo: 1 }
+    ).lean(),
+    ColdTransfer.find(
+      { originalInwardId: { $in: inwardIds } },
+      { originalInwardId: 1, transferType: 1, quantityKg: 1, bagsCount: 1, stackAllocations: 1 }
+    ).lean()
   ]);
 
   const outwardsByInward = allOutwards.reduce((acc: any, out: any) => {
@@ -150,7 +194,15 @@ export async function getColdInwards() {
     };
   });
 
-  return JSON.parse(JSON.stringify(processedInwards));
+  return {
+    inwards: JSON.parse(JSON.stringify(processedInwards)),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1
+    }
+  };
 }
 
 export async function checkExistingReceiptNumber(receiptNumber: string) {

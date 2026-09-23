@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Printer, Download, QrCode, Loader2 } from "lucide-react";
+import { Printer, Download, QrCode, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import QrCodeModal from "./qr-code-modal";
@@ -20,9 +20,24 @@ import { useState } from "react";
 
 interface ColdInwardListProps {
   inwards: any[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  onPageChange?: (page: number) => void;
+  onLimitChange?: (limit: number) => void;
+  isLoading?: boolean;
 }
 
-export default function ColdInwardList({ inwards }: ColdInwardListProps) {
+export default function ColdInwardList({ 
+  inwards, 
+  pagination, 
+  onPageChange, 
+  onLimitChange, 
+  isLoading 
+}: ColdInwardListProps) {
   const { t, formatNumber } = useColdTranslation();
 
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -212,6 +227,52 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
         </TableBody>
       </Table>
       </div>
+
+      {pagination && pagination.total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 px-1 text-sm text-slate-600">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600">Rows per page:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => onLimitChange?.(Number(e.target.value))}
+              disabled={isLoading}
+              className="border rounded px-2 py-1 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-xs text-slate-500 ml-2">
+              Showing {pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.total, pagination.page * pagination.limit)} of {pagination.total} records
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 mr-2">
+              Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange?.(pagination.page - 1)}
+              disabled={pagination.page <= 1 || isLoading}
+              className="h-8 px-2"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange?.(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages || isLoading}
+              className="h-8 px-2"
+            >
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <QrCodeModal 
         isOpen={qrModalOpen} 
         onClose={() => setQrModalOpen(false)} 

@@ -11,6 +11,12 @@ import { useColdTranslation } from '@/components/providers/cold-language-provide
 
 interface ColdInwardWrapperProps {
   initialInwards: any[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
   initialDrafts?: any[];
   clients: any[];
   commodities: any[];
@@ -18,9 +24,11 @@ interface ColdInwardWrapperProps {
   searchParams?: { [key: string]: string | undefined };
 }
 
-export default function ColdInwardWrapper({ initialInwards, initialDrafts = [], clients, commodities, warehouses, searchParams }: ColdInwardWrapperProps) {
+export default function ColdInwardWrapper({ initialInwards, pagination: initialPagination, initialDrafts = [], clients, commodities, warehouses, searchParams }: ColdInwardWrapperProps) {
   const { t } = useColdTranslation();
   const [inwards, setInwards] = useState(initialInwards);
+  const [pagination, setPagination] = useState(initialPagination);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [drafts, setDrafts] = useState(initialDrafts);
   const [isAdding, setIsAdding] = useState(searchParams?.action === 'add');
   const [editingDraft, setEditingDraft] = useState<any>(null);
@@ -50,14 +58,65 @@ export default function ColdInwardWrapper({ initialInwards, initialDrafts = [], 
 
   const refreshData = async () => {
     try {
-      const [data, draftsData] = await Promise.all([getColdInwards(), getColdInwardDrafts()]);
-      setInwards(data);
+      const [data, draftsData] = await Promise.all([
+        getColdInwards({
+          page: pagination?.page || 1,
+          limit: pagination?.limit || 50,
+          warehouseId: searchParams?.warehouseId,
+          clientId: searchParams?.clientId,
+          commodityId: searchParams?.commodityId,
+          search: searchParams?.search,
+        }),
+        getColdInwardDrafts()
+      ]);
+      setInwards(data.inwards);
+      setPagination(data.pagination);
       setDrafts(draftsData);
     } catch (err: any) {
       toast.error(err.message || t('inward.refreshFailed'));
     }
     setIsAdding(false);
     setEditingDraft(null);
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    setIsLoadingPage(true);
+    try {
+      const result = await getColdInwards({
+        page: newPage,
+        limit: pagination?.limit || 50,
+        warehouseId: searchParams?.warehouseId,
+        clientId: searchParams?.clientId,
+        commodityId: searchParams?.commodityId,
+        search: searchParams?.search,
+      });
+      setInwards(result.inwards);
+      setPagination(result.pagination);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change page');
+    } finally {
+      setIsLoadingPage(false);
+    }
+  };
+
+  const handleLimitChange = async (newLimit: number) => {
+    setIsLoadingPage(true);
+    try {
+      const result = await getColdInwards({
+        page: 1,
+        limit: newLimit,
+        warehouseId: searchParams?.warehouseId,
+        clientId: searchParams?.clientId,
+        commodityId: searchParams?.commodityId,
+        search: searchParams?.search,
+      });
+      setInwards(result.inwards);
+      setPagination(result.pagination);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change page size');
+    } finally {
+      setIsLoadingPage(false);
+    }
   };
 
   const handleResumeDraft = (draft: any) => {
@@ -149,7 +208,13 @@ export default function ColdInwardWrapper({ initialInwards, initialDrafts = [], 
         </div>
       )}
 
-      <ColdInwardList inwards={inwards} />
+      <ColdInwardList 
+        inwards={inwards} 
+        pagination={pagination}
+        onPageChange={handlePageChange}
+        onLimitChange={handleLimitChange}
+        isLoading={isLoadingPage}
+      />
     </div>
   );
 }
