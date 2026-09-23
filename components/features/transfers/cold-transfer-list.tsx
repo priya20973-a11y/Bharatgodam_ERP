@@ -31,6 +31,7 @@ export default function ColdTransferList({ transfers }: ColdTransferListProps) {
         <TableHeader>
           <TableRow className="bg-slate-50">
             <TableHead className="font-semibold">{t('inward.dateHeader') || 'Date'}</TableHead>
+            <TableHead className="font-semibold">Receipt No</TableHead>
             <TableHead className="font-semibold">From Client</TableHead>
             <TableHead className="font-semibold">To Client</TableHead>
             <TableHead className="font-semibold">{t('inward.commodityHeader') || 'Commodity'}</TableHead>
@@ -43,7 +44,7 @@ export default function ColdTransferList({ transfers }: ColdTransferListProps) {
         <TableBody>
           {transfers.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+              <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                 No ownership transfers found
               </TableCell>
             </TableRow>
@@ -53,6 +54,9 @@ export default function ColdTransferList({ transfers }: ColdTransferListProps) {
                 <TableRow key={transfer._id || i} className="hover:bg-slate-50/50">
                   <TableCell>
                     {transfer.date ? format(new Date(transfer.date), 'dd MMM yyyy') : '-'}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {transfer.originalInwardId?.receiptNumber || '-'}
                   </TableCell>
                   <TableCell className="font-medium text-red-600">
                     {transfer.fromClientId?.name || '-'}

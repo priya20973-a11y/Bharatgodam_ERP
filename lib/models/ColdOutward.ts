@@ -59,6 +59,9 @@ export interface IColdOutward extends Document {
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   batchId?: string;
+  displayWeightDetails?: boolean;
+  transportationName?: string;
+  driverNumber?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,7 +90,7 @@ const ColdOutwardSchema: Schema = new Schema(
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
     unit: { type: String, default: 'KG' },
-    netWeightLoss: { type: Number, required: false, min: 0 },
+    netWeightLoss: { type: Number, required: false },
     grade: { type: String, enum: ['Large', 'Small', 'Mixed'], required: false },
     serviceType: { type: String, enum: ['None', 'Grading', 'Wet'], required: false, default: 'None' },
     serviceChargeType: { type: String, enum: ['Per Bag', 'Per Kg'], required: false },
@@ -124,6 +127,9 @@ const ColdOutwardSchema: Schema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     batchId: { type: String, required: false },
+    displayWeightDetails: { type: Boolean, required: false, default: false },
+    transportationName: { type: String, required: false },
+    driverNumber: { type: String, required: false },
   },
   { timestamps: true }
 );

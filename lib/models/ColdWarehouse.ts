@@ -58,9 +58,10 @@ export interface IColdWarehouse extends Document {
   sameFloorsPerChamber?: boolean;
   sameStacksPerFloor?: boolean;
   sameStackLayoutPerFloor?: boolean;
-  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
+  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS' | 'CUSTOM_PER_FLOOR';
   chamberFloorsConfig?: number[];
   floorStacksConfig?: Record<string, number>;
+  floorCustomNumberingConfig?: Record<string, { startNo: number; count: number }>;
   customStackCapacities?: Record<string, number>;
 
   aadhaarNo?: string;
@@ -153,11 +154,12 @@ const ColdWarehouseSchema: Schema = new Schema(
     sameStackLayoutPerFloor: { type: Boolean, default: true },
     stackNumberingOption: {
       type: String,
-      enum: ['RESTART_PER_FLOOR', 'CONTINUE_ACROSS_FLOORS'],
+      enum: ['RESTART_PER_FLOOR', 'CONTINUE_ACROSS_FLOORS', 'CUSTOM_PER_FLOOR'],
       default: 'RESTART_PER_FLOOR'
     },
     chamberFloorsConfig: [Number],
     floorStacksConfig: { type: Schema.Types.Mixed, required: false },
+    floorCustomNumberingConfig: { type: Schema.Types.Mixed, required: false },
     customStackCapacities: { type: Schema.Types.Mixed, required: false },
     
     receiptConfig: {

@@ -187,6 +187,40 @@ export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
     } else {
       const outward = await ColdOutward.findOne({ _id: id, ...tenantFilter });
       if (!outward) throw new Error('Transaction not found');
+      
+      let inward;
+      if (outward.inwardId) {
+        inward = await ColdInward.findOne({ _id: outward.inwardId, ...tenantFilter });
+      } else {
+        inward = await ColdInward.findOne({
+          clientId: outward.clientId,
+          commodityId: outward.commodityId,
+          warehouseId: outward.warehouseId,
+          $or: [
+            { 'stackAllocations.chamberName': outward.chamberName || outward.chamberNo?.toString() },
+            ...(outward.chamberNo ? [{ 'stackAllocations.chamberNo': outward.chamberNo }] : [])
+          ],
+          'stackAllocations.floorNo': outward.floorNo,
+          'stackAllocations.stackNo': outward.stackNo,
+          ...tenantFilter
+        });
+      }
+
+      if (inward) {
+        const restoredKg = (inward.remainingQuantityKg || 0) + (outward.quantityKg || 0);
+        const restoredBags = (inward.remainingBagsCount || 0) + (outward.bagsCount || 0);
+        
+        inward.remainingQuantityKg = Math.min(restoredKg, inward.quantityKg || restoredKg);
+        inward.remainingBagsCount = Math.min(restoredBags, inward.bagsCount || restoredBags);
+        
+        if (inward.remainingQuantityKg >= (inward.quantityKg || 0)) {
+           inward.status = 'Active';
+        } else {
+           inward.status = 'Partial';
+        }
+        await inward.save();
+      }
+
       await ColdOutward.deleteOne({ _id: id });
     }
 

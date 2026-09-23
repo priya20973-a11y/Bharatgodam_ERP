@@ -74,8 +74,8 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
       const floor = w.stackAllocations?.map((s: any) => getFloorName(w.warehouseId, s.chamberName || s.chamberNo, s.floorNo)).join('; ') || getFloorName(w.warehouseId, w.chamberName || w.chamberNo, w.floorNo);
       const stack = w.stackAllocations?.map((s: any) => s.stackNo).join('; ') || w.stackNo || '-';
       const grade = w.gradingType || '-';
-      const qty = w.quantityKg || 0;
-      const bags = w.bagsCount || 0;
+      const qty = (w.originalQuantityKg ?? w.quantityKg) || 0;
+      const bags = (w.originalBagsCount ?? w.bagsCount) || 0;
       return [date, client, farmer, village, largeBag, smallBag, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
         .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
@@ -174,10 +174,10 @@ export default function ColdInwardList({ inwards }: ColdInwardListProps) {
                   <TableCell className="text-slate-700">
                     {w.gradingType || '-'}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-slate-900">{formatNumber(w.quantityKg)} KG</TableCell>
+                  <TableCell className="text-right font-medium text-slate-900">{formatNumber((w.originalQuantityKg ?? w.quantityKg) || 0)} KG</TableCell>
                   <TableCell className="text-right text-slate-700">
                     <div>
-                      {formatNumber(w.bagsCount)}
+                      {formatNumber((w.originalBagsCount ?? w.bagsCount) || 0)}
                       {(w.unit || w.commodityId?.unit) && (w.unit || w.commodityId?.unit) !== 'KG' ? ` ${w.unit || w.commodityId?.unit}` : ''}
                     </div>
                     {(w.largeBag || w.smallBag) ? (

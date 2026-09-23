@@ -61,7 +61,7 @@ export function getDynamicUnitLabel(unit: string, type: 'count' | 'alloc' | 'wei
     case 'alloc':
       return u === 'nos' || u === 'no' ? 'Alloc. Qty (Nos)' : `Alloc. ${plural}`;
     case 'weight':
-      return `(KG)`;
+      return `Weight per bag (kg)`;
     case 'storage':
       return `Storage Units (${plural})`;
     case 'singular':

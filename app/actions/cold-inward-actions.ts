@@ -142,6 +142,8 @@ export async function getColdInwards() {
 
     return {
       ...inward,
+      originalQuantityKg: inward.quantityKg,
+      originalBagsCount: inward.bagsCount,
       quantityKg: currentBalanceKg,
       bagsCount: currentBalanceBags,
       stackAllocations: computedStackAllocations
@@ -163,16 +165,59 @@ export async function searchColdInwardByReceipt(receiptNo: string) {
   await connectToDatabase();
   const session = await requireSession();
   
-  const inward = await ColdInward.findOne({ 
+  const inwards = await ColdInward.find({ 
     receiptNumber: { $regex: new RegExp(`^${receiptNo.trim()}$`, 'i') },
+    remainingQuantityKg: { $gt: 0 },
     ...getTenantFilter(session)
   })
+    .sort({ createdAt: -1 })
     .populate('clientId', 'name mobile')
     .populate('commodityId', 'name type gradingType')
     .populate('warehouseId', 'name')
     .lean();
+
+  if (!inwards || inwards.length === 0) return null;
+
+  // We need to find the one that ACTUALLY has stock, considering transfers
+  for (const inward of inwards) {
+    const transfers = await mongoose.model('ColdTransfer').find({ originalInwardId: inward._id }).lean();
+    let totalTransferred = 0;
+    transfers.forEach((t: any) => { totalTransferred += (t.quantityKg || 0); });
+    
+    const outwards = await mongoose.model('ColdOutward').find({ inwardId: inward._id, remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] } }).lean();
+    let totalOutward = 0;
+    outwards.forEach((o: any) => { totalOutward += (o.quantityKg || 0); });
+    
+    const actualRemaining = (inward.quantityKg || 0) - totalOutward - totalTransferred;
+    
+    if (actualRemaining > 0) {
+      return JSON.parse(JSON.stringify(inward));
+    }
+    
+    // If no stock on original, check if it was transferred to someone else who might have stock
+    for (const t of transfers as any[]) {
+      if (t.newInwardId && t.newInwardId.toString() !== inward._id.toString()) {
+        const transferredInward = await ColdInward.findOne({ _id: t.newInwardId }).populate('clientId', 'name mobile').populate('commodityId', 'name type gradingType').populate('warehouseId', 'name').lean();
+        if (transferredInward) {
+           const nextTransfers = await mongoose.model('ColdTransfer').find({ originalInwardId: transferredInward._id }).lean();
+           let nextTotalTransferred = 0;
+           nextTransfers.forEach((nt: any) => { nextTotalTransferred += (nt.quantityKg || 0); });
+           const nextOutwards = await mongoose.model('ColdOutward').find({ inwardId: transferredInward._id, remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] } }).lean();
+           let nextTotalOutward = 0;
+           nextOutwards.forEach((no: any) => { nextTotalOutward += (no.quantityKg || 0); });
+           
+           if ((transferredInward.quantityKg || 0) - nextTotalOutward - nextTotalTransferred > 0) {
+             const result = JSON.parse(JSON.stringify(transferredInward));
+             result.receiptNumber = inward.receiptNumber;
+             result.lotNo = inward.lotNo;
+             return result;
+           }
+        }
+      }
+    }
+  }
   
-  return inward ? JSON.parse(JSON.stringify(inward)) : null;
+  return null;
 }
 
 export async function searchColdInwardByLotNo(lotNo: string) {
@@ -181,16 +226,57 @@ export async function searchColdInwardByLotNo(lotNo: string) {
   await connectToDatabase();
   const session = await requireSession();
   
-  const inward = await ColdInward.findOne({ 
+  const inwards = await ColdInward.find({ 
     lotNo: { $regex: new RegExp(`^${lotNo.trim()}$`, 'i') },
+    remainingQuantityKg: { $gt: 0 },
     ...getTenantFilter(session)
   })
+    .sort({ createdAt: -1 })
     .populate('clientId', 'name mobile')
     .populate('commodityId', 'name type gradingType')
     .populate('warehouseId', 'name')
     .lean();
+
+  if (!inwards || inwards.length === 0) return null;
+
+  for (const inward of inwards) {
+    const transfers = await mongoose.model('ColdTransfer').find({ originalInwardId: inward._id }).lean();
+    let totalTransferred = 0;
+    transfers.forEach((t: any) => { totalTransferred += (t.quantityKg || 0); });
+    
+    const outwards = await mongoose.model('ColdOutward').find({ inwardId: inward._id, remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] } }).lean();
+    let totalOutward = 0;
+    outwards.forEach((o: any) => { totalOutward += (o.quantityKg || 0); });
+    
+    const actualRemaining = (inward.quantityKg || 0) - totalOutward - totalTransferred;
+    
+    if (actualRemaining > 0) {
+      return JSON.parse(JSON.stringify(inward));
+    }
+    
+    for (const t of transfers as any[]) {
+      if (t.newInwardId && t.newInwardId.toString() !== inward._id.toString()) {
+        const transferredInward = await ColdInward.findOne({ _id: t.newInwardId }).populate('clientId', 'name mobile').populate('commodityId', 'name type gradingType').populate('warehouseId', 'name').lean();
+        if (transferredInward) {
+           const nextTransfers = await mongoose.model('ColdTransfer').find({ originalInwardId: transferredInward._id }).lean();
+           let nextTotalTransferred = 0;
+           nextTransfers.forEach((nt: any) => { nextTotalTransferred += (nt.quantityKg || 0); });
+           const nextOutwards = await mongoose.model('ColdOutward').find({ inwardId: transferredInward._id, remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] } }).lean();
+           let nextTotalOutward = 0;
+           nextOutwards.forEach((no: any) => { nextTotalOutward += (no.quantityKg || 0); });
+           
+           if ((transferredInward.quantityKg || 0) - nextTotalOutward - nextTotalTransferred > 0) {
+             const result = JSON.parse(JSON.stringify(transferredInward));
+             result.receiptNumber = inward.receiptNumber;
+             result.lotNo = inward.lotNo;
+             return result;
+           }
+        }
+      }
+    }
+  }
   
-  return inward ? JSON.parse(JSON.stringify(inward)) : null;
+  return null;
 }
 
 export async function getColdInwardById(id: string) {
@@ -562,6 +648,10 @@ export async function createColdInward(data: any) {
     const session = await requireSession();
     if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
     
+    if (!data.truckNo || data.truckNo.trim() === '') {
+      return { success: false, error: 'Truck Number is required.' };
+    }
+
     // Check capacity first
     const capacityInfo = await getStackAvailableCapacity(data.warehouseId, data.chamberName || data.chamberNo?.toString(), data.floorNo, data.stackNo);
     const maxAllowedCapacity = capacityInfo.totalCapacity + capacityInfo.bufferCapacity - capacityInfo.occupied;
@@ -684,6 +774,10 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
     const session = await requireSession();
     if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
     
+    if (!data.common?.truckNo || data.common.truckNo.trim() === '') {
+      return { success: false, error: 'Truck Number is required.' };
+    }
+
     // We will start a MongoDB session for transaction if possible, but let's just do sequential for now as some MongoDB setups in this app might not use replica sets.
     const createdInwards = [];
     const clientReceiptMap: Record<string, string[]> = {};

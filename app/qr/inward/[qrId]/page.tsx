@@ -68,6 +68,11 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
   const ownershipTransferKg = transfersForOwnership.reduce((sum: number, t: any) => sum + (t.quantityKg || 0), 0);
   
   const currentBalance = Math.max(0, inwardQuantity - actualOutwardKg - ownershipTransferKg);
+  
+  const inwardBags = inward.totalBags || ((inward.bagsCount || 0) + (inward.jin || 0) + (inward.mixed || 0)) || 0;
+  const actualOutwardBags = regularOutwards.reduce((sum: number, out: any) => sum + (out.totalBags || ((out.bagsCount || 0) + (out.jin || 0) + (out.mixed || 0)) || 0), 0);
+  const ownershipTransferBags = transfersForOwnership.reduce((sum: number, t: any) => sum + (t.bagsCount || 0), 0);
+  const currentBalanceBags = Math.max(0, inwardBags - actualOutwardBags - ownershipTransferBags);
 
   const shiftings = await ColdStockShifting.find({ inwardId: inward._id }).lean();
   const cleanStr = (val: any) => String(val || '').toLowerCase().replace(/^(chamber|floor|stack|c|f|s)\s*/i, '').trim();
@@ -165,7 +170,7 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
             <div>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Receipt No.</span>
               <span className="font-semibold text-slate-800">
-                {inward.receiptNo || inward._id.toString().slice(-4).toUpperCase()}
+                {inward.receiptNumber || inward.receiptNo || '-'}
               </span>
             </div>
             <div>
@@ -268,21 +273,54 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
             <ScaleIcon className="w-5 h-5 mr-2 text-slate-500" /> Stock Status
           </h2>
           <div className="grid grid-cols-1 gap-4">
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-slate-600 font-medium">Inward Quantity</span>
-              <span className="font-bold text-slate-800">{inwardQuantity} {inward.unit || 'Kg'}</span>
+            <div className="flex flex-col p-3 bg-slate-50 rounded-lg">
+              <span className="text-slate-600 font-medium mb-1">Inward</span>
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <span className="font-bold text-slate-800">{inwardQuantity} {inward.unit || 'Kg'} | {inwardBags} Bags</span>
+                <span className="text-sm text-slate-500 font-medium">Date: {inward.date ? new Date(inward.date).toLocaleDateString('en-GB') : '-'}</span>
+              </div>
             </div>
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-slate-600 font-medium">Outward Quantity</span>
-              <span className="font-bold text-rose-600">{actualOutwardKg > 0 ? `${actualOutwardKg} ${inward.unit || 'Kg'}` : '-'}</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <span className="text-slate-600 font-medium">Ownership Transfer</span>
-              <span className="font-bold text-blue-600">{ownershipTransferKg > 0 ? `${ownershipTransferKg} ${inward.unit || 'Kg'}` : '-'}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+
+            {regularOutwards.length > 0 ? (
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg gap-2">
+                <span className="text-slate-600 font-medium">Outward</span>
+                {regularOutwards.map((out: any, idx: number) => {
+                  const outBags = out.totalBags || ((out.bagsCount || 0) + (out.jin || 0) + (out.mixed || 0)) || 0;
+                  return (
+                    <div key={idx} className="flex justify-between items-center pl-3 border-l-[3px] border-rose-300 flex-wrap gap-2">
+                      <span className="font-bold text-rose-600">{out.quantityKg} {inward.unit || 'Kg'} | {outBags} Bags</span>
+                      <span className="text-sm text-slate-500 font-medium">Date: {out.date ? new Date(out.date).toLocaleDateString('en-GB') : '-'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                <span className="text-slate-600 font-medium">Outward</span>
+                <span className="font-bold text-rose-600">-</span>
+              </div>
+            )}
+
+            {transfersForOwnership.length > 0 ? (
+              <div className="flex flex-col p-3 bg-slate-50 rounded-lg gap-2">
+                <span className="text-slate-600 font-medium">Ownership Transfer</span>
+                {transfersForOwnership.map((t: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center pl-3 border-l-[3px] border-blue-300 flex-wrap gap-2">
+                    <span className="font-bold text-blue-600">{t.quantityKg} {inward.unit || 'Kg'} | {t.bagsCount || 0} Bags</span>
+                    <span className="text-sm text-slate-500 font-medium">Date: {t.date ? new Date(t.date).toLocaleDateString('en-GB') : '-'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                <span className="text-slate-600 font-medium">Ownership Transfer</span>
+                <span className="font-bold text-blue-600">-</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center p-4 bg-indigo-50 border border-indigo-100 rounded-lg flex-wrap gap-2">
               <span className="text-indigo-900 font-bold">Remaining Stock</span>
-              <span className="font-bold text-indigo-700 text-lg">{currentBalance} {inward.unit || 'Kg'}</span>
+              <span className="font-bold text-indigo-700 text-lg">{currentBalance} {inward.unit || 'Kg'} | {currentBalanceBags} Bags</span>
             </div>
           </div>
         </div>

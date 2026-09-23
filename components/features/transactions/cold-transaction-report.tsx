@@ -87,7 +87,54 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     });
   }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, search, receiptSearch, lotNoSearch]);
 
-  const handleDelete = async (id: string, type: string) => {
+  const groupedTransactions = useMemo(() => {
+    const grouped: any[] = [];
+    const receiptMap = new Map<string, any>();
+    
+    filteredTransactions.forEach(txn => {
+      // Only group OUTWARDs that have a receiptNumber
+      if (txn.type === 'OUTWARD' && txn.receiptNumber) {
+        const key = `OUT_${txn.receiptNumber}`;
+        if (!receiptMap.has(key)) {
+          // Clone the transaction to avoid mutating the original
+          receiptMap.set(key, { 
+            ...txn, 
+            groupedIds: [txn._id],
+            groupedLocations: [{
+              chamberNo: txn.chamberNo,
+              chamberName: txn.chamberName,
+              floorNo: txn.floorNo,
+              floorName: txn.floorName,
+              stackNo: txn.stackNo,
+              quantityKg: txn.quantityKg,
+              bagsCount: txn.bagsCount || txn.jin || txn.mixed || txn.totalBags || 0
+            }]
+          });
+          grouped.push(receiptMap.get(key));
+        } else {
+          const group = receiptMap.get(key);
+          group.quantityKg = (group.quantityKg || 0) + (txn.quantityKg || 0);
+          group.totalBags = (group.totalBags ?? 0) + (txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)));
+          group.bagsCount = group.totalBags;
+          group.groupedIds.push(txn._id);
+          group.groupedLocations.push({
+            chamberNo: txn.chamberNo,
+            chamberName: txn.chamberName,
+            floorNo: txn.floorNo,
+            floorName: txn.floorName,
+            stackNo: txn.stackNo,
+            quantityKg: txn.quantityKg,
+            bagsCount: txn.bagsCount || txn.jin || txn.mixed || txn.totalBags || 0
+          });
+        }
+      } else {
+        grouped.push(txn);
+      }
+    });
+    return grouped;
+  }, [filteredTransactions]);
+
+  const handleDelete = async (id: string | string[], type: string) => {
     if (type === 'OWNERSHIP TRANSFER') {
       toast.error('Cannot delete ownership transfers from this report.');
       return;
@@ -95,12 +142,26 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     if (!confirm(t('transactions.deleteConfirm'))) return;
 
     try {
-      const res = await deleteColdTransaction(id, type as 'INWARD' | 'OUTWARD');
-      if (res.success) {
-        toast.success(t('transactions.deleteSuccess'));
-        setTransactions(prev => prev.filter(txn => txn._id !== id));
+      if (Array.isArray(id)) {
+        let allSuccess = true;
+        for (const singleId of id) {
+          const res = await deleteColdTransaction(singleId, type as 'INWARD' | 'OUTWARD');
+          if (res.success) {
+            setTransactions(prev => prev.filter(txn => txn._id !== singleId));
+          } else {
+            toast.error(res.error || t('transactions.deleteFailed'));
+            allSuccess = false;
+          }
+        }
+        if (allSuccess) toast.success(t('transactions.deleteSuccess'));
       } else {
-        toast.error(res.error || t('transactions.deleteFailed'));
+        const res = await deleteColdTransaction(id, type as 'INWARD' | 'OUTWARD');
+        if (res.success) {
+          toast.success(t('transactions.deleteSuccess'));
+          setTransactions(prev => prev.filter(txn => txn._id !== id));
+        } else {
+          toast.error(res.error || t('transactions.deleteFailed'));
+        }
       }
     } catch (err: any) {
       toast.error(t('transactions.unexpectedError'));
@@ -270,7 +331,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                 </TableCell>
               </TableRow>
             ) : (
-              filteredTransactions.map((txn) => (
+              groupedTransactions.map((txn) => (
                 <TableRow key={txn._id} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell>
                     {txn.type === 'OWNERSHIP TRANSFER' ? (
@@ -326,7 +387,18 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                   <TableCell className="text-slate-600 text-xs">
                     <div className="space-y-1">
                       <span className="font-semibold text-slate-800">{txn.warehouse?.name}</span>
-                      {txn.stackAllocations && txn.stackAllocations.length > 0 ? (
+                      {txn.groupedLocations && txn.groupedLocations.length > 0 ? (
+                        txn.groupedLocations.map((s: any, idx: number) => (
+                          <Link 
+                            key={idx}
+                            href={`/cold/floor-mapping?warehouseId=${txn.warehouse?._id}&chamberNo=${s.chamberNo || s.chamberName}&floorNo=${s.floorNo}&stackNo=${s.stackNo}`}
+                            className="hover:text-blue-600 hover:underline transition-colors block text-[11px]"
+                          >
+                            {formatChamberDisplay(s.chamberName || s.chamberNo, s.chamberNo)}.{formatFloorDisplay(s.floorName || s.floorNo, s.floorNo)}.S{s.stackNo}
+                            {s.quantityKg ? ` (${s.quantityKg} KG${s.bagsCount ? `, ${s.bagsCount} bags` : ''})` : ''}
+                          </Link>
+                        ))
+                      ) : txn.stackAllocations && txn.stackAllocations.length > 0 ? (
                         txn.stackAllocations.map((s: any, idx: number) => (
                           <Link 
                             key={idx}
@@ -391,7 +463,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
                         variant="ghost" 
                         size="sm"
                         className="text-rose-500 hover:bg-rose-50"
-                        onClick={() => handleDelete(txn._id, txn.type)}
+                        onClick={() => handleDelete(txn.groupedIds || txn._id, txn.type)}
                         title={t('transactions.delete')}
                       >
                         <Trash2 className="h-4 w-4" />

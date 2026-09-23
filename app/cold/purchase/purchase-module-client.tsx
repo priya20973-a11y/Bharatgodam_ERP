@@ -71,7 +71,7 @@ export default function PurchaseModuleClient({ warehouses }: PurchaseModuleClien
       ...filteredStock.map((s: any) => {
         const clientFarmer = s.farmerName && s.farmerName !== '-' ? `${s.clientName} (Farmer: ${s.farmerName})` : s.clientName;
         const location = `C${s.chamber}-F${s.floor}-S${s.stack}`;
-        const unitLabel = getDynamicUnitLabel(s.unit, 'weight');
+        const unitLabel = '(KG)';
         return [
           `"${(clientFarmer || '').replace(/"/g, '""')}"`,
           `"${(s.referencePerson || '').replace(/"/g, '""')}"`,
@@ -199,10 +199,10 @@ export default function PurchaseModuleClient({ warehouses }: PurchaseModuleClien
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600">
-                        {Number(stock.purchaseQuantity).toLocaleString()} {getDynamicUnitLabel(stock.unit, 'weight')}
+                        {Number(stock.purchaseQuantity).toLocaleString()} (KG)
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-blue-700">
-                        {Number(stock.availableQuantity).toLocaleString()} {getDynamicUnitLabel(stock.unit, 'weight')}
+                        {Number(stock.availableQuantity).toLocaleString()} (KG)
                       </td>
                     </tr>
                   ))

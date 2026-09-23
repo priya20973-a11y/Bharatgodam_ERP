@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { Trash2, ChevronDown, QrCode, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getDynamicUnitLabel } from '@/lib/utils';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import OutwardQRScannerModal from './outward-qr-scanner-modal';
 import StackQRScannerModal from '@/components/features/inward/stack-qr-scanner-modal';
 import { parseStackQrString, verifyStackMatch, getUniqueInwardStacks, isSingleStackAllocMatch, InwardStackLocation } from '@/lib/utils/stack-qr-parser';
@@ -79,6 +80,13 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [weighbridgeSlipNo, setWeighbridgeSlipNo] = useState('');
   const [weighbridgeCharge, setWeighbridgeCharge] = useState<number | ''>('');
 
+  // Common Global Record Fields
+  const [globalGrossWeight, setGlobalGrossWeight] = useState<number | ''>('');
+  const [globalEmptyWeight, setGlobalEmptyWeight] = useState<number | ''>('');
+  const [displayWeightDetails, setDisplayWeightDetails] = useState(false);
+  const [transportationName, setTransportationName] = useState('');
+  const [driverNumber, setDriverNumber] = useState('');
+
   // Selected Inwards
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -101,7 +109,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       const isWarehouse = warehouses.some((w: any) => w._id === clientId);
       getAvailableInwardsForClient(clientId, isWarehouse).then(res => {
         let items = res || [];
-        
+
         // Filter by stack if coming from Stack Details page
         if (prefillData?.warehouseId && prefillData?.chamberName && prefillData?.floorNo && prefillData?.stackNo) {
           items = items.filter((i: any) => {
@@ -109,7 +117,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             return chMatch && i.floorNo === parseInt(prefillData.floorNo) && i.stackNo === parseInt(prefillData.stackNo);
           });
         }
-        
+
         setAvailableInwards(items);
         setSelectedItems(prev => {
           if (prev.length > 0 && prev.every(item => {
@@ -307,7 +315,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                 availableQty: alloc.allocatedWeight,
                 bagsCount: alloc.bagsCount
               }));
-              
+
               if (inward.availableAllocations.length > 1) {
                 inward.availableAllocations.forEach((alloc: any) => {
                   const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
@@ -407,6 +415,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         netWeightLoss: null,
         grossWeight: remainingQtyDb || null,
         emptyWeight: null,
+        outwardWeight: remainingQtyDb || null,
         gradingApplied: isGradingFromInward ? true : false,
         gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
         gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
@@ -426,7 +435,24 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const handleItemChange = (inwardId: string, field: string, value: any) => {
     setSelectedItems(selectedItems.map(item => {
       if (item.inwardId === inwardId) {
-        return { ...item, [field]: value };
+        let updates: any = { [field]: value };
+        const ratio = (item.inward.originalQuantityKg || item.inward.quantityKg || 0) / (item.inward.originalBagsCount || item.inward.bagsCount || 1);
+
+        if (ratio > 0) {
+          if (field === 'bagsCount') {
+            const wholeVal = value ? Math.round(Number(value)) : null;
+            updates[field] = wholeVal;
+            if (wholeVal !== null) {
+              updates['outwardWeight'] = Number((wholeVal * ratio).toFixed(2));
+            }
+          } else if (field === 'outwardWeight') {
+            const val = value ? Number(value) : null;
+            if (val !== null) {
+              updates['bagsCount'] = Math.round(val / ratio);
+            }
+          }
+        }
+        return { ...item, ...updates };
       }
       return item;
     }));
@@ -437,13 +463,32 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       if (item.inwardId === inwardId) {
         const currentSelections = item.stackSelections || {};
         const currentStack = currentSelections[allocKey] || { selected: false, outwardWeight: null, bagsCount: null, jin: null, mixed: null };
+
+        let updates: any = { [field]: value };
+        const ratio = (item.inward.originalQuantityKg || item.inward.quantityKg || 0) / (item.inward.originalBagsCount || item.inward.bagsCount || 1);
+
+        if (ratio > 0) {
+          if (field === 'bagsCount') {
+            const wholeVal = value ? Math.round(Number(value)) : null;
+            updates[field] = wholeVal;
+            if (wholeVal !== null) {
+              updates['outwardWeight'] = Number((wholeVal * ratio).toFixed(2));
+            }
+          } else if (field === 'outwardWeight') {
+            const val = value ? Number(value) : null;
+            if (val !== null) {
+              updates['bagsCount'] = Math.round(val / ratio);
+            }
+          }
+        }
+
         return {
           ...item,
           stackSelections: {
             ...currentSelections,
             [allocKey]: {
               ...currentStack,
-              [field]: value
+              ...updates
             }
           }
         };
@@ -456,6 +501,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     e.preventDefault();
     if (!clientId || selectedItems.length === 0) {
       toast.error(t('outward.fillRequired'));
+      return;
+    }
+    if (!truckNo || truckNo.trim() === '') {
+      toast.error('Truck Number is required');
       return;
     }
 
@@ -473,6 +522,15 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     }
 
     // Validate quantities
+    const computedGlobalNetWeight = selectedItems.reduce((acc, item) => {
+      const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
+      const calcNetWeight = isMultiStack
+        ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
+        : (Number(item.outwardWeight || 0));
+      return acc + calcNetWeight;
+    }, 0);
+    const computedWeightLoss = (Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)) - computedGlobalNetWeight;
+
     const itemsPayload = [];
     for (const item of selectedItems) {
       const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
@@ -535,12 +593,15 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             tableLabel: item.inward.tableLabel,
             jin: deductSmallBags,
             mixed: deductMixedBags,
-            plusMinus: Number(item.plusMinus) || 0,
-            netWeightLoss: Number(item.netWeightLoss) || 0,
+            plusMinus: 0,
+            netWeightLoss: computedWeightLoss,
             totalBags: deductTotalBags,
             weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
-            grossWeight: outwardWeight,
-            emptyWeight: 0,
+            grossWeight: globalGrossWeight ? Number(globalGrossWeight) : 0,
+            emptyWeight: globalEmptyWeight ? Number(globalEmptyWeight) : 0,
+            displayWeightDetails: displayWeightDetails,
+            transportationName: transportationName,
+            driverNumber: driverNumber,
             kataBharati: deductTotalBags > 0 ? outwardWeight / deductTotalBags : 0,
             marko: item.inward.marko,
             referencePersons: item.inward.referencePersons,
@@ -552,7 +613,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         }
       } else {
         // Single stack receipt flow
-        const calcNetWeight = (Number(item.grossWeight || 0) - Number(item.emptyWeight || 0) - (Number(item.plusMinus) || 0));
+        const calcNetWeight = Number(item.outwardWeight || 0);
         const calcTotalBags = Number(item.bagsCount || 0) + Number(item.jin || 0) + Number(item.mixed || 0);
 
         if (calcNetWeight <= 0) {
@@ -560,10 +621,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           return;
         }
 
-        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null 
-          ? item.inward.remainingQuantityKg 
+        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null
+          ? item.inward.remainingQuantityKg
           : (item.inward.quantityKg || 0);
-          
+
         if (calcNetWeight > remainingQtyDb) {
           toast.error(`Quantity exceeds available stock (${remainingQtyDb.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
           return;
@@ -583,6 +644,8 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           const allocAvailQty = allocations.length === 1 ? remainingQtyDb : (alloc.availableQty || 0);
           const isLastAlloc = i === allocations.length - 1 || remainingNetWeight <= allocAvailQty;
           const deductNetWeight = Math.min(remainingNetWeight, allocAvailQty);
+          
+          if (deductNetWeight <= 0) continue;
 
           const ratio = deductNetWeight / calcNetWeight;
 
@@ -595,8 +658,8 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           remainingSmallBags -= deductSmallBags;
           remainingMixedBags -= deductMixedBags;
 
-          const grossWeightPart = Number(item.grossWeight || 0) * ratio;
-          const emptyWeightPart = Number(item.emptyWeight || 0) * ratio;
+          const grossWeightPart = globalGrossWeight ? Number(globalGrossWeight) : 0;
+          const emptyWeightPart = globalEmptyWeight ? Number(globalEmptyWeight) : 0;
           const deductTotalBags = deductLargeBags + deductSmallBags + deductMixedBags;
 
           let calculatedGradingCharge = 0;
@@ -624,12 +687,15 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             tableLabel: item.inward.tableLabel,
             jin: deductSmallBags,
             mixed: deductMixedBags,
-            plusMinus: Number(item.plusMinus) || 0,
-            netWeightLoss: Number(item.netWeightLoss) || 0,
+            plusMinus: 0,
+            netWeightLoss: computedWeightLoss,
             totalBags: deductTotalBags,
             weighbridgeSlipNo: item.inward.weighbridgeSlipNo,
             grossWeight: grossWeightPart,
             emptyWeight: emptyWeightPart,
+            displayWeightDetails: displayWeightDetails,
+            transportationName: transportationName,
+            driverNumber: driverNumber,
             kataBharati: deductTotalBags > 0 ? deductNetWeight / deductTotalBags : 0,
             marko: item.inward.marko,
             referencePersons: item.inward.referencePersons,
@@ -690,75 +756,71 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('outward.clientName')}</label>
-            <Select value={clientId} onValueChange={setClientId} required>
-              <SelectTrigger><SelectValue placeholder={t('outward.selectClient')} /></SelectTrigger>
-              <SelectContent>
-                {clients.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                {warehouses.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel>Warehouses (Purchase Stock)</SelectLabel>
-                    {warehouses.map((w: any) => (
-                      <SelectItem key={w._id} value={w._id}>{w.name} (Warehouse)</SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+          <SearchableSelect
+            value={clientId}
+            onValueChange={setClientId}
+            required
+            placeholder={t('outward.selectClient')}
+            options={[
+              ...clients.map(c => ({ value: c._id, label: c.name })),
+              ...warehouses.map((w: any) => ({ value: w._id, label: `${w.name} (Warehouse)` }))
+            ]}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">{t('outward.selectInward')}</label>
-            <div className="relative" ref={dropdownRef}>
-              <div
-                className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${!clientId ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                onClick={() => { if (clientId) setIsDropdownOpen(!isDropdownOpen); }}
-              >
-                <span className={selectedItems.length > 0 ? "text-slate-900" : "text-slate-500"}>
-                  {selectedItems.length > 0
-                    ? `${selectedItems.length} inward(s) selected`
-                    : t('outward.selectInward')}
-                </span>
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </div>
-
-              {isDropdownOpen && availableInwards.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-md max-h-60 overflow-y-auto">
-                  {availableInwards.map(inw => {
-                    const isSelected = selectedItems.some(item => item.inwardId === inw.uniqueKey);
-                    return (
-                      <div
-                        key={inw.uniqueKey}
-                        className="flex items-center space-x-2 p-2 hover:bg-slate-100 cursor-pointer"
-                        onClick={() => {
-                          if (isSelected) {
-                            handleRemoveInward(inw.uniqueKey);
-                          } else {
-                            handleAddInward(inw.uniqueKey);
-                          }
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          readOnly
-                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
-                        <span className="text-sm text-slate-700">
-                          {new Date(inw.date).toLocaleDateString('en-GB')} - {inw.commodityId?.name}{inw.commodityId?.type ? ` (${inw.commodityId.type})` : ''} ({(inw.availableAllocations || [{ chamberName: inw.chamberName, chamberNo: inw.chamberNo, floorName: inw.floorName, floorNo: inw.floorNo, stackName: inw.stackName, stackNo: inw.stackNo }]).map((a: any) => formatLocation(a, inw._id)).join(', ')}) - {inw.availableQty.toFixed(2)} {inw.unit || inw.commodityId?.unit || 'KG'} {inw.warehouseId?.name ? `(${inw.warehouseId.name})` : ''}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              {isDropdownOpen && availableInwards.length === 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-md p-3 text-sm text-center text-slate-500">
-                  No inwards available
-                </div>
-              )}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t('outward.selectInward')}</label>
+          <div className="relative" ref={dropdownRef}>
+            <div
+              className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${!clientId ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              onClick={() => { if (clientId) setIsDropdownOpen(!isDropdownOpen); }}
+            >
+              <span className={selectedItems.length > 0 ? "text-slate-900" : "text-slate-500"}>
+                {selectedItems.length > 0
+                  ? `${selectedItems.length} inward(s) selected`
+                  : t('outward.selectInward')}
+              </span>
+              <ChevronDown className="h-4 w-4 opacity-50" />
             </div>
+
+            {isDropdownOpen && availableInwards.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-md max-h-60 overflow-y-auto">
+                {availableInwards.map(inw => {
+                  const isSelected = selectedItems.some(item => item.inwardId === inw.uniqueKey);
+                  return (
+                    <div
+                      key={inw.uniqueKey}
+                      className="flex items-center space-x-2 p-2 hover:bg-slate-100 cursor-pointer"
+                      onClick={() => {
+                        if (isSelected) {
+                          handleRemoveInward(inw.uniqueKey);
+                        } else {
+                          handleAddInward(inw.uniqueKey);
+                        }
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        readOnly
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <span className="text-sm text-slate-700">
+                        LOT: {inw.lotNo || '-'} | Receipt: {inw.receiptNumber || '-'} | {inw.date ? new Date(inw.date).toLocaleDateString('en-GB') : ''} | {inw.commodityId?.name}{inw.commodityId?.type ? `(${inw.commodityId.type})` : ''}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {isDropdownOpen && availableInwards.length === 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-md p-3 text-sm text-center text-slate-500">
+                No inwards available
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded border">
         <div className="space-y-2">
@@ -766,8 +828,16 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           <Input required type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">{t('outward.truckNo')}</label>
-          <Input value={truckNo} onChange={(e) => setTruckNo(e.target.value)} />
+          <label className="text-sm font-medium">{t('outward.truckNo')} *</label>
+          <Input placeholder="Enter Truck Number" value={truckNo} onChange={(e) => setTruckNo(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Transportation Name</label>
+          <Input placeholder="Enter Transportation Name" value={transportationName} onChange={(e) => setTransportationName(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Driver/Transportation Number</label>
+          <Input placeholder="Enter Driver Number" value={driverNumber} onChange={(e) => setDriverNumber(e.target.value)} />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Vehicle Type</label>
@@ -805,20 +875,68 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded border border-slate-200">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Gross Weight (KG)</label>
+          <ColdNumberInput min="0" value={globalGrossWeight} onChange={(val) => setGlobalGrossWeight(val ? Number(val) : '')} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Empty Weight (KG)</label>
+          <ColdNumberInput min="0" value={globalEmptyWeight} onChange={(val) => setGlobalEmptyWeight(val ? Number(val) : '')} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-green-700">Net Weight (KG)</label>
+          <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">
+            {selectedItems.reduce((acc, item) => {
+              const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
+              const calcNetWeight = isMultiStack
+                ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
+                : (Number(item.outwardWeight || 0));
+              return acc + calcNetWeight;
+            }, 0).toFixed(2)}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-blue-700">Weight Loss (KG)</label>
+          <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">
+            {((Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)) - selectedItems.reduce((acc, item) => {
+              const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
+              const calcNetWeight = isMultiStack
+                ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
+                : (Number(item.outwardWeight || 0));
+              return acc + calcNetWeight;
+            }, 0)).toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2 bg-slate-50 p-4 rounded border border-slate-200 mt-4">
+        <input
+          type="checkbox"
+          id="displayWeightDetails"
+          checked={displayWeightDetails}
+          onChange={(e) => setDisplayWeightDetails(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+        />
+        <label htmlFor="displayWeightDetails" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+          Display Weight Details in Gate Pass
+        </label>
+      </div>
+
       {selectedItems.map((item, index) => {
-        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null 
-          ? item.inward.remainingQuantityKg 
+        const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null
+          ? item.inward.remainingQuantityKg
           : (item.inward.quantityKg || 0);
 
         const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
         const calcNetWeight = isMultiStack
           ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
-          : (Number(item.grossWeight || 0) - Number(item.emptyWeight || 0) - (Number(item.plusMinus) || 0));
-        
+          : (Number(item.outwardWeight || 0));
+
         const calcTotalBags = isMultiStack
           ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? ((Number(s.bagsCount) || 0) + (Number(s.jin) || 0) + (Number(s.mixed) || 0)) : 0), 0)
           : (Number(item.bagsCount || 0) + Number(item.jin || 0) + Number(item.mixed || 0));
-        
+
         const calcKataBharati = calcTotalBags > 0 ? (calcNetWeight / calcTotalBags) : 0;
 
         return (
@@ -834,6 +952,17 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             </Button>
 
             <h4 className="font-semibold mb-4 text-slate-700">Item {index + 1}: {item.inward.commodityId?.name}{item.inward.commodityId?.type ? ` (${item.inward.commodityId.type})` : ''} - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(remainingQtyDb) || 0).toFixed(2)} KG)</h4>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 bg-slate-50 p-3 rounded-md border border-slate-100">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase">Receipt Number</label>
+                <div className="text-sm font-medium text-slate-800">{item.inward.receiptNumber || item.inward.receiptNo || '-'}</div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase">LOT No.</label>
+                <div className="text-sm font-medium text-slate-800">{item.inward.lotNo || '-'}</div>
+              </div>
+            </div>
 
             {isMultiStack ? (
               <div className="mb-4 p-4 border border-indigo-200 rounded-lg bg-indigo-50/40 space-y-4">
@@ -922,13 +1051,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                   })}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-indigo-200">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-indigo-200">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-blue-600">Net Loss (KG)</label>
-                    <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-green-700">Net Weight (KG)</label>
+                    <label className="text-sm font-medium text-green-700">Weight (KG)</label>
                     <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">{calcNetWeight.toFixed(2)}</div>
                   </div>
                   <div className="space-y-2">
@@ -943,22 +1068,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 gap-4 mb-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-blue-600">Net Loss (KG)</label>
-                    <ColdNumberInput value={item.plusMinus ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'plusMinus', val)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-blue-600">Gross Qty (KG)</label>
-                    <ColdNumberInput required min="0" step="0.01" value={item.grossWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'grossWeight', val ? Number(val) : null)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-orange-600">Empty Qty (KG)</label>
-                    <ColdNumberInput min="0" step="0.01" value={item.emptyWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'emptyWeight', val ? Number(val) : null)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-green-700">Final Net Qty (KG)</label>
-                    <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-700 font-bold">{calcNetWeight.toFixed(2)}</div>
+                    <label className="text-sm font-medium text-green-700">Outward Weight (KG) *</label>
+                    <ColdNumberInput required min="0" step="0.01" value={item.outwardWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'outwardWeight', val ? Number(val) : null)} />
                   </div>
                 </div>
 

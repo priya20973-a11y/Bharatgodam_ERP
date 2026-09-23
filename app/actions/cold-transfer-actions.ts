@@ -55,6 +55,7 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
 
   const transfers = await ColdTransfer.find({
     fromClientId: new mongoose.Types.ObjectId(clientId),
+    transferType: { $ne: 'Purchase' },
     ...tenantFilter
   }).lean();
 
@@ -82,16 +83,7 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
       const stockType = alloc.stockType || inward.stockType || 'Self';
       if (stockType !== 'Self') return;
 
-      let resolvedChamberName = alloc.chamberName;
-      if (!resolvedChamberName && inward.warehouseId?.chambers) {
-         const chamber = inward.warehouseId.chambers.find((c: any) => c.chamberNo === alloc.chamberNo);
-         if (chamber) {
-            resolvedChamberName = chamber.name;
-         }
-      }
-      resolvedChamberName = resolvedChamberName || (alloc.chamberNo ? alloc.chamberNo.toString() : 'Unknown');
-
-      const chamberKey = resolvedChamberName || alloc.chamberNo;
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
       const k = `${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       if (mergedAllocations.has(k)) {
          const existing = mergedAllocations.get(k);
@@ -99,7 +91,149 @@ export async function getAvailableInwardsForTransfer(clientId: string, transferT
          existing.bagsCount += (alloc.bagsCount || 0);
       } else {
          mergedAllocations.set(k, {
-           chamberName: resolvedChamberName,
+           chamberName: alloc.chamberName,
+           chamberNo: alloc.chamberNo,
+           floorNo: alloc.floorNo,
+           stackNo: alloc.stackNo,
+           allocatedWeight: alloc.allocatedWeight || 0,
+           bagsCount: alloc.bagsCount || 0,
+           stockType: stockType
+         });
+      }
+    });
+    
+    let totalAvailableQty = 0;
+    let totalAvailableBags = 0;
+    const availableAllocations: any[] = [];
+    
+    Array.from(mergedAllocations.values()).forEach((alloc: any) => {
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+      const outData = outwardMap.get(key) || { out: 0, bagsOut: 0 };
+      const transData = transferMap.get(key) || { transferredQty: 0, transferredBags: 0 };
+
+      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out - transData.transferredQty);
+      const availableBags = Math.max(0, alloc.bagsCount - outData.bagsOut - transData.transferredBags);
+      
+      if (availableQty > 0) {
+        totalAvailableQty += availableQty;
+        totalAvailableBags += availableBags;
+        availableAllocations.push({
+          chamberName: alloc.chamberName,
+          chamberNo: alloc.chamberNo,
+          floorNo: alloc.floorNo,
+          stackNo: alloc.stackNo,
+          allocatedWeight: availableQty,
+          bagsCount: availableBags,
+          stockType: alloc.stockType
+        });
+      }
+    });
+    
+    if (totalAvailableQty > 0) {
+      return { 
+        ...inward,
+        uniqueKey: inward._id.toString(),
+        availableQty: totalAvailableQty,
+        availableBags: totalAvailableBags,
+        availableAllocations 
+      };
+    }
+    
+    return null;
+  }).filter(Boolean);
+
+  return JSON.parse(JSON.stringify(availableInwards));
+}
+
+export async function searchAvailableInwardsForTransfer(query: string, searchBy: 'receipt' | 'lot') {
+  if (!query || typeof query !== 'string') return [];
+  
+  await connectToDatabase();
+  const session = await requireSession();
+  const tenantFilter = getTenantFilter(session);
+  ColdCommodity.init();
+  ColdWarehouse.init();
+
+  const searchFilter = searchBy === 'receipt' 
+    ? { receiptNumber: { $regex: new RegExp(`^${query.trim()}$`, 'i') } }
+    : { lotNo: { $regex: new RegExp(`^${query.trim()}$`, 'i') } };
+
+  const inwards = await ColdInward.find({ ...searchFilter, ...tenantFilter })
+    .populate('commodityId', 'name type unit')
+    .populate('warehouseId', 'name chambers')
+    .populate('clientId', 'name')
+    .sort({ date: -1, createdAt: -1 })
+    .lean();
+
+  if (inwards.length === 0) return [];
+
+  const inwardIds = inwards.map(i => i._id);
+
+  const outwards = await ColdOutward.aggregate([
+    { 
+      $match: { 
+        inwardId: { $in: inwardIds },
+        remarks: { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] },
+        ...tenantFilter 
+      } 
+    },
+    { $group: { 
+        _id: { inwardId: '$inwardId', chamberName: '$chamberName', chamberNo: '$chamberNo', floorNo: '$floorNo', stackNo: '$stackNo' }, 
+        totalOutward: { $sum: '$quantityKg' },
+        totalBagsOut: { $sum: '$bagsCount' }
+      } 
+    }
+  ]);
+
+  const outwardMap = new Map();
+  outwards.forEach(o => {
+    if (o._id.inwardId) {
+      const chamberKey = o._id.chamberName || o._id.chamberNo;
+      const key = `${o._id.inwardId.toString()}_${chamberKey}_${o._id.floorNo}_${o._id.stackNo}`;
+      outwardMap.set(key, { out: o.totalOutward, bagsOut: o.totalBagsOut });
+    }
+  });
+
+  const transfers = await ColdTransfer.find({
+    originalInwardId: { $in: inwardIds },
+    transferType: { $ne: 'Purchase' },
+    ...tenantFilter
+  }).lean();
+
+  const transferMap = new Map();
+  transfers.forEach((t: any) => {
+    if (t.originalInwardId && t.stackAllocations) {
+      t.stackAllocations.forEach((alloc: any) => {
+        const chamberKey = alloc.chamberName || alloc.chamberNo;
+        const key = `${t.originalInwardId.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+        const existing = transferMap.get(key) || { transferredQty: 0, transferredBags: 0 };
+        transferMap.set(key, {
+          transferredQty: existing.transferredQty + (alloc.allocatedWeight || 0),
+          transferredBags: existing.transferredBags + (alloc.bagsCount || 0)
+        });
+      });
+    }
+  });
+
+  const availableInwards = inwards.map((inward: any) => {
+    if (!inward.stackAllocations) return null;
+    
+    const mergedAllocations = new Map();
+    inward.stackAllocations.forEach((alloc: any) => {
+      // Filter by stockType (only Self stock can be transferred)
+      const stockType = alloc.stockType || inward.stockType || 'Self';
+      if (stockType !== 'Self') return;
+
+      const chamberKey = alloc.chamberName || alloc.chamberNo;
+      const k = `${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+      if (mergedAllocations.has(k)) {
+         const existing = mergedAllocations.get(k);
+         existing.allocatedWeight += (alloc.allocatedWeight || 0);
+         existing.bagsCount += (alloc.bagsCount || 0);
+      } else {
+         mergedAllocations.set(k, {
+           chamberName: alloc.chamberName,
            chamberNo: alloc.chamberNo,
            floorNo: alloc.floorNo,
            stackNo: alloc.stackNo,
@@ -390,6 +524,7 @@ export async function getColdTransfers() {
     .populate('toClientId', 'name mobile')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name')
+    .populate('originalInwardId', 'receiptNumber')
     .sort({ date: -1, createdAt: -1 })
     .lean();
 

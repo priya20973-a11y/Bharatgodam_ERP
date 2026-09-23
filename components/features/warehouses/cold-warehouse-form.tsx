@@ -86,8 +86,12 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
     };
   });
 
-  const [stackNumberingOption, setStackNumberingOption] = useState<'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS'>(
+  const [stackNumberingOption, setStackNumberingOption] = useState<'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS' | 'CUSTOM_PER_FLOOR'>(
     initialData?.stackNumberingOption || 'RESTART_PER_FLOOR'
+  );
+
+  const [floorCustomNumberingConfig, setFloorCustomNumberingConfig] = useState<Record<string, { startNo: number; count: number }>>(
+    initialData?.floorCustomNumberingConfig || {}
   );
 
   // Custom Naming State
@@ -218,8 +222,11 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
 
   // Helper to get stack count for chamber c, floor f (1-indexed)
   const getStackCountForFloor = (c: number, f: number) => {
-    if (sameStacksPerFloor) return formData.noOfStacks || 1;
     const key = `${c}-${f}`;
+    if (stackNumberingOption === 'CUSTOM_PER_FLOOR' && floorCustomNumberingConfig[key]) {
+      return floorCustomNumberingConfig[key].count || 1;
+    }
+    if (sameStacksPerFloor) return formData.noOfStacks || 1;
     return floorStacksConfig[key] || formData.noOfStacks || 1;
   };
 
@@ -387,6 +394,7 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
         floorStacksConfig: sameStacksPerFloor ? undefined : floorStacksConfig,
         sameStackLayoutPerFloor,
         stackNumberingOption,
+        floorCustomNumberingConfig: stackNumberingOption === 'CUSTOM_PER_FLOOR' ? floorCustomNumberingConfig : undefined,
         chamberCustomNames,
         floorCustomNames,
         floorLayoutConfig: preparedFloorLayoutConfig,
@@ -461,29 +469,37 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
 
     let gridCells: (number | null)[][] = Array.from({ length: rows }).map(() => Array(cols).fill(null));
     let sNo = 1;
+    if (stackNumberingOption === 'CUSTOM_PER_FLOOR') {
+      const key = `${c}-${f}`;
+      if (floorCustomNumberingConfig[key]) {
+        sNo = floorCustomNumberingConfig[key].startNo;
+      }
+    }
+
+    let count = 1;
 
     if (layout.stackLayout === 'ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let cIdx = 0; cIdx < cols; cIdx++) {
-          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
+          if (count <= stacksCount) { gridCells[r][cIdx] = sNo++; count++; }
         }
       }
     } else if (layout.stackLayout === 'REVERSE_ROW_WISE') {
       for (let r = 0; r < rows; r++) {
         for (let cIdx = cols - 1; cIdx >= 0; cIdx--) {
-          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
+          if (count <= stacksCount) { gridCells[r][cIdx] = sNo++; count++; }
         }
       }
     } else if (layout.stackLayout === 'COLUMN_WISE') {
       for (let cIdx = 0; cIdx < cols; cIdx++) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
+          if (count <= stacksCount) { gridCells[r][cIdx] = sNo++; count++; }
         }
       }
     } else if (layout.stackLayout === 'REVERSE_COLUMN_WISE') {
       for (let cIdx = cols - 1; cIdx >= 0; cIdx--) {
         for (let r = 0; r < rows; r++) {
-          if (sNo <= stacksCount) gridCells[r][cIdx] = sNo++;
+          if (count <= stacksCount) { gridCells[r][cIdx] = sNo++; count++; }
         }
       }
     }
@@ -972,7 +988,93 @@ export default function ColdWarehouseForm({ onSuccess, initialData, onCancel }: 
                 Floor 1: Stack 1–50 | Floor 2: Stack 51–100
               </div>
             </div>
+
+            <div 
+              onClick={() => !isEdit && setStackNumberingOption('CUSTOM_PER_FLOOR')}
+              className={`p-4 rounded-lg border cursor-pointer transition-all md:col-span-2 ${
+                stackNumberingOption === 'CUSTOM_PER_FLOOR' 
+                  ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-500/20' 
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-sm text-slate-900">Custom Numbering per Floor</span>
+                {stackNumberingOption === 'CUSTOM_PER_FLOOR' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+              </div>
+              <p className="text-xs text-slate-500">Specify the exact Starting Stack Number and Number of Stacks to Add for each floor independently.</p>
+              <div className="mt-2 text-[11px] font-mono text-slate-600 bg-slate-100 p-1.5 rounded">
+                Floor 1: Start 101, Count 20 (Stacks 101-120) | Floor 2: Start 201, Count 15 (Stacks 201-215)
+              </div>
+            </div>
           </div>
+
+          {stackNumberingOption === 'CUSTOM_PER_FLOOR' && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+              <p className="text-xs text-slate-500 font-medium">Configure Custom Numbering for each floor:</p>
+              {Array.from({ length: formData.noOfChambers }).map((_, cIdx) => {
+                const cNo = cIdx + 1;
+                const floorsCount = getFloorCountForChamber(cNo);
+                const cName = formatChamberName(chamberCustomNames[cNo], cNo);
+
+                return (
+                  <div key={cNo} className="bg-white p-3 rounded border space-y-2">
+                    <h6 className="text-xs font-bold text-indigo-800 uppercase tracking-wide">{cName}</h6>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Array.from({ length: floorsCount }).map((_, fIdx) => {
+                        const fNo = fIdx + 1;
+                        const key = `${cNo}-${fNo}`;
+                        const customConfig = floorCustomNumberingConfig[key] || { startNo: 1, count: getStackCountForFloor(cNo, fNo) };
+                        const fName = formatFloorName(floorCustomNames[key], fNo);
+
+                        return (
+                          <div key={fNo} className="space-y-2 bg-slate-50 p-2.5 rounded border">
+                            <label className="text-xs font-semibold text-slate-700 block border-b pb-1">
+                              {cName} → {fName}
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500">Start No.</label>
+                                <ColdNumberInput 
+                                  required 
+                                  min="1"
+                                  disabled={isEdit}
+                                  value={customConfig.startNo} 
+                                  onChange={(val) => {
+                                    setFloorCustomNumberingConfig(prev => ({
+                                      ...prev,
+                                      [key]: { ...customConfig, startNo: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) }
+                                    }));
+                                  }} 
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-medium text-slate-500">Count</label>
+                                <ColdNumberInput 
+                                  required 
+                                  min="1"
+                                  disabled={isEdit}
+                                  value={customConfig.count} 
+                                  onChange={(val) => {
+                                    setFloorCustomNumberingConfig(prev => ({
+                                      ...prev,
+                                      [key]: { ...customConfig, count: val === '' ? ('' as any) : Math.max(1, parseInt(val) || 1) }
+                                    }));
+                                  }} 
+                                />
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-indigo-600 bg-indigo-50 p-1 rounded font-mono mt-1">
+                              Preview: Stacks {customConfig.startNo} to {Number(customConfig.startNo) + Number(customConfig.count) - 1}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 5. Stack Capacity & Buffer Capacity */}

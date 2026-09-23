@@ -65,9 +65,10 @@ export async function createColdWarehouse(data: {
   sameFloorsPerChamber?: boolean;
   sameStacksPerFloor?: boolean;
   sameStackLayoutPerFloor?: boolean;
-  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS';
+  stackNumberingOption?: 'RESTART_PER_FLOOR' | 'CONTINUE_ACROSS_FLOORS' | 'CUSTOM_PER_FLOOR';
   chamberFloorsConfig?: number[];
   floorStacksConfig?: Record<string, number>;
+  floorCustomNumberingConfig?: Record<string, { startNo: number; count: number }>;
   stackCapacity: number;
   bufferCapacity?: number;
   stackLayout: string;
@@ -146,9 +147,22 @@ export async function createColdWarehouse(data: {
           currentStackNumber = 1;
         }
 
+        let currentFloorStackStart = currentStackNumber;
+        let actualFloorStacksCount = floorStacksCount;
+
+        if (numberingOption === 'CUSTOM_PER_FLOOR' && data.floorCustomNumberingConfig) {
+          const customConfig = data.floorCustomNumberingConfig[`${c}-${f}`];
+          if (customConfig) {
+            currentFloorStackStart = customConfig.startNo;
+            actualFloorStacksCount = customConfig.count;
+          }
+        }
+
         const stacks = [];
-        for (let s = 1; s <= floorStacksCount; s++) {
-          const stackNo = currentStackNumber;
+        for (let s = 1; s <= actualFloorStacksCount; s++) {
+          const stackNo = numberingOption === 'CUSTOM_PER_FLOOR' 
+            ? currentFloorStackStart + s - 1 
+            : currentStackNumber;
           const customCapKey = `${c}-${f}-${stackNo}`;
           const customCapKeyIdx = `${c}-${f}-${s}`;
           const customCap = customCapacities[customCapKey] !== undefined ? customCapacities[customCapKey] : customCapacities[customCapKeyIdx];
@@ -159,7 +173,9 @@ export async function createColdWarehouse(data: {
             stackNo: stackNo,
             capacity: sCapacity
           });
-          currentStackNumber++;
+          if (numberingOption !== 'CUSTOM_PER_FLOOR') {
+            currentStackNumber++;
+          }
           totalStacksCount++;
           totalCapacity += sCapacity;
         }

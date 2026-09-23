@@ -16,7 +16,7 @@ export default async function PublicTransferQRDetailsPage({ params }: { params: 
   const transfer = await ColdTransfer.findOne({ _id: resolvedParams.id })
     .populate('fromClientId', 'name')
     .populate('toClientId', 'name')
-    .populate('originalInwardId', 'farmerName referencePersons unit')
+    .populate('originalInwardId', 'farmerName referencePersons unit receiptNumber')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name')
     .lean() as any;
@@ -81,6 +81,10 @@ export default async function PublicTransferQRDetailsPage({ params }: { params: 
             <div className="col-span-2 md:col-span-1">
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">New Owner</span>
               <span className="font-semibold text-indigo-700">{newOwner}</span>
+            </div>
+            <div className="col-span-2">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Inward Receipt Number</span>
+              <span className="font-semibold text-slate-800">{transfer.originalInwardId?.receiptNumber || '-'}</span>
             </div>
             <div>
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider block">Farmer Name</span>

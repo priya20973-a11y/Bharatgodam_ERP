@@ -175,21 +175,39 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
   });
 
   const transfers = await ColdTransfer.find({
-    fromClientId: new mongoose.Types.ObjectId(clientId),
+    $or: [
+      { fromClientId: new mongoose.Types.ObjectId(clientId) },
+      { toClientId: new mongoose.Types.ObjectId(clientId) }
+    ],
     ...tenantFilter
-  }).lean();
+  }).populate('originalInwardId', 'receiptNumber lotNo').lean();
 
   const transferMap = new Map();
+  const inwardMetadataMap = new Map();
+
   transfers.forEach((t: any) => {
-    if (t.originalInwardId && t.stackAllocations) {
-      t.stackAllocations.forEach((alloc: any) => {
-        const chamberKey = alloc.chamberName || alloc.chamberNo;
-        const key = `${t.originalInwardId.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
-        const existing = transferMap.get(key) || { transferredQty: 0 };
-        transferMap.set(key, {
-          transferredQty: existing.transferredQty + (alloc.allocatedWeight || 0)
+    // If client is sender, map for deduction
+    if (t.fromClientId?.toString() === clientId.toString() || t.fromClientId?.toString() === clientId) {
+      if (t.originalInwardId?._id && t.stackAllocations) {
+        t.stackAllocations.forEach((alloc: any) => {
+          const chamberKey = alloc.chamberName || alloc.chamberNo;
+          const key = `${t.originalInwardId._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
+          const existing = transferMap.get(key) || { transferredQty: 0 };
+          transferMap.set(key, {
+            transferredQty: existing.transferredQty + (alloc.allocatedWeight || 0)
+          });
         });
-      });
+      }
+    }
+    
+    // If client is receiver, map original LOT and receipt to the new inward
+    if (t.toClientId?.toString() === clientId.toString() || t.toClientId?.toString() === clientId) {
+      if (t.newInwardId && t.originalInwardId) {
+        inwardMetadataMap.set(t.newInwardId.toString(), {
+          receiptNumber: t.originalInwardId.receiptNumber,
+          lotNo: t.originalInwardId.lotNo
+        });
+      }
     }
   });
 
@@ -269,11 +287,14 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     });
     
     if (totalAvailableQty > 0) {
+      const metadata = inwardMetadataMap.get(inward._id.toString());
       return { 
         ...inward,
         uniqueKey: inward._id.toString(),
         availableQty: totalAvailableQty,
-        availableAllocations 
+        availableAllocations,
+        receiptNumber: metadata?.receiptNumber || inward.receiptNumber,
+        lotNo: metadata?.lotNo || inward.lotNo
       };
     }
     
@@ -289,6 +310,10 @@ export async function createColdOutward(data: any) {
     const session = await requireSession();
     if (!hasPermission(session, 'outward', 'create')) throw new Error('Forbidden: Insufficient permissions');
     
+    if (!data.truckNo || data.truckNo.trim() === '') {
+      return { success: false, error: 'Cannot create outward: Truck Number is required.' };
+    }
+
     if (!data.inwardId) {
       return { success: false, error: 'Cannot create outward: Inward ID is required.' };
     }
@@ -465,6 +490,10 @@ export async function createBatchColdOutwards(payload: any) {
     const session = await requireSession();
     if (!hasPermission(session, 'outward', 'create')) throw new Error('Forbidden: Insufficient permissions');
     
+    if (!payload.truckNo || payload.truckNo.trim() === '') {
+      return { success: false, error: 'Cannot create batch outward: Truck Number is required.' };
+    }
+
     if (!payload.items || !Array.isArray(payload.items) || payload.items.length === 0) {
       return { success: false, error: 'No items provided for batch.' };
     }
@@ -488,18 +517,17 @@ export async function createBatchColdOutwards(payload: any) {
           return { success: false, error: 'Cannot create outward: Inward not found.' };
         }
         
-        const dbRemainingKg = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null 
-          ? Number(inward.remainingQuantityKg) 
-          : Number(inward.quantityKg || 0);
-
-        const dbRemainingBags = inward.remainingBagsCount !== undefined && inward.remainingBagsCount !== null 
-          ? Number(inward.remainingBagsCount) 
-          : Number(inward.bagsCount || 0);
+        const outwards = await ColdOutward.aggregate([
+          { $match: { inwardId: inward._id } },
+          { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
+        ]);
+        const totalOutward = outwards[0]?.totalOut || 0;
+        const totalOutwardBags = outwards[0]?.totalBags || 0;
         
-        const currentRemaining = Math.max(0, dbRemainingKg);
-        const currentRemainingBags = Math.max(0, dbRemainingBags);
+        const currentRemaining = Math.max(0, inward.quantityKg - totalOutward);
+        const currentRemainingBags = Math.max(0, inward.bagsCount - totalOutwardBags);
         
-        if (currentRemaining <= 0) {
+        if (currentRemaining <= 0 && Number(item.quantityKg) > 0) {
           if (inward.status !== 'Completed') {
             inward.status = 'Completed';
             inward.remainingQuantityKg = 0;
@@ -644,9 +672,9 @@ export async function createBatchColdOutwards(payload: any) {
         vehicleType: payload.vehicleType,
         weighbridgeSlipNo: payload.weighbridgeSlipNo,
         weighbridgeCharge: payload.weighbridgeCharge,
-        grossWeight: payload.grossWeight,
-        emptyWeight: payload.emptyWeight,
-        kataBharati: payload.kataBharati,
+        grossWeight: item.grossWeight !== undefined ? item.grossWeight : payload.grossWeight,
+        emptyWeight: item.emptyWeight !== undefined ? item.emptyWeight : payload.emptyWeight,
+        kataBharati: item.kataBharati !== undefined ? item.kataBharati : payload.kataBharati,
         referencePersons: payload.referencePersons,
         remarks: payload.remarks,
         note: payload.note,

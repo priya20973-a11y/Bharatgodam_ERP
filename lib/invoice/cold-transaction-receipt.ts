@@ -18,8 +18,8 @@ export function generateColdTransactionReceiptHTML(
   const dateStr = data.date ? format(new Date(data.date), 'dd/MM/yyyy') : '';
   const dateFormatted = formatNum(dateStr);
 
-  // Use generated receiptNumber if available, fallback to legacy receiptNo or _id slice
-  const receiptNo = data.receiptNumber ? data.receiptNumber.toString() : (data.receiptNo ? data.receiptNo.toString() : data._id.toString().slice(-4).toUpperCase());
+  // Use generated receiptNumber if available, fallback to legacy receiptNo or empty
+  const receiptNo = data.receiptNumber ? data.receiptNumber.toString() : (data.receiptNo ? data.receiptNo.toString() : '-');
   const receiptNoFormatted = formatNum(receiptNo);
 
   const clientName = data.clientId?.name || '';

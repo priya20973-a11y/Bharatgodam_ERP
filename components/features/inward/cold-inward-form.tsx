@@ -472,6 +472,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       toast.error('Please add at least one client');
       return;
     }
+    if (!common.truckNo || common.truckNo.trim() === '') {
+      toast.error('Truck Number is required');
+      return;
+    }
 
     const commonNetWeight = (Number(common.grossWeight) || 0) - (Number(common.emptyWeight) || 0);
     
@@ -728,8 +732,8 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t">
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('inward.truckNo')}</label>
-            <Input value={common.truckNo} onChange={(e) => setCommon({ ...common, truckNo: e.target.value })} />
+            <label className="text-sm font-medium">{t('inward.truckNo')} *</label>
+            <Input value={common.truckNo} onChange={(e) => setCommon({ ...common, truckNo: e.target.value })} required />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('inward.weighbridgeSlipNo')}</label>

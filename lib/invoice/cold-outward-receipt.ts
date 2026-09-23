@@ -135,7 +135,9 @@ export function generateColdOutwardReceiptHTML(
   const vehicleDisplay = vehicleType ? `${vehicleType} ${truckNo}`.trim() : truckNo;
   const remarks = firstData.remarks || '';
   const note = firstData.note || '';
-  const farmerName = firstData.farmerName ? (firstData.farmerId ? `${firstData.farmerName} - ${firstData.farmerId}` : firstData.farmerName) : '';
+  const fName = firstData.farmerName || firstData.inwardId?.farmerName || '';
+  const fId = firstData.farmerId || firstData.inwardId?.farmerId || '';
+  const farmerName = fName ? (fId ? `${fName} - ${fId}` : fName) : '';
 
   const warehouseName = firstData.warehouseId?.name || (lang === 'gu' ? 'સ્વાગત કોલ્ડ સ્ટોરેજ' : 'Swagat Cold Storage');
   const warehouseAddress = firstData.warehouseId?.address || (lang === 'gu' ? 'મુ.ખેંટવા, ડીસા-ભીલડી હાઇવે, તા.ડીસા, જિ.બનાસકાંઠા' : 'Deesa-Bhildi Highway, Deesa, Banaskantha');
@@ -156,9 +158,8 @@ export function generateColdOutwardReceiptHTML(
     mo: 'Mo.',
     titleBox: lang === 'gu' ? 'ગેટ પાસ' : 'GATE PASS',
     receiptNoLabel: lang === 'gu' ? 'પાવતી નં.' : 'Receipt No.',
-    markoLabel: lang === 'gu' 
-      ? (hasLotNo ? 'માર્કો / લોટ નં.' : 'માર્કો') 
-      : (hasLotNo ? 'Marko / Lot No.' : 'Marko'),
+    markoLabel: lang === 'gu' ? 'માર્કો' : 'Marko',
+    lotNoLabel: lang === 'gu' ? 'લોટ નં.' : 'Lot No.',
     dateLabel: lang === 'gu' ? 'તા.' : 'Date',
     nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name,',
     addressLabel: lang === 'gu' ? 'સરનામું' : 'Address',
@@ -176,8 +177,8 @@ export function generateColdOutwardReceiptHTML(
     qtySmall: lang === 'gu' ? '(૨) જીણ' : `(2) ${getDynamicUnitLabel(unitStr, 'small')}`,
     qtyMixed: lang === 'gu' ? '(૩) છોલાટ' : `(3) ${getDynamicUnitLabel(unitStr, 'mixed')}`,
     qtyPlusMinus: lang === 'gu' ? '(૪) વધ/ઘટ' : '(4) Plus/Minus Weight (KG)',
-    qtyTotal: lang === 'gu' ? '(૫) કુલ...' : `(5) ${getDynamicUnitLabel(unitStr, 'total')}`,
-    qtyOther: lang === 'gu' ? '(૬) અન્ય વિગત' : '(6) Other Details',
+    qtyTotal: lang === 'gu' ? '(૪) કુલ...' : `(4) ${getDynamicUnitLabel(unitStr, 'total')}`,
+    qtyOther: lang === 'gu' ? '(૫) અન્ય વિગત' : '(5) Other Details',
     managerSign: lang === 'gu' ? 'મેનેજર' : 'Manager',
     receiverSign: lang === 'gu' ? 'લેનારની સહી' : 'Receiver Sign',
     farmerNameLabel: lang === 'gu' ? 'ખેડૂતનું નામ' : 'Farmer Name',
@@ -488,7 +489,8 @@ export function generateColdOutwardReceiptHTML(
     
     <div class="col-header">
       <div style="width: 48%; display: flex; justify-content: space-between;">
-        <span style="width: 40%;">${t.detailsHeader}</span>
+        <span style="width: 20%; text-align: center;">${t.receiptNoLabel}</span>
+        <span style="width: 20%; text-align: center;">${t.lotNoLabel}</span>
         <span style="width: 20%; text-align: center;">${t.markoLabel}</span>
         <span style="width: 20%; text-align: center;">${t.bagsHeader}</span>
         <span style="width: 20%; text-align: center;">${t.weightHeader}</span>
@@ -498,35 +500,58 @@ export function generateColdOutwardReceiptHTML(
 
     <div class="grid-container">
       <div class="left-grid">
-        ${outwards.map(o => `
-        <div class="receipt-line">
-          <div class="label">${t.receiptNoLabel}</div>
-          <div class="value">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : o.inwardId._id.toString().slice(-4).toUpperCase()) : (o.weighbridgeSlipNo || '')}</div>
-          <div class="value-small text-center">${o.inwardId ? ((o.inwardId.marko || '') + (o.inwardId.lotNo ? (o.inwardId.marko ? ' / ' : '') + o.inwardId.lotNo : '')) : ''}</div>
-          <div class="value-small text-center">${formatNum(o.totalBags || 0)}</div>
-          <div class="value-small text-center">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
+        ${(() => {
+          const groupedOutwards = Object.values(outwards.reduce((acc, curr) => {
+            const key = curr.inwardId?._id?.toString() || curr.inwardId?.toString() || curr.weighbridgeSlipNo || Math.random().toString();
+            if (!acc[key]) {
+              acc[key] = { ...curr };
+            } else {
+              acc[key].totalBags = (acc[key].totalBags || 0) + (curr.totalBags || 0);
+              acc[key].quantityKg = (acc[key].quantityKg || 0) + (curr.quantityKg || 0);
+            }
+            return acc;
+          }, {} as Record<string, any>));
+
+          return groupedOutwards.map((o: any) => `
+        <div class="receipt-line" style="justify-content: space-between;">
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : (o.inwardId.receiptNo ? o.inwardId.receiptNo.toString() : '-')) : (o.weighbridgeSlipNo || '')}</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId?.lotNo ? o.inwardId.lotNo.toString() : '-'}</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId?.marko || '-'}</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${formatNum(o.totalBags || 0)}</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
         </div>
-        `).join('')}
-        ${Array.from({length: Math.max(0, 4 - outwards.length)}).map(() => `
-        <div class="receipt-line">
-          <div class="label">${t.receiptNoLabel}</div>
-          <div class="value"></div>
-          <div class="value-small"></div>
-          <div class="value-small"></div>
-          <div class="value-small"></div>
+        `).join('') + Array.from({length: Math.max(0, 4 - groupedOutwards.length)}).map(() => `
+        <div class="receipt-line" style="justify-content: space-between;">
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
+          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
         </div>
-        `).join('')}
-        <div class="receipt-line">
-          <div class="label">${t.totalLabel}</div>
-          <div class="value" style="border-bottom: none;"></div>
-          <div class="value-small" style="text-align:center; color:#333;"></div>
-          <div class="value-small" style="text-align:center; color:#333;">${totalBags}</div>
-          <div class="value-small" style="text-align:center; color:#333;">${netWeight}</div>
+        `).join('');
+        })()}
+        <div class="receipt-line" style="justify-content: space-between;">
+          <div class="label" style="width: 60%;">${t.totalLabel}</div>
+          <div class="value-small" style="width: 20%; text-align:center; margin: 0; flex: none; color:#333;">${totalBags}</div>
+          <div class="value-small" style="width: 20%; text-align:center; margin: 0; flex: none; color:#333;">${netWeight}</div>
         </div>
         <div class="receipt-line">
           <div class="label">${t.truckNoLabel}</div>
           <div class="value" style="color:#333;">${vehicleDisplay}</div>
         </div>
+        ${firstData.transportationName ? `
+        <div class="receipt-line">
+          <div class="label">${lang === 'gu' ? 'ટ્રાન્સપોર્ટેશન નામ:' : 'Transportation Name:'}</div>
+          <div class="value" style="color:#333;">${firstData.transportationName}</div>
+        </div>
+        ` : ''}
+        ${firstData.driverNumber ? `
+        <div class="receipt-line">
+          <div class="label">${lang === 'gu' ? 'ડ્રાઈવર/ટ્રાન્સપોર્ટ નં:' : 'Driver/Transport No:'}</div>
+          <div class="value" style="color:#333;">${firstData.driverNumber}</div>
+        </div>
+        ` : ''}
+
         ${firstData.weighbridgeSlipNo ? `
         <div class="receipt-line">
           <div class="label">${t.weighbridgeLabel}</div>
@@ -602,11 +627,7 @@ export function generateColdOutwardReceiptHTML(
           <div class="value">${mixed}</div>
           <div class="unit"></div>
         </div>
-        <div class="qty-line">
-          <div class="label">${t.qtyPlusMinus}</div>
-          <div class="value">${plusMinusStr}</div>
-          <div class="unit"></div>
-        </div>
+
         <div class="qty-line">
           <div class="label">${t.qtyTotal}</div>
           <div class="value">${totalBags}</div>
@@ -617,6 +638,23 @@ export function generateColdOutwardReceiptHTML(
           <div class="value">${commodityDisplay}</div>
           <div class="unit"></div>
         </div>
+        ${firstData.displayWeightDetails ? `
+        <div class="qty-line" style="margin-top: 10px;">
+          <div class="label">${lang === 'gu' ? 'ગ્રોસ વજન (KG)' : 'Gross Weight (KG)'}</div>
+          <div class="value">${formatNum((firstData.grossWeight || 0).toFixed(2))}</div>
+          <div class="unit"></div>
+        </div>
+        <div class="qty-line">
+          <div class="label">${lang === 'gu' ? 'ખાલી વજન (KG)' : 'Empty Weight (KG)'}</div>
+          <div class="value">${formatNum((firstData.emptyWeight || 0).toFixed(2))}</div>
+          <div class="unit"></div>
+        </div>
+        <div class="qty-line">
+          <div class="label">${lang === 'gu' ? 'વજન ઘટ (KG)' : 'Weight Loss (KG)'}</div>
+          <div class="value">${formatNum((firstData.netWeightLoss || 0).toFixed(2))}</div>
+          <div class="unit"></div>
+        </div>
+        ` : ''}
       </div>
     </div>
 

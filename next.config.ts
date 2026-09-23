@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   },
   reactCompiler: true,
   outputFileTracingRoot: __dirname,
+  // allowedDevOrigins: ['192.168.29.193']
 };
 
 export default nextConfig;

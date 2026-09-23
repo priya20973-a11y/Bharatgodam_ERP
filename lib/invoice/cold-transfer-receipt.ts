@@ -17,8 +17,15 @@ export function generateColdTransferReceiptHTML(
   const dateStr = data.date ? format(new Date(data.date), 'dd/MM/yyyy') : '';
   const dateFormatted = formatNum(dateStr);
 
-  const receiptNo = data.receiptNo ? data.receiptNo.toString() : (data._id ? data._id.toString().slice(-4).toUpperCase() : '');
-  const receiptNoFormatted = formatNum(receiptNo);
+  let receiptNoStr = '';
+  if (data.originalInwardId && data.originalInwardId.receiptNumber) {
+    receiptNoStr = data.originalInwardId.receiptNumber.toString();
+  } else if (data.receiptNo) {
+    receiptNoStr = data.receiptNo.toString();
+  } else {
+    receiptNoStr = '-';
+  }
+  const receiptNoFormatted = formatNum(receiptNoStr);
 
   const fromClientName = data.fromClientId?.name || '';
   let toClientName = data.toClientId?.name || '';
@@ -401,6 +408,10 @@ export function generateColdTransferReceiptHTML(
         <div class="form-row">
           <div class="form-label">${l.markoLabel}</div>
           <div class="form-value">${marko}</div>
+        </div>
+        <div class="form-row">
+          <div class="form-label">${lang === 'gu' ? 'લોટ નં:' : 'Lot No:'}</div>
+          <div class="form-value">${data.originalInwardId?.lotNo || data.lotNo || '-'}</div>
         </div>
         <div class="form-row">
           <div class="form-label">${l.tractorTruckNoLabel}</div>

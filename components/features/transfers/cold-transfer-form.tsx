@@ -15,9 +15,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import SearchTransferStockModal from './search-transfer-stock-modal';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const formSchema = z.object({
   transferType: z.enum(['Self', 'Purchase']).default('Self'),
@@ -40,6 +42,8 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
   const [availableInwards, setAvailableInwards] = useState<any[]>([]);
   const [loadingInwards, setLoadingInwards] = useState(false);
   const [selectedInwardDetails, setSelectedInwardDetails] = useState<any>(null);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [pendingInwardId, setPendingInwardId] = useState<string | null>(null);
 
   const {
     control,
@@ -75,6 +79,10 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
       try {
         const data = await getAvailableInwardsForTransfer(fromClientId, transferType);
         setAvailableInwards(data);
+        if (pendingInwardId) {
+          setValue('inwardId', pendingInwardId);
+          setPendingInwardId(null);
+        }
       } catch (error) {
         console.error('Failed to fetch inwards', error);
       } finally {
@@ -82,8 +90,10 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
       }
     }
     fetchInwards();
-    setValue('inwardId', ''); // reset selected inward when client or type changes
-  }, [fromClientId, transferType, setValue]);
+    if (!pendingInwardId) {
+      setValue('inwardId', ''); // reset selected inward when client or type changes
+    }
+  }, [fromClientId, transferType, setValue]); // intentionally omitting pendingInwardId to avoid double triggers
 
   useEffect(() => {
     if (inwardId && availableInwards.length > 0) {
@@ -155,7 +165,19 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">1. Select Source</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium">1. Select Source</h3>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsSearchModalOpen(true)}
+              className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Search Receipt / LOT
+            </Button>
+          </div>
           
           <div className="space-y-2 mb-4">
             <label className="text-sm font-medium leading-none">Transfer Type *</label>
@@ -200,16 +222,16 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
                 name="fromClientId"
                 control={control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.fromClientId ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select Client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(c => (
-                        <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={field.value}
+                    onValueChange={(val) => {
+                      setPendingInwardId(null);
+                      field.onChange(val);
+                    }}
+                    options={clients.map(c => ({ value: c._id, label: c.name }))}
+                    placeholder="Select Client"
+                    className={errors.fromClientId ? "border-red-500" : ""}
+                  />
                 )}
               />
               {errors.fromClientId && <p className="text-red-500 text-sm">{errors.fromClientId.message}</p>}
@@ -228,7 +250,7 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
                     <SelectContent>
                       {availableInwards.map(inv => (
                         <SelectItem key={inv._id} value={inv._id}>
-                          {inv.date ? new Date(inv.date).toISOString().slice(0, 10) : ''} - {inv.commodityId?.name} ({formatNumber(inv.availableQty)} {inv.unit || inv.commodityId?.unit || 'KG'})
+                          LOT: {inv.lotNo || '-'} | Receipt: {inv.receiptNumber || '-'} | {inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : ''} | {inv.commodityId?.name}{inv.commodityId?.type ? `(${inv.commodityId.type})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -289,16 +311,13 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
                   name="toClientId"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.toClientId ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Select Client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.filter(c => c._id !== fromClientId).map(c => (
-                          <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={clients.filter(c => c._id !== fromClientId).map(c => ({ value: c._id, label: c.name }))}
+                      placeholder="Select Client"
+                      className={errors.toClientId ? "border-red-500" : ""}
+                    />
                   )}
                 />
               )}
@@ -333,7 +352,21 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
                     type="number"
                     step="0.01"
                     className={errors.transferWeight ? "border-red-500" : ""}
-                    {...field}
+                    value={field.value}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      field.onChange(val);
+                      if (selectedInwardDetails) {
+                        const ratio = (selectedInwardDetails.originalQuantityKg || selectedInwardDetails.quantityKg || 0) / (selectedInwardDetails.originalBagsCount || selectedInwardDetails.bagsCount || 1);
+                        if (ratio > 0) {
+                          const calcBags = Math.round(val / ratio);
+                          setValue('transferBags', calcBags, { shouldValidate: true });
+                        }
+                      }
+                    }}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
                   />
                 )}
               />
@@ -349,7 +382,22 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
                   <Input
                     type="number"
                     className={errors.transferBags ? "border-red-500" : ""}
-                    {...field}
+                    value={field.value}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      const wholeVal = Math.round(val);
+                      field.onChange(wholeVal);
+                      if (selectedInwardDetails) {
+                        const ratio = (selectedInwardDetails.originalQuantityKg || selectedInwardDetails.quantityKg || 0) / (selectedInwardDetails.originalBagsCount || selectedInwardDetails.bagsCount || 1);
+                        if (ratio > 0) {
+                          const calcWeight = Number((wholeVal * ratio).toFixed(2));
+                          setValue('transferWeight', calcWeight, { shouldValidate: true });
+                        }
+                      }
+                    }}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
                   />
                 )}
               />
@@ -376,6 +424,19 @@ export default function ColdTransferForm({ clients }: ColdTransferFormProps) {
           </Button>
         </div>
       </form>
+
+      <SearchTransferStockModal 
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onSelect={(id, clientId) => {
+          if (fromClientId === clientId) {
+             setValue('inwardId', id);
+          } else {
+             setPendingInwardId(id);
+             setValue('fromClientId', clientId);
+          }
+        }}
+      />
     </div>
   );
 }
