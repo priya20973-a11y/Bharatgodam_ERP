@@ -84,9 +84,25 @@ export function generateColdInvoiceHTML(
     const wState = warehouse?.state?.toLowerCase().trim() || userDetails?.state?.toLowerCase().trim() || '';
     const bState = (invoice.billingState && invoice.billingState !== 'null_val');
 
+      let rawCommodityName = it.commodityName || it.commodity || 'Commodity';
+      let variety = it.commodityId?.type || it.inwardId?.commodityId?.type || it.variety || '';
+      
+      if (!variety && rawCommodityName.includes('(')) {
+        const match = rawCommodityName.match(/\((.*?)\)/);
+        if (match && match[1] !== 'Per Month') {
+          variety = match[1];
+        }
+      }
+      
+      let finalCommodityName = rawCommodityName;
+      if (variety && rawCommodityName.includes(`(${variety})`)) {
+        finalCommodityName = rawCommodityName.replace(`(${variety})`, '').trim();
+      }
+
     return {
       srNo: idx + 1,
-      commodityName: it.commodityName || it.commodity || 'Commodity',
+      commodityName: finalCommodityName,
+      variety: variety || '-',
       sacCode: it.sacCode || '998612',
       hsnCode: it.hsnCode || '',
       inwardDate: inwardDateFormatted,
@@ -578,6 +594,7 @@ export function generateColdInvoiceHTML(
         <tr>
           <th style="width: 30px;" class="text-center">#</th>
           <th>Commodity / Description</th>
+          <th style="width: 80px;">Variety</th>
           <th class="text-center" style="width: 75px;">Inward</th>
           <th class="text-center" style="width: 75px;">Outward</th>
           <th class="text-right" style="width: 80px;">Qty (Kg)</th>
@@ -615,6 +632,9 @@ export function generateColdInvoiceHTML(
               </table>
               ` : ''}
             </td>
+            <td>
+              <div class="font-bold text-gray-700">${item.variety}</div>
+            </td>
             <td class="text-center">${item.inwardDate}</td>
             <td class="text-center">${item.outwardDate}</td>
             <td class="text-right font-semibold">${formatNumber(item.inwardKg, 2)}</td>
@@ -627,7 +647,7 @@ export function generateColdInvoiceHTML(
         ${additionalCharges.map((chg: any, idx: number) => `
           <tr style="background: #fff9f5;">
             <td class="text-center font-semibold">${lineItems.length + idx + 1}</td>
-            <td colspan="6">
+            <td colspan="7">
               <div class="font-bold" style="color: #c2410c;">Additional Charge: ${chg.name}</div>
             </td>
             <td class="text-right font-bold" style="color: #c2410c;">${formatCurrency(Number(chg.amount || 0), false)}</td>

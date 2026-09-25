@@ -8,7 +8,8 @@ import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
   userDetails?: { companyLogo: string, phoneNumber: string },
-  lang: string = 'en'
+  lang: string = 'en',
+  showFarmerName: boolean = true
 ): string {
   const formatNum = (num: number | string) => lang === 'gu' ? toGujaratiDigits(num) : String(num);
 
@@ -370,11 +371,11 @@ export function generateColdOutwardReceiptHTML(
     }
     
     .left-grid {
-      width: 48%;
+      width: 53%;
     }
     
     .right-grid {
-      width: 48%;
+      width: 44%;
     }
 
     .col-header {
@@ -482,20 +483,22 @@ export function generateColdOutwardReceiptHTML(
       <div class="form-value" style="flex: 0.5;">${clientVillage}</div>
     </div>
     
+    ${showFarmerName ? `
     <div class="form-row">
       <div class="form-label">${t.farmerNameLabel}</div>
       <div class="form-value">${farmerName}</div>
     </div>
+    ` : ''}
     
     <div class="col-header">
-      <div style="width: 48%; display: flex; justify-content: space-between;">
-        <span style="width: 20%; text-align: center;">${t.receiptNoLabel}</span>
-        <span style="width: 20%; text-align: center;">${t.lotNoLabel}</span>
-        <span style="width: 20%; text-align: center;">${t.markoLabel}</span>
-        <span style="width: 20%; text-align: center;">${t.bagsHeader}</span>
-        <span style="width: 20%; text-align: center;">${t.weightHeader}</span>
+      <div style="width: 53%; display: flex; gap: 4px;">
+        <span style="flex: 1.2; text-align: left;">${t.receiptNoLabel}</span>
+        <span style="flex: 1.2; text-align: left;">${t.lotNoLabel}</span>
+        <span style="flex: 1; text-align: center;">${t.markoLabel}</span>
+        <span style="flex: 0.8; text-align: center;">${t.bagsHeader}</span>
+        <span style="flex: 1; text-align: right;">${t.weightHeader}</span>
       </div>
-      <div style="width: 48%;"></div>
+      <div style="width: 44%;"></div>
     </div>
 
     <div class="grid-container">
@@ -513,20 +516,20 @@ export function generateColdOutwardReceiptHTML(
           }, {} as Record<string, any>));
 
           return groupedOutwards.map((o: any) => `
-        <div class="receipt-line" style="justify-content: space-between;">
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : (o.inwardId.receiptNo ? o.inwardId.receiptNo.toString() : '-')) : (o.weighbridgeSlipNo || '')}</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId?.lotNo ? o.inwardId.lotNo.toString() : '-'}</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${o.inwardId?.marko || '-'}</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${formatNum(o.totalBags || 0)}</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
+        <div class="receipt-line" style="gap: 4px;">
+          <div class="value-small" style="flex: 1.2; text-align: left; margin: 0; white-space: normal; word-break: break-all;">${o.inwardId ? (o.inwardId.receiptNumber ? o.inwardId.receiptNumber.toString() : (o.inwardId.receiptNo ? o.inwardId.receiptNo.toString() : '-')) : (o.weighbridgeSlipNo || '')}</div>
+          <div class="value-small" style="flex: 1.2; text-align: left; margin: 0; white-space: normal; word-break: break-all;">${o.inwardId?.lotNo ? o.inwardId.lotNo.toString() : '-'}</div>
+          <div class="value-small text-center" style="flex: 1; margin: 0; white-space: normal; word-break: break-word;">${o.inwardId?.marko || '-'}</div>
+          <div class="value-small text-center" style="flex: 0.8; margin: 0;">${formatNum(o.totalBags || 0)}</div>
+          <div class="value-small" style="flex: 1; text-align: right; margin: 0;">${formatNum((o.quantityKg || 0).toFixed(2))}</div>
         </div>
         `).join('') + Array.from({length: Math.max(0, 4 - groupedOutwards.length)}).map(() => `
-        <div class="receipt-line" style="justify-content: space-between;">
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
-          <div class="value-small text-center" style="width: 20%; margin: 0; flex: none;">&nbsp;</div>
+        <div class="receipt-line" style="gap: 4px;">
+          <div class="value-small" style="flex: 1.2; text-align: left; margin: 0;">&nbsp;</div>
+          <div class="value-small" style="flex: 1.2; text-align: left; margin: 0;">&nbsp;</div>
+          <div class="value-small text-center" style="flex: 1; margin: 0;">&nbsp;</div>
+          <div class="value-small text-center" style="flex: 0.8; margin: 0;">&nbsp;</div>
+          <div class="value-small" style="flex: 1; text-align: right; margin: 0;">&nbsp;</div>
         </div>
         `).join('');
         })()}

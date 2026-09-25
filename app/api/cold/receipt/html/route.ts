@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     const id = request.nextUrl.searchParams.get('id');
     const batchId = request.nextUrl.searchParams.get('batchId');
     const type = request.nextUrl.searchParams.get('type') as 'inward' | 'outward' | 'transfer';
+    const showFarmerNameStr = request.nextUrl.searchParams.get('showFarmerName');
+    const showFarmerName = showFarmerNameStr === null ? true : showFarmerNameStr === 'true';
     
     if ((!id && !batchId) || (type !== 'inward' && type !== 'outward' && type !== 'transfer')) {
       return new NextResponse('Invalid parameters', { status: 400 });
@@ -258,9 +260,9 @@ export async function GET(request: NextRequest) {
         html = generateColdTransactionReceiptHTML(data, 'inward', userDetails, lang, qrDataUrl);
       } else if (type === 'outward') {
         if (batchData && batchData.length > 0) {
-          html = generateColdOutwardReceiptHTML(batchData, userDetails, lang);
+          html = generateColdOutwardReceiptHTML(batchData, userDetails, lang, showFarmerName);
         } else {
-          html = generateColdOutwardReceiptHTML(data, userDetails, lang);
+          html = generateColdOutwardReceiptHTML(data, userDetails, lang, showFarmerName);
         }
       } else if (type === 'transfer') {
         let qrDataUrl = '';

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongoose';
 import ColdInvoice from '@/lib/models/ColdInvoice';
+import '@/lib/models/ColdInward';
 import '@/lib/models/Client';
 import '@/lib/models/ColdWarehouse';
+import '@/lib/models/ColdCommodity';
 import { generateColdInvoiceHTML } from '@/lib/invoice/cold-invoice-pdf';
 import { requireSession, getTenantFilterForMongo } from '@/lib/ownership';
 import { generateColdDynamicReceiptHTML } from '@/lib/invoice/cold-dynamic-receipt';
@@ -27,6 +29,12 @@ export async function GET(request: NextRequest) {
     })
       .populate('clientId')
       .populate('warehouseId')
+      .populate('items.commodityId', 'name type')
+      .populate({
+        path: 'items.inwardId',
+        select: 'commodityId',
+        populate: { path: 'commodityId', select: 'name type' }
+      })
       .lean();
 
     if (!invoiceDoc) {

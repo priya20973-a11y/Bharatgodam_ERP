@@ -109,10 +109,38 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
     fetchOutwards();
   }, [warehouseId, clientId]);
 
-  // Compute unique available months from fetched outwards
+  // Group outwards into transactions
+  const groupedOutwardsData = React.useMemo(() => {
+    const map = new Map<string, any[]>();
+    outwards.forEach(o => {
+      const groupKey = o.batchId || o.receiptNumber || o.receiptNo || o._id?.toString();
+      if (!map.has(groupKey)) {
+        map.set(groupKey, []);
+      }
+      map.get(groupKey)!.push(o);
+    });
+
+    const grouped = [];
+    for (const [key, group] of map.entries()) {
+      const primary = group[0];
+      const totalQuantity = group.reduce((sum, g) => sum + (g.quantityKg || 0), 0);
+      const totalRent = group.reduce((sum, g) => sum + (g.rentRs || 0), 0);
+      grouped.push({
+        ...primary,
+        _groupKey: key,
+        _outwardIds: group.map(g => g._id?.toString()).filter(Boolean),
+        quantityKg: totalQuantity,
+        rentRs: totalRent,
+        _groupCount: group.length
+      });
+    }
+    return grouped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [outwards]);
+
+  // Compute unique available months from fetched grouped outwards
   const availableMonths = React.useMemo(() => {
     const map = new Map<string, string>();
-    outwards.forEach(o => {
+    groupedOutwardsData.forEach(o => {
       if (!o.date) return;
       const d = new Date(o.date);
       if (isNaN(d.getTime())) return;
@@ -121,19 +149,19 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
       map.set(key, label);
     });
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [outwards]);
+  }, [groupedOutwardsData]);
 
-  // Filter outwards by selected month
+  // Filter grouped outwards by selected month
   const filteredOutwards = React.useMemo(() => {
-    if (!selectedMonth || selectedMonth === 'all') return outwards;
-    return outwards.filter(o => {
+    if (!selectedMonth || selectedMonth === 'all') return groupedOutwardsData;
+    return groupedOutwardsData.filter(o => {
       if (!o.date) return false;
       const d = new Date(o.date);
       if (isNaN(d.getTime())) return false;
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       return ym === selectedMonth;
     });
-  }, [outwards, selectedMonth]);
+  }, [groupedOutwardsData, selectedMonth]);
 
   const handleMonthChange = (monthKey: string) => {
     setSelectedMonth(monthKey);
@@ -278,12 +306,12 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
               disabled={!clientId || outwards.length === 0}
             >
               <SelectTrigger>
-                <SelectValue placeholder={!clientId ? 'Select Client First' : (outwards.length === 0 ? 'No Outwards Found' : 'Select Month')} />
+                <SelectValue placeholder={!clientId ? 'Select Client First' : (groupedOutwardsData.length === 0 ? 'No Outwards Found' : 'Select Month')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Months ({outwards.length})</SelectItem>
+                <SelectItem value="all">All Months ({groupedOutwardsData.length})</SelectItem>
                 {availableMonths.map(([key, label]) => {
-                  const monthCount = outwards.filter(o => {
+                  const monthCount = groupedOutwardsData.filter(o => {
                     const d = new Date(o.date);
                     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === key;
                   }).length;
@@ -309,7 +337,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                       ? 'No Outwards for Month' 
                       : (selectedOutwardIds.length === 0 
                           ? 'Select Outward Transactions' 
-                          : `${selectedOutwardIds.length} selected`))}
+                          : `${groupedOutwardsData.filter(o => o._outwardIds.every((id: string) => selectedOutwardIds.includes(id))).length} selected`))}
               </button>
               {outwardDropdownOpen && filteredOutwards.length > 0 && (
                 <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto border rounded bg-white shadow-lg p-2">
@@ -319,7 +347,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                       type="button" 
                       className="text-indigo-600 hover:underline cursor-pointer"
                       onClick={() => {
-                        const filteredIds = filteredOutwards.map(o => o._id?.toString()).filter(Boolean);
+                        const filteredIds = filteredOutwards.flatMap(o => o._outwardIds).filter(Boolean);
                         const allSelected = filteredIds.every(id => selectedOutwardIds.includes(id));
                         if (allSelected) {
                           setSelectedOutwardIds(prev => prev.filter(id => !filteredIds.includes(id)));
@@ -328,15 +356,20 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                         }
                       }}
                     >
-                      {filteredOutwards.every(o => selectedOutwardIds.includes(o._id?.toString())) ? 'Deselect All' : 'Select All'}
+                      {filteredOutwards.flatMap(o => o._outwardIds).every(id => selectedOutwardIds.includes(id)) ? 'Deselect All' : 'Select All'}
                     </button>
                   </div>
                   {filteredOutwards.map(o => (
-                    <div key={o._id} className="flex items-center justify-between gap-2 p-2 hover:bg-slate-50 rounded">
+                    <div key={o._groupKey} className="flex items-center justify-between gap-2 p-2 hover:bg-slate-50 rounded">
                       <label className="flex items-center gap-3 cursor-pointer flex-1">
-                        <input type="checkbox" checked={selectedOutwardIds.includes(o._id?.toString())} onChange={() => {
-                          const idStr = o._id?.toString();
-                          setSelectedOutwardIds(prev => prev.includes(idStr) ? prev.filter(x => x !== idStr) : [...prev, idStr]);
+                        <input type="checkbox" checked={o._outwardIds.every((id: string) => selectedOutwardIds.includes(id))} onChange={() => {
+                          const idsInGroup = o._outwardIds;
+                          const allSelected = idsInGroup.every((id: string) => selectedOutwardIds.includes(id));
+                          if (allSelected) {
+                            setSelectedOutwardIds(prev => prev.filter(x => !idsInGroup.includes(x)));
+                          } else {
+                            setSelectedOutwardIds(prev => Array.from(new Set([...prev, ...idsInGroup])));
+                          }
                         }} />
                         <div className="text-sm">
                           <div className="font-medium">

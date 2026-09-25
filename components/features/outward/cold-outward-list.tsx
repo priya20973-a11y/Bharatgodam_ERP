@@ -29,6 +29,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isSearchLotModalOpen, setIsSearchLotModalOpen] = useState(false);
+  const [showFarmerNameOnPrint, setShowFarmerNameOnPrint] = useState(true);
 
   const groupedOutwards = useMemo(() => {
     return outwards;
@@ -91,16 +92,30 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end gap-2">
-        <Button onClick={() => setIsSearchLotModalOpen(true)} variant="secondary" size="sm">
-          <Search className="mr-2 h-4 w-4" /> Search Lot No
-        </Button>
-        <Button onClick={() => setIsSearchModalOpen(true)} variant="secondary" size="sm">
-          <Search className="mr-2 h-4 w-4" /> Search Inward
-        </Button>
-        <Button onClick={exportCsv} variant="outline" size="sm">
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </Button>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex items-center space-x-2">
+          <input 
+            type="checkbox" 
+            id="showFarmerName" 
+            checked={showFarmerNameOnPrint} 
+            onChange={(e) => setShowFarmerNameOnPrint(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+          />
+          <label htmlFor="showFarmerName" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+            Show Farmer Name on Gate Pass
+          </label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setIsSearchLotModalOpen(true)} variant="secondary" size="sm">
+            <Search className="mr-2 h-4 w-4" /> Search Lot No
+          </Button>
+          <Button onClick={() => setIsSearchModalOpen(true)} variant="secondary" size="sm">
+            <Search className="mr-2 h-4 w-4" /> Search Inward
+          </Button>
+          <Button onClick={exportCsv} variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+        </div>
       </div>
       
       <SearchLotModal 
@@ -141,8 +156,8 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
               const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
               
               const printUrl = (w.isBatch && w.batchId)
-                ? `/api/cold/receipt/html?batchId=${w.batchId}&type=outward`
-                : `/api/cold/receipt/html?id=${w._id}&type=outward`;
+                ? `/api/cold/receipt/html?batchId=${w.batchId}&type=outward&showFarmerName=${showFarmerNameOnPrint}`
+                : `/api/cold/receipt/html?id=${w._id}&type=outward&showFarmerName=${showFarmerNameOnPrint}`;
 
               let sameGrade = true;
 

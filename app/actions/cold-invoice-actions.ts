@@ -42,7 +42,7 @@ export async function generateColdClientInvoicePreview(
   }
 
   const outwards = await ColdOutward.find(outwardsQuery)
-    .populate('commodityId', 'name unit rentCalculationOn seasonalPrices priceType')
+    .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType')
     .populate({
       path: 'inwardId',
       populate: { path: 'commodityId' }
@@ -52,112 +52,145 @@ export async function generateColdClientInvoicePreview(
   const items: any[] = [];
   let totalAmount = 0;
 
+  const groupedOutwards = new Map<string, any[]>();
   for (const outward of outwards) {
     const o = outward as any;
-    const inward = o.inwardId as any;
-    const commodity = o.commodityId || inward?.commodityId;
+    const groupKey = o.batchId || o.receiptNumber || o.receiptNo || o._id.toString();
+    if (!groupedOutwards.has(groupKey)) {
+      groupedOutwards.set(groupKey, []);
+    }
+    groupedOutwards.get(groupKey)!.push(o);
+  }
+
+  for (const [groupKey, group] of groupedOutwards.entries()) {
+    const oPrimary = group[0];
+    const inward = oPrimary.inwardId as any;
+    const commodity = oPrimary.commodityId || inward?.commodityId;
 
     if (!commodity) continue;
 
-    const inwDate = inward?.date ? new Date(inward.date) : (o.date ? new Date(o.date) : new Date());
-    const outDate = o.date ? new Date(o.date) : new Date();
+    const inwDate = inward?.date ? new Date(inward.date) : (oPrimary.date ? new Date(oPrimary.date) : new Date());
+    const outDate = oPrimary.date ? new Date(oPrimary.date) : new Date();
 
-    const bagsLarge = o.bagsCount || 0;
-    const bagsSmall = o.jin || 0;
-    const bagsMixed = o.mixed || 0;
-    const totalBags = o.totalBags || (bagsLarge + bagsSmall + bagsMixed);
-    const quantityKg = o.quantityKg || 0;
+    let totalBagsLarge = 0;
+    let totalBagsSmall = 0;
+    let totalBagsMixed = 0;
+    let totalTotalBags = 0;
+    let totalQuantityKg = 0;
+    let totalRent = 0;
+    let combinedPaths: string[] = [];
 
-    // Use stored outward rent (o.rentRs) directly as requested
-    let rent = Number(o.rentRs !== undefined && o.rentRs !== null ? o.rentRs : 0);
-    
-    // Fallback if rentRs was not stored on the outward document:
-    if (!rent || rent <= 0) {
-      const startCalcTime = inwDate.getTime();
-      const seasonalPrice = commodity.seasonalPrices?.find((sp: any) =>
-        startCalcTime >= new Date(sp.fromDate).getTime() && startCalcTime <= new Date(sp.toDate).getTime()
-      ) || commodity.seasonalPrices?.[0];
-      const pricePerKg = seasonalPrice?.pricePerKg || 0;
+    for (const o of group) {
+      const bagsLarge = o.bagsCount || 0;
+      const bagsSmall = o.jin || 0;
+      const bagsMixed = o.mixed || 0;
+      const totalBags = o.totalBags || (bagsLarge + bagsSmall + bagsMixed);
+      const quantityKg = o.quantityKg || 0;
 
-      const unit = (commodity.unit || 'KG').toUpperCase();
-      const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
+      totalBagsLarge += bagsLarge;
+      totalBagsSmall += bagsSmall;
+      totalBagsMixed += bagsMixed;
+      totalTotalBags += totalBags;
+      totalQuantityKg += quantityKg;
 
-      if (isKg) {
-        if (commodity.priceType === 'Different Price') {
-          const pLarge = seasonalPrice?.priceLarge || 0;
-          const pSmall = seasonalPrice?.priceSmall || 0;
-          const pMixed = seasonalPrice?.priceMixed || 0;
-          rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
+      // Use stored outward rent (o.rentRs) directly as requested
+      let rent = Number(o.rentRs !== undefined && o.rentRs !== null ? o.rentRs : 0);
+      
+      // Fallback if rentRs was not stored on the outward document:
+      if (!rent || rent <= 0) {
+        const startCalcTime = inwDate.getTime();
+        const seasonalPrice = commodity.seasonalPrices?.find((sp: any) =>
+          startCalcTime >= new Date(sp.fromDate).getTime() && startCalcTime <= new Date(sp.toDate).getTime()
+        ) || commodity.seasonalPrices?.[0];
+        const pricePerKg = seasonalPrice?.pricePerKg || 0;
+
+        const unit = (commodity.unit || 'KG').toUpperCase();
+        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
+
+        if (isKg) {
+          if (commodity.priceType === 'Different Price') {
+            const pLarge = seasonalPrice?.priceLarge || 0;
+            const pSmall = seasonalPrice?.priceSmall || 0;
+            const pMixed = seasonalPrice?.priceMixed || 0;
+            rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
+          } else {
+            rent = quantityKg * pricePerKg;
+          }
         } else {
-          rent = quantityKg * pricePerKg;
+          if (commodity.priceType === 'Different Price') {
+            const pLarge = seasonalPrice?.priceLarge || 0;
+            const pSmall = seasonalPrice?.priceSmall || 0;
+            const pMixed = seasonalPrice?.priceMixed || 0;
+            rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
+          } else {
+            rent = totalBags * pricePerKg;
+          }
         }
-      } else {
-        if (commodity.priceType === 'Different Price') {
-          const pLarge = seasonalPrice?.priceLarge || 0;
-          const pSmall = seasonalPrice?.priceSmall || 0;
-          const pMixed = seasonalPrice?.priceMixed || 0;
-          rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-        } else {
-          rent = totalBags * pricePerKg;
+
+        if (commodity.rentType === 'Per Month') {
+          const perMonthResult = calculatePerMonthRent({
+            inwardDate: inwDate,
+            outwardDate: outDate,
+            seasonalPrices: commodity.seasonalPrices,
+            priceType: commodity.priceType || 'Same Price',
+            unit: commodity.unit || 'KG',
+            rentCalculationOn: commodity.rentCalculationOn,
+            gradingType: (commodity as any).gradingType,
+            quantityKg,
+            bagsLarge,
+            bagsSmall,
+            bagsMixed,
+            totalBags,
+          });
+          rent = perMonthResult.totalRent;
+          (o as any)._monthBreakdown = perMonthResult.monthBreakdown;
+          (o as any)._rentReason = perMonthResult.rentReason;
         }
       }
 
-      if (commodity.rentType === 'Per Month') {
-        const perMonthResult = calculatePerMonthRent({
-          inwardDate: inwDate,
-          outwardDate: outDate,
-          seasonalPrices: commodity.seasonalPrices,
-          priceType: commodity.priceType || 'Same Price',
-          unit: commodity.unit || 'KG',
-          rentCalculationOn: commodity.rentCalculationOn,
-          gradingType: (commodity as any).gradingType,
-          quantityKg,
-          bagsLarge,
-          bagsSmall,
-          bagsMixed,
-          totalBags,
-        });
-        rent = perMonthResult.totalRent;
-        (o as any)._monthBreakdown = perMonthResult.monthBreakdown;
-        (o as any)._rentReason = perMonthResult.rentReason;
+      totalRent += rent;
+      const path = (o as any)._rentReason || o.rentReason || '';
+      if (path && !combinedPaths.includes(path)) {
+        combinedPaths.push(path);
       }
     }
 
-    let rateApplied = Number(o.unitRate || o.rateApplied || 0);
-    if (rateApplied === 0 && rent > 0 && commodity.priceType !== 'Different Price') {
+    let rateApplied = Number(oPrimary.unitRate || oPrimary.rateApplied || 0);
+    if (rateApplied === 0 && totalRent > 0 && commodity.priceType !== 'Different Price') {
       const unit = (commodity.unit || 'KG').toUpperCase();
       const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
-      if (isKg && quantityKg > 0) {
-        rateApplied = Number((rent / quantityKg).toFixed(4));
-      } else if (!isKg && totalBags > 0) {
-        rateApplied = Number((rent / totalBags).toFixed(4));
+      if (isKg && totalQuantityKg > 0) {
+        rateApplied = Number((totalRent / totalQuantityKg).toFixed(4));
+      } else if (!isKg && totalTotalBags > 0) {
+        rateApplied = Number((totalRent / totalTotalBags).toFixed(4));
       }
     }
 
     items.push({
-      outwardId: o._id.toString(),
+      outwardId: oPrimary._id.toString(), // Keep one primary id reference for UI
+      outwardIds: group.map(o => o._id.toString()), // Array of all outward ids for linking
       inwardId: inward?._id?.toString() || '',
-      receiptNo: o.receiptNo || inward?.receiptNo || '',
+      receiptNo: oPrimary.receiptNumber || inward?.receiptNumber || oPrimary.receiptNo || inward?.receiptNo || '',
       inwardDate: inwDate.toISOString(),
       outwardDate: outDate.toISOString(),
       commodityId: commodity._id.toString(),
       commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : '') + (commodity.rentType === 'Per Month' ? ' (Per Month)' : ''),
       hsnCode: commodity.hsnCode || '',
-      quantityKg: inward?.quantityKg || quantityKg,
-      outwardKg: quantityKg,
-      balanceKg: Math.max(0, (inward?.quantityKg || quantityKg) - quantityKg),
-      bagsLarge,
-      bagsSmall,
-      bagsMixed,
-      totalBags,
+      quantityKg: inward?.quantityKg || totalQuantityKg,
+      outwardKg: totalQuantityKg,
+      balanceKg: Math.max(0, (inward?.quantityKg || totalQuantityKg) - totalQuantityKg),
+      bagsLarge: totalBagsLarge,
+      bagsSmall: totalBagsSmall,
+      bagsMixed: totalBagsMixed,
+      totalBags: totalTotalBags,
       days: 0,
       rateApplied,
-      subtotal: rent,
-      calculationPath: (o as any)._rentReason || o.rentReason || '',
-      monthBreakdown: (o as any)._monthBreakdown || o.rentBreakdown || null
+      subtotal: totalRent,
+      calculationPath: combinedPaths.join(', '),
+      monthBreakdown: group[0].rentBreakdown || (group[0] as any)._monthBreakdown || null
     });
 
-    totalAmount += rent;
+    totalAmount += totalRent;
   }
 
   let gradingAmount = 0;
@@ -235,7 +268,7 @@ export async function saveColdClientInvoice(data: any) {
 
   // Link any referenced outwards to this invoice for traceability
   try {
-    const outwardIds = (data.items || []).map((it: any) => it.outwardId).filter(Boolean);
+    const outwardIds = (data.items || []).flatMap((it: any) => it.outwardIds || [it.outwardId]).filter(Boolean);
     if (outwardIds.length > 0) {
       await ColdOutward.updateMany({ _id: { $in: outwardIds } }, { $set: { invoiceId } });
     }
