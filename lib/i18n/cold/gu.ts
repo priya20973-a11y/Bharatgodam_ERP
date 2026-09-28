@@ -345,7 +345,7 @@ export const gu: Dictionary = {
     inwardCreated: 'આવક સફળતાપૂર્વક નોંધાઈ ગઈ છે',
     saveFailed: 'આવક સાચવવામાં નિષ્ફળ',
     somethingWentWrong: 'કંઈક ખોટું થયું',
-    noInwardFound: 'કોઈ આવક નોંધાયેલ નથી. નવી આવક ઉમેરો.',
+    noInwardFound: 'કોઈ આવક નોંધાયેલ નથી. ',
     dateHeader: 'તારીખ',
     clientNameHeader: 'ગ્રાહકનું નામ',
     commodityHeader: 'માલ (વેરાયટી)',
