@@ -164,12 +164,34 @@ export async function GET(request: NextRequest) {
         transaction = transactions[0];
       }
     } else if (type === 'transfer') {
-      transaction = await ColdTransfer.findOne({ _id: id, ...getTenantFilterForMongo(session) })
-        .populate('fromClientId', 'name address village')
-        .populate('toClientId', 'name address village')
-        .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
-        .populate('warehouseId')
-        .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo');
+      if (batchId) {
+        transactions = await ColdTransfer.find({ batchId, ...getTenantFilterForMongo(session) })
+          .populate('fromClientId', 'name address village')
+          .populate('toClientId', 'name address village')
+          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('warehouseId')
+          .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo')
+          .sort({ createdAt: 1 });
+        if (transactions.length > 0) {
+          transaction = transactions[0];
+        }
+      } else {
+        transaction = await ColdTransfer.findOne({ _id: id, ...getTenantFilterForMongo(session) })
+          .populate('fromClientId', 'name address village')
+          .populate('toClientId', 'name address village')
+          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('warehouseId')
+          .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo');
+        if (transaction && transaction.batchId) {
+          transactions = await ColdTransfer.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
+            .populate('fromClientId', 'name address village')
+            .populate('toClientId', 'name address village')
+            .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+            .populate('warehouseId')
+            .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo')
+            .sort({ createdAt: 1 });
+        }
+      }
     }
     
     if (!transaction && transactions.length === 0) {

@@ -26,8 +26,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+
+
 
 interface TransactionRecord {
   _id: string;
@@ -373,9 +374,46 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
     getFilteredRowModel: getFilteredRowModel(),
   });
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
     try {
-      const exportData = filteredTransactions.map((item) => ({
+
+      const groupedExport: any[] = [];
+      const receiptMap = new Map<string, any>();
+
+      filteredTransactions.forEach((txn) => {
+        if (txn.direction === 'OUTWARD' && txn.receiptNumber) {
+          const key = `OUT_${txn.receiptNumber}`;
+          if (!receiptMap.has(key)) {
+            receiptMap.set(key, {
+              ...txn,
+              allChambers: txn.chamberNo ? String(txn.chamberNo).split(/[;,]/).map(c => c.trim()).filter(Boolean) : [],
+              allFloors: txn.floorNo ? [String(txn.floorNo)] : [],
+              allStacks: txn.stackNo ? [String(txn.stackNo)] : []
+            });
+            groupedExport.push(receiptMap.get(key));
+          } else {
+            const group = receiptMap.get(key);
+            group.quantityKg = (group.quantityKg || 0) + (txn.quantityKg || 0);
+            
+            if (txn.bagsCount != null) {
+              group.bagsCount = (group.bagsCount || 0) + txn.bagsCount;
+            }
+            if (txn.netWeightLoss != null) {
+              group.netWeightLoss = (group.netWeightLoss || 0) + txn.netWeightLoss;
+            }
+
+            if (txn.chamberNo) {
+              group.allChambers.push(...String(txn.chamberNo).split(/[;,]/).map(c => c.trim()).filter(Boolean));
+            }
+            if (txn.floorNo) group.allFloors.push(String(txn.floorNo));
+            if (txn.stackNo) group.allStacks.push(String(txn.stackNo));
+          }
+        } else {
+          groupedExport.push(txn);
+        }
+      });
+
+      const exportData = groupedExport.map((item) => ({
         'Direction': item.direction,
         'Date': new Date(item.date).toLocaleDateString('en-IN'),
         'Client': item.clientName,
@@ -385,18 +423,26 @@ export default function ColdTransactionsReport({ transactions, isAdmin = false, 
         'Net Loss': item.netWeightLoss || '',
         'Weighbridge Slip No': item.weighbridgeSlipNo || '-',
         'Receipt No': item.receiptNumber || '-',
-        'Chamber No': item.chamberNo ? Array.from(new Set(item.chamberNo.split(/[;,]/).map(c => c.trim()).filter(Boolean))).join(', ') : '',
-        'Floor No': item.floorNo || '',
-        'Stack No': item.stackNo || '',
+        'Chamber No': item.direction === 'OUTWARD' && item.allChambers
+          ? Array.from(new Set(item.allChambers)).join(', ')
+          : item.chamberNo ? Array.from(new Set(String(item.chamberNo).split(/[;,]/).map(c => c.trim()).filter(Boolean))).join(', ') : '',
+        'Floor No': item.direction === 'OUTWARD' && item.allFloors
+          ? Array.from(new Set(item.allFloors)).join(', ')
+          : item.floorNo || '',
+        'Stack No': item.direction === 'OUTWARD' && item.allStacks
+          ? Array.from(new Set(item.allStacks)).join(', ')
+          : item.stackNo || '',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',
         'Gate Pass': item.gatePass || '',
         'Lot No': item.lotNo || '',
         'Created': new Date(item.createdAt).toLocaleDateString('en-IN'),
       }));
 
+      const XLSX = await import('xlsx');
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+
 
       const maxWidths = exportData.reduce((acc: number[], row) => {
         Object.entries(row).forEach(([key, val], idx) => {

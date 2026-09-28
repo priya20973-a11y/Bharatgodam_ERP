@@ -20,15 +20,17 @@ interface SearchTransferStockModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (inwardId: string, clientId: string) => void;
+  onSelectMultiple?: (inwards: any[]) => void;
 }
 
-export default function SearchTransferStockModal({ isOpen, onClose, onSelect }: SearchTransferStockModalProps) {
+export default function SearchTransferStockModal({ isOpen, onClose, onSelect, onSelectMultiple }: SearchTransferStockModalProps) {
   const { t } = useColdTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchBy, setSearchBy] = useState<'receipt' | 'lot'>('receipt');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedInwards, setSelectedInwards] = useState<any[]>([]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +57,30 @@ export default function SearchTransferStockModal({ isOpen, onClose, onSelect }: 
     onClose();
   };
 
+  const toggleSelection = (inward: any) => {
+    if (selectedInwards.some(inv => inv._id === inward._id)) {
+      setSelectedInwards(selectedInwards.filter(inv => inv._id !== inward._id));
+    } else {
+      setSelectedInwards([...selectedInwards, inward]);
+    }
+  };
+
+  const handleSelectMultiple = () => {
+    if (selectedInwards.length === 0) return;
+    if (onSelectMultiple) {
+      onSelectMultiple(selectedInwards);
+    }
+    setSelectedInwards([]);
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        setSelectedInwards([]);
+        onClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Search Available Stock</DialogTitle>
@@ -95,10 +119,30 @@ export default function SearchTransferStockModal({ isOpen, onClose, onSelect }: 
 
           {searchResults.length > 0 && (
             <div className="space-y-3 mt-4">
-              <h3 className="font-medium text-slate-900 border-b pb-2">Search Results ({searchResults.length})</h3>
+              <div className="flex justify-between items-end border-b pb-2">
+                <h3 className="font-medium text-slate-900">Search Results ({searchResults.length})</h3>
+                {onSelectMultiple && selectedInwards.length > 0 && (
+                  <Button type="button" onClick={handleSelectMultiple} className="bg-indigo-600 hover:bg-indigo-700 h-8">
+                    Add Selected ({selectedInwards.length})
+                  </Button>
+                )}
+              </div>
               <div className="grid gap-3">
                 {searchResults.map((inward) => (
-                  <div key={inward._id} className="border rounded-md p-4 bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div key={inward._id} className={`border rounded-md p-4 transition-colors ${selectedInwards.some(i => i._id === inward._id) ? 'bg-indigo-50 border-indigo-300 shadow-sm' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                    {onSelectMultiple && (
+                      <div className="mb-3 pb-2 border-b border-slate-200/50">
+                        <label className="flex items-center gap-2 cursor-pointer w-max">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 text-indigo-600 rounded border-gray-300 cursor-pointer"
+                            checked={selectedInwards.some(i => i._id === inward._id)}
+                            onChange={() => toggleSelection(inward)}
+                          />
+                          <span className="font-bold text-indigo-700 text-sm">Select for Batch Transfer</span>
+                        </label>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm mb-3">
                       <div>
                         <div className="text-slate-500 text-xs uppercase font-bold">Receipt No</div>

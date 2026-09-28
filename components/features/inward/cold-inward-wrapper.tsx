@@ -214,6 +214,16 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
         onPageChange={handlePageChange}
         onLimitChange={handleLimitChange}
         isLoading={isLoadingPage}
+        fetchFullDataset={async () => {
+          const result = await getColdInwards({
+            limit: -1,
+            warehouseId: searchParams?.warehouseId,
+            clientId: searchParams?.clientId,
+            commodityId: searchParams?.commodityId,
+            search: searchParams?.search,
+          });
+          return result.inwards;
+        }}
       />
     </div>
   );

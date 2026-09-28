@@ -57,7 +57,15 @@ const InvoiceSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+InvoiceSchema.index({ userId: 1, createdAt: -1 });
+InvoiceSchema.index({ userEmail: 1, createdAt: -1 });
+InvoiceSchema.index({ warehouseId: 1, createdAt: -1 });
+InvoiceSchema.index({ clientId: 1, createdAt: -1 });
+InvoiceSchema.index({ invoiceNumber: 1 });
+InvoiceSchema.index({ status: 1 });
+
 const Invoice: Model<IInvoice> =
   mongoose.models.Invoice || mongoose.model<IInvoice>('Invoice', InvoiceSchema);
 
 export default Invoice;
+

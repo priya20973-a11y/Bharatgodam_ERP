@@ -43,7 +43,15 @@ const OutwardSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+OutwardSchema.index({ inwardId: 1 });
+OutwardSchema.index({ userId: 1, date: -1 });
+OutwardSchema.index({ userEmail: 1, date: -1 });
+OutwardSchema.index({ warehouseId: 1, date: -1 });
+OutwardSchema.index({ clientId: 1, date: -1 });
+OutwardSchema.index({ receiptNumber: 1 });
+
 const Outward: Model<IOutward> =
   mongoose.models.Outward || mongoose.model<IOutward>('Outward', OutwardSchema);
 
 export default Outward;
+

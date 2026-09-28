@@ -69,12 +69,10 @@ const ColdCommoditySchema: Schema = new Schema(
 
 // Ensure a user can't create two cold commodities with the exact same name AND type
 ColdCommoditySchema.index({ userId: 1, name: 1, type: 1 }, { unique: true });
-
-if (mongoose.models.ColdCommodity) {
-  delete mongoose.models.ColdCommodity;
-}
+ColdCommoditySchema.index({ userEmail: 1, name: 1, type: 1 });
 
 const ColdCommodity: Model<IColdCommodity> =
-  mongoose.model<IColdCommodity>('ColdCommodity', ColdCommoditySchema);
+  mongoose.models.ColdCommodity || mongoose.model<IColdCommodity>('ColdCommodity', ColdCommoditySchema);
 
 export default ColdCommodity;
+

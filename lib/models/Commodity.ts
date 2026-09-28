@@ -22,8 +22,10 @@ const CommoditySchema: Schema = new Schema(
 );
 
 CommoditySchema.index({ userId: 1, name: 1 }, { unique: true });
+CommoditySchema.index({ userEmail: 1, name: 1 });
 
-delete mongoose.models.Commodity;
-const Commodity: Model<ICommodity> = mongoose.model<ICommodity>('Commodity', CommoditySchema);
+const Commodity: Model<ICommodity> =
+  mongoose.models.Commodity || mongoose.model<ICommodity>('Commodity', CommoditySchema);
 
 export default Commodity;
+

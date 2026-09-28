@@ -32,7 +32,7 @@ export async function generateColdClientInvoicePreview(
     ...tenantFilter,
   };
 
-  let outwardsQuery: any = { ...matchCriteria };
+  const outwardsQuery: any = { ...matchCriteria };
   if (Array.isArray(outwardIds) && outwardIds.length > 0) {
     outwardsQuery._id = { $in: outwardIds.map(id => new mongoose.Types.ObjectId(id)) };
   } else if (toDateStr) {
@@ -78,7 +78,7 @@ export async function generateColdClientInvoicePreview(
     let totalTotalBags = 0;
     let totalQuantityKg = 0;
     let totalRent = 0;
-    let combinedPaths: string[] = [];
+    const combinedPaths: string[] = [];
 
     for (const o of group) {
       const bagsLarge = o.bagsCount || 0;
@@ -171,6 +171,7 @@ export async function generateColdClientInvoicePreview(
       outwardIds: group.map(o => o._id.toString()), // Array of all outward ids for linking
       inwardId: inward?._id?.toString() || '',
       receiptNo: oPrimary.receiptNumber || inward?.receiptNumber || oPrimary.receiptNo || inward?.receiptNo || '',
+      lotNo: inward?.lotNo || oPrimary.lotNo || '',
       inwardDate: inwDate.toISOString(),
       outwardDate: outDate.toISOString(),
       commodityId: commodity._id.toString(),
@@ -196,7 +197,7 @@ export async function generateColdClientInvoicePreview(
   let gradingAmount = 0;
   let wetAmount = 0;
   let weighbridgeAmount = 0;
-  let weighbridgeSlips: string[] = [];
+  const weighbridgeSlips: string[] = [];
 
   for (const o of outwards) {
     if (o.serviceType === 'Grading' && (o.serviceAmount || 0) > 0) gradingAmount += (o.serviceAmount || 0);
@@ -292,19 +293,35 @@ export async function saveColdClientInvoice(data: any) {
     console.error('Failed to log invoice activity:', logErr);
   }
 
-  return JSON.parse(JSON.stringify(invoice));
+  const savedObj = JSON.parse(JSON.stringify(invoice));
+  
+  // Patch lotNo back in case Mongoose strict schema cached during hot-reload dropped it
+  if (savedObj.items && data.items) {
+    savedObj.items = savedObj.items.map((it: any, i: number) => ({
+      ...it,
+      lotNo: data.items[i]?.lotNo || it.lotNo || ''
+    }));
+  }
+
+  return savedObj;
 }
 
-export async function getColdInvoices() {
+export async function getColdInvoices(limit: number = 250) {
   await connectToDatabase();
   const session = await requireSession();
   const filter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
-  const invoices = await ColdInvoice.find(filter)
+  let query = ColdInvoice.find(filter)
     .populate('clientId', 'name mobile')
     .populate('warehouseId', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
+    .sort({ createdAt: -1 });
+
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+
+  const invoices = await query.lean();
 
   return JSON.parse(JSON.stringify(invoices));
 }
+

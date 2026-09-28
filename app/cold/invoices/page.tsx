@@ -12,16 +12,19 @@ export const metadata = {
 
 export default async function ColdInvoicesPage() {
   const session = await requireSession();
-  await connectToDatabase();
+  const conn = await connectToDatabase();
+  const db = conn.connection.db;
   
-  const clients = await getClients();
-  const warehouses = await getColdWarehouses();
-  
-  // Fetch user details for invoice header
-  const db = mongoose.connection.db;
   const isStaff = (session.user as any).isStaff;
   const userId = isStaff ? (session.user as any).staffId : session.user.id;
-  const user = db ? await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) }) : null;
+  
+  // Parallelize independent calls to remove the await waterfall
+  const [clients, warehouses, user] = await Promise.all([
+    getClients(),
+    getColdWarehouses(),
+    db && userId ? db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) }) : null
+  ]);
+
   
   const userDetails = {
     companyName: user?.companyName || session.user.companyName,

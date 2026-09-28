@@ -79,12 +79,12 @@ export function generateColdInvoiceHTML(
       }
     }
 
-    let isInterState = false;
+    const isInterState = false;
 
     const wState = warehouse?.state?.toLowerCase().trim() || userDetails?.state?.toLowerCase().trim() || '';
     const bState = (invoice.billingState && invoice.billingState !== 'null_val');
 
-      let rawCommodityName = it.commodityName || it.commodity || 'Commodity';
+      const rawCommodityName = it.commodityName || it.commodity || 'Commodity';
       let variety = it.commodityId?.type || it.inwardId?.commodityId?.type || it.variety || '';
       
       if (!variety && rawCommodityName.includes('(')) {
@@ -113,6 +113,7 @@ export function generateColdInvoiceHTML(
       totalBags: totalBags,
       days: days,
       rate: rate,
+      lotNo: it.lotNo || it.inwardId?.lotNo || '-',
       calculationPath: it.calculationPath || '',
       subtotal: subtotal
     };
@@ -216,12 +217,34 @@ export function generateColdInvoiceHTML(
       }
     }
 
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.08;
+      pointer-events: none;
+      z-index: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .watermark img {
+      max-width: 60%;
+      max-height: 60%;
+      object-fit: contain;
+    }
+
     .invoice-container {
       width: 100%;
       max-width: 8.5in;
       margin: 0 auto;
       padding: 16px 20px;
-      background: #ffffff;
+      position: relative;
+      z-index: 1;
     }
 
     /* Top Title Bar */
@@ -530,6 +553,11 @@ export function generateColdInvoiceHTML(
   </style>
 </head>
 <body>
+  ${logoUrl ? `
+  <div class="watermark">
+    <img src="${logoUrl}" alt="Watermark" />
+  </div>
+  ` : ''}
   <div class="invoice-container">
     <!-- Top Banner -->
     <div class="invoice-banner">
@@ -595,6 +623,7 @@ export function generateColdInvoiceHTML(
           <th style="width: 30px;" class="text-center">#</th>
           <th>Commodity / Description</th>
           <th style="width: 80px;">Variety</th>
+          <th class="text-center" style="width: 75px;">LOT No.</th>
           <th class="text-center" style="width: 75px;">Inward</th>
           <th class="text-center" style="width: 75px;">Outward</th>
           <th class="text-right" style="width: 80px;">Qty (Kg)</th>
@@ -635,6 +664,7 @@ export function generateColdInvoiceHTML(
             <td>
               <div class="font-bold text-gray-700">${item.variety}</div>
             </td>
+            <td class="text-center font-semibold">${item.lotNo}</td>
             <td class="text-center">${item.inwardDate}</td>
             <td class="text-center">${item.outwardDate}</td>
             <td class="text-right font-semibold">${formatNumber(item.inwardKg, 2)}</td>

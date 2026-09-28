@@ -45,6 +45,32 @@ export default async function ColdDashboardContent({ session }: { session: any }
   const db = await getDb();
   const tenantFilter = isAdmin(session) ? {} : getTenantFilterForMongo(session);
 
+  const warehouseFilter = tenantFilter;
+  const clientFilter = tenantFilter;
+  const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
+    ? (tenantFilter as any).$or
+    : [];
+  const invoiceFilter = isAdmin(session)
+    ? {}
+    : {
+      $or: [
+        ...ownershipFilters,
+        { clientEmail: session.user.email }
+      ]
+    };
+
+  // Launch counts and secondary aggregations immediately in parallel with warehouse lookup & analytics
+  const secondaryMetricsPromise = Promise.all([
+    db.collection('coldinvoices').aggregate([
+      { $match: { ...tenantFilter } },
+      { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' } } }
+    ]).toArray(),
+    db.collection('coldwarehouses').countDocuments(warehouseFilter),
+    db.collection('clients').countDocuments(clientFilter),
+    db.collection('coldinvoices').countDocuments(invoiceFilter),
+    db.collection('coldcommodities').countDocuments(tenantFilter)
+  ]);
+
   const ownedWarehouseDocs = !isAdmin(session)
     ? await db.collection('coldwarehouses').find({ ...tenantFilter }).project({ _id: 1 }).toArray()
     : [];
@@ -65,11 +91,10 @@ export default async function ColdDashboardContent({ session }: { session: any }
     ...warehouseMatch,
   };
 
-
   const t0 = Date.now();
   console.log('[Dashboard] Starting analytics aggregation...');
 
-  const [transactionAnalytics] = await db.collection('coldinwards').aggregate([
+  const analyticsPromise = db.collection('coldinwards').aggregate([
     {
       $match: Object.keys(transactionMatch).length ? transactionMatch : {}
     },
@@ -77,6 +102,7 @@ export default async function ColdDashboardContent({ session }: { session: any }
       $project: {
         direction: { $literal: 'INWARD' },
         quantityMT: { $divide: [{ $ifNull: ['$quantityKg', 0] }, 1000] },
+        bags: { $ifNull: ['$totalBags', { $ifNull: ['$bagsCount', 0] }] },
         date: 1,
         dateString: {
           $cond: [
@@ -99,6 +125,7 @@ export default async function ColdDashboardContent({ session }: { session: any }
               direction: { $literal: 'OUTWARD' },
               quantityMT: { $divide: [{ $ifNull: ['$quantityKg', 0] }, 1000] },
               plusMinus: { $ifNull: ['$plusMinus', 0] },
+              bags: { $ifNull: ['$totalBags', { $ifNull: ['$bagsCount', 0] }] },
               date: 1,
               dateString: {
                 $cond: [
@@ -138,12 +165,31 @@ export default async function ColdDashboardContent({ session }: { session: any }
                     0
                   ]
                 }
+              },
+              totalInwardBags: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$direction', 'INWARD'] },
+                    '$bags',
+                    0
+                  ]
+                }
+              },
+              totalOutwardBags: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$direction', 'OUTWARD'] },
+                    '$bags',
+                    0
+                  ]
+                }
               }
             }
           },
           {
             $project: {
-              netInventory: { $subtract: ['$totalInward', '$totalOutward'] }
+              netInventory: { $subtract: ['$totalInward', '$totalOutward'] },
+              netBags: { $subtract: ['$totalInwardBags', '$totalOutwardBags'] }
             }
           }
         ],
@@ -167,43 +213,21 @@ export default async function ColdDashboardContent({ session }: { session: any }
     }
   ]).toArray();
 
-  const t1 = Date.now();
-  console.log(`[Dashboard] Analytics aggregation took ${t1 - t0}ms`);
-
-  const warehouseFilter = tenantFilter;
-  const clientFilter = tenantFilter;
-  const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
-    ? (tenantFilter as any).$or
-    : [];
-  const invoiceFilter = isAdmin(session)
-    ? {}
-    : {
-      $or: [
-        ...ownershipFilters,
-        { clientEmail: session.user.email }
-      ]
-    };
-
-  console.log('[Dashboard] Starting counts and secondary aggregations...');
-  const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, coldInvoiceCount, activeCommodityCount] = await Promise.all([
-    db.collection('coldinvoices').aggregate([
-      { $match: { ...tenantFilter } },
-      { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' } } }
-    ]).toArray(),
-    db.collection('coldwarehouses').countDocuments(warehouseFilter),
-    db.collection('clients').countDocuments(clientFilter),
-    db.collection('coldinvoices').countDocuments(invoiceFilter),
-    db.collection('coldcommodities').countDocuments(tenantFilter)
+  const [[transactionAnalytics], [paymentsReceivedResult, activeWarehouseCount, activeClientCount, coldInvoiceCount, activeCommodityCount]] = await Promise.all([
+    analyticsPromise,
+    secondaryMetricsPromise
   ]);
 
-  const t2 = Date.now();
-  console.log(`[Dashboard] Counts and secondary aggregations took ${t2 - t1}ms`);
+  const t1 = Date.now();
+  console.log(`[Dashboard] Aggregations and counts took ${t1 - t0}ms total`);
+
 
   const invoiceCount = coldInvoiceCount ?? 0;
   const commodityCountValue = activeCommodityCount ?? 0;
 
   const totalTransactions = transactionAnalytics?.totals?.[0]?.totalTransactions ?? 0;
   const activeInventory = transactionAnalytics?.activeInventory?.[0]?.netInventory ?? 0;
+  const activeBags = transactionAnalytics?.activeInventory?.[0]?.netBags ?? 0;
   const totalNetWeightLoss = transactionAnalytics?.totalNetWeightLoss?.[0]?.totalLoss ?? 0;
 
 
@@ -235,6 +259,13 @@ export default async function ColdDashboardContent({ session }: { session: any }
       icon: TrendingDown,
       color: 'text-red-600',
       bg: 'bg-red-50',
+    },
+    {
+      name: 'Total Available Bags',
+      value: formatNumber(Math.max(activeBags, 0), langStr),
+      icon: Box,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
     },
   ];
 
@@ -277,7 +308,7 @@ export default async function ColdDashboardContent({ session }: { session: any }
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat: any) => {
           const Icon = stat.icon;
           const cardContent = (
@@ -292,6 +323,9 @@ export default async function ColdDashboardContent({ session }: { session: any }
                   )}
                   {stat.name === t.currentInventory && (
                     <p className="text-xs text-slate-400 mt-2 font-medium">{t.netVolumeActive}</p>
+                  )}
+                  {stat.name === 'Total Available Bags' && (
+                    <p className="text-xs text-slate-400 mt-2 font-medium">Available Bags</p>
                   )}
                   {stat.name === t.totalRevenue && (
                     <p className="text-xs text-slate-400 mt-2 font-medium">{t.clickViewAnalytics}</p>

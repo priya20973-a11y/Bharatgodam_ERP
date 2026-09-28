@@ -33,9 +33,11 @@ const ColdUnitSchema = new Schema<IColdUnit>(
   }
 );
 
-if (mongoose.models.ColdUnit) {
-  delete mongoose.models.ColdUnit;
-}
-const ColdUnit = mongoose.model<IColdUnit>('ColdUnit', ColdUnitSchema);
+ColdUnitSchema.index({ userId: 1 });
+ColdUnitSchema.index({ userEmail: 1 });
+
+const ColdUnit: Model<IColdUnit> =
+  mongoose.models.ColdUnit || mongoose.model<IColdUnit>('ColdUnit', ColdUnitSchema);
 
 export default ColdUnit;
+

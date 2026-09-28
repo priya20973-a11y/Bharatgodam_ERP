@@ -12,31 +12,202 @@ import { getStackAvailableCapacity } from './cold-inward-actions';
 import mongoose from 'mongoose';
 import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 import { logColdActivity } from '@/lib/cold-logger';
-export async function getColdTransactions() {
+export async function getColdTransactionFilters() {
   await connectToDatabase();
   const session = await requireSession();
   const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
 
-  const inwards = await ColdInward.find(tenantFilter)
-    .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType rentCalculationOn')
-    .populate('warehouseId', 'name warehouseId chambers')
-    .lean();
+  const [clients, warehouses] = await Promise.all([
+    mongoose.model('Client').find(getTenantFilter(session)).select('name').lean(),
+    mongoose.model('ColdWarehouse').find(tenantFilter).select('name chambers.name chambers.chamberNo').lean()
+  ]);
 
-  const outwards = await ColdOutward.find(tenantFilter)
-    .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType rentCalculationOn')
-    .populate('warehouseId', 'name warehouseId chambers')
-    .populate('inwardId', 'lotNo')
-    .lean();
+  const clientNames = Array.from(new Set(clients.map((c: any) => c.name).filter(Boolean))).sort();
+  const warehouseNames = Array.from(new Set(warehouses.map((w: any) => w.name).filter(Boolean))).sort();
+  
+  const chambers = new Set<string>();
+  warehouses.forEach((w: any) => {
+    if (w.chambers) {
+      w.chambers.forEach((c: any) => {
+        if (c.name) chambers.add(c.name);
+        if (c.chamberNo) chambers.add(String(c.chamberNo));
+      });
+    }
+  });
+  
+  const [minInward, maxInward] = await Promise.all([
+    ColdInward.findOne(tenantFilter).sort({ date: 1 }).select('date').lean(),
+    ColdInward.findOne(tenantFilter).sort({ date: -1 }).select('date').lean()
+  ]);
+  
+  const months: string[] = [];
+  if (minInward?.date && maxInward?.date) {
+    let current = new Date(minInward.date);
+    const end = new Date(maxInward.date);
+    while (current <= end) {
+      months.push(current.toISOString().substring(0, 7));
+      current.setMonth(current.getMonth() + 1);
+    }
+  }
+  
+  return {
+    clients: clientNames,
+    warehouses: warehouseNames,
+    chambers: Array.from(chambers).sort(),
+    months: months.reverse()
+  };
+}
 
-  const transfers = await ColdTransfer.find(tenantFilter)
-    .populate('fromClientId', 'name clientType')
-    .populate('toClientId', 'name clientType')
-    .populate('commodityId', 'name type gradingType rentCalculationOn')
-    .populate('warehouseId', 'name warehouseId chambers')
-    .populate('originalInwardId', 'lotNo')
-    .lean();
+export async function getColdTransactions(params: any = {}) {
+  await connectToDatabase();
+  const session = await requireSession();
+  const tenantFilter = { ...getTenantFilter(session), ...getWarehouseFilter(session) };
+
+  const {
+    page = 1,
+    limit = 20,
+    search = '',
+    receiptSearch = '',
+    lotNoSearch = '',
+    clientFilter = 'ALL',
+    warehouseFilter = 'ALL',
+    chamberFilter = 'ALL',
+    monthFilter = 'ALL',
+    fetchAll = false
+  } = params;
+
+  let baseMatch: any = { ...tenantFilter };
+
+  if (monthFilter !== 'ALL') {
+    const start = new Date(`${monthFilter}-01T00:00:00.000Z`);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+    baseMatch.date = { $gte: start, $lte: end };
+  }
+
+  if (receiptSearch) {
+    baseMatch.receiptNumber = { $regex: receiptSearch, $options: 'i' };
+  }
+  
+  let lotInwardIds: any[] = [];
+  if (lotNoSearch) {
+    const lotInwards = await ColdInward.find({ lotNo: { $regex: lotNoSearch, $options: 'i' }, ...tenantFilter }).select('_id').lean();
+    lotInwardIds = lotInwards.map((i: any) => i._id);
+  }
+
+  let clientObjId: any = null;
+  if (clientFilter !== 'ALL') {
+    const client = await mongoose.model('Client').findOne({ name: clientFilter }).select('_id').lean();
+    clientObjId = client ? (client as any)._id : '000000000000000000000000';
+  }
+
+  let warehouseObjId: any = null;
+  if (warehouseFilter !== 'ALL') {
+    const warehouse = await mongoose.model('ColdWarehouse').findOne({ name: warehouseFilter }).select('_id').lean();
+    warehouseObjId = warehouse ? (warehouse as any)._id : '000000000000000000000000';
+  }
+
+  let searchOrs: any[] = [];
+  if (search) {
+    const regex = new RegExp(search, 'i');
+    const [clients, comms] = await Promise.all([
+      mongoose.model('Client').find({ name: regex }).select('_id').lean(),
+      mongoose.model('ColdCommodity').find({ name: regex }).select('_id').lean()
+    ]);
+    if (clients.length > 0) searchOrs.push({ clientId: { $in: clients.map((c: any) => c._id) } });
+    if (comms.length > 0) searchOrs.push({ commodityId: { $in: comms.map((c: any) => c._id) } });
+  }
+
+  const buildQuery = (type: string) => {
+    let q: any = { ...baseMatch };
+    if (warehouseObjId) q.warehouseId = warehouseObjId;
+    
+    if (chamberFilter !== 'ALL') {
+      const cNum = isNaN(Number(chamberFilter)) ? chamberFilter : Number(chamberFilter);
+      q.$or = [
+        { chamberName: chamberFilter },
+        { chamberNo: cNum },
+        { 'stackAllocations.chamberName': chamberFilter },
+        { 'stackAllocations.chamberNo': cNum }
+      ];
+    }
+
+    if (type === 'INWARD') {
+      q.remarks = { $ne: 'Ownership Transfer In' };
+      if (clientObjId) q.clientId = clientObjId;
+      if (search && searchOrs.length > 0) q.$or = (q.$or || []).concat([{ $or: searchOrs }]);
+      else if (search) q._id = '000000000000000000000000';
+      if (lotNoSearch) q._id = { $in: lotInwardIds };
+    } else if (type === 'OUTWARD') {
+      q.remarks = { $nin: ['Ownership Transfer Out', 'Ownership Transfer Purchase'] };
+      if (clientObjId) q.clientId = clientObjId;
+      if (search && searchOrs.length > 0) q.$or = (q.$or || []).concat([{ $or: searchOrs }]);
+      else if (search) q._id = '000000000000000000000000';
+      if (lotNoSearch) q.inwardId = { $in: lotInwardIds };
+    } else if (type === 'TRANSFER') {
+      if (clientObjId) {
+        q.$or = (q.$or || []).concat([{ $or: [{ fromClientId: clientObjId }, { toClientId: clientObjId }] }]);
+      }
+      if (search && searchOrs.length > 0) {
+        const transferSearch = searchOrs.map((s: any) => {
+          if (s.clientId) return { $or: [{ fromClientId: s.clientId.$in }, { toClientId: s.clientId.$in }] };
+          return s;
+        });
+        q.$or = (q.$or || []).concat([{ $or: transferSearch }]);
+      } else if (search) {
+        q._id = '000000000000000000000000';
+      }
+      if (lotNoSearch) q.originalInwardId = { $in: lotInwardIds };
+    }
+    
+    return q;
+  };
+
+  const [inwardsIds, outwardsIds, transfersIds] = await Promise.all([
+    ColdInward.find(buildQuery('INWARD')).select('_id date createdAt').lean(),
+    ColdOutward.find(buildQuery('OUTWARD')).select('_id date createdAt').lean(),
+    ColdTransfer.find(buildQuery('TRANSFER')).select('_id date createdAt').lean()
+  ]);
+
+  const combinedIds = [
+    ...inwardsIds.map((i: any) => ({ _id: i._id, date: i.date, createdAt: i.createdAt, type: 'INWARD' })),
+    ...outwardsIds.map((o: any) => ({ _id: o._id, date: o.date, createdAt: o.createdAt, type: 'OUTWARD' })),
+    ...transfersIds.map((t: any) => ({ _id: t._id, date: t.date, createdAt: t.createdAt, type: 'OWNERSHIP TRANSFER' }))
+  ];
+
+  combinedIds.sort((a, b) => {
+    const dateA = new Date(a.date || 0).getTime();
+    const dateB = new Date(b.date || 0).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+
+  const totalCount = combinedIds.length;
+  const pagedIds = fetchAll ? combinedIds : combinedIds.slice((page - 1) * limit, page * limit);
+
+  const iIds = pagedIds.filter(p => p.type === 'INWARD').map(p => p._id);
+  const oIds = pagedIds.filter(p => p.type === 'OUTWARD').map(p => p._id);
+  const tIds = pagedIds.filter(p => p.type === 'OWNERSHIP TRANSFER').map(p => p._id);
+
+  const [inwards, outwards, transfers] = await Promise.all([
+    ColdInward.find({ _id: { $in: iIds } })
+      .populate('clientId', 'name clientType')
+      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('warehouseId', 'name warehouseId chambers')
+      .lean(),
+    ColdOutward.find({ _id: { $in: oIds } })
+      .populate('clientId', 'name clientType')
+      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('warehouseId', 'name warehouseId chambers')
+      .populate('inwardId', 'lotNo')
+      .lean(),
+    ColdTransfer.find({ _id: { $in: tIds } })
+      .populate('fromClientId', 'name clientType')
+      .populate('toClientId', 'name clientType')
+      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('warehouseId', 'name warehouseId chambers')
+      .populate('originalInwardId', 'lotNo')
+      .lean()
+  ]);
 
   const combined = [
     ...inwards.map(i => ({ ...i, type: 'INWARD' })),
@@ -151,7 +322,7 @@ export async function getColdTransactions() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  return JSON.parse(JSON.stringify(combined));
+  return { transactions: JSON.parse(JSON.stringify(combined)), totalCount };
 }
 
 export async function deleteColdTransaction(id: string, type: 'INWARD' | 'OUTWARD') {

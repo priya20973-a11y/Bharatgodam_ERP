@@ -29,6 +29,7 @@ interface ColdInwardListProps {
   onPageChange?: (page: number) => void;
   onLimitChange?: (limit: number) => void;
   isLoading?: boolean;
+  fetchFullDataset?: () => Promise<any[]>;
 }
 
 export default function ColdInwardList({ 
@@ -36,7 +37,8 @@ export default function ColdInwardList({
   pagination, 
   onPageChange, 
   onLimitChange, 
-  isLoading 
+  isLoading,
+  fetchFullDataset
 }: ColdInwardListProps) {
   const { t, formatNumber } = useColdTranslation();
 
@@ -58,7 +60,24 @@ export default function ColdInwardList({
     return floorNo ?? '-';
   };
 
-  const exportCsv = () => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportCsv = async () => {
+    setIsExporting(true);
+    let exportData = groupedInwards;
+    
+    if (fetchFullDataset) {
+      try {
+        toast.loading("Preparing CSV...", { id: 'csv-export' });
+        exportData = await fetchFullDataset();
+        toast.dismiss('csv-export');
+      } catch (err) {
+        toast.dismiss('csv-export');
+        toast.error("Failed to fetch full dataset for export");
+        setIsExporting(false);
+        return;
+      }
+    }
     const headers = [
       t('inward.dateHeader') || 'Date',
       t('inward.clientNameHeader') || 'Client Name',
@@ -76,7 +95,7 @@ export default function ColdInwardList({
       t('inward.bagsHeader') || 'Bags'
     ];
     
-    const rows = groupedInwards.map(w => {
+    const rows = exportData.map((w: any) => {
       const date = w.date ? format(new Date(w.date), 'dd MMM yyyy') : '-';
       const client = w.clientId?.name || '-';
       const farmer = w.farmerName || '-';
@@ -103,6 +122,7 @@ export default function ColdInwardList({
     link.download = `Inward_Export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    setIsExporting(false);
   };
 
   const handleOpenQrModal = async (w: any) => {
@@ -134,8 +154,9 @@ export default function ColdInwardList({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={exportCsv} variant="outline" size="sm">
-          <Download className="mr-2 h-4 w-4" /> Export CSV
+        <Button onClick={exportCsv} variant="outline" size="sm" disabled={isExporting}>
+          {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          {isExporting ? 'Exporting...' : 'Export CSV'}
         </Button>
       </div>
       <div className="rounded-md border bg-white shadow-sm overflow-hidden">

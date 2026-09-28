@@ -161,11 +161,12 @@ ColdInwardSchema.index({ userId: 1, date: -1, createdAt: -1 });
 ColdInwardSchema.index({ userEmail: 1, date: -1, createdAt: -1 });
 ColdInwardSchema.index({ warehouseId: 1, date: -1 });
 ColdInwardSchema.index({ clientId: 1, date: -1 });
+ColdInwardSchema.index({ warehouseId: 1, clientId: 1, date: -1 });
+ColdInwardSchema.index({ receiptNumber: 1 });
+ColdInwardSchema.index({ lotNo: 1 });
 
-if (mongoose.models.ColdInward) {
-  delete mongoose.models.ColdInward;
-}
-
-const ColdInward: Model<IColdInward> = mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);
+const ColdInward: Model<IColdInward> =
+  mongoose.models.ColdInward || mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);
 
 export default ColdInward;
+

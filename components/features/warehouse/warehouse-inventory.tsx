@@ -172,11 +172,27 @@ export default function WarehouseInventory() {
   const utilizationPercentage = warehouse_stats.utilization_percentage;
   const capacityStatus = getCapacityStatus(utilizationPercentage);
 
-  const chartData = commodities.map((commodity, index) => ({
-    name: commodity.commodityName,
-    value: commodity.totalWeight,
-    color: COLORS[index % COLORS.length]
-  }));
+  const chartData = [
+    ...commodities.map((commodity, index) => ({
+      name: commodity.commodityName,
+      value: commodity.totalWeight,
+      color: COLORS[index % COLORS.length]
+    }))
+  ];
+  
+  if (availableCapacity > 0) {
+    chartData.push({
+      name: 'Available Space',
+      value: availableCapacity,
+      color: '#f1f5f9'
+    });
+  } else if (usedCapacity === 0) {
+    chartData.push({
+      name: 'Available Space',
+      value: 1, // Fallback to render a grey ring when total capacity is 0
+      color: '#f1f5f9'
+    });
+  }
 
   return (
     <div className="space-y-5">

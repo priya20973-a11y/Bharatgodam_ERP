@@ -36,15 +36,16 @@ const ColdActivityLogSchema = new Schema(
 );
 
 ColdActivityLogSchema.index({ userId: 1 });
+ColdActivityLogSchema.index({ userEmail: 1 });
+ColdActivityLogSchema.index({ userId: 1, createdAt: -1 });
+ColdActivityLogSchema.index({ userEmail: 1, createdAt: -1 });
 ColdActivityLogSchema.index({ module: 1 });
 ColdActivityLogSchema.index({ actionType: 1 });
 ColdActivityLogSchema.index({ storageType: 1 });
 ColdActivityLogSchema.index({ createdAt: -1 });
 
-if (mongoose.models.ColdActivityLog) {
-  delete mongoose.models.ColdActivityLog;
-}
-
-const ColdActivityLog: Model<IColdActivityLog> = mongoose.model<IColdActivityLog>('ColdActivityLog', ColdActivityLogSchema);
+const ColdActivityLog: Model<IColdActivityLog> =
+  mongoose.models.ColdActivityLog || mongoose.model<IColdActivityLog>('ColdActivityLog', ColdActivityLogSchema);
 
 export default ColdActivityLog;
+

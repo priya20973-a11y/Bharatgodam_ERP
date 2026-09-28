@@ -418,6 +418,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                 <tr>
                   <th className="p-3 border text-center w-10">#</th>
                   <th className="p-3 border">Commodity / Particulars</th>
+                  <th className="p-3 border text-center">LOT No.</th>
                   <th className="p-3 border text-center">Inward Date</th>
                   <th className="p-3 border text-center">Outward Date</th>
                   <th className="p-3 border text-right">Inward Qty (Kg)</th>
@@ -433,6 +434,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                       <div className="font-semibold text-slate-900">{item.commodityName}</div>
                       {item.calculationPath && <div className="text-xs text-slate-500 mt-0.5">{item.calculationPath}</div>}
                     </td>
+                    <td className="p-3 border text-center text-slate-700">{item.lotNo || '-'}</td>
                     <td className="p-3 border text-center">{new Date(item.inwardDate).toLocaleDateString('en-GB')}</td>
                     <td className="p-3 border text-center">{item.outwardDate ? new Date(item.outwardDate).toLocaleDateString('en-GB') : '-'}</td>
                     <td className="p-3 border text-right font-medium">{item.quantityKg.toFixed(2)} Kg</td>

@@ -37,7 +37,15 @@ const InwardSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+InwardSchema.index({ userId: 1, date: -1 });
+InwardSchema.index({ userEmail: 1, date: -1 });
+InwardSchema.index({ warehouseId: 1, date: -1 });
+InwardSchema.index({ clientId: 1, date: -1 });
+InwardSchema.index({ receiptNumber: 1 });
+InwardSchema.index({ commodityId: 1 });
+
 const Inward: Model<IInward> =
   mongoose.models.Inward || mongoose.model<IInward>('Inward', InwardSchema);
 
 export default Inward;
+

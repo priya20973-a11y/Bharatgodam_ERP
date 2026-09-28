@@ -1,29 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getColdTransactions } from '@/app/actions/cold-transaction-report-actions';
+import { getColdTransactionFilters } from '@/app/actions/cold-transaction-report-actions';
 import ColdTransactionReport from './cold-transaction-report';
 import { Toaster, toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 export default function ColdTransactionReportWrapper() {
   const { t } = useColdTranslation();
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [filterOptions, setFilterOptions] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchFilters = async () => {
       try {
-        const data = await getColdTransactions();
-        setTransactions(data);
+        const options = await getColdTransactionFilters();
+        setFilterOptions(options);
       } catch (err: any) {
-        toast.error(err.message || t('transactions.fetchFailed'));
+        toast.error(err.message || 'Failed to load filters');
       } finally {
         setLoading(false);
       }
     };
-    fetchTransactions();
-  }, [t]);
+    fetchFilters();
+  }, []);
 
   if (loading) {
     return <div className="text-center py-10 text-slate-500">{t('transactions.loadingMsg')}</div>;
@@ -38,7 +38,7 @@ export default function ColdTransactionReportWrapper() {
         </p>
       </div>
       <Toaster />
-      <ColdTransactionReport initialTransactions={transactions} />
+      <ColdTransactionReport filterOptions={filterOptions} />
     </>
   );
 }

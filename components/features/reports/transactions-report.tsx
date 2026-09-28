@@ -26,8 +26,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getClientOptions, getWarehouseOptions, logTransactionsExportCSV } from '@/app/actions/reports';
 import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+
 import { getDropdownDisplayName } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
@@ -584,7 +584,9 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
   const exportToCSV = async () => {
     try {
+      const XLSX = await import('xlsx');
       if (reportType === 'statement' && statementData) {
+
         const exportData = statementData.rows.map(row => {
           const rowData: Record<string, any> = { 'Commodity': row.commodity };
           statementData.clientsList.forEach(c => {

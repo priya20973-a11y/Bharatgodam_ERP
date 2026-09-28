@@ -92,6 +92,84 @@ export default async function DashboardContent({ session }: { session: any }) {
   const db = await getDb();
   const tenantFilter = isAdmin(session) ? {} : getTenantFilterForMongo(session);
 
+  const warehouseFilter = tenantFilter;
+  const clientFilter = tenantFilter;
+  const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
+    ? (tenantFilter as any).$or
+    : [];
+  const invoiceMasterFilter = isAdmin(session)
+    ? {}
+    : {
+      $or: [
+        ...ownershipFilters,
+        { clientEmail: session.user.email }
+      ]
+    };
+  const invoiceFilter = isAdmin(session)
+    ? {}
+    : {
+      $or: [
+        ...ownershipFilters,
+        { clientEmail: session.user.email }
+      ]
+    };
+
+  const now = new Date();
+  const currentYearStart = new Date(now.getFullYear(), 0, 1);
+  const currentYearEnd = new Date(now.getFullYear() + 1, 0, 1);
+  const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
+  const previousYearEnd = new Date(now.getFullYear(), 0, 1);
+
+  const currentYearStartStr = currentYearStart.toISOString().slice(0, 10);
+  const currentYearEndStr = currentYearEnd.toISOString().slice(0, 10);
+  const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
+  const previousYearEndStr = previousYearEnd.toISOString().slice(0, 10);
+
+  const lastInvoiceMonthKey = getPreviousMonthKey(now);
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Run secondary metrics and revenue analytics in parallel immediately
+  const secondaryMetricsPromise = Promise.all([
+    db.collection('payments').aggregate([
+      { $match: { ...tenantFilter, status: 'COMPLETED' } },
+      { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
+    ]).toArray(),
+    db.collection('warehouses').countDocuments(warehouseFilter),
+    db.collection('clients').countDocuments(clientFilter),
+    db.collection('invoice_master').countDocuments({
+      $and: [
+        invoiceMasterFilter,
+        {
+          $or: [
+            { invoiceMonth: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
+            { generatedAt: { $exists: true, $lt: currentMonthStart } },
+            { createdAt: { $exists: true, $lt: currentMonthStart } }
+          ]
+        }
+      ]
+    }),
+    db.collection('invoices').countDocuments({
+      $and: [
+        invoiceFilter,
+        {
+          $or: [
+            { cycleName: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
+            { generatedAt: { $exists: true, $lt: currentMonthStart } },
+            { createdAt: { $exists: true, $lt: currentMonthStart } }
+          ]
+        }
+      ]
+    }),
+    db.collection('ledger_entries').find({
+      ...tenantFilter,
+      periodStartDate: { $exists: true, $ne: null },
+      quantityMT: { $gt: 0 }
+    }).project({ clientId: 1, warehouseId: 1, periodStartDate: 1, periodEndDate: 1 }).toArray(),
+    db.collection('ledger_entries').countDocuments({ ...tenantFilter })
+  ]);
+
+  const revenueAnalyticsPromise = getClientRevenueAnalytics();
+
   const ownedWarehouseDocs = !isAdmin(session)
     ? await db.collection('warehouses').find({ ...tenantFilter }).project({ _id: 1 }).toArray()
     : [];
@@ -112,18 +190,8 @@ export default async function DashboardContent({ session }: { session: any }) {
     ...warehouseMatch,
   };
 
-  const now = new Date();
-  const currentYearStart = new Date(now.getFullYear(), 0, 1);
-  const currentYearEnd = new Date(now.getFullYear() + 1, 0, 1);
-  const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
-  const previousYearEnd = new Date(now.getFullYear(), 0, 1);
+  const analyticsPromise = db.collection('inwards').aggregate([
 
-  const currentYearStartStr = currentYearStart.toISOString().slice(0, 10);
-  const currentYearEndStr = currentYearEnd.toISOString().slice(0, 10);
-  const previousYearStartStr = previousYearStart.toISOString().slice(0, 10);
-  const previousYearEndStr = previousYearEnd.toISOString().slice(0, 10);
-
-  const [transactionAnalytics] = await db.collection('inwards').aggregate([
     {
       $match: Object.keys(transactionMatch).length ? transactionMatch : {}
     },
@@ -320,68 +388,14 @@ export default async function DashboardContent({ session }: { session: any }) {
     }
   ]).toArray();
 
-  const warehouseFilter = tenantFilter;
-  const clientFilter = tenantFilter;
-  const ownershipFilters = !isAdmin(session) && Array.isArray((tenantFilter as any).$or)
-    ? (tenantFilter as any).$or
-    : [];
-  const invoiceMasterFilter = isAdmin(session)
-    ? {}
-    : {
-      $or: [
-        ...ownershipFilters,
-        { clientEmail: session.user.email }
-      ]
-    };
-  const invoiceFilter = isAdmin(session)
-    ? {}
-    : {
-      $or: [
-        ...ownershipFilters,
-        { clientEmail: session.user.email }
-      ]
-    };
-
-  const lastInvoiceMonthKey = getPreviousMonthKey(now);
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, ledgerEntries, ledgerEntryCount] = await Promise.all([
-    db.collection('payments').aggregate([
-      { $match: { ...tenantFilter, status: 'COMPLETED' } },
-      { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
-    ]).toArray(),
-    db.collection('warehouses').countDocuments(warehouseFilter),
-    db.collection('clients').countDocuments(clientFilter),
-    db.collection('invoice_master').countDocuments({
-      $and: [
-        invoiceMasterFilter,
-        {
-          $or: [
-            { invoiceMonth: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
-            { generatedAt: { $exists: true, $lt: currentMonthStart } },
-            { createdAt: { $exists: true, $lt: currentMonthStart } }
-          ]
-        }
-      ]
-    }),
-    db.collection('invoices').countDocuments({
-      $and: [
-        invoiceFilter,
-        {
-          $or: [
-            { cycleName: { $exists: true, $ne: '', $lte: lastInvoiceMonthKey } },
-            { generatedAt: { $exists: true, $lt: currentMonthStart } },
-            { createdAt: { $exists: true, $lt: currentMonthStart } }
-          ]
-        }
-      ]
-    }),
-    db.collection('ledger_entries').find({
-      ...tenantFilter,
-      periodStartDate: { $exists: true, $ne: null },
-      quantityMT: { $gt: 0 }
-    }).project({ clientId: 1, warehouseId: 1, periodStartDate: 1, periodEndDate: 1 }).toArray(),
-    db.collection('ledger_entries').countDocuments({ ...tenantFilter })
+  const [
+    [transactionAnalytics],
+    [paymentsReceivedResult, activeWarehouseCount, activeClientCount, invoiceMasterCount, formalInvoiceCount, ledgerEntries, ledgerEntryCount],
+    revenueAnalytics
+  ] = await Promise.all([
+    analyticsPromise,
+    secondaryMetricsPromise,
+    revenueAnalyticsPromise
   ]);
 
   const invoiceMasterCountValue = invoiceMasterCount ?? 0;
@@ -399,8 +413,8 @@ export default async function DashboardContent({ session }: { session: any }) {
   const inwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'INWARD')?.count ?? 0;
   const outwardTransactions = transactionAnalytics?.directionBreakdown?.find((item: any) => item._id === 'OUTWARD')?.count ?? 0;
 
-  const revenueAnalytics = await getClientRevenueAnalytics();
   const totalRevenue = revenueAnalytics?.summary?.totalRevenue ?? paymentsReceivedResult[0]?.totalRevenue ?? 0;
+
 
   const masterLinks = [
     { name: 'Active Warehouses', value: activeWarehouseCount, href: '/dashboard/warehouses', icon: Building2, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100/30' },

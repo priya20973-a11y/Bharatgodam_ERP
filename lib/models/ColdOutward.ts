@@ -137,11 +137,13 @@ const ColdOutwardSchema: Schema = new Schema(
 ColdOutwardSchema.index({ inwardId: 1 });
 ColdOutwardSchema.index({ userId: 1, date: -1, createdAt: -1 });
 ColdOutwardSchema.index({ userEmail: 1, date: -1, createdAt: -1 });
+ColdOutwardSchema.index({ warehouseId: 1, date: -1 });
+ColdOutwardSchema.index({ clientId: 1, date: -1 });
+ColdOutwardSchema.index({ receiptNumber: 1 });
+ColdOutwardSchema.index({ batchId: 1 });
 
-if (mongoose.models.ColdOutward) {
-  delete mongoose.models.ColdOutward;
-}
-
-const ColdOutward: Model<IColdOutward> = mongoose.model<IColdOutward>('ColdOutward', ColdOutwardSchema);
+const ColdOutward: Model<IColdOutward> =
+  mongoose.models.ColdOutward || mongoose.model<IColdOutward>('ColdOutward', ColdOutwardSchema);
 
 export default ColdOutward;
+

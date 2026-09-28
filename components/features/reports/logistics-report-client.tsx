@@ -37,8 +37,8 @@ import {
   Truck,
   ArrowUpDown
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+
 
 interface Props {
   initialData: IDetailedBooking[];
@@ -181,8 +181,9 @@ const LogisticsReportClient = ({
   };
 
   // Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     try {
+
       const exportData = data.map((item, index) => ({
         'S.No': (item as any).sNo ?? index + 1,
         'Direction': item.direction,
@@ -206,9 +207,11 @@ const LogisticsReportClient = ({
         'Storage Days': item.storageDays,
       }));
 
+      const XLSX = await import('xlsx');
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Logistics Report');
+
       
       // Auto-size columns
       const maxWidths = exportData.reduce((acc: number[], row) => {

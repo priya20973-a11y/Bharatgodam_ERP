@@ -7,6 +7,7 @@ export interface IColdInvoiceItem {
   commodityId: mongoose.Types.ObjectId;
   commodityName: string;
   hsnCode?: string;
+  lotNo?: string;
   quantityKg: number;
   outwardKg: number;
   balanceKg: number;
@@ -57,6 +58,7 @@ const ColdInvoiceSchema: Schema = new Schema(
         commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity' },
         commodityName: String,
         hsnCode: String,
+        lotNo: String,
         quantityKg: Number,
         outwardKg: Number,
         balanceKg: Number,
@@ -88,7 +90,15 @@ const ColdInvoiceSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+ColdInvoiceSchema.index({ userId: 1, createdAt: -1 });
+ColdInvoiceSchema.index({ userEmail: 1, createdAt: -1 });
+ColdInvoiceSchema.index({ warehouseId: 1, createdAt: -1 });
+ColdInvoiceSchema.index({ clientId: 1, createdAt: -1 });
+ColdInvoiceSchema.index({ invoiceNumber: 1 });
+ColdInvoiceSchema.index({ status: 1 });
+
 const ColdInvoice: Model<IColdInvoice> =
   mongoose.models.ColdInvoice || mongoose.model<IColdInvoice>('ColdInvoice', ColdInvoiceSchema);
 
 export default ColdInvoice;
+

@@ -14,16 +14,22 @@ import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
 import { logColdActivity } from '@/lib/cold-logger';
 
-export async function getColdOutwards() {
+export async function getColdOutwards(limit: number = 250) {
   await connectToDatabase();
   const session = await requireSession();
   
-  const outwards = await ColdOutward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
+  let query = ColdOutward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name warehouseId')
-    .sort({ date: -1, createdAt: -1 })
-    .lean();
+    .sort({ date: -1, createdAt: -1 });
+
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+
+  const outwards = await query.lean();
+
     
   const groups: any[] = [];
   

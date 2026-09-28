@@ -225,8 +225,15 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
               <Card className="bg-slate-900 shadow-sm border-slate-800">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-400 font-medium">Net Balance</p>
-                    <p className="text-2xl font-bold text-white mt-1">{formatNumber(runningBalance.toFixed(2))}</p>
+                    <p className="text-sm text-slate-400 font-medium">Net Balance & Bags</p>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      {formatNumber(runningBalance.toFixed(2))}
+                      <span className="text-sm text-slate-400 ml-2 font-normal">KG</span>
+                    </p>
+                    <p className="text-xl font-bold text-indigo-300 mt-1">
+                      {cleanFormatNum(runningBags)}
+                      <span className="text-sm text-slate-400 ml-2 font-normal">Bags</span>
+                    </p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
                     <span className="text-lg font-bold text-white">∑</span>

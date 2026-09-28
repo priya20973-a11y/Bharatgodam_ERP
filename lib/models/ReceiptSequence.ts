@@ -23,10 +23,9 @@ ReceiptSequenceSchema.index(
   { unique: true }
 );
 
-if (mongoose.models.ReceiptSequence) {
-  delete mongoose.models.ReceiptSequence;
-}
-
-const ReceiptSequence: Model<IReceiptSequence> = mongoose.model<IReceiptSequence>('ReceiptSequence', ReceiptSequenceSchema);
+const ReceiptSequence: Model<IReceiptSequence> =
+  mongoose.models.ReceiptSequence ||
+  mongoose.model<IReceiptSequence>('ReceiptSequence', ReceiptSequenceSchema);
 
 export default ReceiptSequence;
+

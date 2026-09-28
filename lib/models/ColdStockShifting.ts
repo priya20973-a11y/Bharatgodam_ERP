@@ -122,10 +122,13 @@ const ColdStockShiftingSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-if (mongoose.models.ColdStockShifting) {
-  delete mongoose.models.ColdStockShifting;
-}
+ColdStockShiftingSchema.index({ warehouseId: 1, date: -1 });
+ColdStockShiftingSchema.index({ userId: 1, date: -1 });
+ColdStockShiftingSchema.index({ userEmail: 1, date: -1 });
+ColdStockShiftingSchema.index({ fromInwardId: 1 });
 
-const ColdStockShifting: Model<IColdStockShifting> = mongoose.model<IColdStockShifting>('ColdStockShifting', ColdStockShiftingSchema);
+const ColdStockShifting: Model<IColdStockShifting> =
+  mongoose.models.ColdStockShifting || mongoose.model<IColdStockShifting>('ColdStockShifting', ColdStockShiftingSchema);
 
 export default ColdStockShifting;
+

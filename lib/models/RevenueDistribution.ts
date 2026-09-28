@@ -29,7 +29,12 @@ const RevenueDistributionSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+RevenueDistributionSchema.index({ userId: 1, year: -1, month: -1 });
+RevenueDistributionSchema.index({ userEmail: 1, year: -1, month: -1 });
+RevenueDistributionSchema.index({ warehouseId: 1 });
+
 const RevenueDistribution: Model<IRevenueDistribution> =
   mongoose.models.RevenueDistribution || mongoose.model<IRevenueDistribution>('RevenueDistribution', RevenueDistributionSchema);
 
 export default RevenueDistribution;
+

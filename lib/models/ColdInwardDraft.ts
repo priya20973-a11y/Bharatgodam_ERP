@@ -19,7 +19,11 @@ const ColdInwardDraftSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+ColdInwardDraftSchema.index({ userId: 1, updatedAt: -1 });
+ColdInwardDraftSchema.index({ userEmail: 1, updatedAt: -1 });
+
 const ColdInwardDraft: Model<IColdInwardDraft> =
   mongoose.models.ColdInwardDraft || mongoose.model<IColdInwardDraft>('ColdInwardDraft', ColdInwardDraftSchema);
 
 export default ColdInwardDraft;
+

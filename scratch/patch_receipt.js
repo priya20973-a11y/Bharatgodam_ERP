@@ -1,4 +1,11 @@
-import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
+const fs = require('fs');
+const file = 'lib/invoice/cold-transfer-receipt.ts';
+let content = fs.readFileSync(file, 'utf8');
+
+const regex = /return `[\s\S]*?<!DOCTYPE html>[\s\S]*?<title>Ownership Transfer Receipt<\/title>[\s\S]*?<\/head>\s*<body>\s*<div class="print-banner hide-on-print">[\s\S]*?<\/div>([\s\S]*?)<\/body>\s*<\/html>`;/;
+// I'll just rewrite the whole file, it's easier.
+
+const newFileContent = `import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
 import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
@@ -42,7 +49,7 @@ export function generateColdTransferReceiptHTML(
     
     let commodityDisplay = commodityNameBase;
     if (commodityType) {
-      commodityDisplay += ` (${commodityType})`;
+      commodityDisplay += \` (\${commodityType})\`;
     }
 
     const tableLabel = item.tableLabel || '';
@@ -53,7 +60,7 @@ export function generateColdTransferReceiptHTML(
     const mixed = formatNum(item.mixed || 0);
     const totalBags = formatNum(item.bagsCount || 0);
     
-    const farmerName = item.farmerName ? (item.farmerId ? `${item.farmerName} - ${item.farmerId}` : item.farmerName) : '';
+    const farmerName = item.farmerName ? (item.farmerId ? \`\${item.farmerName} - \${item.farmerId}\` : item.farmerName) : '';
     const marko = item.marko || '';
     const truckNo = item.truckNo || '';
     const remarks = item.remarks || '';
@@ -78,180 +85,180 @@ export function generateColdTransferReceiptHTML(
     
     const stackInfoData = item.stackAllocations || [];
     
-    return `
-    <div class="receipt-container" style="${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''}">
+    return \`
+    <div class="receipt-container" style="\${index > 0 ? 'page-break-before: always; margin-top: 20px;' : ''}">
       <div class="header-top">
-        <div>Mo.${mobile}</div>
+        <div>Mo.\${mobile}</div>
       </div>
       
       <div class="header-main">
         <div class="logo-area">
-          ${logoUrl
-        ? `<img src="${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />`
-        : ``}
+          \${logoUrl
+        ? \`<img src="\${logoUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo" />\`
+        : \`\`}
         </div>
         <div class="title-area">
-          <div class="main-title">${warehouseName}</div>
-          <div class="sub-title">${warehouseAddress}</div>
+          <div class="main-title">\${warehouseName}</div>
+          <div class="sub-title">\${warehouseAddress}</div>
         </div>
-        ${qrDataUrl ? `
+        \${qrDataUrl ? \`
         <div class="qr-area" style="width: 80px; text-align: right; padding-right: 10px;">
-          <img src="${qrDataUrl}" style="max-width: 70px; max-height: 70px;" alt="QR Code" />
-        </div>` : ''}
+          <img src="\${qrDataUrl}" style="max-width: 70px; max-height: 70px;" alt="QR Code" />
+        </div>\` : ''}
       </div>
       
       <div class="badge-container">
-        <div class="badge">${fullTitle}</div>
+        <div class="badge">\${fullTitle}</div>
       </div>
       
-      ${item.transferType === 'Purchase' ? `
+      \${item.transferType === 'Purchase' ? \`
       <div style="text-align: center; color: #d63333; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
-        ${lang === 'gu' ? 'ટ્રાન્સફર પ્રકાર:' : 'Transfer Type:'} PURCHASE
+        \${lang === 'gu' ? 'ટ્રાન્સફર પ્રકાર:' : 'Transfer Type:'} PURCHASE
       </div>
-      ` : ''}
+      \` : ''}
       
       <div class="receipt-info">
-        <div>${l.receiptNo} ${receiptNoFormatted}</div>
-        <div>${l.date} ${dateFormatted}</div>
+        <div>\${l.receiptNo} \${receiptNoFormatted}</div>
+        <div>\${l.date} \${dateFormatted}</div>
       </div>
       
       <div class="form-row">
-        <div class="form-label">${lang === 'gu' ? 'લેનાર શ્રી,' : 'New Owner:'}</div>
-        <div class="form-value">${toClientName}</div>
+        <div class="form-label">\${lang === 'gu' ? 'લેનાર શ્રી,' : 'New Owner:'}</div>
+        <div class="form-value">\${toClientName}</div>
       </div>
       
       <div class="form-row">
-        <div class="form-label">${lang === 'gu' ? 'આપનાર શ્રી,' : 'Previous Owner:'}</div>
-        <div class="form-value" style="flex: 2;">${fromClientName}</div>
-        <div class="form-label">${l.addressLabel}</div>
-        <div class="form-value">${clientVillage}</div>
+        <div class="form-label">\${lang === 'gu' ? 'આપનાર શ્રી,' : 'Previous Owner:'}</div>
+        <div class="form-value" style="flex: 2;">\${fromClientName}</div>
+        <div class="form-label">\${l.addressLabel}</div>
+        <div class="form-value">\${clientVillage}</div>
       </div>
-      ${farmerName ? `
+      \${farmerName ? \`
       <div class="form-row">
-        <div class="form-label">${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
-        <div class="form-value">${farmerName}</div>
-      </div>` : `
+        <div class="form-label">\${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
+        <div class="form-value">\${farmerName}</div>
+      </div>\` : \`
       <div class="form-row">
-        <div class="form-label">${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
+        <div class="form-label">\${l.farmerNameLabel || (lang === 'gu' ? 'ખેડૂતનું નામ:' : 'Farmer Name:')}</div>
         <div class="form-value">-</div>
-      </div>`}
+      </div>\`}
       
       <div class="form-row">
-        <div class="form-label">${lang === 'gu' ? 'સંદર્ભ વ્યક્તિ:' : 'Reference Person:'}</div>
-        <div class="form-value">${referencePerson}</div>
-        <div class="form-label">${lang === 'gu' ? 'બહાર કાઢેલ વજન:' : 'Outward Weight:'}</div>
-        <div class="form-value">${outwardWeightDisplay}</div>
-        <div class="form-label">${lang === 'gu' ? 'બાકી વજન:' : 'Remaining Weight:'}</div>
-        <div class="form-value">${remainingWeightDisplay}</div>
+        <div class="form-label">\${lang === 'gu' ? 'સંદર્ભ વ્યક્તિ:' : 'Reference Person:'}</div>
+        <div class="form-value">\${referencePerson}</div>
+        <div class="form-label">\${lang === 'gu' ? 'બહાર કાઢેલ વજન:' : 'Outward Weight:'}</div>
+        <div class="form-value">\${outwardWeightDisplay}</div>
+        <div class="form-label">\${lang === 'gu' ? 'બાકી વજન:' : 'Remaining Weight:'}</div>
+        <div class="form-value">\${remainingWeightDisplay}</div>
       </div>
       
       <div class="form-row">
-        <div class="form-label">${l.commodityVarietyLabel}</div>
-        <div class="form-value">${commodityDisplay}</div>
-        <div class="form-label">${l.tableLabel}</div>
-        <div class="form-value">${tableLabel}</div>
-        <div class="form-label">${l.seedLabel}</div>
-        <div class="form-value">${seed}</div>
+        <div class="form-label">\${l.commodityVarietyLabel}</div>
+        <div class="form-value">\${commodityDisplay}</div>
+        <div class="form-label">\${l.tableLabel}</div>
+        <div class="form-value">\${tableLabel}</div>
+        <div class="form-label">\${l.seedLabel}</div>
+        <div class="form-value">\${seed}</div>
       </div>
       
       <div class="form-row">
-        <div class="form-label">${getDynamicUnitLabel(unitStr, 'large')}</div>
-        <div class="form-value">${bags}</div>
-        <div class="form-label">${getDynamicUnitLabel(unitStr, 'small')}</div>
-        <div class="form-value">${jin}</div>
-        <div class="form-label">${getDynamicUnitLabel(unitStr, 'mixed')}</div>
-        <div class="form-value">${mixed}</div>
-        <div class="form-label">${getDynamicUnitLabel(unitStr, 'total')}</div>
-        <div class="form-value">${totalBags}</div>
+        <div class="form-label">\${getDynamicUnitLabel(unitStr, 'large')}</div>
+        <div class="form-value">\${bags}</div>
+        <div class="form-label">\${getDynamicUnitLabel(unitStr, 'small')}</div>
+        <div class="form-value">\${jin}</div>
+        <div class="form-label">\${getDynamicUnitLabel(unitStr, 'mixed')}</div>
+        <div class="form-value">\${mixed}</div>
+        <div class="form-label">\${getDynamicUnitLabel(unitStr, 'total')}</div>
+        <div class="form-value">\${totalBags}</div>
       </div>
       
       <div class="grid-container">
         <div class="left-grid">
           <div class="form-row">
-            <div class="form-label">${l.markoLabel}</div>
-            <div class="form-value">${marko}</div>
+            <div class="form-label">\${l.markoLabel}</div>
+            <div class="form-value">\${marko}</div>
           </div>
           <div class="form-row">
-            <div class="form-label">${lang === 'gu' ? 'લોટ નં:' : 'Lot No:'}</div>
-            <div class="form-value">${item.originalInwardId?.lotNo || item.lotNo || '-'}</div>
+            <div class="form-label">\${lang === 'gu' ? 'લોટ નં:' : 'Lot No:'}</div>
+            <div class="form-value">\${item.originalInwardId?.lotNo || item.lotNo || '-'}</div>
           </div>
           <div class="form-row">
-            <div class="form-label">${l.tractorTruckNoLabel}</div>
-            <div class="form-value">${truckNo}</div>
+            <div class="form-label">\${l.tractorTruckNoLabel}</div>
+            <div class="form-value">\${truckNo}</div>
           </div>
           <div class="form-row">
-            <div class="form-label">${l.remarkLabel}</div>
-            <div class="form-value">${remarks}</div>
+            <div class="form-label">\${l.remarkLabel}</div>
+            <div class="form-value">\${remarks}</div>
           </div>
           <div class="form-row">
-            <div class="form-label">${l.weighbridgeSlipNoLabel}</div>
-            <div class="form-value">${wbSlip}</div>
+            <div class="form-label">\${l.weighbridgeSlipNoLabel}</div>
+            <div class="form-value">\${wbSlip}</div>
           </div>
           
           <table class="data-table stack-table" style="margin-top: 15px;">
             <tr>
-              <th>${l.chamberNoLabel}</th>
-              <th>${l.floorNoLabel}</th>
-              <th>${l.stackNoLabel}</th>
-              <th>${l.netWeightLabel}</th>
+              <th>\${l.chamberNoLabel}</th>
+              <th>\${l.floorNoLabel}</th>
+              <th>\${l.stackNoLabel}</th>
+              <th>\${l.netWeightLabel}</th>
             </tr>
-            ${stackInfoData && stackInfoData.length > 0 ? 
-              stackInfoData.map((s: any) => `
+            \${stackInfoData && stackInfoData.length > 0 ? 
+              stackInfoData.map((s: any) => \`
               <tr>
-                <td>${formatNum(s.chamberName || s.chamberNo)}</td>
-                <td>${formatNum(s.floorNo)}</td>
-                <td>${formatNum(s.stackNo)}</td>
-                <td>${formatNum(s.allocatedWeight)} ${unitStr}</td>
+                <td>\${formatNum(s.chamberName || s.chamberNo)}</td>
+                <td>\${formatNum(s.floorNo)}</td>
+                <td>\${formatNum(s.stackNo)}</td>
+                <td>\${formatNum(s.allocatedWeight)} \${unitStr}</td>
               </tr>
-              `).join('')
-            : `
+              \`).join('')
+            : \`
               <tr>
                 <td></td>
                 <td></td>
                 <td></td>
-                <td>${netWeight}</td>
+                <td>\${netWeight}</td>
               </tr>
-            `}
+            \`}
           </table>
         </div>
         
         <div class="right-grid">
           <div class="weight-box">
             <div class="weight-row">
-              <div class="weight-label">${l.grossWeightLabel}</div>
-              <div class="weight-value">${grossWeight}</div>
+              <div class="weight-label">\${l.grossWeightLabel}</div>
+              <div class="weight-value">\${grossWeight}</div>
             </div>
             <div class="weight-row">
-              <div class="weight-label">${l.emptyWeightLabel}</div>
-              <div class="weight-value">${emptyWeight}</div>
+              <div class="weight-label">\${l.emptyWeightLabel}</div>
+              <div class="weight-value">\${emptyWeight}</div>
             </div>
             <div class="weight-row">
-              <div class="weight-label">${lang === 'gu' ? 'કાંટા ભરતી:' : 'Kata Bharati:'}</div>
-              <div class="weight-value">${formatNum('0')} KG</div>
+              <div class="weight-label">\${lang === 'gu' ? 'કાંટા ભરતી:' : 'Kata Bharati:'}</div>
+              <div class="weight-value">\${formatNum('0')} KG</div>
             </div>
             <div class="weight-row total">
-              <div class="weight-label">${l.netWeightLabel}</div>
-              <div class="weight-value">${netWeight}</div>
+              <div class="weight-label">\${l.netWeightLabel}</div>
+              <div class="weight-value">\${netWeight}</div>
             </div>
           </div>
         </div>
       </div>
       
-      <div style="margin-top: 20px; display: flex; justify-content: space-between;">
+      <div style="margin-top: 30px; display: flex; justify-content: space-between;">
         <div style="font-size: 13px; font-weight: bold; color: #333;">
-          ${lang === 'gu' ? 'આપનારની સહી' : "Sender's Signature"} <span class="signature-line"></span>
+          \${lang === 'gu' ? 'આપનારની સહી' : "Sender's Signature"} <span class="signature-line"></span>
         </div>
         <div style="font-size: 13px; font-weight: bold; color: #333;">
-          ${lang === 'gu' ? 'લેનારની સહી' : "Receiver's Signature"} <span class="signature-line"></span>
+          \${lang === 'gu' ? 'લેનારની સહી' : "Receiver's Signature"} <span class="signature-line"></span>
         </div>
         <div style="font-size: 13px; font-weight: bold; color: #333;">
-          ${lang === 'gu' ? 'ઓથોરાઈઝ્ડ સહી' : 'Authorized Signatory'} <span class="signature-line"></span>
+          \${lang === 'gu' ? 'ઓથોરાઈઝ્ડ સહી' : 'Authorized Signatory'} <span class="signature-line"></span>
         </div>
       </div>
-    </div>`;
-  }).join('\n');
+    </div>\`;
+  }).join('\\n');
 
-  return `
+  return \`
 <!DOCTYPE html>
 <html lang="gu">
 <head>
@@ -279,14 +286,12 @@ export function generateColdTransferReceiptHTML(
     
     .receipt-container { 
       width: 148mm; 
-      height: 208mm;
+      min-height: 210mm;
       margin: 0 auto; 
-      padding: 10px; 
+      padding: 15px; 
       background-color: #ffffff;
       border: 1px solid #ccc;
       position: relative;
-      box-sizing: border-box;
-      overflow: hidden;
     }
     
     .print-banner {
@@ -312,8 +317,8 @@ export function generateColdTransferReceiptHTML(
       align-items: center;
       border: 2px solid #b89735;
       background: #fff;
-      padding: 4px;
-      margin-bottom: 8px;
+      padding: 5px;
+      margin-bottom: 15px;
     }
     
     .logo-area {
@@ -351,7 +356,7 @@ export function generateColdTransferReceiptHTML(
     
     .badge-container {
       text-align: center;
-      margin-bottom: 8px;
+      margin-bottom: 15px;
     }
     
     .badge {
@@ -369,15 +374,15 @@ export function generateColdTransferReceiptHTML(
       justify-content: space-between;
       color: #d63333;
       font-weight: bold;
-      font-size: 12px;
-      margin-bottom: 10px;
+      font-size: 13px;
+      margin-bottom: 20px;
     }
     
     .form-row {
       display: flex;
       align-items: flex-end;
-      margin-bottom: 8px;
-      font-size: 12px;
+      margin-bottom: 12px;
+      font-size: 13px;
       font-weight: 600;
       color: #9e2a2b;
     }
@@ -398,7 +403,7 @@ export function generateColdTransferReceiptHTML(
     .grid-container {
       display: flex;
       justify-content: space-between;
-      margin-top: 10px;
+      margin-top: 15px;
     }
     
     .left-grid {
@@ -419,8 +424,8 @@ export function generateColdTransferReceiptHTML(
     
     .data-table td, .data-table th {
       border: 1px solid #8b5a2b;
-      padding: 4px;
-      font-size: 12px;
+      padding: 6px;
+      font-size: 13px;
       font-weight: 600;
     }
     
@@ -437,16 +442,16 @@ export function generateColdTransferReceiptHTML(
     .weight-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 3px;
-      font-size: 12px;
+      margin-bottom: 5px;
+      font-size: 13px;
       color: #0b4b8a;
       font-weight: bold;
     }
     
     .weight-row.total {
       border-top: 1px solid #8b5a2b;
-      padding-top: 3px;
-      font-size: 12px;
+      padding-top: 5px;
+      font-size: 13px;
       color: #9e2a2b;
       font-weight: bold;
     }
@@ -465,7 +470,10 @@ export function generateColdTransferReceiptHTML(
     <br/>
     <button onclick="window.print()" style="margin-top:10px; padding: 5px 15px; cursor:pointer;">Print Now</button>
   </div>
-  ${pagesHtml}
+  \${pagesHtml}
 </body>
-</html>`;
+</html>\`;
 }
+`;
+fs.writeFileSync(file, newFileContent);
+console.log("Patched cold-transfer-receipt.ts");

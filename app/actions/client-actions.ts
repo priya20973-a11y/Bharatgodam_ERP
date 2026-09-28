@@ -120,7 +120,8 @@ type LegacyClient = {
 export async function getClients() {
   await connectToDatabase();
   const session = await requireSession();
-  const clients = await Client.find({ ...getTenantFilter(session) }).sort({ name: 1 });
+  const clients = await Client.find({ ...getTenantFilter(session) }).sort({ name: 1 }).lean();
+
 
   if (!clients.length) {
     if (!mongoose.connection.db) {

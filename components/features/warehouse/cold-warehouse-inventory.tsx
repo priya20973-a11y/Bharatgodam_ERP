@@ -192,11 +192,18 @@ export default function ColdWarehouseInventory() {
   const utilizationPercentage = warehouse_stats.utilization_percentage;
   const capacityStatus = getCapacityStatus(utilizationPercentage);
 
-  const chartData = commodities.map((commodity, index) => ({
-    name: commodity.commodityName,
-    value: commodity.totalWeight,
-    color: COLORS[index % COLORS.length]
-  }));
+  const chartData = [
+    {
+      name: 'Used Capacity',
+      value: usedCapacity > 0 ? usedCapacity : 0,
+      color: '#6366F1' // Primary color
+    },
+    {
+      name: 'Available Capacity',
+      value: availableCapacity > 0 ? availableCapacity : (usedCapacity === 0 ? 1 : 0), // Fallback to 1 if both 0 so it renders a grey ring
+      color: '#f1f5f9' // Light grey
+    }
+  ];
 
   return (
     <div className="space-y-5">

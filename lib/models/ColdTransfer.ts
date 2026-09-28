@@ -22,6 +22,7 @@ export interface IColdTransfer extends Document {
   quantityKg: number;
   bagsCount: number;
   date: Date;
+  batchId?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
@@ -51,6 +52,7 @@ const ColdTransferSchema: Schema = new Schema(
     quantityKg: { type: Number, required: true, min: 0 },
     bagsCount: { type: Number, required: true, min: 0 },
     date: { type: Date, default: Date.now },
+    batchId: { type: String, required: false },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },
@@ -60,11 +62,13 @@ const ColdTransferSchema: Schema = new Schema(
 ColdTransferSchema.index({ originalInwardId: 1 });
 ColdTransferSchema.index({ userId: 1, createdAt: -1 });
 ColdTransferSchema.index({ userEmail: 1, createdAt: -1 });
+ColdTransferSchema.index({ warehouseId: 1, createdAt: -1 });
+ColdTransferSchema.index({ batchId: 1 });
+ColdTransferSchema.index({ fromClientId: 1 });
+ColdTransferSchema.index({ toClientId: 1 });
 
-if (mongoose.models.ColdTransfer) {
-  delete mongoose.models.ColdTransfer;
-}
-
-const ColdTransfer: Model<IColdTransfer> = mongoose.model<IColdTransfer>('ColdTransfer', ColdTransferSchema);
+const ColdTransfer: Model<IColdTransfer> =
+  mongoose.models.ColdTransfer || mongoose.model<IColdTransfer>('ColdTransfer', ColdTransferSchema);
 
 export default ColdTransfer;
+

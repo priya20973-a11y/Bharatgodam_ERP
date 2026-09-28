@@ -58,10 +58,9 @@ const ReceiptTemplateSchema: Schema = new Schema(
 // Ensure a warehouse can only have one template per receipt type
 ReceiptTemplateSchema.index({ warehouseId: 1, receiptType: 1 }, { unique: true });
 
-if (mongoose.models.ReceiptTemplate) {
-  delete mongoose.models.ReceiptTemplate;
-}
-
-const ReceiptTemplate: Model<IReceiptTemplate> = mongoose.model<IReceiptTemplate>('ReceiptTemplate', ReceiptTemplateSchema);
+const ReceiptTemplate: Model<IReceiptTemplate> =
+  mongoose.models.ReceiptTemplate ||
+  mongoose.model<IReceiptTemplate>('ReceiptTemplate', ReceiptTemplateSchema);
 
 export default ReceiptTemplate;
+

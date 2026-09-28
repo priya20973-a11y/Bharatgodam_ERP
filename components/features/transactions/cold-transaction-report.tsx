@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Download, Trash2, Edit, Search, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
@@ -23,12 +23,17 @@ import ColdEditTransactionModal from './cold-edit-transaction-modal';
 import { formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
 
 interface ColdTransactionReportProps {
-  initialTransactions: any[];
+  filterOptions: { clients: string[], warehouses: string[], chambers: string[], months: string[] };
 }
 
-export default function ColdTransactionReport({ initialTransactions }: ColdTransactionReportProps) {
-  const { t, formatNumber } = useColdTranslation();
-  const [transactions, setTransactions] = useState(initialTransactions);
+export default function ColdTransactionReport({ filterOptions }: ColdTransactionReportProps) {
+    const { t, formatNumber } = useColdTranslation();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
   const [search, setSearch] = useState('');
   const [receiptSearch, setReceiptSearch] = useState('');
   const [lotNoSearch, setLotNoSearch] = useState('');
@@ -41,62 +46,51 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
   const [editingTxnId, setEditingTxnId] = useState('');
   const [editingTxnType, setEditingTxnType] = useState<'INWARD' | 'OUTWARD'>('INWARD');
 
-  // Extract unique filters
-  const clients = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.client?.name).filter(Boolean))), [initialTransactions]);
-  const warehouses = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.warehouse?.name).filter(Boolean))), [initialTransactions]);
-  const chambers = useMemo(() => {
-    if (warehouseFilter === 'ALL') return [];
-    const uniqueChambers = new Set<string>();
-    initialTransactions.forEach(txn => {
-      if (txn.warehouse?.name === warehouseFilter && txn.chamberNo) {
-        const cList = txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean);
-        cList.forEach((c: string) => uniqueChambers.add(c));
-      }
-    });
-    return Array.from(uniqueChambers).sort();
-  }, [initialTransactions, warehouseFilter]);
-  const months = useMemo(() => Array.from(new Set(initialTransactions.map(txn => txn.date ? txn.date.substring(0, 7) : null).filter(Boolean))).sort().reverse(), [initialTransactions]);
+  const clients = filterOptions?.clients || [];
+  const warehouses = filterOptions?.warehouses || [];
+  const chambers = filterOptions?.chambers || [];
+  const months = filterOptions?.months || [];
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(txn => {
-      if (clientFilter !== 'ALL' && txn.client?.name !== clientFilter) return false;
-      if (warehouseFilter !== 'ALL' && txn.warehouse?.name !== warehouseFilter) return false;
-      if (chamberFilter !== 'ALL' && (!txn.chamberNo || !txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean).includes(chamberFilter))) return false;
-      if (monthFilter !== 'ALL' && (!txn.date || !txn.date.startsWith(monthFilter))) return false;
-      
-      if (search) {
-        const query = search.toLowerCase();
-        const clientMatch = txn.client?.name?.toLowerCase().includes(query);
-        const commMatch = txn.commodity?.name?.toLowerCase().includes(query);
-        const typeMatch = txn.type?.toLowerCase().includes(query);
-        if (!clientMatch && !commMatch && !typeMatch) return false;
+  useEffect(() => {
+    const fetchTimer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { getColdTransactions } = await import('@/app/actions/cold-transaction-report-actions');
+        const res = await getColdTransactions({
+          page,
+          limit: pageSize,
+          search,
+          receiptSearch,
+          lotNoSearch,
+          clientFilter,
+          warehouseFilter,
+          chamberFilter,
+          monthFilter
+        });
+        setTransactions(res.transactions || []);
+        setTotalCount(res.totalCount || 0);
+      } catch (err: any) {
+        toast.error('Failed to load transactions');
+      } finally {
+        setLoading(false);
       }
-      
-      if (receiptSearch) {
-        const rQuery = receiptSearch.toLowerCase().trim();
-        const rNum = String(txn.receiptNumber || '').toLowerCase();
-        if (!rNum || !rNum.includes(rQuery)) return false;
-      }
-      
-      if (lotNoSearch) {
-        const lQuery = lotNoSearch.toLowerCase().trim();
-        const lNum = String(txn.lotNo || '').toLowerCase();
-        if (!lNum || !lNum.includes(lQuery)) return false;
-      }
-      return true;
-    });
-  }, [transactions, clientFilter, warehouseFilter, chamberFilter, monthFilter, search, receiptSearch, lotNoSearch]);
+    }, 500); // debounce
+    return () => clearTimeout(fetchTimer);
+  }, [page, search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter]);
+
+  // When filters change, reset page to 1
+  useEffect(() => {
+    setPage(1);
+  }, [search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter]);
 
   const groupedTransactions = useMemo(() => {
     const grouped: any[] = [];
     const receiptMap = new Map<string, any>();
     
-    filteredTransactions.forEach(txn => {
-      // Only group OUTWARDs that have a receiptNumber
+    transactions.forEach(txn => {
       if (txn.type === 'OUTWARD' && txn.receiptNumber) {
         const key = `OUT_${txn.receiptNumber}`;
         if (!receiptMap.has(key)) {
-          // Clone the transaction to avoid mutating the original
           receiptMap.set(key, { 
             ...txn, 
             groupedIds: [txn._id],
@@ -132,7 +126,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
       }
     });
     return grouped;
-  }, [filteredTransactions]);
+  }, [transactions]);
 
   const handleDelete = async (id: string | string[], type: string) => {
     if (type === 'OWNERSHIP TRANSFER') {
@@ -142,6 +136,7 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     if (!confirm(t('transactions.deleteConfirm'))) return;
 
     try {
+      const { deleteColdTransaction } = await import('@/app/actions/cold-transaction-report-actions');
       if (Array.isArray(id)) {
         let allSuccess = true;
         for (const singleId of id) {
@@ -168,66 +163,131 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
     }
   };
 
-  const exportCSV = () => {
-    const headers = [
-      t('transactions.typeHeader'), 
-      t('transactions.dateHeader'), 
-      t('transactions.clientHeader'), 
-      t('transactions.commodityHeader'), 
-      t('transactions.locationHeader'), 
-      'Grade',
-      'Lot No',
-      'Weighbridge Slip No',
-      'Receipt No',
-      t('inward.chamberHeader'), 
-      t('inward.floorHeader'), 
-      t('inward.stackHeader'), 
-      t('transactions.qtyHeader'), 
-      t('transactions.bagsHeader')
-    ];
-    const rows = filteredTransactions.map(txn => {
-      let typeLabel = txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward');
-      if (txn.type === 'OWNERSHIP TRANSFER') typeLabel = 'OWNERSHIP TRANSFER';
-
-      let clientLabel = txn.client?.name || '';
-      if (txn.type === 'OWNERSHIP TRANSFER') {
-        if (txn.transferType === 'Purchase') {
-          clientLabel = `${txn.previousClient?.name || ''} -> Warehouse (${txn.warehouse?.name || ''})`;
+  const exportCSV = async () => {
+    toast.loading('Preparing CSV export...', { id: 'csv-export' });
+    try {
+      const { getColdTransactions } = await import('@/app/actions/cold-transaction-report-actions');
+      const res = await getColdTransactions({
+        fetchAll: true,
+        search,
+        receiptSearch,
+        lotNoSearch,
+        clientFilter,
+        warehouseFilter,
+        chamberFilter,
+        monthFilter
+      });
+      
+      const allTxns = res.transactions || [];
+      
+      const groupedExport: any[] = [];
+      const receiptMap = new Map<string, any>();
+      allTxns.forEach((txn: any) => {
+        if (txn.type === 'OUTWARD' && txn.receiptNumber) {
+          const key = `OUT_${txn.receiptNumber}`;
+          if (!receiptMap.has(key)) {
+            receiptMap.set(key, { 
+              ...txn, 
+              groupedLocations: [{
+                chamberNo: txn.chamberNo,
+                chamberName: txn.chamberName,
+                floorNo: txn.floorNo,
+                floorName: txn.floorName,
+                stackNo: txn.stackNo,
+                quantityKg: txn.quantityKg,
+                bagsCount: txn.bagsCount || txn.jin || txn.mixed || txn.totalBags || 0
+              }]
+            });
+            groupedExport.push(receiptMap.get(key));
+          } else {
+            const group = receiptMap.get(key);
+            group.quantityKg = (group.quantityKg || 0) + (txn.quantityKg || 0);
+            group.totalBags = (group.totalBags ?? 0) + (txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)));
+            group.bagsCount = group.totalBags;
+            group.groupedLocations.push({
+              chamberNo: txn.chamberNo,
+              chamberName: txn.chamberName,
+              floorNo: txn.floorNo,
+              floorName: txn.floorName,
+              stackNo: txn.stackNo,
+              quantityKg: txn.quantityKg,
+              bagsCount: txn.bagsCount || txn.jin || txn.mixed || txn.totalBags || 0
+            });
+          }
         } else {
-          clientLabel = `${txn.client?.name || ''} (From: ${txn.previousClient?.name || ''})`;
+          groupedExport.push(txn);
         }
-      } else if (txn.client?.clientType === 'PURCHASE') {
-        clientLabel = `Warehouse (${txn.client?.name})`;
-      }
+      });
 
-      return [
-        typeLabel,
-        txn.date ? format(new Date(txn.date), 'yyyy-MM-dd') : '',
-        clientLabel,
-        `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
-        txn.warehouse?.name || '',
-        txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
-        txn.lotNo || '-',
-        txn.weighbridgeSlipNo || '-',
-        txn.receiptNumber || '-',
-        txn.chamberNo ? Array.from(new Set(txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean))).join(', ') : '',
-        txn.floorNo,
-        txn.stackNo,
-        formatNumber(txn.quantityKg),
-        formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))
+      const headers = [
+        t('transactions.typeHeader'), 
+        t('transactions.dateHeader'), 
+        t('transactions.clientHeader'), 
+        t('transactions.commodityHeader'), 
+        t('transactions.locationHeader'), 
+        'Grade',
+        'Lot No',
+        'Weighbridge Slip No',
+        'Receipt No',
+        t('inward.chamberHeader'), 
+        t('inward.floorHeader'), 
+        t('inward.stackHeader'), 
+        t('transactions.qtyHeader'), 
+        t('transactions.bagsHeader')
       ];
-    });
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `cold_transactions_${format(new Date(), 'yyyyMMdd')}.csv`;
-    link.click();
+      const rows = groupedExport.map(txn => {
+        let typeLabel = txn.type === 'INWARD' ? t('transactions.inward') : t('transactions.outward');
+        if (txn.type === 'OWNERSHIP TRANSFER') typeLabel = 'OWNERSHIP TRANSFER';
+
+        let clientLabel = txn.client?.name || '';
+        if (txn.type === 'OWNERSHIP TRANSFER') {
+          if (txn.transferType === 'Purchase') {
+            clientLabel = `${txn.previousClient?.name || ''} -> Warehouse (${txn.warehouse?.name || ''})`;
+          } else {
+            clientLabel = `${txn.client?.name || ''} (From: ${txn.previousClient?.name || ''})`;
+          }
+        } else if (txn.client?.clientType === 'PURCHASE') {
+          clientLabel = `Warehouse (${txn.client?.name})`;
+        }
+
+        return [
+          typeLabel,
+          txn.date ? format(new Date(txn.date), 'yyyy-MM-dd') : '',
+          clientLabel,
+          `${txn.commodity?.name || ''} (${txn.commodity?.type || ''})`,
+          txn.warehouse?.name || '',
+          txn.gradingType === 'Wet' ? 'Wet' : txn.gradingType === 'Grading' ? 'Grading' : '-',
+          txn.lotNo || '-',
+          txn.weighbridgeSlipNo || '-',
+          txn.receiptNumber || '-',
+          txn.groupedLocations
+            ? Array.from(new Set(txn.groupedLocations.map((l: any) => l.chamberNo || l.chamberName))).filter(Boolean).join(', ')
+            : txn.chamberNo ? Array.from(new Set(txn.chamberNo.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean))).join(', ') : '',
+          txn.groupedLocations
+            ? Array.from(new Set(txn.groupedLocations.map((l: any) => l.floorNo || l.floorName))).filter(Boolean).join(', ')
+            : txn.floorNo,
+          txn.groupedLocations
+            ? Array.from(new Set(txn.groupedLocations.map((l: any) => l.stackNo))).filter(Boolean).join(', ')
+            : txn.stackNo,
+          formatNumber(txn.quantityKg),
+          formatNumber(txn.totalBags ?? ((txn.bagsCount || 0) + (txn.jin || 0) + (txn.mixed || 0)))
+        ];
+      });
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `cold_transactions_${format(new Date(), 'yyyyMMdd')}.csv`;
+      link.click();
+      toast.success('Export downloaded!', { id: 'csv-export' });
+    } catch (err) {
+      toast.error('Failed to export', { id: 'csv-export' });
+    }
   };
 
   const downloadInvoice = (id: string, type: string) => {
@@ -324,7 +384,13 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTransactions.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={12} className="h-24 text-center text-slate-500">
+                  Loading transactions...
+                </TableCell>
+              </TableRow>
+            ) : groupedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="h-24 text-center text-slate-500">
                   {t('transactions.noTransactions')}
@@ -476,6 +542,36 @@ export default function ColdTransactionReport({ initialTransactions }: ColdTrans
           </TableBody>
         </Table>
       </div>
+      
+      {/* Pagination Controls */}
+      {!loading && totalCount > 0 && (
+        <div className="flex items-center justify-between px-2 py-4">
+          <div className="text-sm text-slate-500">
+            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount} entries
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <div className="text-sm font-medium text-slate-700">
+              Page {page} of {Math.ceil(totalCount / pageSize)}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={page >= Math.ceil(totalCount / pageSize)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {editModalOpen && (
         <ColdEditTransactionModal

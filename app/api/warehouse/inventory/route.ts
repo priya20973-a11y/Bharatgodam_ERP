@@ -69,6 +69,7 @@ export async function GET(request: Request) {
       {
         $match: {
           warehouseId: warehouse._id.toString(),
+          status: 'COMPLETED',
           ...tenantFilter,
           ...dateFilter
         }
@@ -76,22 +77,26 @@ export async function GET(request: Request) {
       {
         $group: {
           _id: '$commodityName',
-          totalWeight: {
-            $sum: {
-              $cond: [
-                { $eq: ['$direction', 'OUTWARD'] },
-                { $multiply: ['$quantityMT', -1] },
-                '$quantityMT'
-              ]
-            }
+          inwardQuantity: {
+            $sum: { $cond: [{ $eq: ['$direction', 'INWARD'] }, '$quantityMT', 0] }
           },
-          bookingCount: { $sum: 1 }
+          outwardQuantity: {
+            $sum: { $cond: [{ $eq: ['$direction', 'OUTWARD'] }, '$quantityMT', 0] }
+          },
+          bookingCount: {
+            $sum: { $cond: [{ $eq: ['$direction', 'INWARD'] }, 1, 0] }
+          }
         }
       },
       {
         $project: {
           commodityName: '$_id',
-          totalWeight: { $round: [{ $max: ['$totalWeight', 0] }, 3] },
+          totalWeight: { 
+            $round: [
+              { $max: [{ $subtract: ['$inwardQuantity', '$outwardQuantity'] }, 0] }, 
+              3
+            ] 
+          },
           bookingCount: 1,
           _id: 0
         }

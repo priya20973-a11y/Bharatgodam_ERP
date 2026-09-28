@@ -247,17 +247,41 @@ export async function POST(request: NextRequest) {
     const commodityMap = buildLookupMap(commodities);
     const warehouseMap = buildLookupMap(warehouses);
 
+    const rawGroups = new Map<string, Array<{ rowNum: number, row: any }>>();
+    for (let i = 0; i < rows.length; i++) {
+      const rowNum = i + 2;
+      const row = rows[i];
+      const date = parseDate(row.date);
+      const dateKey = date ? date.toISOString().slice(0, 10) : (row.date || '').trim();
+      const rawKey = [
+        normalizeName(row.clientName),
+        normalizeName(row.commodityName),
+        normalizeName(row.warehouseName),
+        dateKey,
+        (row.truckNo || '').trim(),
+        (row.weighbridgeSlipNo || '').trim(),
+      ].join('|');
+      
+      if (!rawGroups.has(rawKey)) {
+        rawGroups.set(rawKey, []);
+      }
+      rawGroups.get(rawKey)!.push({ rowNum, row });
+    }
+
     const errors: Array<{ row: number; error: string }> = [];
     const warnings: string[] = [];
     let successCount = 0;
     const groupedReceipts = new Map<string, any>();
     const processedRowIds = new Set<string>();
 
-    for (let i = 0; i < rows.length; i++) {
-      const rowNum = i + 2;
-      const row = rows[i];
+    for (const [rawKey, groupRows] of Array.from(rawGroups.entries())) {
+      let groupHasError = false;
+      const tempGroupErrors: Array<{ row: number; error: string }> = [];
+      let currentReceiptKey = '';
+      let groupedReceiptData: any = null;
 
-      try {
+      for (const { rowNum, row } of groupRows) {
+        try {
         if (!row.variety) {
           throw new Error('Variety is required.');
         }
@@ -394,14 +418,15 @@ export async function POST(request: NextRequest) {
         const rowId = `bulkinw|${receiptKey}|${finalChamberNo}|${finalFloorNo}|${finalStackNo}`;
 
         if (processedRowIds.has(rowId)) {
-          warnings.push(`Row ${rowNum}: Duplicate row within upload - skipped`);
-          continue;
+          throw new Error(`Duplicate stack allocation within upload file: Stack ${finalStackNo}`);
         }
 
         processedRowIds.add(rowId);
 
-        if (!groupedReceipts.has(receiptKey)) {
-          groupedReceipts.set(receiptKey, {
+        currentReceiptKey = receiptKey;
+
+        if (!groupedReceiptData) {
+          groupedReceiptData = {
             rowNums: [],
             warehouseId: warehouseId.toString(),
             common: {
@@ -444,12 +469,11 @@ export async function POST(request: NextRequest) {
               qualityReadings: [],
               referencePersons: row.referencePersonName ? [{ name: row.referencePersonName }] : [],
             }],
-          });
+          };
         }
 
-        const groupedReceipt = groupedReceipts.get(receiptKey);
-        groupedReceipt.rowNums.push(rowNum);
-        groupedReceipt.clients[0].stacks.push({
+        groupedReceiptData.rowNums.push(rowNum);
+        groupedReceiptData.clients[0].stacks.push({
           chamberNo: finalChamberNo,
           chamberName: finalChamberName,
           floorNo: finalFloorNo,
@@ -463,15 +487,27 @@ export async function POST(request: NextRequest) {
         });
 
         if (row.referencePersonName) {
-          const existingRefNames = new Set((groupedReceipt.clients[0].referencePersons || []).map((person: any) => person.name?.trim().toLowerCase()));
+          const existingRefNames = new Set((groupedReceiptData.clients[0].referencePersons || []).map((person: any) => person.name?.trim().toLowerCase()));
           if (!existingRefNames.has(row.referencePersonName.trim().toLowerCase())) {
-            groupedReceipt.clients[0].referencePersons.push({ name: row.referencePersonName.trim() });
+            groupedReceiptData.clients[0].referencePersons.push({ name: row.referencePersonName.trim() });
           }
         }
       } catch (error: any) {
-        errors.push({ row: rowNum, error: error.message || 'Unknown validation error' });
+        groupHasError = true;
+        tempGroupErrors.push({ row: rowNum, error: error.message || 'Unknown validation error' });
       }
     }
+    
+    if (groupHasError) {
+      errors.push(...tempGroupErrors);
+      // Rollback processed row ids so they don't affect other groups
+      if (groupedReceiptData) {
+        groupedReceiptData.clients[0].stacks.forEach((s: any) => processedRowIds.delete(s.rowId));
+      }
+    } else if (currentReceiptKey && groupedReceiptData) {
+      groupedReceipts.set(currentReceiptKey, groupedReceiptData);
+    }
+  }
 
     // Pre-fetch all duplicate rowIds from DB to avoid sequential queries
     const allProcessedRowIds = Array.from(processedRowIds);
@@ -491,17 +527,22 @@ export async function POST(request: NextRequest) {
     const finalGroupedReceipts = new Map<string, any>();
     
     // Filter out duplicates and rebuild grouped receipts
-    for (const [receiptKey, groupedReceipt] of groupedReceipts.entries()) {
+    for (const [receiptKey, groupedReceipt] of Array.from(groupedReceipts.entries())) {
       const client = groupedReceipt.clients[0];
-      const validStacks = client.stacks.filter((stack: any) => {
+      
+      let hasDuplicate = false;
+      const duplicateStackNo = [];
+      for (const stack of client.stacks) {
         if (dbDuplicateSet.has(stack.rowId)) {
-          warnings.push(`Row with Stack ${stack.stackNo} already exists in database - skipped`);
-          return false;
+          hasDuplicate = true;
+          duplicateStackNo.push(stack.stackNo);
         }
-        return true;
-      });
+      }
 
-      if (validStacks.length > 0) {
+      if (hasDuplicate) {
+        errors.push({ row: groupedReceipt.rowNums[0], error: `Stack ${duplicateStackNo.join(', ')} already exists in database. Entire transaction failed.` });
+      } else {
+        const validStacks = client.stacks;
         client.stacks = validStacks;
         
         // Recalculate summary totals

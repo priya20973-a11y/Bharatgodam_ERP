@@ -221,11 +221,11 @@ const ColdWarehouseSchema: Schema = new Schema(
 );
 
 ColdWarehouseSchema.index({ userId: 1, name: 1 }, { unique: true });
+ColdWarehouseSchema.index({ userEmail: 1, name: 1 });
+ColdWarehouseSchema.index({ status: 1 });
 
-if (mongoose.models.ColdWarehouse) {
-  delete mongoose.models.ColdWarehouse;
-}
-
-const ColdWarehouse: Model<IColdWarehouse> = mongoose.model<IColdWarehouse>('ColdWarehouse', ColdWarehouseSchema);
+const ColdWarehouse: Model<IColdWarehouse> =
+  mongoose.models.ColdWarehouse || mongoose.model<IColdWarehouse>('ColdWarehouse', ColdWarehouseSchema);
 
 export default ColdWarehouse;
+

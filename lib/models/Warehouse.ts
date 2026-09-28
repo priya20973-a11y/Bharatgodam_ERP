@@ -34,8 +34,11 @@ const WarehouseSchema: Schema = new Schema(
 );
 
 WarehouseSchema.index({ userId: 1, name: 1 }, { unique: true });
+WarehouseSchema.index({ userEmail: 1, name: 1 });
+WarehouseSchema.index({ status: 1 });
 
 const Warehouse: Model<IWarehouse> =
   mongoose.models.Warehouse || mongoose.model<IWarehouse>('Warehouse', WarehouseSchema);
+
 
 export default Warehouse;

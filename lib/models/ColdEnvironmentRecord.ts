@@ -31,10 +31,13 @@ const ColdEnvironmentRecordSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-if (mongoose.models.ColdEnvironmentRecord) {
-  delete mongoose.models.ColdEnvironmentRecord;
-}
+ColdEnvironmentRecordSchema.index({ warehouseId: 1, chamberId: 1, date: -1 });
+ColdEnvironmentRecordSchema.index({ userId: 1, date: -1 });
+ColdEnvironmentRecordSchema.index({ userEmail: 1, date: -1 });
 
-const ColdEnvironmentRecord: Model<IColdEnvironmentRecord> = mongoose.model<IColdEnvironmentRecord>('ColdEnvironmentRecord', ColdEnvironmentRecordSchema);
+const ColdEnvironmentRecord: Model<IColdEnvironmentRecord> =
+  mongoose.models.ColdEnvironmentRecord ||
+  mongoose.model<IColdEnvironmentRecord>('ColdEnvironmentRecord', ColdEnvironmentRecordSchema);
 
 export default ColdEnvironmentRecord;
+
