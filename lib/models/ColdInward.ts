@@ -149,7 +149,7 @@ const ColdInwardSchema: Schema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     villageName: { type: String, required: false },
-    lotNo: { type: String, required: false },
+    lotNo: { type: String, required: true },
     largeBag: { type: Number, required: false },
     smallBag: { type: Number, required: false },
   },

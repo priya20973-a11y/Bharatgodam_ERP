@@ -711,6 +711,19 @@ export async function createColdInward(data: any) {
       return { success: false, error: 'Truck Number is required.' };
     }
 
+    if (!data.lotNo || data.lotNo.trim() === '') {
+      return { success: false, error: 'Lot No is required.' };
+    }
+
+    const existingLot = await ColdInward.findOne({ 
+      lotNo: new RegExp(`^${data.lotNo.trim()}$`, 'i'), 
+      ...getTenantFilter(session) 
+    }).lean();
+    
+    if (existingLot) {
+      return { success: false, error: `Lot No '${data.lotNo}' already exists.` };
+    }
+
     // Check capacity first
     const capacityInfo = await getStackAvailableCapacity(data.warehouseId, data.chamberName || data.chamberNo?.toString(), data.floorNo, data.stackNo);
     const maxAllowedCapacity = capacityInfo.totalCapacity + capacityInfo.bufferCapacity - capacityInfo.occupied;
@@ -840,6 +853,36 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
     const createdInwards = [];
     const clientReceiptMap: Record<string, string[]> = {};
     const warnings: string[] = [];
+
+    // Validate Lot No for bulk upload
+    const lotNosInRequest = new Set<string>();
+    for (let i = 0; i < data.clients.length; i++) {
+      const client = data.clients[i];
+      const rowNum = i + 1;
+      
+      if (!client.lotNo || client.lotNo.trim() === '') {
+        return { success: false, error: `Lot No is required for row ${rowNum}.` };
+      }
+      
+      const trimmedLotNo = client.lotNo.trim();
+      const lowerLotNo = trimmedLotNo.toLowerCase();
+      
+      if (lotNosInRequest.has(lowerLotNo)) {
+        return { success: false, error: `Duplicate Lot No '${trimmedLotNo}' found within the uploaded data (Row ${rowNum}).` };
+      }
+      lotNosInRequest.add(lowerLotNo);
+    }
+    
+    // Check against existing DB records
+    const existingLots = await ColdInward.find({ 
+      lotNo: { $in: data.clients.map((c: any) => new RegExp(`^${c.lotNo.trim()}$`, 'i')) }, 
+      ...getTenantFilter(session) 
+    }).select('lotNo').lean();
+    
+    if (existingLots && existingLots.length > 0) {
+      const duplicateLots = existingLots.map((l: any) => l.lotNo).join(', ');
+      return { success: false, error: `The following Lot No(s) already exist in the database: ${duplicateLots}` };
+    }
 
     // Validate commodities assignment
     for (const client of data.clients) {

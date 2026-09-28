@@ -305,11 +305,16 @@ export async function POST(request: NextRequest) {
 
         if (!warehouseId) {
           const fallbackWarehouse = await ColdWarehouse.findOne({
-            name: { $regex: new RegExp(`^${escapeRegExp((row.warehouseName || '').trim())}$`, 'i') }
+            name: { $regex: new RegExp(`^${escapeRegExp((row.warehouseName || '').trim())}$`, 'i') },
+            ...tenantFilter
           }).lean();
           if (fallbackWarehouse) {
             warehouseId = fallbackWarehouse._id;
           }
+        }
+
+        if (!warehouseId) {
+          throw new Error(`Warehouse '${row.warehouseName}' does not exist in this account.`);
         }
 
         if (!clientId) {
@@ -325,18 +330,6 @@ export async function POST(request: NextRequest) {
            if (!hasAccess) {
              throw new Error(`Variety ${row.variety} is not assigned to this client.`);
            }
-        }
-
-        if (!warehouseId) {
-          const availableWarehouses = warehouses
-            .slice(0, 10)
-            .map((warehouse: any) => warehouse.name)
-            .join(', ');
-          const debugMsg = `Warehouse "${row.warehouseName}" not found in current WSP. Session userId=${session?.user?.id}; role=${session?.user?.role}; companyName=${(session?.user as any)?.companyName || 'N/A'}; loadedWarehouseNames=${warehouses.map((w: any) => w.name).join(' | ') || 'none'}`;
-          console.error('[cold bulk upload debug]', debugMsg);
-          throw new Error(
-            `Warehouse "${row.warehouseName}" not found in current WSP. Available warehouses: ${availableWarehouses || 'none'}`
-          );
         }
 
         const rawChamber = (row.chamberNo || '').trim();
