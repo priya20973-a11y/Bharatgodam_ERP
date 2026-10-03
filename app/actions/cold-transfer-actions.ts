@@ -372,157 +372,181 @@ export async function createOwnershipTransfer(data: {
   try {
     await mongooseSession.withTransaction(async () => {
       for (const { source, targetInward } of validatedSources) {
-        let remainingWeight = source.transferWeight;
-        let remainingBags = source.transferBags;
+        try {
+          let remainingWeight = source.transferWeight;
+          let remainingBags = source.transferBags;
 
-        // 1. Distribute across available allocations
-        const transferAllocations = [];
-        
-        for (const alloc of targetInward.availableAllocations) {
-          if (remainingWeight <= 0 && remainingBags <= 0) break;
+          // 1. Distribute across available allocations
+          const transferAllocations = [];
           
-          const takeWeight = Math.min(alloc.allocatedWeight, remainingWeight);
-          const takeBags = Math.min(alloc.bagsCount, remainingBags);
-          
-          if (takeWeight > 0 || takeBags > 0) {
-            transferAllocations.push({
-              chamberName: alloc.chamberName,
-              chamberNo: alloc.chamberNo,
-              floorNo: alloc.floorNo,
-              stackNo: alloc.stackNo,
-              allocatedWeight: takeWeight,
-              bagsCount: takeBags,
-              grade: targetInward.grade,
-              gradingType: targetInward.gradingType,
-              stockType: transferType
-            });
+          for (const alloc of targetInward.availableAllocations) {
+            if (remainingWeight <= 0 && remainingBags <= 0) break;
             
-            remainingWeight -= takeWeight;
-            remainingBags -= takeBags;
+            const takeWeight = Math.min(alloc.allocatedWeight, remainingWeight);
+            const takeBags = Math.min(alloc.bagsCount, remainingBags);
+            
+            if (takeWeight > 0 || takeBags > 0) {
+              transferAllocations.push({
+                chamberName: alloc.chamberName,
+                chamberNo: alloc.chamberNo,
+                floorNo: alloc.floorNo,
+                stackNo: alloc.stackNo,
+                allocatedWeight: takeWeight,
+                bagsCount: takeBags,
+                grade: targetInward.grade,
+                gradingType: targetInward.gradingType,
+                stockType: transferType
+              });
+              
+              remainingWeight -= takeWeight;
+              remainingBags -= takeBags;
+            }
           }
-        }
 
-        if (transferType === 'Purchase') {
-          const originalInward = await ColdInward.findById(targetInward._id).session(mongooseSession);
-          if (!originalInward) throw new Error("Original inward not found");
+          if (transferType === 'Purchase') {
+            const originalInward = await ColdInward.findById(targetInward._id).session(mongooseSession);
+            if (!originalInward) throw new Error("Original inward not found");
 
-          for (const item of transferAllocations) {
-            const selfAlloc = originalInward.stackAllocations.find((a: any) => 
-              (a.chamberName === item.chamberName || (a.chamberNo && a.chamberNo === item.chamberNo)) && 
-              a.floorNo === item.floorNo && 
-              a.stackNo === item.stackNo &&
-              (a.stockType === 'Self' || !a.stockType)
-            );
+            for (const item of transferAllocations) {
+              const selfAlloc = originalInward.stackAllocations.find((a: any) => 
+                (a.chamberName === item.chamberName || (a.chamberNo && a.chamberNo === item.chamberNo)) && 
+                a.floorNo === item.floorNo && 
+                a.stackNo === item.stackNo &&
+                (a.stockType === 'Self' || !a.stockType)
+              );
 
-            if (selfAlloc) {
-              selfAlloc.allocatedWeight -= item.allocatedWeight;
-              if (selfAlloc.bagsCount) selfAlloc.bagsCount -= item.bagsCount;
-              if (selfAlloc.allocatedWeight < 0) selfAlloc.allocatedWeight = 0;
-              if (selfAlloc.bagsCount && selfAlloc.bagsCount < 0) selfAlloc.bagsCount = 0;
+              if (selfAlloc) {
+                selfAlloc.allocatedWeight -= item.allocatedWeight;
+                if (selfAlloc.bagsCount) selfAlloc.bagsCount -= item.bagsCount;
+                if (selfAlloc.allocatedWeight < 0) selfAlloc.allocatedWeight = 0;
+                if (selfAlloc.bagsCount && selfAlloc.bagsCount < 0) selfAlloc.bagsCount = 0;
+              }
+
+              originalInward.stackAllocations.push({
+                chamberName: item.chamberName,
+                chamberNo: item.chamberNo,
+                floorNo: item.floorNo,
+                stackNo: item.stackNo,
+                allocatedWeight: item.allocatedWeight,
+                bagsCount: item.bagsCount,
+                stockType: 'Purchase'
+              });
             }
 
-            originalInward.stackAllocations.push({
-              chamberName: item.chamberName,
-              chamberNo: item.chamberNo,
-              floorNo: item.floorNo,
-              stackNo: item.stackNo,
-              allocatedWeight: item.allocatedWeight,
-              bagsCount: item.bagsCount,
-              stockType: 'Purchase'
+            const hasSelf = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && (a.stockType === 'Self' || !a.stockType));
+            const hasPurchase = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && a.stockType === 'Purchase');
+            
+            if (hasSelf && hasPurchase) {
+              originalInward.stockType = 'Both';
+            } else if (hasPurchase) {
+              originalInward.stockType = 'Purchase';
+            } else {
+              originalInward.stockType = 'Self';
+            }
+
+            // Ensure old records don't fail schema validation on save
+            if (!originalInward.lotNo) {
+              originalInward.lotNo = originalInward.receiptNumber || `T-${new mongoose.Types.ObjectId().toString()}`;
+            }
+
+            await originalInward.save({ session: mongooseSession });
+
+            const transferData = {
+              fromClientId: source.fromClientId,
+              toClientId: toClientId || targetInward.warehouseId._id,
+              toClientModel: 'ColdWarehouse',
+              originalInwardId: targetInward._id,
+              newInwardId: targetInward._id, 
+              warehouseId: targetInward.warehouseId._id,
+              commodityId: targetInward.commodityId._id,
+              stackAllocations: transferAllocations,
+              quantityKg: source.transferWeight,
+              bagsCount: source.transferBags,
+              transferType: transferType,
+              date: transferDateObj,
+              batchId
+            };
+
+            const transfer = (await ColdTransfer.create([appendOwnership(transferData, session)], { session: mongooseSession }))[0];
+            createdTransferIds.push(transfer._id.toString());
+
+            await logColdActivity({
+              actionType: 'CREATE',
+              module: 'Ownership Transfer',
+              recordId: transfer._id.toString(),
+              description: `Ownership transferred (Purchase): ${source.transferWeight} Kg (Batch: ${batchId})`,
+              newValue: JSON.parse(JSON.stringify(transfer)),
+              sessionFallback: session
+            });
+          } else {
+            // Self transfer
+            const newInwardData = {
+              clientId: toClientId,
+              commodityId: targetInward.commodityId._id,
+              warehouseId: targetInward.warehouseId._id,
+              stackAllocations: transferAllocations,
+              quantityKg: source.transferWeight,
+              bagsCount: source.transferBags,
+              grade: targetInward.grade,
+              gradingType: targetInward.gradingType,
+              stockType: transferType,
+              seed: targetInward.seed,
+              tableLabel: targetInward.tableLabel,
+              date: transferDateObj,
+              remarks: 'Ownership Transfer In',
+              weighbridgeSlipNo: targetInward.weighbridgeSlipNo,
+              marko: targetInward.marko,
+              lotNo: targetInward.lotNo || targetInward.receiptNumber || `T-${new mongoose.Types.ObjectId().toString()}`,
+              receiptNumber: targetInward.receiptNumber || targetInward.lotNo || `R-${new mongoose.Types.ObjectId().toString()}`,
+              jin: targetInward.jin,
+              mixed: targetInward.mixed,
+              kataBharati: targetInward.kataBharati,
+              largeBag: targetInward.largeBag,
+              smallBag: targetInward.smallBag,
+              unit: targetInward.unit,
+              farmerName: targetInward.farmerName,
+              farmerId: targetInward.farmerId,
+              villageName: targetInward.villageName
+            };
+
+            const newInward = (await ColdInward.create([appendOwnership(newInwardData, session)], { session: mongooseSession }))[0];
+
+            const transferData = {
+              fromClientId: source.fromClientId,
+              toClientId: toClientId,
+              originalInwardId: targetInward._id,
+              newInwardId: newInward._id,
+              warehouseId: targetInward.warehouseId._id,
+              commodityId: targetInward.commodityId._id,
+              stackAllocations: transferAllocations,
+              quantityKg: source.transferWeight,
+              bagsCount: source.transferBags,
+              transferType: transferType,
+              date: transferDateObj,
+              batchId
+            };
+
+            const transfer = (await ColdTransfer.create([appendOwnership(transferData, session)], { session: mongooseSession }))[0];
+            createdTransferIds.push(transfer._id.toString());
+
+            await logColdActivity({
+              actionType: 'CREATE',
+              module: 'Ownership Transfer',
+              recordId: transfer._id.toString(),
+              description: `Ownership transferred: ${source.transferWeight} Kg to new receipt ${newInward.receiptNumber || newInward.lotNo} (Batch: ${batchId})`,
+              newValue: JSON.parse(JSON.stringify(transfer)),
+              sessionFallback: session
             });
           }
-
-          const hasSelf = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && (a.stockType === 'Self' || !a.stockType));
-          const hasPurchase = originalInward.stackAllocations.some((a: any) => a.allocatedWeight > 0 && a.stockType === 'Purchase');
-          
-          if (hasSelf && hasPurchase) {
-            originalInward.stockType = 'Both';
-          } else if (hasPurchase) {
-            originalInward.stockType = 'Purchase';
-          } else {
-            originalInward.stockType = 'Self';
-          }
-
-          await originalInward.save({ session: mongooseSession });
-
-          const transferData = {
-            fromClientId: source.fromClientId,
-            toClientId: toClientId || targetInward.warehouseId._id,
-            toClientModel: 'ColdWarehouse',
-            originalInwardId: targetInward._id,
-            newInwardId: targetInward._id, 
-            warehouseId: targetInward.warehouseId._id,
-            commodityId: targetInward.commodityId._id,
-            stackAllocations: transferAllocations,
-            quantityKg: source.transferWeight,
-            bagsCount: source.transferBags,
-            transferType: transferType,
-            date: transferDateObj,
-            batchId
-          };
-
-          const transfer = (await ColdTransfer.create([appendOwnership(transferData, session)], { session: mongooseSession }))[0];
-          createdTransferIds.push(transfer._id.toString());
-
-          await logColdActivity({
-            actionType: 'CREATE',
-            module: 'Ownership Transfer',
-            recordId: transfer._id.toString(),
-            description: `Ownership transferred (Purchase): ${source.transferWeight} Kg (Batch: ${batchId})`,
-            newValue: JSON.parse(JSON.stringify(transfer)),
-            sessionFallback: session
-          });
-        } else {
-          // Self transfer
-          const newInwardData = {
-            clientId: toClientId,
-            commodityId: targetInward.commodityId._id,
-            warehouseId: targetInward.warehouseId._id,
-            stackAllocations: transferAllocations,
-            quantityKg: source.transferWeight,
-            bagsCount: source.transferBags,
-            grade: targetInward.grade,
-            gradingType: targetInward.gradingType,
-            stockType: transferType,
-            seed: targetInward.seed,
-            tableLabel: targetInward.tableLabel,
-            date: transferDateObj,
-            remarks: 'Ownership Transfer In',
-            weighbridgeSlipNo: targetInward.weighbridgeSlipNo,
-            marko: targetInward.marko,
-          };
-
-          const newInward = (await ColdInward.create([appendOwnership(newInwardData, session)], { session: mongooseSession }))[0];
-
-          const transferData = {
-            fromClientId: source.fromClientId,
-            toClientId: toClientId,
-            originalInwardId: targetInward._id,
-            newInwardId: newInward._id,
-            warehouseId: targetInward.warehouseId._id,
-            commodityId: targetInward.commodityId._id,
-            stackAllocations: transferAllocations,
-            quantityKg: source.transferWeight,
-            bagsCount: source.transferBags,
-            transferType: transferType,
-            date: transferDateObj,
-            batchId
-          };
-
-          const transfer = (await ColdTransfer.create([appendOwnership(transferData, session)], { session: mongooseSession }))[0];
-          createdTransferIds.push(transfer._id.toString());
-
-          await logColdActivity({
-            actionType: 'CREATE',
-            module: 'Ownership Transfer',
-            recordId: transfer._id.toString(),
-            description: `Ownership transferred: ${source.transferWeight} Kg to new receipt ${newInward.receiptNumber} (Batch: ${batchId})`,
-            newValue: JSON.parse(JSON.stringify(transfer)),
-            sessionFallback: session
-          });
+        } catch (innerError: any) {
+          console.error(`[Ownership Transfer Error] Failed processing transfer for receipt ${targetInward.receiptNumber || targetInward.lotNo}:`, innerError);
+          throw innerError;
         }
       }
     });
+  } catch (error: any) {
+    console.error('[Ownership Transfer Transaction Error]', error);
+    return { success: false, error: error.message || 'Failed to process ownership transfer' };
   } finally {
     await mongooseSession.endSession();
   }

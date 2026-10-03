@@ -522,14 +522,14 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     }
 
     // Validate quantities
-    const computedGlobalNetWeight = selectedItems.reduce((acc, item) => {
+    const totalOutwardWeight = selectedItems.reduce((acc, item) => {
       const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
-      const calcNetWeight = isMultiStack
+      const calcOutwardWeight = isMultiStack
         ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
         : (Number(item.outwardWeight || 0));
-      return acc + calcNetWeight;
+      return acc + calcOutwardWeight;
     }, 0);
-    const computedWeightLoss = (Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)) - computedGlobalNetWeight;
+    const computedWeightLoss = (Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)) - totalOutwardWeight;
 
     const itemsPayload = [];
     for (const item of selectedItems) {
@@ -887,13 +887,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         <div className="space-y-2">
           <label className="text-sm font-medium text-green-700">Net Weight (KG)</label>
           <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">
-            {selectedItems.reduce((acc, item) => {
-              const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
-              const calcNetWeight = isMultiStack
-                ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
-                : (Number(item.outwardWeight || 0));
-              return acc + calcNetWeight;
-            }, 0).toFixed(2)}
+            {(Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)).toFixed(2)}
           </div>
         </div>
         <div className="space-y-2">
@@ -901,10 +895,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           <div className="px-3 py-2 border rounded-md bg-white text-slate-700 font-bold shadow-sm">
             {((Number(globalGrossWeight || 0) - Number(globalEmptyWeight || 0)) - selectedItems.reduce((acc, item) => {
               const isMultiStack = item.inward.availableAllocations && item.inward.availableAllocations.length > 1;
-              const calcNetWeight = isMultiStack
+              const calcOutwardWeight = isMultiStack
                 ? Object.values(item.stackSelections || {}).reduce((sum: number, s: any) => sum + (s.selected ? (Number(s.outwardWeight) || 0) : 0), 0)
                 : (Number(item.outwardWeight || 0));
-              return acc + calcNetWeight;
+              return acc + calcOutwardWeight;
             }, 0)).toFixed(2)}
           </div>
         </div>
@@ -1009,7 +1003,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         {stackSel.selected && (
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
                             <div className="space-y-1">
-                              <label className="text-xs font-semibold text-blue-700">Outward Weight (KG) *</label>
+                              <label className="text-xs font-semibold text-blue-700">Weight (KG) *</label>
                               <ColdNumberInput
                                 required
                                 min="0"
@@ -1070,7 +1064,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               <>
                 <div className="grid grid-cols-1 gap-4 mb-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-green-700">Outward Weight (KG) *</label>
+                    <label className="text-sm font-medium text-green-700">Weight (KG) *</label>
                     <ColdNumberInput required min="0" step="0.01" value={item.outwardWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'outwardWeight', val ? Number(val) : null)} />
                   </div>
                 </div>
