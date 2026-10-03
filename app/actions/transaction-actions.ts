@@ -9,7 +9,7 @@ import Commodity from '@/lib/models/Commodity';
 import Client from '@/lib/models/Client';
 import RevenueDistribution from '@/lib/models/RevenueDistribution';
 import { revalidatePath } from 'next/cache';
-import { calculateRent } from '@/lib/pricing-engine';
+import { calculateRent, calculateInventoryBasedRent, InventoryChange } from '@/lib/pricing-engine';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
@@ -736,317 +736,105 @@ export async function processOutward(data: {
  */
 export async function getClientRevenueAnalytics(warehouseId?: string, month?: string) {
   try {
-    console.log('[getClientRevenueAnalytics] Starting client revenue calculation...');
+    const session = await getServerSession(authOptions);
+    const isAdminUser = isAdmin(session);
+    const tenantFilter = getTenantFilterForMongo(session);
+    const ownershipFilter = appendOwnershipForMongo({}, session);
+
     await connectToDatabase();
-
-    let session;
-    try {
-      session = await requireSession();
-      console.log('[getClientRevenueAnalytics] Session found for:', session.user?.email);
-    } catch (error) {
-      console.log('[getClientRevenueAnalytics] No session found, proceeding without tenant filter');
-    }
-
-    const tenantFilter = session
-      ? getTenantFilterForMongo(session)
-      : {};
-    console.log('[getClientRevenueAnalytics] Tenant filter applied', tenantFilter);
-
     const db = mongoose.connection.db;
-    if (!db) throw new Error('Database connection not established');
-
-    const isAdminUser = session ? isAdmin(session) : false;
-    let warehouseOwnerFilter: any = {};
-    let warehouseObjectId: mongoose.Types.ObjectId | null = null;
-
-    if (warehouseId && warehouseId !== 'ALL') {
-      try {
-        warehouseObjectId = new mongoose.Types.ObjectId(warehouseId);
-      } catch (error) {
-        console.warn('[getClientRevenueAnalytics] Invalid warehouseId provided:', warehouseId);
-      }
+    if (!db) throw new Error('DB missing');
+    
+    // Instead of querying ledger_entries, we query inwards!
+    let inwardQuery: any = { ...ownershipFilter };
+    if (!isAdminUser && session && Object.keys(ownershipFilter).length === 0) {
+       inwardQuery = { ...tenantFilter };
     }
 
-    if (isAdminUser && warehouseObjectId) {
-      const selectedWarehouse = await db.collection('warehouses').findOne({ _id: warehouseObjectId });
-      if (selectedWarehouse) {
-        const ownerClauses: any[] = [];
-        if (selectedWarehouse.userId) ownerClauses.push({ userId: selectedWarehouse.userId });
-        if (selectedWarehouse.userEmail) ownerClauses.push({ userEmail: selectedWarehouse.userEmail });
-        if (ownerClauses.length > 0) {
-          warehouseOwnerFilter = { $or: ownerClauses };
-        }
-      }
+    if (warehouseId) {
+      inwardQuery.warehouseId = { $in: [warehouseId, new mongoose.Types.ObjectId(warehouseId)] };
     }
 
-    const ownershipFilter = isAdminUser && warehouseObjectId && Object.keys(warehouseOwnerFilter).length > 0
-      ? warehouseOwnerFilter
-      : session
-        ? tenantFilter
-        : {};
-
-    const ledgerQuery: any = {};
-    let warehouseScopedFilter: any = {};
-    let warehouseOwnedByTenant = false;
-
-    if (warehouseObjectId) {
-      const warehouseMatchIds: Array<string | mongoose.Types.ObjectId> = [warehouseObjectId];
-      if (warehouseId) {
-        warehouseMatchIds.push(warehouseId);
-      }
-
-      const warehouseQuery: any = {
-        _id: { $in: warehouseMatchIds }
-      };
-      if (!isAdminUser && session) {
-        warehouseQuery.$or = tenantFilter.$or ? tenantFilter.$or : [];
-      }
-
-      const selectedWarehouse = await db.collection('warehouses').findOne(warehouseQuery);
-      if (!selectedWarehouse) {
-        return {
-          summary: { totalRevenue: 0, ownerEarnings: 0, platformCommissions: 0 },
-          warehouseRevenue: [],
-        };
-      }
-
-      warehouseOwnedByTenant = !isAdminUser;
-      warehouseScopedFilter = {};
-
-      const inwardQuery: any = {
-        warehouseId: { $in: warehouseMatchIds },
-      };
-      const matchingInwards = await db
-        .collection('inwards')
-        .find(inwardQuery, { projection: { _id: 1 } })
-        .toArray();
-      const matchingInwardIds = matchingInwards.flatMap((inward: any) => {
-        const ids: any[] = [];
-        if (inward._id != null) {
-          ids.push(inward._id);
-          ids.push(inward._id.toString());
-        }
-        return ids;
-      });
-
-      const warehouseClause = { warehouseId: { $in: warehouseMatchIds } };
-      const orClauses: any[] = [warehouseClause];
-      if (matchingInwardIds.length > 0) {
-        orClauses.push({ inwardId: { $in: matchingInwardIds } });
-      }
-
-      const accessClause = { $or: orClauses };
-      if (Object.keys(ownershipFilter).length > 0 && isAdminUser) {
-        ledgerQuery.$and = [accessClause, ownershipFilter];
-      } else {
-        Object.assign(ledgerQuery, accessClause);
-      }
-    } else if (Object.keys(ownershipFilter).length > 0) {
-      const ownedWarehouses = await db.collection('warehouses')
-        .find(ownershipFilter, { projection: { _id: 1 } })
-        .toArray();
-      const ownedWarehouseIds = ownedWarehouses.flatMap((warehouse: any) => {
-        const ids: any[] = [];
-        if (warehouse._id != null) {
-          ids.push(warehouse._id);
-          ids.push(warehouse._id.toString());
-        }
-        return ids;
-      });
-
-      const ownedInwards = ownedWarehouseIds.length > 0
-        ? await db.collection('inwards')
-          .find({ warehouseId: { $in: ownedWarehouseIds } }, { projection: { _id: 1 } })
-          .toArray()
-        : [];
-      const ownedInwardIds = ownedInwards.flatMap((inward: any) => {
-        const ids: any[] = [];
-        if (inward._id != null) {
-          ids.push(inward._id);
-          ids.push(inward._id.toString());
-        }
-        return ids;
-      });
-
-      const warehouseClauses: any[] = [];
-      if (ownedWarehouseIds.length > 0) {
-        warehouseClauses.push({ warehouseId: { $in: ownedWarehouseIds } });
-      }
-      if (ownedInwardIds.length > 0) {
-        warehouseClauses.push({ inwardId: { $in: ownedInwardIds } });
-      }
-
-      if (warehouseClauses.length > 0) {
-        ledgerQuery.$or = warehouseClauses;
-      } else {
-        Object.assign(ledgerQuery, ownershipFilter);
-      }
-    }
-
-    // Exclude stale SPLIT entries to avoid double counting
-    ledgerQuery.status = { $ne: 'SPLIT' };
-
-    // Get all ledger entries
-    const allLedgerEntries = await db.collection('ledger_entries').find(ledgerQuery).toArray();
-    console.log('[getClientRevenueAnalytics] Total ledger entries:', allLedgerEntries.length);
-
-    const filteredEntries = allLedgerEntries;
-
-    // Build lookup sets for warehouses, commodities, clients, and inward records
+    const allInwards = await db.collection('inwards').find(inwardQuery).toArray();
+    
+    // Get unique warehouse, client, commodity IDs
     const warehouseIds = new Set<string>();
     const commodityIds = new Set<string>();
     const clientIds = new Set<string>();
     const inwardIds = new Set<string>();
 
-    filteredEntries.forEach((entry: any) => {
-      if (entry.warehouseId) warehouseIds.add(entry.warehouseId.toString());
-      if (entry.commodityId) commodityIds.add(entry.commodityId.toString());
-      if (entry.clientId) clientIds.add(entry.clientId.toString());
-      if (!entry.warehouseId && entry.inwardId) inwardIds.add(entry.inwardId.toString());
+    allInwards.forEach((inward: any) => {
+      if (inward.warehouseId) warehouseIds.add(inward.warehouseId.toString());
+      if (inward.commodityId) commodityIds.add(inward.commodityId.toString());
+      if (inward.clientId) clientIds.add(inward.clientId.toString());
+      if (inward._id) inwardIds.add(inward._id.toString());
     });
 
-    let inwardMap = new Map<string, { warehouseId: any; commodityId: any }>();
-    if (inwardIds.size > 0) {
-      const inwards = await db.collection('inwards').find({
-        _id: { $in: Array.from(inwardIds).map(id => new mongoose.Types.ObjectId(id)) }
-      }).toArray();
-
-      inwardMap = new Map(inwards.map(inward => [
-        inward._id.toString(),
-        {
-          warehouseId: inward.warehouseId,
-          commodityId: inward.commodityId
-        }
-      ]));
-
-      inwards.forEach(inward => {
-        if (inward.warehouseId) warehouseIds.add(inward.warehouseId.toString());
-        if (inward.commodityId) commodityIds.add(inward.commodityId.toString());
-      });
+    if (inwardIds.size === 0) {
+      return {
+        summary: { totalRevenue: 0, ownerEarnings: 0, platformCommissions: 0 },
+        warehouseRevenue: [],
+        ledgerPeriods: []
+      };
     }
 
-    const warehouses = await db.collection('warehouses').find({
-      _id: { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) },
-      ...(session ? tenantFilter : {})
-    }).toArray();
-    const commodities = await db.collection('commodities').find({
-      _id: { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) }
-    }).toArray();
-    const clients = await db.collection('clients').find({
-      _id: { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) }
-    }).toArray();
+    let outwardDirectFilter: any = { ...ownershipFilter };
+    if (!isAdminUser && session && Object.keys(ownershipFilter).length === 0) {
+       outwardDirectFilter = { ...tenantFilter };
+    }
+    if (warehouseIds.size > 0) outwardDirectFilter.warehouseId = { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) };
+    if (clientIds.size > 0) outwardDirectFilter.clientId = { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) };
+    if (commodityIds.size > 0) outwardDirectFilter.commodityId = { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) };
 
     const outwardFilter: any = {
-      ...(Object.keys(ownershipFilter).length > 0 ? ownershipFilter : (session ? tenantFilter : {})),
-      warehouseId: { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) }
+      $or: [
+        { inwardId: { $in: Array.from(inwardIds).map(id => new mongoose.Types.ObjectId(id)) } },
+        outwardDirectFilter
+      ]
     };
-    if (clientIds.size > 0) {
-      outwardFilter.clientId = { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) };
-    }
-    if (commodityIds.size > 0) {
-      outwardFilter.commodityId = { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) };
-    }
+    const allOutwards = await db.collection('outwards').find(outwardFilter).toArray();
 
-    const outwards = await db.collection('outwards').find(outwardFilter).toArray();
-    const outwardGroups = new Map<string, Array<{ date: Date; quantity: number }>>();
-    outwards.forEach((outward: any) => {
-      const key = `${outward.clientId?.toString() || ''}-${outward.warehouseId?.toString() || ''}-${outward.commodityId?.toString() || ''}`;
-      const outwardDate = parseIsoDate(outward.date);
-      const quantity = typeof outward.quantityMT === 'number' ? outward.quantityMT : 0;
-      if (!outwardDate || quantity <= 0) return;
+    // Dictionaries for fast lookup
+    const warehouses = await db.collection('warehouses').find({ _id: { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
+    const commodities = await db.collection('commodities').find({ _id: { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
+    const clients = await db.collection('clients').find({ _id: { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
 
-      if (!outwardGroups.has(key)) {
-        outwardGroups.set(key, []);
-      }
-      outwardGroups.get(key)?.push({ date: outwardDate, quantity });
-    });
-
-    outwardGroups.forEach((events) => {
-      events.sort((a, b) => a.date.getTime() - b.date.getTime());
-    });
-
-    const warehouseMap = new Map(warehouses.map(w => [w._id.toString(), w.name]));
-    const commodityRateMap = new Map(commodities.map(c => [
+    const warehouseMap = new Map(warehouses.map((w: any) => [w._id.toString(), w.name]));
+    const commodityMap = new Map(commodities.map((c: any) => [c._id.toString(), c.name]));
+    const commodityRateMap = new Map(commodities.map((c: any) => [
       c._id.toString(),
-      c.ratePerMtPerDay ?? (c.ratePerMtMonth ? c.ratePerMtMonth / 30 : 10)
+      c.ratePerMtPerMonth || (c.ratePerMtPerDay ? c.ratePerMtPerDay * 30 : 300)
     ]));
-    const commodityMap = new Map(commodities.map(c => [c._id.toString(), c.name]));
-    const clientMap = new Map(clients.map(c => [c._id.toString(), c.name]));
+    const clientMap = new Map(clients.map((c: any) => [c._id.toString(), c.name]));
 
-    // Group by warehouse, then by month
+    // Group inwards and outwards by combo: clientId-warehouseId-commodityId
+    const comboMap = new Map<string, { inwards: any[], outwards: any[] }>();
+    
+    allInwards.forEach((inward: any) => {
+      const key = `${inward.clientId?.toString() || ''}-${inward.warehouseId?.toString() || ''}-${inward.commodityId?.toString() || ''}`;
+      if (!comboMap.has(key)) comboMap.set(key, { inwards: [], outwards: [] });
+      comboMap.get(key)!.inwards.push(inward);
+    });
+
+    allOutwards.forEach((outward: any) => {
+      const inward = allInwards.find((i: any) => i._id.toString() === outward.inwardId?.toString());
+      
+      const clientId = outward.clientId || inward?.clientId;
+      const warehouseId = outward.warehouseId || inward?.warehouseId;
+      const commodityId = outward.commodityId || inward?.commodityId;
+
+      if (clientId && warehouseId && commodityId) {
+        const key = `${clientId.toString()}-${warehouseId.toString()}-${commodityId.toString()}`;
+        if (!comboMap.has(key)) comboMap.set(key, { inwards: [], outwards: [] });
+        comboMap.get(key)!.outwards.push(outward);
+      }
+    });
+
     const warehouseRevenueData = new Map<string, any>();
+    const ledgerPeriods: any[] = [];
 
-    const entriesByKey = new Map<string, Array<any>>();
-    const keyToWarehouseId = new Map<string, string>();
-
-    for (const entry of filteredEntries) {
-      let warehouseId = entry.warehouseId;
-      let commodityId = entry.commodityId;
-
-      if (!warehouseId && entry.inwardId) {
-        const inwardData = inwardMap.get(entry.inwardId.toString());
-        if (inwardData) {
-          warehouseId = inwardData.warehouseId;
-          commodityId = inwardData.commodityId;
-        }
-      }
-
-      if (!warehouseId || !commodityId) {
-        continue;
-      }
-
-      const warehouseIdStr = warehouseId.toString();
-      const commodityIdStr = commodityId.toString();
-      const ledgerKey = `${entry.clientId?.toString() || ''}-${warehouseIdStr}-${commodityIdStr}`;
-
-      const startDate = parseIsoDate(entry.periodStartDate);
-      let endDate = parseIsoDate(entry.periodEndDate);
-      const today: Date = parseIsoDate(new Date()) ?? new Date();
-
-      if (!endDate && startDate) {
-        if (entry.status === 'ACTIVE') {
-          endDate = today;
-        } else {
-          const daysStored = typeof entry.daysStored === 'number' ? entry.daysStored : 0;
-          if (daysStored > 0) {
-            endDate = addDays(startDate, daysStored - 1);
-          }
-        }
-      }
-
-      if (!startDate || !endDate) {
-        continue;
-      }
-
-      if (endDate > today) {
-        endDate = today;
-      }
-      if (startDate > endDate) {
-        continue;
-      }
-
-      const dailyRate = getDailyRateForEntry(entry, commodityRateMap);
-      const quantity = entry.quantityMT || 0;
-      if (quantity <= 0) continue;
-
-      if (!entriesByKey.has(ledgerKey)) {
-        entriesByKey.set(ledgerKey, []);
-        keyToWarehouseId.set(ledgerKey, warehouseIdStr);
-      }
-      entriesByKey.get(ledgerKey)?.push({
-        originalEntry: entry,
-        startDate,
-        endDate,
-        quantity,
-        remainingQuantity: quantity,
-        dailyRate,
-        revenueByMonth: new Map<string, number>()
-      });
-    }
-
-    for (const [ledgerKey, ledgerEntries] of entriesByKey.entries()) {
-      const warehouseIdStr = keyToWarehouseId.get(ledgerKey)!;
-      const outwardEvents = outwardGroups.get(ledgerKey) || [];
+    for (const [comboKey, data] of comboMap.entries()) {
+      const [clientIdStr, warehouseIdStr, commodityIdStr] = comboKey.split('-');
       const warehouseData = warehouseRevenueData.get(warehouseIdStr) || {
         warehouseId: new mongoose.Types.ObjectId(warehouseIdStr),
         warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown Warehouse',
@@ -1054,91 +842,85 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         totalRevenue: 0
       };
 
-      const sortedEntries = ledgerEntries.slice().sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-      const startDate = sortedEntries.reduce((min: Date | null, entry: any) => {
-        if (!min || entry.startDate < min) return entry.startDate;
-        return min;
-      }, null as Date | null) as Date;
-      const endDate = sortedEntries.reduce((max: Date | null, entry: any) => {
-        if (!max || entry.endDate > max) return entry.endDate;
-        return max;
-      }, null as Date | null) as Date;
+      const ratePerMonth = commodityRateMap.get(commodityIdStr) || 300;
 
-      const eventsByDate = new Map<string, Array<{ date: Date; quantity: number }>>();
-      outwardEvents.forEach(event => {
-        const dateKey = formatDateKey(event.date);
-        if (!eventsByDate.has(dateKey)) eventsByDate.set(dateKey, []);
-        eventsByDate.get(dateKey)?.push(event);
-      });
+      // Find min date and max date across this combo
+      let minDate: Date | null = null;
+      let maxDate: Date = new Date(); // Up to today
 
-      const boundaryDates = new Set<number>();
-      
-      for (const entry of sortedEntries) {
-        boundaryDates.add(entry.startDate.getTime());
-        boundaryDates.add(entry.endDate.getTime() + 86400000); 
+      for (const i of data.inwards) {
+        const d = new Date(i.date);
+        if (!minDate || d < minDate) minDate = d;
       }
-      for (const event of outwardEvents) {
-        boundaryDates.add(event.date.getTime());
-      }
-      
-      let currentMonthStart = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
-      while (currentMonthStart <= endDate) {
-        boundaryDates.add(currentMonthStart.getTime());
-        currentMonthStart.setUTCMonth(currentMonthStart.getUTCMonth() + 1);
-      }
-      
-      const sortedBoundaries = Array.from(boundaryDates).sort((a, b) => a - b);
-      
-      for (let i = 0; i < sortedBoundaries.length - 1; i++) {
-        const periodStartMs = sortedBoundaries[i];
-        const periodEndMs = sortedBoundaries[i + 1];
-        
-        if (periodStartMs > endDate.getTime()) break;
-        if (periodStartMs < startDate.getTime()) continue;
-        
-        const periodStart = new Date(periodStartMs);
-        
-        const currentKey = formatDateKey(periodStart);
-        const events = eventsByDate.get(currentKey) || [];
-        let remainingOutwardQuantity = events.reduce((sum, event) => sum + event.quantity, 0);
 
-        if (remainingOutwardQuantity > 0) {
-          for (const entry of sortedEntries) {
-            if (remainingOutwardQuantity <= 0) break;
-            if (entry.remainingQuantity <= 0) continue;
-            if (entry.startDate.getTime() <= periodStartMs && periodStartMs <= entry.endDate.getTime()) {
-              const reduceQty = Math.min(entry.remainingQuantity, remainingOutwardQuantity);
-              entry.remainingQuantity -= reduceQty;
-              remainingOutwardQuantity -= reduceQty;
-            }
+      if (!minDate) continue;
+
+      let currentMonthStart = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), 1));
+      const endMonthStart = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), 1));
+
+      while (currentMonthStart <= endMonthStart) {
+        const year = currentMonthStart.getUTCFullYear();
+        const monthNum = currentMonthStart.getUTCMonth() + 1;
+        const monthKey = `${year}-${String(monthNum).padStart(2, '0')}`;
+        
+        if (!month || month === 'ALL' || monthKey === month) {
+          const mStart = new Date(Date.UTC(year, monthNum - 1, 1));
+          const mEnd = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
+
+          const preMonthInwards = data.inwards.filter(i => new Date(i.date) < mStart);
+          const preMonthOutwards = data.outwards.filter(o => new Date(o.date) < mStart);
+          const monthInwards = data.inwards.filter(i => new Date(i.date) >= mStart && new Date(i.date) <= mEnd);
+          const monthOutwards = data.outwards.filter(o => new Date(o.date) >= mStart && new Date(o.date) <= mEnd);
+
+          const openingInventory = Math.max(
+            0,
+            preMonthInwards.reduce((sum, i) => sum + (i.quantityMT || 0), 0) -
+            preMonthOutwards.reduce((sum, o) => sum + (o.quantityMT || 0), 0)
+          );
+
+          const inventoryChanges: InventoryChange[] = [];
+          if (openingInventory > 0) {
+            inventoryChanges.push({ date: mStart, quantityMT: openingInventory, type: 'INWARD' });
           }
-        }
-        
-        const daysInPeriod = Math.round((periodEndMs - periodStartMs) / 86400000);
-        
-        if (daysInPeriod > 0) {
-          const monthKey = getMonthKey(periodStart);
-          let periodRevenue = 0;
-          
-          for (const entry of sortedEntries) {
-            if (entry.remainingQuantity <= 0) continue;
-            if (entry.startDate.getTime() <= periodStartMs && periodStartMs <= entry.endDate.getTime()) {
-              const dailyRentForEntry = entry.remainingQuantity * entry.dailyRate;
-              const rentForPeriod = dailyRentForEntry * daysInPeriod;
-              
-              periodRevenue += rentForPeriod;
-              
-              const currentEntryMonthCharge = entry.revenueByMonth.get(monthKey) || 0;
-              entry.revenueByMonth.set(monthKey, currentEntryMonthCharge + rentForPeriod);
-            }
-          }
-          
-          if (periodRevenue > 0) {
+          monthInwards.forEach(i => {
+            inventoryChanges.push({ date: new Date(i.date), quantityMT: i.quantityMT || 0, type: 'INWARD' });
+          });
+          monthOutwards.forEach(o => {
+            inventoryChanges.push({ date: new Date(o.date), quantityMT: -(o.quantityMT || 0), type: 'OUTWARD' });
+          });
+
+          // Exact same function used by Invoice
+          const billing = calculateInventoryBasedRent(inventoryChanges, ratePerMonth, monthKey);
+
+          if (billing.totalAmount > 0) {
             const currentMonthCharge = warehouseData.monthlyCharges.get(monthKey) || 0;
-            warehouseData.monthlyCharges.set(monthKey, currentMonthCharge + periodRevenue);
-            warehouseData.totalRevenue += periodRevenue;
+            warehouseData.monthlyCharges.set(monthKey, currentMonthCharge + billing.totalAmount);
+            warehouseData.totalRevenue += billing.totalAmount;
+
+            billing.periods.forEach((period: any) => {
+              ledgerPeriods.push({
+                id: `p-${Math.random().toString(36).substr(2, 9)}`,
+                clientName: clientMap.get(clientIdStr) || 'Unknown',
+                clientId: clientIdStr,
+                warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown',
+                warehouseId: warehouseIdStr,
+                commodityName: commodityMap.get(commodityIdStr) || 'Unknown',
+                commodityId: commodityIdStr,
+                periodStart: period.startDate,
+                periodEnd: period.endDate,
+                daysOccupied: period.daysInPeriod,
+                quantityMT: period.inventoryMT,
+                bagsCount: 0,
+                gatePass: 'N/A',
+                ratePerMTPerDay: period.dailyRate,
+                rentTotal: period.periodCharge,
+                status: 'COMPLETED',
+                month: monthKey,
+              });
+            });
           }
         }
+        currentMonthStart.setUTCMonth(currentMonthStart.getUTCMonth() + 1);
       }
 
       if (!warehouseRevenueData.has(warehouseIdStr)) {
@@ -1146,18 +928,15 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
       }
     }
 
-    // Convert to array format with month columns
     const warehouseRevenue = Array.from(warehouseRevenueData.values())
       .map(item => {
         const monthlyCharges: { [key: string]: number } = {};
         item.monthlyCharges.forEach((charge: number, monthKey: string) => {
-          // Filter by month if provided
           if (!month || month === 'ALL' || monthKey === month) {
             monthlyCharges[monthKey] = Math.round(charge * 100) / 100;
           }
         });
 
-        // Calculate total revenue for filtered months only
         const filteredTotalRevenue = Object.values(monthlyCharges).reduce((sum, charge) => sum + charge, 0);
 
         return {
@@ -1171,81 +950,21 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
       })
       .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
 
-    const ledgerPeriods: any[] = [];
-    for (const [ledgerKey, ledgerEntries] of entriesByKey.entries()) {
-      const warehouseIdStr = keyToWarehouseId.get(ledgerKey)!;
-      for (const processedEntry of ledgerEntries) {
-        if (!processedEntry.revenueByMonth) continue;
-
-        const originalEntry = processedEntry.originalEntry;
-        if (!originalEntry) continue;
-
-        const clientIdStr = originalEntry.clientId?.toString() || '';
-        const commodityIdStr = originalEntry.commodityId?.toString() || '';
-
-        processedEntry.revenueByMonth.forEach((rentAmount: number, monthKey: string) => {
-          if (!month || month === 'ALL' || monthKey === month) {
-            // Reconstruct the start and end dates for this specific month
-            const [yearStr, monthStr] = monthKey.split('-');
-            const year = parseInt(yearStr);
-            const monthIdx = parseInt(monthStr) - 1;
-
-            const monthStart = new Date(Date.UTC(year, monthIdx, 1));
-            const monthEnd = new Date(Date.UTC(year, monthIdx + 1, 0));
-
-            const clampedStart = processedEntry.startDate > monthStart ? processedEntry.startDate : monthStart;
-            const clampedEnd = processedEntry.endDate < monthEnd ? processedEntry.endDate : monthEnd;
-
-            // Calculate days for the CSV column using the same start/end, but wait, the true day count is how many days it was active in that month.
-            // Since we generated revenue daily, we can just compute it.
-            const days = Math.floor((clampedEnd.getTime() - clampedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-            ledgerPeriods.push({
-              id: originalEntry._id?.toString() || '',
-              clientName: clientMap.get(clientIdStr) || 'Unknown',
-              clientId: clientIdStr,
-              warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown',
-              warehouseId: warehouseIdStr,
-              commodityName: commodityMap.get(commodityIdStr) || 'Unknown',
-              commodityId: commodityIdStr,
-              periodStart: clampedStart.toISOString().split('T')[0],
-              periodEnd: clampedEnd.toISOString().split('T')[0],
-              daysOccupied: days,
-              quantityMT: originalEntry.quantityMT,
-              bagsCount: originalEntry.bagsCount ?? originalEntry.bags,
-              gatePass: originalEntry.gatePass || originalEntry.gatepass || '',
-              ratePerMTPerDay: processedEntry.dailyRate,
-              rentTotal: Math.round(rentAmount * 100) / 100,
-              status: originalEntry.status || 'COMPLETED',
-              month: monthKey,
-            });
-          }
-        });
-      }
-    }
-
-    // Calculate overall summary from filtered data
     const totalRevenue = warehouseRevenue.reduce((sum, row) => sum + row.totalRevenue, 0);
     const ownerEarnings = Math.round(totalRevenue * 0.6 * 100) / 100;
     const platformCommissions = Math.round(totalRevenue * 0.4 * 100) / 100;
 
-    const summary = {
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      ownerEarnings,
-      platformCommissions
-    };
-
-    console.log('[getClientRevenueAnalytics] Summary:', summary);
-    console.log('[getClientRevenueAnalytics] Warehouse entries:', warehouseRevenue.length);
-
     return {
-      summary,
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        ownerEarnings,
+        platformCommissions
+      },
       warehouseRevenue,
       ledgerPeriods
     };
-  } catch (error: any) {
-    console.error('[getClientRevenueAnalytics] Error:', error?.message || error);
-    if (error?.stack) console.error(error.stack);
+  } catch (error) {
+    console.error('[getClientRevenueAnalytics] Error:', error);
     return {
       summary: { totalRevenue: 0, ownerEarnings: 0, platformCommissions: 0 },
       warehouseRevenue: [],
@@ -1253,3 +972,4 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
     };
   }
 }
+

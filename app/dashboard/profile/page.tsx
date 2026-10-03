@@ -600,7 +600,7 @@ export default function ProfilePage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Storage Charge SAC Code (Optional)</span>
+              <span className="text-sm font-medium text-slate-700">Storage Charge SAC|HSN Code (Optional)</span>
               <input
                 type="text"
                 value={profileForm.storageChargeSacCode}

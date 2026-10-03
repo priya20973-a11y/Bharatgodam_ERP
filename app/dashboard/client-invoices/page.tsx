@@ -1421,7 +1421,7 @@ export default function ClientInvoicesPage() {
                             <thead className="bg-slate-100">
                               <tr>
                                 <th className="px-3 py-2 text-left font-semibold text-slate-700">Description</th>
-                                <th className="px-3 py-2 text-left font-semibold text-slate-700">SAC Code</th>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-700">SAC|HSN Code</th>
                                 <th className="px-3 py-2 text-right font-semibold text-slate-700">Charge (₹)</th>
                                 <th className="px-3 py-2 text-center font-semibold text-slate-700">Action</th>
                               </tr>

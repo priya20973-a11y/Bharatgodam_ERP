@@ -270,7 +270,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       (item) => `
         <tr>
           <td>${item.name || 'Additional Charge'}</td>
-          ${totalTaxAmount > 0 ? `<td>${item.sacCode || '-'}</td>` : ''}
+          <td>${item.sacCode || '-'}</td>
           <td class="text-right">₹${formatAmount(Number(item.amount || 0))}</td>
         </tr>
       `
@@ -284,7 +284,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
   const adjustmentBody = adjustmentRows || `
         <tr>
           <td>Additional Charges</td>
-          ${totalTaxAmount > 0 ? `<td>-</td>` : ''}
+          <td>-</td>
           <td class="text-right">₹${formatAmount(adjustmentTotal)}</td>
         </tr>
       `;
@@ -880,7 +880,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     ${invoiceRowsList}
                     <tr style="border-top: 1px solid #D9DDE3; background-color: #F8FAFC;">
                       <td colspan="${showWarehouseColumn ? 6 : 5}" style="font-weight: 700; text-align: right;">
-                        Monthly Storage Rent${totalTaxAmount > 0 ? ` (SAC: ${storageChargeSacCode || '-'})` : ''}
+                        Monthly Storage Rent (SAC|HSN: ${storageChargeSacCode || '-'})
                       </td>
                       <td class="text-right font-medium text-dark" style="font-weight: 700; font-size: 9px;">
                         ₹${formatAmount(billingTotal)}
@@ -902,7 +902,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                     <thead>
                       <tr>
                         <th>Description</th>
-                        ${totalTaxAmount > 0 ? '<th>SAC Code</th>' : ''}
+                        <th>SAC|HSN Code</th>
                         <th class="text-right">Charge Amount (₹)</th>
                       </tr>
                     </thead>
