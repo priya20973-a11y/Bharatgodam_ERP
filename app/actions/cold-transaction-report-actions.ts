@@ -10,7 +10,7 @@ import { hasPermission } from '@/lib/permissions';
 import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import { getStackAvailableCapacity } from './cold-inward-actions';
 import mongoose from 'mongoose';
-import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
 import { logColdActivity } from '@/lib/cold-logger';
 export async function getColdTransactionFilters() {
   await connectToDatabase();
@@ -304,7 +304,8 @@ export async function getColdTransactions(params: any = {}) {
       remarks: t.remarks,
       receiptNumber: t.receiptNumber || '',
       weighbridgeSlipNo: t.weighbridgeSlipNo || '',
-      lotNo: t.type === 'INWARD' ? t.lotNo : (t.type === 'OUTWARD' ? t.inwardId?.lotNo : t.originalInwardId?.lotNo) || ''
+      lotNo: t.type === 'INWARD' ? t.lotNo : (t.type === 'OUTWARD' ? t.inwardId?.lotNo : t.originalInwardId?.lotNo) || '',
+      carryOverClientName: t.carryOverClientName || ''
     };
   }).filter((t: any) => {
     // Hide the automatically generated Inward/Outward for Ownership Transfers so they don't duplicate
@@ -664,6 +665,23 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
             });
             rentRs = perMonthResult.totalRent;
             if (!rentReason) rentReason = perMonthResult.rentReason;
+          } else if (commodity.rentType === 'Daily Rate') {
+            const dailyResult = calculateDailyRateRent({
+              inwardDate: inward.date,
+              outwardDate: outwardDate,
+              seasonalPrices: commodity.seasonalPrices,
+              priceType: commodity.priceType || 'Same Price',
+              unit: commodity.unit || 'KG',
+              rentCalculationOn: commodity.rentCalculationOn,
+              gradingType: commodity.gradingType,
+              quantityKg: Number(data.quantityKg) || 0,
+              bagsLarge: Number(data.bagsCount) || 0,
+              bagsSmall: Number(data.jin) || 0,
+              bagsMixed: Number(data.mixed) || 0,
+              totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+            });
+            rentRs = dailyResult.totalRent;
+            if (!rentReason) rentReason = dailyResult.rentReason;
           }
         } else {
           rentReason = 'Seasonal price not found for date';

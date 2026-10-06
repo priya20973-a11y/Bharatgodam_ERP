@@ -11,6 +11,7 @@ import { useColdTranslation } from '@/components/providers/cold-language-provide
 import { Trash2, ChevronDown, QrCode, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getDynamicUnitLabel } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { MultiSearchableSelect } from '@/components/ui/multi-searchable-select';
 import OutwardQRScannerModal from './outward-qr-scanner-modal';
 import StackQRScannerModal from '@/components/features/inward/stack-qr-scanner-modal';
 import { parseStackQrString, verifyStackMatch, getUniqueInwardStacks, isSingleStackAllocMatch, InwardStackLocation } from '@/lib/utils/stack-qr-parser';
@@ -60,7 +61,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [loading, setLoading] = useState(false);
 
   const [clientId, setClientId] = useState('');
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [availableInwards, setAvailableInwards] = useState<any[]>([]);
+  
+  const [isCarryOver, setIsCarryOver] = useState(true);
+  const [carryOverClientId, setCarryOverClientId] = useState('');
 
   // QR Scanner State
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
@@ -105,7 +110,26 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   }, [dropdownRef]);
 
   useEffect(() => {
-    if (clientId) {
+    if (isCarryOver && clientIds.length > 0) {
+      Promise.all(clientIds.map(cId => {
+        const isWarehouse = warehouses.some((w: any) => w._id === cId);
+        return getAvailableInwardsForClient(cId, isWarehouse);
+      })).then(results => {
+        let items = results.flat() || [];
+        if (prefillData?.warehouseId && prefillData?.chamberName && prefillData?.floorNo && prefillData?.stackNo) {
+          items = items.filter((i: any) => {
+            const chMatch = i.chamberName === prefillData.chamberName || i.chamberNo?.toString() === prefillData.chamberName;
+            return chMatch && i.floorNo === parseInt(prefillData.floorNo) && i.stackNo === parseInt(prefillData.stackNo);
+          });
+        }
+        setAvailableInwards(items);
+        setSelectedItems(prev => prev.filter(item => {
+          const cId = item.inward?.clientId?._id || item.inward?.clientId;
+          const wId = item.inward?.warehouseId?._id || item.inward?.warehouseId;
+          return clientIds.includes(cId) || clientIds.includes(wId);
+        }));
+      });
+    } else if (!isCarryOver && clientId) {
       const isWarehouse = warehouses.some((w: any) => w._id === clientId);
       getAvailableInwardsForClient(clientId, isWarehouse).then(res => {
         let items = res || [];
@@ -134,7 +158,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       setAvailableInwards([]);
       setSelectedItems([]);
     }
-  }, [clientId, warehouses, prefillData]);
+  }, [clientId, clientIds, isCarryOver, warehouses, prefillData]);
 
   // Stack QR Verification State
   const [scanningStackForInwardId, setScanningStackForInwardId] = useState<string | null>(null);
@@ -267,7 +291,13 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           stackSelections: initialStackSelections,
         };
 
-        setClientId(res.clientId);
+        if (isCarryOver) {
+          if (!clientIds.includes(res.clientId)) {
+            setClientIds([...clientIds, res.clientId]);
+          }
+        } else {
+          setClientId(res.clientId);
+        }
         setAvailableInwards(prev => {
           const exists = prev.some((i: any) => i.uniqueKey === inward.uniqueKey || i._id === inward._id);
           return exists ? prev : [inward, ...prev];
@@ -353,7 +383,14 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
               stackSelections: initialStackSelections,
             };
 
-            setClientId(inward.clientId?._id || inward.clientId);
+            if (isCarryOver) {
+              const resClientId = inward.clientId?._id || inward.clientId;
+              if (!clientIds.includes(resClientId)) {
+                setClientIds([...clientIds, resClientId]);
+              }
+            } else {
+              setClientId(inward.clientId?._id || inward.clientId);
+            }
             setAvailableInwards(prev => {
               const exists = prev.some((i: any) => i.uniqueKey === inwardId || i._id === inwardId);
               return exists ? prev : [inward, ...prev];
@@ -499,7 +536,8 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId || selectedItems.length === 0) {
+    const isAnyClientSelected = isCarryOver ? clientIds.length > 0 : !!clientId;
+    if (!isAnyClientSelected || selectedItems.length === 0) {
       toast.error(t('outward.fillRequired'));
       return;
     }
@@ -577,6 +615,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
           itemsPayload.push({
             inwardId: item.inward._id,
+            clientId: item.inward.clientId?._id || item.inward.clientId,
             commodityId: item.inward.commodityId._id || item.inward.commodityId,
             warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
             chamberName: alloc.chamberName,
@@ -671,6 +710,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
           itemsPayload.push({
             inwardId: item.inward._id,
+            clientId: item.inward.clientId?._id || item.inward.clientId,
             commodityId: item.inward.commodityId._id || item.inward.commodityId,
             warehouseId: item.inward.warehouseId._id || item.inward.warehouseId,
             chamberName: alloc.chamberName,
@@ -710,9 +750,20 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
     setLoading(true);
     try {
-      const clientModel = warehouses.some((w: any) => w._id === clientId) ? 'ColdWarehouse' : 'Client';
+      const activeClientId = isCarryOver ? clientIds[0] : clientId;
+      const clientModel = warehouses.some((w: any) => w._id === activeClientId) ? 'ColdWarehouse' : 'Client';
+      
+      const payloadItems = itemsPayload.map(ip => {
+        const itemClientId = ip.clientId || activeClientId;
+        return {
+          ...ip,
+          clientId: itemClientId,
+          clientModel: warehouses.some((w: any) => w._id === itemClientId) ? 'ColdWarehouse' : 'Client',
+        };
+      });
+
       const res = await createBatchColdOutwards({
-        clientId,
+        clientId: activeClientId,
         clientModel,
         date,
         truckNo,
@@ -721,7 +772,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         weighbridgeCharge: weighbridgeCharge === '' ? undefined : weighbridgeCharge,
         remarks,
         note,
-        items: itemsPayload
+        items: payloadItems,
+        isCarryOver,
+        carryOverClientId: isCarryOver ? carryOverClientId : undefined,
+        carryOverClientName: isCarryOver ? clients.find(c => c._id === carryOverClientId)?.name : undefined
       });
 
       if (res.success) {
@@ -756,24 +810,52 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('outward.clientName')}</label>
-          <SearchableSelect
-            value={clientId}
-            onValueChange={setClientId}
-            required
-            placeholder={t('outward.selectClient')}
-            options={[
-              ...clients.map(c => ({ value: c._id, label: c.name })),
-              ...warehouses.map((w: any) => ({ value: w._id, label: `${w.name} (Warehouse)` }))
-            ]}
-          />
+          {isCarryOver ? (
+            <MultiSearchableSelect
+              value={clientIds}
+              onValueChange={setClientIds}
+              placeholder={t('outward.selectClient')}
+              options={[
+                ...clients.map(c => ({ value: c._id, label: c.name })),
+                ...warehouses.map((w: any) => ({ value: w._id, label: `${w.name} (Warehouse)` }))
+              ]}
+            />
+          ) : (
+            <SearchableSelect
+              value={clientId}
+              onValueChange={setClientId}
+              required
+              placeholder={t('outward.selectClient')}
+              options={[
+                ...clients.map(c => ({ value: c._id, label: c.name })),
+                ...warehouses.map((w: any) => ({ value: w._id, label: `${w.name} (Warehouse)` }))
+              ]}
+            />
+          )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 flex flex-col justify-start pt-1">
+          <label className="flex items-center space-x-2 cursor-pointer pb-1">
+            <input type="checkbox" checked={isCarryOver} onChange={(e) => setIsCarryOver(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+            <span className="text-sm font-medium text-slate-700">Carry Over (C/o)</span>
+          </label>
+          {isCarryOver && (
+            <SearchableSelect
+              value={carryOverClientId}
+              onValueChange={setCarryOverClientId}
+              required={isCarryOver}
+              placeholder="Select Carry Over Client"
+              options={clients.map(c => ({ value: c._id, label: c.name }))}
+            />
+          )}
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-medium">{t('outward.selectInward')}</label>
           <div className="relative" ref={dropdownRef}>
             <div
-              className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${!clientId ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-              onClick={() => { if (clientId) setIsDropdownOpen(!isDropdownOpen); }}
+              className={`flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${(!isCarryOver && !clientId) || (isCarryOver && clientIds.length === 0) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              onClick={() => { if ((!isCarryOver && clientId) || (isCarryOver && clientIds.length > 0)) setIsDropdownOpen(!isDropdownOpen); }}
             >
               <span className={selectedItems.length > 0 ? "text-slate-900" : "text-slate-500"}>
                 {selectedItems.length > 0

@@ -89,7 +89,7 @@ export function generateColdInvoiceHTML(
       
       if (!variety && rawCommodityName.includes('(')) {
         const match = rawCommodityName.match(/\((.*?)\)/);
-        if (match && match[1] !== 'Per Month') {
+        if (match && match[1] !== 'Per Month' && match[1] !== 'Daily Rate') {
           variety = match[1];
         }
       }

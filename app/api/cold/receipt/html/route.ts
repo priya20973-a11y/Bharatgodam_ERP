@@ -94,6 +94,7 @@ export async function GET(request: NextRequest) {
         transactions = await ColdOutward.find({ batchId, ...getTenantFilterForMongo(session) })
           .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
           .populate('clientId', 'name address village')
+          .populate('carryOverClientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transactions.length > 0) {
@@ -103,6 +104,7 @@ export async function GET(request: NextRequest) {
         transaction = await ColdOutward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
           .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
           .populate('clientId', 'name address village')
+          .populate('carryOverClientId', 'name address village')
           .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transaction) {
@@ -110,6 +112,7 @@ export async function GET(request: NextRequest) {
             transactions = await ColdOutward.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
               .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
               .populate('clientId', 'name address village')
+              .populate('carryOverClientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId');
           } else {
@@ -125,6 +128,7 @@ export async function GET(request: NextRequest) {
             })
               .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
               .populate('clientId', 'name address village')
+              .populate('carryOverClientId', 'name address village')
               .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId')
               .sort({ createdAt: 1 });

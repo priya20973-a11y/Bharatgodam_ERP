@@ -222,7 +222,7 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
       const headers = [
         t('transactions.typeHeader'), 
         t('transactions.dateHeader'), 
-        t('transactions.clientHeader'), 
+        t('transactions.clientHeader'),
         t('transactions.commodityHeader'), 
         t('transactions.locationHeader'), 
         'Grade',
@@ -248,6 +248,10 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
           }
         } else if (txn.client?.clientType === 'PURCHASE') {
           clientLabel = `Warehouse (${txn.client?.name})`;
+        }
+
+        if (txn.carryOverClientName) {
+          clientLabel += ` - C/o: ${txn.carryOverClientName}`;
         }
 
         return [
@@ -445,7 +449,7 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
                     ) : txn.client?.clientType === 'PURCHASE' ? (
                       <span className="text-purple-700 font-bold">Warehouse ({txn.client?.name})</span>
                     ) : (
-                      txn.client?.name || '-'
+                      <>{txn.client?.name || '-'}{txn.carryOverClientName ? ` - C/o: ${txn.carryOverClientName}` : ''}</>
                     )}
                     {txn.farmerName && <div className="text-xs font-normal text-slate-500 mt-0.5">{t('outward.farmerPrefix')}{txn.farmerName}</div>}
                   </TableCell>

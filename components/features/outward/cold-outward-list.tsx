@@ -52,7 +52,10 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
     
     const rows = groupedOutwards.map(w => {
       const date = w.date ? format(new Date(w.date), 'dd MMM yyyy') : '-';
-      const client = w.clientId?.name || '-';
+      const clientName = w.clientId?.name || '-';
+      const coClientName = w.carryOverClientName || w.carryOverClientId?.name;
+      const coClient = w.isCarryOver && coClientName ? ` (C/o: ${coClientName})` : '';
+      const client = `${clientName}${coClient}`;
       const farmer = w.farmerName || '-';
       const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
       const warehouse = w.warehouseId?.name || '-';
@@ -203,6 +206,7 @@ export default function ColdOutwardList({ outwards }: ColdOutwardListProps) {
                   <TableCell className="font-medium text-slate-900">
                     {w.clientId?.name || '-'}
                     {w.farmerName && <div className="text-xs font-normal text-slate-500 mt-0.5">{t('outward.farmerPrefix')}{w.farmerName}</div>}
+                    {w.isCarryOver && (w.carryOverClientName || w.carryOverClientId?.name) && <div className="text-xs font-semibold text-indigo-600 mt-0.5">C/o: {w.carryOverClientName || w.carryOverClientId?.name}</div>}
                   </TableCell>
                   <TableCell className="text-slate-700">{commodityDisplay}</TableCell>
                   <TableCell className="text-slate-700">{w.warehouseId?.name || '-'}</TableCell>

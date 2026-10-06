@@ -14,7 +14,7 @@ export interface IColdCommodity extends Document {
   type: string;
   unit: string;
   rentCalculationOn?: 'Kg' | 'Bag';
-  rentType?: 'One Time' | 'Per Month';
+  rentType?: 'One Time' | 'Per Month' | 'Daily Rate';
   hsnCode?: string;
   qualityParameters: { name: string; lowerLimit: number; upperLimit: number }[];
   gradingCharge?: { type: 'Per Bag' | 'Per Kg'; defaultRate: number };
@@ -45,7 +45,7 @@ const ColdCommoditySchema: Schema = new Schema(
     type: { type: String, required: true },
     unit: { type: String, required: true, default: 'KG', uppercase: true },
     rentCalculationOn: { type: String, enum: ['Kg', 'Bag'], default: 'Kg' },
-    rentType: { type: String, enum: ['One Time', 'Per Month'], default: 'One Time' },
+    rentType: { type: String, enum: ['One Time', 'Per Month', 'Daily Rate'], default: 'One Time' },
     hsnCode: { type: String, required: false },
     qualityParameters: [
       {
@@ -71,6 +71,7 @@ const ColdCommoditySchema: Schema = new Schema(
 ColdCommoditySchema.index({ userId: 1, name: 1, type: 1 }, { unique: true });
 ColdCommoditySchema.index({ userEmail: 1, name: 1, type: 1 });
 
+delete mongoose.models.ColdCommodity;
 const ColdCommodity: Model<IColdCommodity> =
   mongoose.models.ColdCommodity || mongoose.model<IColdCommodity>('ColdCommodity', ColdCommoditySchema);
 

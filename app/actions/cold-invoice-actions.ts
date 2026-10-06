@@ -10,7 +10,7 @@ import { requireSession, getTenantFilter, appendOwnership, getWarehouseFilter } 
 import mongoose from 'mongoose';
 import { differenceInDays } from 'date-fns';
 import { generateReceiptNumber } from '@/lib/receipt-generator';
-import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
 import { logColdActivity } from '@/lib/cold-logger';
 
 export async function generateColdClientInvoicePreview(
@@ -43,6 +43,7 @@ export async function generateColdClientInvoicePreview(
 
   const outwards = await ColdOutward.find(outwardsQuery)
     .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType')
+    .populate('carryOverClientId', 'name')
     .populate({
       path: 'inwardId',
       populate: { path: 'commodityId' }
@@ -145,6 +146,24 @@ export async function generateColdClientInvoicePreview(
           rent = perMonthResult.totalRent;
           (o as any)._monthBreakdown = perMonthResult.monthBreakdown;
           (o as any)._rentReason = perMonthResult.rentReason;
+        } else if (commodity.rentType === 'Daily Rate') {
+          const dailyResult = calculateDailyRateRent({
+            inwardDate: inwDate,
+            outwardDate: outDate,
+            seasonalPrices: commodity.seasonalPrices,
+            priceType: commodity.priceType || 'Same Price',
+            unit: commodity.unit || 'KG',
+            rentCalculationOn: commodity.rentCalculationOn,
+            gradingType: (commodity as any).gradingType,
+            quantityKg,
+            bagsLarge,
+            bagsSmall,
+            bagsMixed,
+            totalBags,
+          });
+          rent = dailyResult.totalRent;
+          (o as any)._monthBreakdown = dailyResult.monthBreakdown;
+          (o as any)._rentReason = dailyResult.rentReason;
         }
       }
 
@@ -175,7 +194,7 @@ export async function generateColdClientInvoicePreview(
       inwardDate: inwDate.toISOString(),
       outwardDate: outDate.toISOString(),
       commodityId: commodity._id.toString(),
-      commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : '') + (commodity.rentType === 'Per Month' ? ' (Per Month)' : ''),
+      commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : '') + (commodity.rentType === 'Per Month' ? ' (Per Month)' : commodity.rentType === 'Daily Rate' ? ' (Daily Rate)' : '') + (oPrimary.isCarryOver && oPrimary.carryOverClientId?.name ? ` - C/o: ${oPrimary.carryOverClientId.name}` : ''),
       hsnCode: commodity.hsnCode || '',
       quantityKg: inward?.quantityKg || totalQuantityKg,
       outwardKg: totalQuantityKg,

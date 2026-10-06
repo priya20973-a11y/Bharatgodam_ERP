@@ -293,6 +293,7 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                 >
                   <option value="One Time">One Time</option>
                   <option value="Per Month">Per Month</option>
+                  <option value="Daily Rate">Daily Rate</option>
                 </select>
               </div>
 

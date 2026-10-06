@@ -89,7 +89,10 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
 
                   let displayBags = Number(tx.totalBags || tx.bagsCount || 0);
 
-                  if (tx.type === 'INWARD' || tx.type === 'TRANSFER IN') {
+                  if (tx.type === 'C/o ENTRY') {
+                    // C/o is display/reference only. Do NOT affect balances.
+                    inQty = Number(tx.quantityKg ?? tx.selfQuantityKg ?? 0);
+                  } else if (tx.type === 'INWARD' || tx.type === 'TRANSFER IN') {
                     if (tx.isPurchaseStock) {
                       const pQty = Number((tx.stockType === 'Both' ? (tx.purchaseQuantityKg ?? 0) : (tx.purchaseQuantityKg ?? tx.quantityKg ?? 0)) ?? 0);
                       const pBags = Number((tx.stockType === 'Both' ? (tx.purchaseBagsCount ?? 0) : (tx.purchaseBagsCount ?? tx.totalBags ?? tx.bagsCount ?? 0)) ?? 0);
@@ -144,16 +147,21 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                             variant="outline" 
                             className={tx.type === 'TRANSFER IN' || tx.type === 'TRANSFER OUT' || tx.type === 'PURCHASE TRANSFER' ? "bg-cyan-50 text-cyan-700 border-cyan-200" : "bg-purple-50 text-purple-700 border-purple-200"}
                           >
-                            {tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
-                            Purchase Stock ({tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? 'In' : 'Out'})
+                            {tx.type === 'C/o ENTRY' || tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
+                            Purchase Stock ({tx.type === 'C/o ENTRY' || tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? 'In' : 'Out'})
                           </Badge>
                         ) : (
                           <div className="flex flex-col gap-1 items-start">
                             <Badge 
                               variant="outline" 
-                              className={tx.type === 'TRANSFER IN' || tx.type === 'TRANSFER OUT' || tx.type === 'PURCHASE TRANSFER' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : (tx.type === 'INWARD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200')}
+                              className={
+                                tx.type === 'C/o ENTRY' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                tx.type === 'TRANSFER IN' || tx.type === 'TRANSFER OUT' || tx.type === 'PURCHASE TRANSFER' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 
+                                tx.type === 'INWARD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                'bg-rose-50 text-rose-700 border-rose-200'
+                              }
                             >
-                              {tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
+                              {tx.type === 'C/o ENTRY' || tx.type === 'INWARD' || tx.type === 'TRANSFER IN' ? <ArrowDownToLine className="w-3 h-3 mr-1" /> : <ArrowUpFromLine className="w-3 h-3 mr-1" />}
                               {tx.type}
                             </Badge>
                             {(tx.type === 'INWARD' || tx.type === 'OUTWARD') && (tx.stockType === 'Purchase' || tx.stockType === 'Both') && (
@@ -172,7 +180,16 @@ export function ColdClientLedger({ clientId, clientName }: ColdClientLedgerProps
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-emerald-600 font-medium">
-                        {inQty > 0 ? cleanFormatNum(inQty) : '-'}
+                        {inQty > 0 ? (
+                          <div className="flex flex-col items-end">
+                            <span>{cleanFormatNum(inQty)}</span>
+                            {tx.type === 'C/o ENTRY' && displayBags > 0 && (
+                              <span className="text-xs text-amber-600 font-normal mt-0.5">
+                                {displayBags} Bags
+                              </span>
+                            )}
+                          </div>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="text-right text-rose-600 font-medium">
                         {outQty > 0 ? cleanFormatNum(outQty) : '-'}

@@ -325,7 +325,12 @@ export default async function TransactionDetailsPage({ params }: { params: Promi
                   return (
                     <tr key={out._id?.toString() || i} className="bg-white hover:bg-slate-50">
                       <td className="px-4 py-3 font-medium">{out.date ? new Date(out.date).toLocaleDateString('en-GB') : new Date(out.createdAt).toLocaleDateString('en-GB')}</td>
-                      <td className="px-4 py-3 font-bold text-rose-600">{out.weighbridgeSlipNo || `OUT-${out._id.toString().slice(-6).toUpperCase()}`}</td>
+                      <td className="px-4 py-3 font-bold text-rose-600">
+                        {out.weighbridgeSlipNo || `OUT-${out._id.toString().slice(-6).toUpperCase()}`}
+                        {out.isCarryOver && out.carryOverClientName && (
+                          <div className="text-xs font-semibold text-slate-500 mt-0.5">C/o: {out.carryOverClientName}</div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-bold text-right text-slate-800">{out.quantityKg || 0} {inward.unit || 'Kg'}</td>
                       <td className="px-4 py-3 font-bold text-right text-emerald-700">{balanceAtTime} {inward.unit || 'Kg'}</td>
                     </tr>

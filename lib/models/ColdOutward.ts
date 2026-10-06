@@ -62,6 +62,9 @@ export interface IColdOutward extends Document {
   displayWeightDetails?: boolean;
   transportationName?: string;
   driverNumber?: string;
+  isCarryOver?: boolean;
+  carryOverClientId?: mongoose.Types.ObjectId;
+  carryOverClientName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -130,6 +133,9 @@ const ColdOutwardSchema: Schema = new Schema(
     displayWeightDetails: { type: Boolean, required: false, default: false },
     transportationName: { type: String, required: false },
     driverNumber: { type: String, required: false },
+    isCarryOver: { type: Boolean, default: false },
+    carryOverClientId: { type: Schema.Types.ObjectId, ref: 'Client', required: false },
+    carryOverClientName: { type: String, required: false },
   },
   { timestamps: true }
 );

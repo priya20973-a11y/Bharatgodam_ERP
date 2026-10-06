@@ -288,7 +288,14 @@ export default async function PublicInwardQRDetailsPage({ params }: { params: Pr
                   const outBags = out.totalBags || ((out.bagsCount || 0) + (out.jin || 0) + (out.mixed || 0)) || 0;
                   return (
                     <div key={idx} className="flex justify-between items-center pl-3 border-l-[3px] border-rose-300 flex-wrap gap-2">
-                      <span className="font-bold text-rose-600">{out.quantityKg} {inward.unit || 'Kg'} | {outBags} Bags</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-rose-600">{out.quantityKg} {inward.unit || 'Kg'} | {outBags} Bags</span>
+                        {out.isCarryOver && out.carryOverClientName && (
+                          <span className="text-xs font-medium text-slate-500 mt-0.5">
+                            C/o: {out.carryOverClientName}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm text-slate-500 font-medium">Date: {out.date ? new Date(out.date).toLocaleDateString('en-GB') : '-'}</span>
                     </div>
                   );

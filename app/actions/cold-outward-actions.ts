@@ -11,7 +11,7 @@ import { hasPermission } from '@/lib/permissions';
 import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/ownership';
 import mongoose from 'mongoose';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
-import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
 import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getColdOutwards(limit: number = 250) {
@@ -22,6 +22,7 @@ export async function getColdOutwards(limit: number = 250) {
     .populate('clientId', 'name')
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name warehouseId')
+    .populate('carryOverClientId', 'name')
     .sort({ date: -1, createdAt: -1 });
 
   if (limit > 0) {
@@ -162,6 +163,49 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     .populate('warehouseId')
     .sort({ date: -1, createdAt: -1 })
     .lean();
+
+  const carryOverOutwards = await ColdOutward.find({
+    isCarryOver: true,
+    carryOverClientId: new mongoose.Types.ObjectId(clientId),
+    ...tenantFilter
+  }).populate({
+    path: 'inwardId',
+    populate: [
+      { path: 'commodityId', select: 'name type unit' },
+      { path: 'warehouseId' }
+    ]
+  }).lean();
+
+  const carryOverInwardMap = new Map();
+  carryOverOutwards.forEach((co: any) => {
+    if (!co.inwardId) return;
+    const invId = co.inwardId._id.toString();
+    if (!carryOverInwardMap.has(invId)) {
+      carryOverInwardMap.set(invId, {
+        ...co.inwardId,
+        stackAllocations: []
+      });
+    }
+    const inv = carryOverInwardMap.get(invId);
+    inv.stackAllocations.push({
+        chamberName: co.chamberName,
+        chamberNo: co.chamberNo,
+        floorNo: co.floorNo,
+        stackNo: co.stackNo,
+        allocatedWeight: co.quantityKg,
+        bagsCount: co.bagsCount,
+        stockType: isWarehouse ? 'Purchase' : undefined
+    });
+  });
+
+  carryOverInwardMap.forEach((inv, invId) => {
+    const existing = inwards.find((i: any) => i._id.toString() === invId);
+    if (existing) {
+      existing.stackAllocations.push(...inv.stackAllocations);
+    } else {
+      inwards.push(inv);
+    }
+  });
 
   const outwards = await ColdOutward.aggregate([
     { $match: outwardMatch },
@@ -333,7 +377,7 @@ export async function createColdOutward(data: any) {
       }
       
       const outwards = await ColdOutward.aggregate([
-        { $match: { inwardId: inward._id } },
+        { $match: { inwardId: inward._id, isCarryOver: { $ne: true } } },
         { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
       ]);
       const totalOutward = outwards[0]?.totalOut || 0;
@@ -440,6 +484,24 @@ export async function createColdOutward(data: any) {
           rentRs = perMonthResult.totalRent;
           rentBreakdown = perMonthResult.monthBreakdown;
           if (!rentReason) rentReason = perMonthResult.rentReason;
+        } else if (commodity.rentType === 'Daily Rate') {
+          const dailyResult = calculateDailyRateRent({
+            inwardDate: inward.date,
+            outwardDate: outDate,
+            seasonalPrices: commodity.seasonalPrices,
+            priceType: commodity.priceType || 'Same Price',
+            unit: commodity.unit || 'KG',
+            rentCalculationOn: commodity.rentCalculationOn,
+            gradingType: commodity.gradingType,
+            quantityKg: Number(data.quantityKg) || 0,
+            bagsLarge: Number(data.bagsCount) || 0,
+            bagsSmall: Number(data.jin) || 0,
+            bagsMixed: Number(data.mixed) || 0,
+            totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+          });
+          rentRs = dailyResult.totalRent;
+          rentBreakdown = dailyResult.monthBreakdown;
+          if (!rentReason) rentReason = dailyResult.rentReason;
         }
       } else {
         rentReason = 'Seasonal price not found for date';
@@ -472,6 +534,9 @@ export async function createColdOutward(data: any) {
       date: outDate,
       netWeightLoss: data.netWeightLoss,
       unit: commodity?.unit || 'KG',
+      isCarryOver: data.isCarryOver || false,
+      carryOverClientId: data.carryOverClientId,
+      carryOverClientName: data.carryOverClientName,
     }, session));
     
     await logColdActivity({
@@ -525,7 +590,7 @@ export async function createBatchColdOutwards(payload: any) {
         }
         
         const outwards = await ColdOutward.aggregate([
-          { $match: { inwardId: inward._id } },
+          { $match: { inwardId: inward._id, isCarryOver: { $ne: true } } },
           { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
         ]);
         const totalOutward = outwards[0]?.totalOut || 0;
@@ -654,6 +719,24 @@ export async function createBatchColdOutwards(payload: any) {
             rentRs = perMonthResult.totalRent;
             rentBreakdown = perMonthResult.monthBreakdown;
             if (!rentReason) rentReason = perMonthResult.rentReason;
+          } else if (commodity.rentType === 'Daily Rate') {
+            const dailyResult = calculateDailyRateRent({
+              inwardDate: inward.date,
+              outwardDate: outDate,
+              seasonalPrices: commodity.seasonalPrices,
+              priceType: commodity.priceType || 'Same Price',
+              unit: commodity.unit || 'KG',
+              rentCalculationOn: commodity.rentCalculationOn,
+              gradingType: commodity.gradingType,
+              quantityKg: Number(item.quantityKg) || 0,
+              bagsLarge: Number(item.bagsCount) || 0,
+              bagsSmall: Number(item.jin) || 0,
+              bagsMixed: Number(item.mixed) || 0,
+              totalBags: (Number(item.bagsCount) || 0) + (Number(item.jin) || 0) + (Number(item.mixed) || 0),
+            });
+            rentRs = dailyResult.totalRent;
+            rentBreakdown = dailyResult.monthBreakdown;
+            if (!rentReason) rentReason = dailyResult.rentReason;
           }
         } else {
           rentReason = 'Seasonal price not found for date';
@@ -673,8 +756,8 @@ export async function createBatchColdOutwards(payload: any) {
         rentRs,
         rentReason,
         rentBreakdown,
-        clientId: payload.clientId,
-        clientModel: payload.clientModel || 'Client',
+        clientId: item.clientId || payload.clientId,
+        clientModel: item.clientModel || payload.clientModel || 'Client',
         truckNo: payload.truckNo,
         vehicleType: payload.vehicleType,
         weighbridgeSlipNo: payload.weighbridgeSlipNo,
@@ -695,6 +778,9 @@ export async function createBatchColdOutwards(payload: any) {
         gradingCharge: item.gradingCharge,
         netWeightLoss: item.netWeightLoss,
         unit: commodity?.unit || 'KG',
+        isCarryOver: item.isCarryOver !== undefined ? item.isCarryOver : (payload.isCarryOver || false),
+        carryOverClientId: item.carryOverClientId || payload.carryOverClientId,
+        carryOverClientName: item.carryOverClientName || payload.carryOverClientName,
       }, session));
       createdOutwards.push(outward);
       

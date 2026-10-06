@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
 import { getDynamicUnitLabel } from '@/lib/utils';
-import { calculatePerMonthRent } from '@/lib/utils/cold-rent-calculator';
+import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
 
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
@@ -27,8 +27,11 @@ export function generateColdOutwardReceiptHTML(
       : (firstData.receiptNo ? firstData.receiptNo.toString() : (firstData._id ? firstData._id.toString().slice(-4).toUpperCase() : '')));
   const receiptNoFormatted = formatNum(receiptNo);
 
-  const clientName = firstData.clientId?.name || '';
-  const clientVillage = firstData.clientId?.address || firstData.clientId?.village || '';
+  const carryOverName = firstData.carryOverClientName || firstData.carryOverClientId?.name;
+  const clientName = firstData.isCarryOver && carryOverName ? carryOverName : (firstData.clientId?.name || '');
+  const clientVillage = firstData.isCarryOver && carryOverName 
+    ? (firstData.carryOverClientId?.address || firstData.carryOverClientId?.village || '') 
+    : (firstData.clientId?.address || firstData.clientId?.village || '');
 
   const commodityNameBase = firstData.commodityId?.name || '';
   const commodityType = firstData.commodityId?.type || '';
@@ -79,6 +82,34 @@ export function generateColdOutwardReceiptHTML(
       });
       perMonthBreakdown = perMonthResult.monthBreakdown;
       return perMonthResult.totalRent;
+    } else if (commodity?.rentType === 'Daily Rate' && commodity?.seasonalPrices?.length > 0) {
+      // Get total quantities across all outwards
+      const totalQuantityKg = outwards.reduce((acc, curr) => acc + (curr.quantityKg || 0), 0);
+      const totalBagsLarge = outwards.reduce((acc, curr) => acc + (curr.bagsCount || 0), 0);
+      const totalBagsSmall = outwards.reduce((acc, curr) => acc + (curr.jin || 0), 0);
+      const totalBagsMixed = outwards.reduce((acc, curr) => acc + (curr.mixed || 0), 0);
+      const totalBagsAll = outwards.reduce((acc, curr) => acc + (curr.totalBags || 0), 0);
+
+      // Use inward date from first outward's inwardId, or outward date as fallback
+      const inwDate = firstData.inwardId?.date ? new Date(firstData.inwardId.date) : (firstData.date ? new Date(firstData.date) : new Date());
+      const outDate = firstData.date ? new Date(firstData.date) : new Date();
+
+      const dailyResult = calculateDailyRateRent({
+        inwardDate: inwDate,
+        outwardDate: outDate,
+        seasonalPrices: commodity.seasonalPrices,
+        priceType: commodity.priceType || 'Same Price',
+        unit: commodity.unit || unitStr,
+        rentCalculationOn: commodity.rentCalculationOn,
+        gradingType: commodity.gradingType,
+        quantityKg: totalQuantityKg,
+        bagsLarge: totalBagsLarge,
+        bagsSmall: totalBagsSmall,
+        bagsMixed: totalBagsMixed,
+        totalBags: totalBagsAll || (totalBagsLarge + totalBagsSmall + totalBagsMixed),
+      });
+      perMonthBreakdown = dailyResult.monthBreakdown;
+      return dailyResult.totalRent;
     }
 
     // For non-Per-Month commodities, keep the original calculation
@@ -489,7 +520,8 @@ export function generateColdOutwardReceiptHTML(
       <div class="form-value">${farmerName}</div>
     </div>
     ` : ''}
-    
+
+
     <div class="col-header">
       <div style="width: 53%; display: flex; gap: 4px;">
         <span style="flex: 1.2; text-align: left;">${t.receiptNoLabel}</span>

@@ -30,6 +30,13 @@ export async function getColdClientLedger(clientId: string) {
   const outwards = await ColdOutward.find({ clientId, ...tenantFilter })
     .populate('commodityId', 'name type')
     .populate('warehouseId', 'name chambers')
+    .populate('carryOverClientId', 'name')
+    .lean();
+
+  const carryOverInwards = await ColdOutward.find({ carryOverClientId: clientId, isCarryOver: true, ...tenantFilter })
+    .populate('commodityId', 'name type')
+    .populate('warehouseId', 'name chambers')
+    .populate('clientId', 'name')
     .lean();
 
   const { default: ColdTransfer } = await import('@/lib/models/ColdTransfer');
@@ -45,7 +52,8 @@ export async function getColdClientLedger(clientId: string) {
 
   const combined = [
     ...inwards.map(i => ({ ...i, type: 'INWARD' })),
-    ...outwards.map(o => ({ ...o, type: 'OUTWARD' })),
+    ...outwards.map(o => ({ ...o, type: o.isCarryOver ? 'OUTWARD (C/o)' : 'OUTWARD' })),
+    ...carryOverInwards.map(o => ({ ...o, type: 'C/o ENTRY' })),
     ...transfers.map(t => ({ ...t, type: 'OWNERSHIP TRANSFER' }))
   ].map((t: any) => {
     let locationStr = '';
