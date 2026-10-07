@@ -41,6 +41,9 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
   const [chamberFilter, setChamberFilter] = useState('ALL');
   const [monthFilter, setMonthFilter] = useState('ALL');
+  const [isDailyReport, setIsDailyReport] = useState(false);
+  const [fromDateFilter, setFromDateFilter] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [toDateFilter, setToDateFilter] = useState(() => format(new Date(), 'yyyy-MM-dd'));
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTxnId, setEditingTxnId] = useState('');
@@ -65,7 +68,9 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
           clientFilter,
           warehouseFilter,
           chamberFilter,
-          monthFilter
+          monthFilter: isDailyReport ? 'ALL' : monthFilter,
+          fromDate: isDailyReport ? fromDateFilter : undefined,
+          toDate: isDailyReport ? toDateFilter : undefined
         });
         setTransactions(res.transactions || []);
         setTotalCount(res.totalCount || 0);
@@ -76,12 +81,12 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
       }
     }, 500); // debounce
     return () => clearTimeout(fetchTimer);
-  }, [page, search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter]);
+  }, [page, search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter, isDailyReport, fromDateFilter, toDateFilter]);
 
   // When filters change, reset page to 1
   useEffect(() => {
     setPage(1);
-  }, [search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter]);
+  }, [search, receiptSearch, lotNoSearch, clientFilter, warehouseFilter, chamberFilter, monthFilter, isDailyReport, fromDateFilter, toDateFilter]);
 
   const groupedTransactions = useMemo(() => {
     const grouped: any[] = [];
@@ -175,7 +180,9 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
         clientFilter,
         warehouseFilter,
         chamberFilter,
-        monthFilter
+        monthFilter: isDailyReport ? 'ALL' : monthFilter,
+        fromDate: isDailyReport ? fromDateFilter : undefined,
+        toDate: isDailyReport ? toDateFilter : undefined
       });
       
       const allTxns = res.transactions || [];
@@ -301,7 +308,7 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-4 ${isDailyReport ? 'lg:grid-cols-9' : 'lg:grid-cols-9'} gap-4`}>
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
           <Input
@@ -356,13 +363,30 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
           </SelectContent>
         </Select>
 
-        <Select value={monthFilter} onValueChange={setMonthFilter}>
-          <SelectTrigger><SelectValue placeholder={t('transactions.allMonths')} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">{t('transactions.allMonths')}</SelectItem>
-            {months.map((m: any) => <SelectItem key={m} value={m}>{format(new Date(`${m}-01`), 'MMM yyyy')}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {isDailyReport ? (
+          <div className="flex flex-col space-y-1 md:col-span-2">
+            <div className="flex space-x-2">
+              <Input type="date" value={fromDateFilter} onChange={e => setFromDateFilter(e.target.value)} title="From Date" className="w-full" />
+              <Input type="date" value={toDateFilter} onChange={e => setToDateFilter(e.target.value)} title="To Date" className="w-full" />
+            </div>
+          </div>
+        ) : (
+          <Select value={monthFilter} onValueChange={setMonthFilter}>
+            <SelectTrigger><SelectValue placeholder={t('transactions.allMonths')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">{t('transactions.allMonths')}</SelectItem>
+              {months.map((m: any) => <SelectItem key={m} value={m}>{format(new Date(`${m}-01`), 'MMM yyyy')}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Button
+          onClick={() => setIsDailyReport(!isDailyReport)}
+          variant={isDailyReport ? "default" : "outline"}
+          className={`font-bold flex items-center justify-center ${isDailyReport ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+        >
+          Daily Report
+        </Button>
 
         <Button variant="outline" onClick={exportCSV} className="w-full">
           <Download className="mr-2 h-4 w-4" /> {t('transactions.exportCsv')}

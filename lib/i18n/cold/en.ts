@@ -82,7 +82,7 @@ export const en: Dictionary = {
     printReceipt: 'Print Receipt',
     inward: 'INWARD',
     outward: 'OUTWARD',
-    nameShree: 'Name,',
+    nameShree: 'Name',
     farmerNameLabel: 'Farmer Name',
     addressLabel: 'Address',
     commodityVarietyLabel: 'Variety',

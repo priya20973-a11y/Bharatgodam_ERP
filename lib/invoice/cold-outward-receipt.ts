@@ -193,7 +193,7 @@ export function generateColdOutwardReceiptHTML(
     markoLabel: lang === 'gu' ? 'માર્કો' : 'Marko',
     lotNoLabel: lang === 'gu' ? 'લોટ નં.' : 'Lot No.',
     dateLabel: lang === 'gu' ? 'તા.' : 'Date',
-    nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name,',
+    nameShree: lang === 'gu' ? 'નામશ્રી,' : 'Name',
     addressLabel: lang === 'gu' ? 'સરનામું' : 'Address',
     detailsHeader: lang === 'gu' ? 'બહાર કાઢેલ માલની વિગત' : 'Details of Outward Goods',
     bagsHeader: lang === 'gu' ? 'થોરી (કટ્ટા)' : getDynamicUnitLabel(unitStr, 'storage'),
@@ -694,8 +694,8 @@ export function generateColdOutwardReceiptHTML(
     </div>
 
     <div class="signatures">
-      <div>${t.receiverSign}</div>
-      <div>${t.managerSign}</div>
+      <div>${t.receiverSign} <span style="display:inline-block; width:150px; border-bottom:1px solid #7b1e28; margin-left:10px;"></span></div>
+      <div>${t.managerSign} <span style="display:inline-block; width:150px; border-bottom:1px solid #7b1e28; margin-left:10px;"></span></div>
     </div>
   </div>
 </body>

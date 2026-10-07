@@ -78,7 +78,11 @@ export async function getColdTransactions(params: any = {}) {
 
   let baseMatch: any = { ...tenantFilter };
 
-  if (monthFilter !== 'ALL') {
+  if (params.fromDate && params.toDate) {
+    const start = new Date(`${params.fromDate}T00:00:00.000Z`);
+    const end = new Date(`${params.toDate}T23:59:59.999Z`);
+    baseMatch.date = { $gte: start, $lte: end };
+  } else if (monthFilter !== 'ALL') {
     const start = new Date(`${monthFilter}-01T00:00:00.000Z`);
     const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
     baseMatch.date = { $gte: start, $lte: end };

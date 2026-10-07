@@ -75,6 +75,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [searchReceiptNo, setSearchReceiptNo] = useState('');
   const [isSearchingReceipt, setIsSearchingReceipt] = useState(false);
 
+  // Lot Search State
+  const [searchLotNo, setSearchLotNo] = useState('');
+  const [isSearchingLot, setIsSearchingLot] = useState(false);
+
   // Common Editable fields
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [remarks, setRemarks] = useState('');
@@ -312,6 +316,98 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       toast.error(err.message || 'Error processing scanned QR code.');
     } finally {
       setIsResolvingQr(false);
+    }
+  };
+
+  const handleLotSearch = async () => {
+    if (!searchLotNo.trim()) return;
+    setIsSearchingLot(true);
+    try {
+      const { searchColdInwardByLotNo } = await import('@/app/actions/cold-inward-actions');
+      const inward = await searchColdInwardByLotNo(searchLotNo.trim());
+      if (inward) {
+        const inwardId = inward.uniqueKey || inward._id;
+        if (selectedItems.some(item => item.inwardId === inwardId)) {
+          toast.error('Lot already added');
+          return;
+        }
+
+        const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
+        const isGradingFromInward = inward.gradingApplied === true;
+        const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
+
+        const initialStackSelections: Record<string, any> = {};
+        if (inward.stackAllocations && inward.stackAllocations.length > 0) {
+          inward.availableAllocations = inward.stackAllocations.map((alloc: any) => ({
+            ...alloc,
+            availableQty: alloc.allocatedWeight,
+            bagsCount: alloc.bagsCount
+          }));
+
+          if (inward.availableAllocations.length > 1) {
+            inward.availableAllocations.forEach((alloc: any) => {
+              const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+              initialStackSelections[allocKey] = {
+                selected: true,
+                outwardWeight: alloc.availableQty,
+                bagsCount: alloc.bagsCount || null,
+                jin: null,
+                mixed: null
+              };
+            });
+          }
+        }
+
+        const newItem = {
+          inwardId,
+          inward,
+          grade: inward.grade || '',
+          bagsCount: inward.bagsCount || null,
+          jin: inward.jin || null,
+          mixed: inward.mixed || null,
+          plusMinus: '-',
+          netWeightLoss: null,
+          grossWeight: remainingQtyDb || null,
+          emptyWeight: 0,
+          outwardWeight: remainingQtyDb || null,
+          gradingApplied: isGradingFromInward ? true : false,
+          gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
+          gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
+          verifyStockWithQr: false,
+          verified: false,
+          verifiedStacks: {},
+          verificationError: null,
+          stackSelections: initialStackSelections,
+        };
+
+        const resClientId = inward.clientId?._id || inward.clientId;
+        if (isCarryOver && resClientId) {
+          setClientIds(prev => prev.includes(resClientId) ? prev : [...prev, resClientId]);
+        } else if (!isCarryOver && resClientId) {
+          if (clientId && clientId !== resClientId) {
+            toast.error('Lot No. belongs to a different client. Select a lot from the same client.');
+            setIsSearchingLot(false);
+            return;
+          }
+          if (!clientId) {
+            setClientId(resClientId);
+          }
+        }
+
+        setAvailableInwards(prev => {
+          const exists = prev.some((i: any) => i.uniqueKey === inwardId || i._id === inwardId);
+          return exists ? prev : [inward, ...prev];
+        });
+        setSelectedItems(prev => [...prev, newItem]);
+        setSearchLotNo('');
+        toast.success(`Lot No ${searchLotNo} added successfully.`);
+      } else {
+        toast.error('Lot No not found or no available stock.');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error searching Lot No.');
+    } finally {
+      setIsSearchingLot(false);
     }
   };
 
@@ -808,6 +904,42 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2 flex flex-col justify-start pt-1">
+          <label className="flex items-center space-x-2 cursor-pointer pb-1">
+            <input type="checkbox" checked={isCarryOver} onChange={(e) => setIsCarryOver(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+            <span className="text-sm font-medium text-slate-700">Carry Over (C/o)</span>
+          </label>
+          {isCarryOver && (
+            <SearchableSelect
+              value={carryOverClientId}
+              onValueChange={setCarryOverClientId}
+              required={isCarryOver}
+              placeholder="Select Carry Over Client"
+              options={clients.map(c => ({ value: c._id, label: c.name }))}
+            />
+          )}
+        </div>
+
+        <div className="space-y-2 md:col-span-1">
+          <label className="text-sm font-medium text-indigo-700">Lot No.</label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter Lot No"
+              value={searchLotNo}
+              onChange={(e) => setSearchLotNo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleLotSearch();
+                }
+              }}
+            />
+            <Button type="button" variant="secondary" onClick={handleLotSearch} disabled={isSearchingLot || !searchLotNo.trim()}>
+              {isSearchingLot ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+            </Button>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('outward.clientName')}</label>
           {isCarryOver ? (
@@ -834,23 +966,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           )}
         </div>
 
-        <div className="space-y-2 flex flex-col justify-start pt-1">
-          <label className="flex items-center space-x-2 cursor-pointer pb-1">
-            <input type="checkbox" checked={isCarryOver} onChange={(e) => setIsCarryOver(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-            <span className="text-sm font-medium text-slate-700">Carry Over (C/o)</span>
-          </label>
-          {isCarryOver && (
-            <SearchableSelect
-              value={carryOverClientId}
-              onValueChange={setCarryOverClientId}
-              required={isCarryOver}
-              placeholder="Select Carry Over Client"
-              options={clients.map(c => ({ value: c._id, label: c.name }))}
-            />
-          )}
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2 md:col-span-1">
           <label className="text-sm font-medium">{t('outward.selectInward')}</label>
           <div className="relative" ref={dropdownRef}>
             <div
@@ -902,6 +1018,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
             )}
           </div>
         </div>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded border">
