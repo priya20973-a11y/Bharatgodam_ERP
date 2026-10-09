@@ -5,6 +5,7 @@ import { createBatchColdOutwards, getAvailableInwardsForClient, resolveQRForCold
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
@@ -78,6 +79,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   // Lot Search State
   const [searchLotNo, setSearchLotNo] = useState('');
   const [isSearchingLot, setIsSearchingLot] = useState(false);
+  const [lotSearchResults, setLotSearchResults] = useState<any[]>([]);
+  const [isLotSearchModalOpen, setIsLotSearchModalOpen] = useState(false);
+  const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
 
   // Common Editable fields
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -323,84 +327,12 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     if (!searchLotNo.trim()) return;
     setIsSearchingLot(true);
     try {
-      const { searchColdInwardByLotNo } = await import('@/app/actions/cold-inward-actions');
-      const inward = await searchColdInwardByLotNo(searchLotNo.trim());
-      if (inward) {
-        const inwardId = inward.uniqueKey || inward._id;
-        if (selectedItems.some(item => item.inwardId === inwardId)) {
-          toast.error('Lot already added');
-          return;
-        }
-
-        const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
-        const isGradingFromInward = inward.gradingApplied === true;
-        const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
-
-        const initialStackSelections: Record<string, any> = {};
-        if (inward.stackAllocations && inward.stackAllocations.length > 0) {
-          inward.availableAllocations = inward.stackAllocations.map((alloc: any) => ({
-            ...alloc,
-            availableQty: alloc.allocatedWeight,
-            bagsCount: alloc.bagsCount
-          }));
-
-          if (inward.availableAllocations.length > 1) {
-            inward.availableAllocations.forEach((alloc: any) => {
-              const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
-              initialStackSelections[allocKey] = {
-                selected: true,
-                outwardWeight: alloc.availableQty,
-                bagsCount: alloc.bagsCount || null,
-                jin: null,
-                mixed: null
-              };
-            });
-          }
-        }
-
-        const newItem = {
-          inwardId,
-          inward,
-          grade: inward.grade || '',
-          bagsCount: inward.bagsCount || null,
-          jin: inward.jin || null,
-          mixed: inward.mixed || null,
-          plusMinus: '-',
-          netWeightLoss: null,
-          grossWeight: remainingQtyDb || null,
-          emptyWeight: 0,
-          outwardWeight: remainingQtyDb || null,
-          gradingApplied: isGradingFromInward ? true : false,
-          gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
-          gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
-          verifyStockWithQr: false,
-          verified: false,
-          verifiedStacks: {},
-          verificationError: null,
-          stackSelections: initialStackSelections,
-        };
-
-        const resClientId = inward.clientId?._id || inward.clientId;
-        if (isCarryOver && resClientId) {
-          setClientIds(prev => prev.includes(resClientId) ? prev : [...prev, resClientId]);
-        } else if (!isCarryOver && resClientId) {
-          if (clientId && clientId !== resClientId) {
-            toast.error('Lot No. belongs to a different client. Select a lot from the same client.');
-            setIsSearchingLot(false);
-            return;
-          }
-          if (!clientId) {
-            setClientId(resClientId);
-          }
-        }
-
-        setAvailableInwards(prev => {
-          const exists = prev.some((i: any) => i.uniqueKey === inwardId || i._id === inwardId);
-          return exists ? prev : [inward, ...prev];
-        });
-        setSelectedItems(prev => [...prev, newItem]);
-        setSearchLotNo('');
-        toast.success(`Lot No ${searchLotNo} added successfully.`);
+      const { searchMultipleColdInwardsByLotNo } = await import('@/app/actions/cold-inward-actions');
+      const inwards = await searchMultipleColdInwardsByLotNo(searchLotNo.trim());
+      if (inwards && inwards.length > 0) {
+        setLotSearchResults(inwards);
+        setIsLotSearchModalOpen(true);
+        setSelectedLotIds([]);
       } else {
         toast.error('Lot No not found or no available stock.');
       }
@@ -408,6 +340,119 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       toast.error(error.message || 'Error searching Lot No.');
     } finally {
       setIsSearchingLot(false);
+    }
+  };
+
+  const handleAddSelectedLots = () => {
+    if (selectedLotIds.length === 0) {
+      toast.error('Please select at least one lot.');
+      return;
+    }
+    if (!isCarryOver && selectedLotIds.length > 1) {
+      toast.error('Multiple lot selection is only allowed when Carry Over (C/o) is enabled.');
+      return;
+    }
+
+    let hasError = false;
+    let newItems: any[] = [];
+    let updatedClientIds = [...clientIds];
+    let newClientId = clientId;
+    let newAvailableInwards = [...availableInwards];
+    let addedCount = 0;
+
+    for (const inwardId of selectedLotIds) {
+      const inward = lotSearchResults.find(i => (i.uniqueKey || i._id) === inwardId);
+      if (!inward) continue;
+
+      if (selectedItems.some(item => item.inwardId === inwardId) || newItems.some(item => item.inwardId === inwardId)) {
+        toast.error(`Lot ${inward.lotNo} is already added.`);
+        continue;
+      }
+
+      const resClientId = inward.clientId?._id || inward.clientId;
+      if (isCarryOver && resClientId) {
+        if (!updatedClientIds.includes(resClientId)) {
+          updatedClientIds.push(resClientId);
+        }
+      } else if (!isCarryOver && resClientId) {
+        if (newClientId && newClientId !== resClientId) {
+          toast.error(`Lot No ${inward.lotNo} belongs to a different client. Select a lot from the same client.`);
+          hasError = true;
+          continue;
+        }
+        if (!newClientId) {
+          newClientId = resClientId;
+        }
+      }
+
+      const commodity = commodities.find((c: any) => c._id === (inward.commodityId?._id || inward.commodityId));
+      const isGradingFromInward = inward.gradingApplied === true;
+      const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
+
+      const initialStackSelections: Record<string, any> = {};
+      if (inward.stackAllocations && inward.stackAllocations.length > 0) {
+        inward.availableAllocations = inward.stackAllocations.map((alloc: any) => ({
+          ...alloc,
+          availableQty: alloc.allocatedWeight,
+          bagsCount: alloc.bagsCount
+        }));
+
+        if (inward.availableAllocations.length > 1) {
+          inward.availableAllocations.forEach((alloc: any) => {
+            const allocKey = `${alloc.chamberName || alloc.chamberNo}_${alloc.floorNo}_${alloc.stackNo}`;
+            initialStackSelections[allocKey] = {
+              selected: true,
+              outwardWeight: alloc.availableQty,
+              bagsCount: alloc.bagsCount || null,
+              jin: null,
+              mixed: null
+            };
+          });
+        }
+      }
+
+      newItems.push({
+        inwardId,
+        inward,
+        grade: inward.grade || '',
+        bagsCount: inward.bagsCount || null,
+        jin: inward.jin || null,
+        mixed: inward.mixed || null,
+        plusMinus: '-',
+        netWeightLoss: null,
+        grossWeight: remainingQtyDb || null,
+        emptyWeight: 0,
+        outwardWeight: remainingQtyDb || null,
+        gradingApplied: isGradingFromInward ? true : false,
+        gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
+        gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
+        verifyStockWithQr: false,
+        verified: false,
+        verifiedStacks: {},
+        verificationError: null,
+        stackSelections: initialStackSelections,
+      });
+
+      if (!newAvailableInwards.some((i: any) => (i.uniqueKey || i._id) === inwardId)) {
+        newAvailableInwards.unshift(inward);
+      }
+      addedCount++;
+    }
+
+    if (isCarryOver) {
+      setClientIds(updatedClientIds);
+    } else {
+      setClientId(newClientId);
+    }
+    setAvailableInwards(newAvailableInwards);
+    setSelectedItems(prev => [...prev, ...newItems]);
+    
+    if (addedCount > 0) {
+      toast.success(`Successfully added ${addedCount} lot(s).`);
+      setSearchLotNo('');
+      setIsLotSearchModalOpen(false);
+    } else if (!hasError) {
+      setIsLotSearchModalOpen(false);
     }
   };
 
@@ -1475,6 +1520,45 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         onClose={() => setScanningStackForInwardId(null)}
         onScanSuccess={handleStackQrScanForItem}
       />
+
+      <Dialog open={isLotSearchModalOpen} onOpenChange={setIsLotSearchModalOpen}>
+        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Lot Numbers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {lotSearchResults.map((inward) => {
+              const itemId = inward.uniqueKey || inward._id;
+              const isSelected = selectedLotIds.includes(itemId);
+              return (
+                <div key={itemId} className="flex items-start space-x-3 p-3 border dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer" onClick={() => {
+                  if (isCarryOver) {
+                    setSelectedLotIds(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
+                  } else {
+                    setSelectedLotIds([itemId]);
+                  }
+                }}>
+                  <input 
+                    type={isCarryOver ? "checkbox" : "radio"} 
+                    checked={isSelected} 
+                    readOnly
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">{inward.lotNo}</div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">Receipt: {inward.receiptNumber || '-'} | Client: {inward.clientId?.name || '-'}</div>
+                    <div className="text-sm font-semibold mt-1 text-slate-700 dark:text-slate-300">Available: {inward.remainingQuantityKg !== undefined ? inward.remainingQuantityKg : inward.quantityKg} KG</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" className="dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700" onClick={() => setIsLotSearchModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={handleAddSelectedLots}>Add Selected</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
