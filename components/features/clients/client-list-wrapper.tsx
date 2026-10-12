@@ -102,6 +102,7 @@ export default function ClientListWrapper({ initialClients, initialCommodities, 
               commodityIds: client.commodityIds || [],
               email: client.email || client.userEmail || '',
               state: client.state || '',
+              customClientId: client.customClientId || '',
             });
           }}
           onDelete={handleDelete}

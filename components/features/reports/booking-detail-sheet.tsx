@@ -246,6 +246,10 @@ const BookingDetailSheet: React.FC<BookingDetailSheetProps> = ({ booking, isOpen
             <DetailRow icon={Package} label="DO Number" value={displayBooking.doNumber} isEditing={isEditing} onChange={(value) => handleFieldChange('doNumber', value)} />
             <DetailRow icon={Info} label="CDF No" value={displayBooking.cdfNo} isEditing={isEditing} onChange={(value) => handleFieldChange('cdfNo', value)} />
             <DetailRow icon={Truck} label="Gate Pass" value={displayBooking.gatePass} color="text-indigo-500" isEditing={isEditing} onChange={(value) => handleFieldChange('gatePass', value)} />
+            <DetailRow icon={Truck} label="Vehicle Number" value={displayBooking.vehicleNumber} isEditing={isEditing} onChange={(value) => handleFieldChange('vehicleNumber', value)} />
+            <DetailRow icon={Truck} label="Transport" value={displayBooking.transportationName} isEditing={isEditing} onChange={(value) => handleFieldChange('transportationName', value)} />
+            <DetailRow icon={User} label="Driver Details" value={displayBooking.driverName} isEditing={isEditing} onChange={(value) => handleFieldChange('driverName', value)} />
+            <DetailRow icon={Info} label="Additional Note" value={displayBooking.note} isEditing={isEditing} onChange={(value) => handleFieldChange('note', value)} />
             <DetailRow icon={Info} label="Pass" value={displayBooking.pass} isEditing={isEditing} onChange={(value) => handleFieldChange('pass', value)} />
           </div>
 

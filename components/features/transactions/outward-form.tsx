@@ -196,7 +196,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         if (res.success) {
           toast.success('Outward Transaction Recorded');
-          
+
           reset({
             clientId: '',
             commodityId: '',
@@ -210,7 +210,7 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
             actualWeight: undefined,
             date: new Date().toISOString().split('T')[0],
           });
-          
+
           router.refresh();
           onSuccess?.();
           setTimeout(() => { submittingRef.current = false; }, 1000);
@@ -337,10 +337,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
             name="quantityMT"
             control={control}
             render={({ field }) => (
-              <Input 
+              <Input
                 id={quantityId}
                 name="quantityMT"
-                type="number" 
+                type="number"
                 step="0.01"
                 placeholder="0.00"
                 className={errors.quantityMT ? 'border-red-500' : ''}
@@ -375,20 +375,20 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         <div className="space-y-2">
           <label htmlFor={dateId} className="text-sm font-semibold text-slate-700">Withdrawal Date *</label>
-          <Input 
+          <Input
             id={dateId}
             {...register('date')}
-            type="date" 
+            type="date"
           />
           {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
         </div>
 
         <div className="space-y-2">
           <label htmlFor={partyNameId} className="text-sm font-semibold text-slate-700">Party Name</label>
-          <Input 
+          <Input
             id={partyNameId}
             {...register('partyName')}
-            type="text" 
+            type="text"
             placeholder="Enter party name"
           />
           {errors.partyName && <p className="text-xs text-red-500">{errors.partyName.message}</p>}
@@ -418,10 +418,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700">Net Weight Loss (MT)</label>
-          <Input 
-            type="text" 
-            readOnly 
+          <label className="text-sm font-semibold text-slate-700">Net Weight Loss/Gain (MT)</label>
+          <Input
+            type="text"
+            readOnly
             disabled
             value={watchedValues.quantityMT !== undefined && watchedValues.actualWeight !== undefined ? (watchedValues.quantityMT - watchedValues.actualWeight).toFixed(2) : ''}
             placeholder="Auto-calculated"
@@ -433,10 +433,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="space-y-2">
           <label htmlFor={stackNoId} className="text-sm font-semibold text-slate-700">Stack No</label>
-          <Input 
+          <Input
             id={stackNoId}
             {...register('stackNo')}
-            type="text" 
+            type="text"
             placeholder="Enter stack number"
           />
           {errors.stackNo && <p className="text-xs text-red-500">{errors.stackNo.message}</p>}
@@ -444,10 +444,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         <div className="space-y-2">
           <label htmlFor={lotNoId} className="text-sm font-semibold text-slate-700">Lot No</label>
-          <Input 
+          <Input
             id={lotNoId}
             {...register('lotNo')}
-            type="text" 
+            type="text"
             placeholder="Enter lot number"
           />
           {errors.lotNo && <p className="text-xs text-red-500">{errors.lotNo.message}</p>}
@@ -455,10 +455,10 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
         <div className="space-y-2">
           <label htmlFor={gatePassId} className="text-sm font-semibold text-slate-700">Gate Pass</label>
-          <Input 
+          <Input
             id={gatePassId}
             {...register('gatePass')}
-            type="text" 
+            type="text"
             placeholder="Enter gate pass"
           />
           {errors.gatePass && <p className="text-xs text-red-500">{errors.gatePass.message}</p>}
@@ -467,9 +467,9 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       </div>
 
       <div className="flex gap-4 pt-2">
-        <Button 
-          type="button" 
-          variant="outline" 
+        <Button
+          type="button"
+          variant="outline"
           className="flex-1 border-slate-200"
           onClick={() => {
             const { clientId, commodityId, warehouseId } = watchedValues;
@@ -479,9 +479,9 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         >
           <RefreshCcw className={`mr-2 h-4 w-4 ${checkingStock ? 'animate-spin' : ''}`} /> Sync Balance
         </Button>
-        <Button 
-          type="submit" 
-          className="flex-[2] bg-orange-600 hover:bg-orange-700 text-white font-bold h-10" 
+        <Button
+          type="submit"
+          className="flex-[2] bg-orange-600 hover:bg-orange-700 text-white font-bold h-10"
           disabled={isPending || checkingStock || (currentStock !== null && currentStock <= 0)}
         >
           {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Withdrawal...</> : 'Confirm Withdrawal'}

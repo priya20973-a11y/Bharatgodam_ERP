@@ -38,6 +38,10 @@ type ReportRecord = {
   storageDays: number;
   date: Date | string;
   createdAt?: Date | string;
+  vehicleNumber?: string;
+  transportationName?: string;
+  driverName?: string;
+  note?: string;
 };
 
 type ReportRow = ReportRecord & {
@@ -308,6 +312,10 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
               doNumber: { $ifNull: ['$doNumber', ''] },
               cdfNo: { $ifNull: ['$cdfNo', ''] },
               gatePass: { $ifNull: ['$gatePass', ''] },
+              vehicleNumber: { $ifNull: ['$vehicleNumber', ''] },
+              transportationName: { $ifNull: ['$transportationName', ''] },
+              driverName: { $ifNull: ['$driverName', ''] },
+              note: { $ifNull: ['$note', ''] },
               pass: { $ifNull: ['$pass', ''] },
               quantityMT: '$quantityMT',
               bags: '$bagsCount',
@@ -481,6 +489,10 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
               doNumber: { $ifNull: ['$doNumber', ''] },
               cdfNo: { $ifNull: ['$cdfNo', ''] },
               gatePass: { $ifNull: ['$gatePass', ''] },
+              vehicleNumber: { $ifNull: ['$vehicleNumber', ''] },
+              transportationName: { $ifNull: ['$transportationName', ''] },
+              driverName: { $ifNull: ['$driverName', ''] },
+              note: { $ifNull: ['$note', ''] },
               pass: { $ifNull: ['$pass', ''] },
               quantityMT: '$quantityMT',
               bags: '$bagsCount',
@@ -514,6 +526,10 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
         createdAt: record.createdAt,
         lotNo: '',
         gatePass: '',
+        vehicleNumber: record.vehicleNumber || '',
+        transportationName: record.transportationName || '',
+        driverName: record.driverName || '',
+        note: record.note || '',
         pass: '',
         suppliers: '',
         cadNo: '',
@@ -540,6 +556,10 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
         createdAt: record.createdAt,
         lotNo: '',
         gatePass: '',
+        vehicleNumber: record.vehicleNumber || '',
+        transportationName: record.transportationName || '',
+        driverName: record.driverName || '',
+        note: record.note || '',
         pass: '',
         suppliers: '',
         cadNo: '',
@@ -621,6 +641,10 @@ export async function getFilteredBookings(filters: ReportFilter = {}) {
       createdAt: normalizedValue(booking.createdAt),
       lotNo: booking.lotNo,
       gatePass: booking.gatePass,
+      vehicleNumber: booking.vehicleNumber,
+      transportationName: booking.transportationName,
+      driverName: booking.driverName,
+      note: booking.note,
       pass: booking.pass,
       suppliers: booking.suppliers,
       cadNo: booking.cadNo,

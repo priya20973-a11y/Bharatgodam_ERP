@@ -33,6 +33,7 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
         <TableHeader>
           <TableRow>
             <TableHead>{t('clients.name')}</TableHead>
+            <TableHead>Client ID</TableHead>
             <TableHead>{t('clients.type')}</TableHead>
             <TableHead>{t('profile.address')}</TableHead>
             <TableHead>{t('clients.mobile')}</TableHead>
@@ -46,7 +47,7 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
         <TableBody>
           {clients.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center">
+              <TableCell colSpan={10} className="h-24 text-center">
                 {t('clients.noClients')}
               </TableCell>
             </TableRow>
@@ -59,6 +60,7 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
                     <User className="h-4 w-4 text-slate-400" />
                     {c.name}
                   </TableCell>
+                  <TableCell className="font-semibold text-slate-700">{c.customClientId || '—'}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {c.clientType}

@@ -34,12 +34,13 @@ export async function fetchCommodities() {
       createdAt: item.createdAt,
       userId: item.userId,
       userEmail: item.userEmail,
+      gradingParameters: item.gradingParameters,
       wspName,
     };
   })));
 }
 
-export async function addCommodity(data: { name: string; ratePerMtPerDay: number }) {
+export async function addCommodity(data: { name: string; ratePerMtPerDay: number; gradingParameters?: any[] }) {
   await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
@@ -66,7 +67,23 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
       return { success: false, error: 'Commodity name already exists for this WSP. Please use a different name.' };
     }
 
-    const itemData = { ...data, name: nameVal };
+    if (data.gradingParameters && data.gradingParameters.length > 0) {
+      const seenNames = new Set<string>();
+      for (const param of data.gradingParameters) {
+        if (!param.name) continue;
+        const normalizedName = param.name.trim().toLowerCase();
+        if (seenNames.has(normalizedName)) {
+          return { success: false, error: `Duplicate grading parameter name found: ${param.name.trim()}` };
+        }
+        seenNames.add(normalizedName);
+      }
+    }
+
+    const itemData = { 
+      ...data, 
+      name: nameVal,
+      gradingParameters: data.gradingParameters || []
+    };
 
     const item = await Commodity.create(appendOwnership(itemData, session));
 
@@ -90,7 +107,7 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
   }
 }
 
-export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number }) {
+export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number; gradingParameters?: any[] }) {
   await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
@@ -118,7 +135,23 @@ export async function updateCommodity(id: string, data: { name: string; ratePerM
       return { success: false, error: 'Commodity name already exists for this WSP. Please use a different name.' };
     }
 
-    const itemData = { ...data, name: nameVal };
+    if (data.gradingParameters && data.gradingParameters.length > 0) {
+      const seenNames = new Set<string>();
+      for (const param of data.gradingParameters) {
+        if (!param.name) continue;
+        const normalizedName = param.name.trim().toLowerCase();
+        if (seenNames.has(normalizedName)) {
+          return { success: false, error: `Duplicate grading parameter name found: ${param.name.trim()}` };
+        }
+        seenNames.add(normalizedName);
+      }
+    }
+
+    const itemData = { 
+      ...data, 
+      name: nameVal,
+      gradingParameters: data.gradingParameters || []
+    };
 
     const item = await Commodity.findOneAndUpdate(
       { _id: id, ...ownerFilter },

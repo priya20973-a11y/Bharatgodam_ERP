@@ -177,6 +177,7 @@ export async function createClient(data: {
   state?: string;
   commodityIds?: string[];
   email?: string;
+  customClientId?: string;
 }, isColdStorage: boolean = false, isBulkUpload: boolean = false) {
   await requireWspActionPermission('clientMaster');
   await connectToDatabase();
@@ -248,7 +249,16 @@ export async function createClient(data: {
       }
     }
 
-    const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey }, session));
+    if (data.customClientId && data.customClientId.trim()) {
+      const existingCustomId = await Client.findOne({
+        $and: [ownerFilter, { customClientId: data.customClientId.trim() }]
+      });
+      if (existingCustomId) {
+        return { success: false, error: 'Client ID must be unique. This ID is already in use.' };
+      }
+    }
+
+    const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey, customClientId: data.customClientId?.trim() }, session));
 
     await logActivity({
       actionType: 'CREATE',
@@ -289,6 +299,7 @@ export async function updateClient(id: string, data: Partial<{
   gstNumber: string;
   state?: string;
   commodityIds?: string[];
+  customClientId?: string;
 }>, isColdStorage: boolean = false, isBulkUpload: boolean = false) {
   await requireWspActionPermission('clientMaster');
   await connectToDatabase();
@@ -363,12 +374,46 @@ export async function updateClient(id: string, data: Partial<{
       }
     }
 
+    if (data.customClientId && data.customClientId.trim()) {
+      const ownerFilterForCheck: any = {
+        $or: [
+          { userId: session.user.id },
+          ...(normalizeEmail(session.user.email)
+            ? [{
+              $and: [
+                { $or: [{ userId: { $exists: false } }, { userId: null }] },
+                { userEmail: { $regex: new RegExp(`^${normalizeEmail(session.user.email)!.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') } }
+              ]
+            }]
+            : [])
+        ]
+      };
+      
+      const existingCustomId = await Client.findOne({
+        _id: { $ne: id },
+        $and: [ownerFilterForCheck, { customClientId: data.customClientId.trim() }]
+      });
+      if (existingCustomId) {
+        return { success: false, error: 'Client ID must be unique. This ID is already in use.' };
+      }
+      data.customClientId = data.customClientId.trim();
+    } else if (data.customClientId === '') {
+       data.customClientId = undefined;
+    }
+
     const oldClient = await Client.findOne({ _id: id, ...getTenantFilter(session) });
     const previousValue = oldClient ? JSON.parse(JSON.stringify(oldClient)) : null;
 
+    const updatePayload: any = { $set: { ...data } };
+    
+    if (data.customClientId === undefined || data.customClientId === '') {
+      updatePayload.$unset = { customClientId: 1 };
+      delete updatePayload.$set.customClientId;
+    }
+
     const client = await Client.findOneAndUpdate(
       { _id: id, ...getTenantFilter(session) },
-      data,
+      updatePayload,
       { new: true }
     );
 
@@ -385,45 +430,13 @@ export async function updateClient(id: string, data: Partial<{
       });
     }
 
-    if (client && !isColdStorage) {
-      const userUpdate: any = { updatedAt: new Date() };
-      if (data.name) {
-        userUpdate.fullName = data.name;
-        userUpdate.companyName = data.name;
-      }
-      if (data.clientType) {
-        userUpdate.role = data.clientType;
-      }
-      if (data.mobile) {
-        userUpdate.phoneNumber = data.mobile;
-      }
-      if (data.address) {
-        userUpdate.warehouseLocation = data.address;
-      }
-      if (data.gstNumber) {
-        userUpdate.gstNumber = data.gstNumber;
-      }
-      if ((data as any).email) {
-        userUpdate.email = (data as any).email;
-      }
 
-      if (Object.keys(userUpdate).length > 1) {
-        const db = await getDb();
-        const userQuery: any = {};
 
-        if (client.userId) {
-          userQuery._id = client.userId;
-        } else if (client.userEmail) {
-          userQuery.email = client.userEmail;
-        }
-
-        if (Object.keys(userQuery).length > 0) {
-          await db.collection('users').updateOne({ ...userQuery }, { $set: userUpdate });
-        }
-      }
+    if (isColdStorage) {
+      revalidatePath('/cold/clients');
+    } else {
+      revalidatePath('/dashboard/clients');
     }
-
-    revalidatePath('/dashboard/clients');
     return { success: true, data: JSON.parse(JSON.stringify(client)) };
   } catch (error: unknown) {
     const message = error instanceof Error && /duplicate key/i.test(error.message)

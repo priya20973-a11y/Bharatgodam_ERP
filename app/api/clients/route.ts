@@ -148,6 +148,7 @@ export async function GET() {
           panNumber: client.panNumber || client.panCard || '',
           aadharNumber: client.aadharNumber || client.adhaarNumber || '',
           gstNumber: client.gstNumber || client.gst || client.gstin || '',
+          customClientId: client.customClientId || '',
           commodityIds: Array.isArray(client.commodityIds) ? client.commodityIds.map((id: any) => id?.toString?.() || id) : [],
           wspName
         };
@@ -182,6 +183,7 @@ export async function GET() {
         address: client.clientLocation || client.address || '',
         state: client.state || '',
         mobile: client.contactInfo?.mobile || client.contactInfo?.phone || '',
+        customClientId: client.customClientId || '',
         wspName
       };
     });
@@ -208,7 +210,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, type, address, state, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds } = body;
+    const { name, type, address, state, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds, customClientId } = body;
 
     if (!name || !type || !address || !mobile || !panNumber || !aadharNumber || !gstNumber) {
       return NextResponse.json({
@@ -270,6 +272,18 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    
+    if (customClientId && customClientId.trim()) {
+       const existingCustomId = await db.collection('clients').findOne({
+         $and: [
+           ownerFilter,
+           { customClientId: customClientId.trim() }
+         ]
+       });
+       if (existingCustomId) {
+         return NextResponse.json({ success: false, message: 'Client ID must be unique. This ID is already in use.' }, { status: 400 });
+       }
+    }
 
     const client = appendOwnershipForMongo({
       name: nameValue,
@@ -283,6 +297,7 @@ export async function POST(request: Request) {
       gstNumber,
       otherDetails: otherDetails || '',
       commodityIds: Array.isArray(commodityIds) ? commodityIds : [],
+      customClientId: customClientId ? customClientId.trim() : undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     }, session);

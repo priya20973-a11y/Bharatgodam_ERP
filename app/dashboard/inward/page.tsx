@@ -1,6 +1,7 @@
 import { getClients } from '@/app/actions/client-actions';
 import { fetchCommodities } from '@/app/actions/commodities';
 import { getWarehouses } from '@/app/actions/warehouse-actions';
+import { getAssayers } from '@/app/actions/assayer-actions';
 import InwardForm from '@/components/features/transactions/inward-form';
 import { Toaster } from 'react-hot-toast';
 
@@ -12,14 +13,15 @@ import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
 
 export default async function InwardPage() {
   await requireWspPagePermission('inward');
-  const [clients, commodities, warehouses] = await Promise.all([
+  const [clients, commodities, warehouses, assayers] = await Promise.all([
     getClients(),
     fetchCommodities(),
     getWarehouses(),
+    getAssayers(),
   ]);
 
   // Sanitize for serializable props
-  const sanitized = JSON.parse(JSON.stringify({ clients, commodities, warehouses }));
+  const sanitized = JSON.parse(JSON.stringify({ clients, commodities, warehouses, assayers }));
 
   return (
     <div className="space-y-6">
@@ -35,6 +37,7 @@ export default async function InwardPage() {
           clients={sanitized.clients} 
           commodities={sanitized.commodities} 
           warehouses={sanitized.warehouses}
+          assayers={sanitized.assayers}
         />
       </div>
       <Toaster position="top-right" />

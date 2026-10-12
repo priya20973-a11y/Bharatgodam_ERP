@@ -14,6 +14,7 @@ export interface IClient extends Document {
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   email?: string;
+  customClientId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,10 +38,18 @@ const ClientSchema: Schema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     email: { type: String, required: false },
+    customClientId: { type: String, required: false },
   },
   { timestamps: true }
 );
 
+ClientSchema.index(
+  { userId: 1, customClientId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { customClientId: { $exists: true, $type: 'string' } },
+  }
+);
 ClientSchema.index({ userId: 1, nameKey: 1 }, { unique: true });
 ClientSchema.index(
   { userEmail: 1, nameKey: 1 },

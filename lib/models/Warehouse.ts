@@ -1,5 +1,14 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface IInsurance {
+  policyName?: string;
+  companyName?: string;
+  policyNumber?: string;
+  amount?: number;
+  validityStart?: Date;
+  validityEnd?: Date;
+}
+
 export interface IWarehouse extends Document {
   warehouseId?: string;
   name: string;
@@ -8,11 +17,21 @@ export interface IWarehouse extends Document {
   totalCapacity: number; // in MT
   occupiedCapacity: number; // in MT
   status: 'ACTIVE' | 'INACTIVE' | 'FULL';
+  insurances?: IInsurance[];
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const InsuranceSchema = new Schema({
+  policyName: { type: String, required: false },
+  companyName: { type: String, required: false },
+  policyNumber: { type: String, required: false },
+  amount: { type: Number, required: false },
+  validityStart: { type: Date, required: false },
+  validityEnd: { type: Date, required: false },
+});
 
 const WarehouseSchema: Schema = new Schema(
   {
@@ -27,6 +46,7 @@ const WarehouseSchema: Schema = new Schema(
       enum: ['ACTIVE', 'INACTIVE', 'FULL'],
       default: 'ACTIVE',
     },
+    insurances: { type: [InsuranceSchema], required: false, default: [] },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },
@@ -39,6 +59,5 @@ WarehouseSchema.index({ status: 1 });
 
 const Warehouse: Model<IWarehouse> =
   mongoose.models.Warehouse || mongoose.model<IWarehouse>('Warehouse', WarehouseSchema);
-
 
 export default Warehouse;

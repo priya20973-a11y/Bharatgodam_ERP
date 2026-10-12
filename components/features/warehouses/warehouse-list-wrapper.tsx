@@ -90,9 +90,11 @@ export default function WarehouseListWrapper({ initialWarehouses }: { initialWar
           setIsAdding(false);
           setEditingWarehouse({
             id: w._id,
+            warehouseId: w.warehouseId,
             name: w.name,
             address: w.address,
-            totalCapacity: w.totalCapacity
+            totalCapacity: w.totalCapacity,
+            insurances: w.insurances
           });
         }} 
         onToggleStatus={handleToggleStatus}

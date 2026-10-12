@@ -73,6 +73,17 @@ export default async function TransactionsReportWrapper() {
         { $sort: { date: -1, createdAt: -1 } },
         { $match: tenantWarehouseMatch },
         {
+          $addFields: {
+            clientId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$clientId', null] }, { $regexMatch: { input: { $toString: '$clientId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$clientId' },
+                else: '$clientId'
+              }
+            }
+          }
+        },
+        {
           $lookup: {
             from: 'warehouses',
             localField: 'warehouseId',
@@ -81,14 +92,34 @@ export default async function TransactionsReportWrapper() {
           },
         },
         {
+          $lookup: {
+            from: 'clients',
+            localField: 'clientId',
+            foreignField: '_id',
+            as: 'client',
+          },
+        },
+        {
           $addFields: {
             warehouse: { $arrayElemAt: ['$warehouse', 0] },
+            client: { $arrayElemAt: ['$client', 0] },
           },
         },
       ]).toArray(),
       db.collection('inwards').aggregate([
         { $sort: { date: -1, createdAt: -1 } },
         { $match: tenantWarehouseMatch },
+        {
+          $addFields: {
+            clientId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$clientId', null] }, { $regexMatch: { input: { $toString: '$clientId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$clientId' },
+                else: '$clientId'
+              }
+            }
+          }
+        },
         {
           $lookup: {
             from: 'clients',
@@ -124,6 +155,17 @@ export default async function TransactionsReportWrapper() {
       db.collection('outwards').aggregate([
         { $sort: { date: -1, createdAt: -1 } },
         { $match: tenantWarehouseMatch },
+        {
+          $addFields: {
+            clientId: {
+              $cond: {
+                if: { $and: [{ $ne: ['$clientId', null] }, { $regexMatch: { input: { $toString: '$clientId' }, regex: /^[a-fA-F0-9]{24}$/ } }] },
+                then: { $toObjectId: '$clientId' },
+                else: '$clientId'
+              }
+            }
+          }
+        },
         {
           $lookup: {
             from: 'clients',
@@ -217,6 +259,16 @@ export default async function TransactionsReportWrapper() {
         },
       ]).toArray(),
     ]);
+
+    const inwardsMap = new Map(inwards.map(i => [i._id?.toString(), i]));
+    transactions.forEach(t => {
+      if (t.sourceType === 'inward' && t.sourceId) {
+        const inwardDoc = inwardsMap.get(t.sourceId.toString());
+        if (inwardDoc && inwardDoc.receiptNumber && !t.receiptNumber) {
+          t.receiptNumber = inwardDoc.receiptNumber;
+        }
+      }
+    });
 
     const normalizeId = (id: any) => {
       if (id === undefined || id === null) return '';
@@ -321,6 +373,7 @@ export default async function TransactionsReportWrapper() {
       date: t.direction === 'OUTWARD' ? (t.actualOutwardDate || t.inwardDate || t.date || t.createdAt) : (t.inwardDate || t.date || t.createdAt),
       clientName: t.clientName || t.client?.name || '',
       clientId: t.clientId?.toString() || t.client?._id?.toString() || '',
+      clientIdentifier: t.client?.customClientId || '',
       commodityName: t.commodityName || t.commodity?.name || '',
       commodityId: t.commodityId?.toString() || t.commodity?._id?.toString() || '',
       // Display CURRENT warehouse name from the lookup, fall back to stored name
@@ -336,9 +389,18 @@ export default async function TransactionsReportWrapper() {
       lotNo: t.lotNo,
       status: t.status || 'COMPLETED',
       createdAt: t.createdAt || t.updatedAt || t.date,
+      receiptNumber: t.receiptNumber,
+      vehicleNumber: t.vehicleNumber,
+      transportationName: t.transportationName,
+      driverName: t.driverName,
+      note: t.note,
     }));
+    const isStaff = (session.user as any).isStaff;
+    const userId = isStaff ? (session.user as any).staffId : session.user.id;
+    const userProfile = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    const wspName = userProfile?.companyName || '';
 
-    return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} isAdmin={isAdminUser} />;
+    return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} isAdmin={isAdminUser} wspName={wspName} />;
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return (

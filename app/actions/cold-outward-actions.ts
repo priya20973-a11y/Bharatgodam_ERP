@@ -262,6 +262,16 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     }
   });
 
+  const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+  const activePledges = await Pledge.aggregate([
+    { $match: { clientId: new mongoose.Types.ObjectId(clientId), status: 'ACTIVE' } },
+    { $unwind: '$items' },
+    { $match: { 'items.storageType': 'COLD' } },
+    { $group: { _id: '$items.inwardId', totalPledged: { $sum: '$items.pledgedQuantity' } } }
+  ]);
+  const pledgeMap = new Map();
+  activePledges.forEach(p => pledgeMap.set(p._id.toString(), p.totalPledged));
+
   const availableInwards = inwards.map((inward: any) => {
     if (!inward.stackAllocations) return null;
     
@@ -295,12 +305,26 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     let totalAvailableQty = 0;
     const availableAllocations: any[] = [];
     
+    let remainingPledgeToDeduct = pledgeMap.get(inward._id.toString()) || 0;
+
     Array.from(mergedAllocations.values()).forEach((alloc: any) => {
       const chamberKey = alloc.chamberName || alloc.chamberNo;
       const key = `${inward._id.toString()}_${chamberKey}_${alloc.floorNo}_${alloc.stackNo}`;
       const outData = outwardMap.get(key) || { out: 0 };
       const transData = transferMap.get(key) || { transferredQty: 0 };
-      const availableQty = Math.max(0, alloc.allocatedWeight - outData.out - transData.transferredQty);
+      
+      let rawAvailableQty = Math.max(0, alloc.allocatedWeight - outData.out - transData.transferredQty);
+      let availableQty = rawAvailableQty;
+      
+      if (remainingPledgeToDeduct > 0) {
+        if (availableQty >= remainingPledgeToDeduct) {
+          availableQty -= remainingPledgeToDeduct;
+          remainingPledgeToDeduct = 0;
+        } else {
+          remainingPledgeToDeduct -= availableQty;
+          availableQty = 0;
+        }
+      }
       
       if (availableQty > 0) {
         totalAvailableQty += availableQty;
@@ -383,9 +407,20 @@ export async function createColdOutward(data: any) {
       const totalOutward = outwards[0]?.totalOut || 0;
       const totalOutwardBags = outwards[0]?.totalBags || 0;
       
-      const currentRemaining = inward.quantityKg - totalOutward;
+      const physicalRemaining = inward.quantityKg - totalOutward;
       
-      if (currentRemaining <= 0) {
+      const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+      const pledgeAgg = await Pledge.aggregate([
+        { $match: { status: 'ACTIVE' } },
+        { $unwind: '$items' },
+        { $match: { 'items.inwardId': inward._id, 'items.storageType': 'COLD' } },
+        { $group: { _id: null, totalPledged: { $sum: '$items.pledgedQuantity' } } }
+      ]);
+      const totalPledged = pledgeAgg[0]?.totalPledged || 0;
+
+      const currentRemaining = physicalRemaining - totalPledged;
+      
+      if (physicalRemaining <= 0) {
         if (inward.status !== 'Completed') {
           inward.status = 'Completed';
           inward.remainingQuantityKg = 0;
@@ -395,10 +430,13 @@ export async function createColdOutward(data: any) {
       }
       
       if (data.quantityKg > currentRemaining) {
+        if (totalPledged > 0) {
+           return { success: false, error: `Quantity exceeds available stock. Physical remaining: ${physicalRemaining} Kg, Pledged: ${totalPledged} Kg` };
+        }
         return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
       }
       
-      const remainingKg = currentRemaining - data.quantityKg;
+      const remainingKg = physicalRemaining - data.quantityKg;
       const remainingBags = (inward.bagsCount - totalOutwardBags) - data.bagsCount;
       
       inward.remainingQuantityKg = Math.max(0, remainingKg);

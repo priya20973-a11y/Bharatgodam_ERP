@@ -1,3 +1,4 @@
+import React from 'react';
 import { requireWspPagePermission } from '@/lib/server-wsp-permissions';
 
 export default async function RevenueLayout({

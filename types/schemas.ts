@@ -154,6 +154,10 @@ export interface ILogisticsBooking {
 
   // 4. Gate & Quantities
   gatePass: string;
+  vehicleNumber?: string;
+  transportationName?: string;
+  driverName?: string;
+  note?: string;
   pass?: string;
   bags: number;
   palaBags: number;

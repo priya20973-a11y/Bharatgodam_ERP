@@ -28,16 +28,18 @@ import { getClientOptions, getWarehouseOptions, logTransactionsExportCSV } from 
 import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+
 import { getDropdownDisplayName } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
-interface TransactionRecord {
+export interface TransactionRecord {
   _id: string;
   sourceType?: string;
   direction: 'INWARD' | 'OUTWARD' | 'No Data Found';
   date: string;
   clientName: string;
   clientId: string;
+  clientIdentifier?: string;
   commodityName: string;
   commodityId: string;
   warehouseName: string;
@@ -53,15 +55,21 @@ interface TransactionRecord {
   lotNo?: string;
   status?: string;
   createdAt: string;
+  vehicleNumber?: string;
+  transportationName?: string;
+  driverName?: string;
+  note?: string;
+  receiptNumber?: string;
 }
 
 interface TransactionsReportProps {
   transactions: TransactionRecord[];
   isAdmin?: boolean;
   isLoading?: boolean;
+  wspName?: string;
 }
 
-export default function TransactionsReport({ transactions, isAdmin = false, isLoading = false }: TransactionsReportProps) {
+export default function TransactionsReport({ transactions, isAdmin = false, isLoading = false, wspName = '' }: TransactionsReportProps) {
   const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
@@ -170,6 +178,20 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     } catch (error) {
       console.error('Edit failed:', error);
       toast.error(`Edit failed: ${String(error)}`);
+    }
+  };
+
+  const handleDownloadReceipt = async (transaction: TransactionRecord) => {
+    try {
+      if (transaction.direction === 'INWARD') {
+        window.open(`/api/receipt/html?id=${transaction._id}`, '_blank');
+      } else {
+        // Fallback or outward if applicable, though typically only Inward has receipt here
+        toast.error('Dynamic receipt generation is supported for Inwards only.');
+      }
+    } catch (error) {
+       console.error(error);
+       toast.error('Failed to open receipt');
     }
   };
 
@@ -497,6 +519,42 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       },
     },
     {
+      accessorKey: 'vehicleNumber',
+      header: 'Vehicle No.',
+      cell: ({ row }) => {
+        const value = row.getValue('vehicleNumber');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
+      accessorKey: 'transportationName',
+      header: 'Transport',
+      cell: ({ row }) => {
+        const value = row.getValue('transportationName');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
+      accessorKey: 'driverName',
+      header: 'Driver Details',
+      cell: ({ row }) => {
+        const value = row.getValue('driverName');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
+      accessorKey: 'note',
+      header: 'Note',
+      cell: ({ row }) => {
+        const value = row.getValue('note');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
       accessorKey: 'partyName',
       header: 'Party Name',
       cell: ({ row }) => {
@@ -537,26 +595,37 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       header: 'Actions',
       cell: ({ row }) => {
         const transaction = row.original as TransactionRecord;
-        if (!isAdmin) {
-          return null;
-        }
 
         return (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleEditTransaction(transaction)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => handleDeleteTransaction(transaction)}
-            >
-              Delete
-            </Button>
+            {transaction.direction === 'INWARD' && transaction.receiptNumber && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadReceipt(transaction)}
+                title="Open Receipt"
+              >
+                <Download className="w-4 h-4 mr-2" /> Receipt
+              </Button>
+            )}
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditTransaction(transaction)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDeleteTransaction(transaction)}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
           </div>
         );
       },
@@ -632,6 +701,10 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         'Net Loss (MT)': item.direction === 'OUTWARD' && item.netWeightLoss != null ? item.netWeightLoss : '-',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',
         'Gate Pass': item.gatePass || '',
+        'Vehicle Number': item.vehicleNumber || '',
+        'Transportation': item.transportationName || '',
+        'Driver Name': item.driverName || '',
+        'Note': item.note || '',
         'Stack No': item.stackNo || '',
         'Lot No': item.lotNo || '',
         'Created': item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '-',

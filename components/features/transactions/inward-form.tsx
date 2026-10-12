@@ -16,6 +16,17 @@ import { Loader2, Calculator, Calendar, Info } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { getDropdownDisplayName } from '@/lib/utils';
 
+const getGradingStatus = (observedValue: string | undefined, lowRange: number | undefined, highRange: number | undefined) => {
+  if (!observedValue || observedValue.trim() === '') return '';
+  const val = parseFloat(observedValue);
+  if (isNaN(val)) return '';
+  
+  if (lowRange !== undefined && val < lowRange) return 'LOW';
+  if (highRange !== undefined && val > highRange) return 'HIGH';
+  if (lowRange !== undefined && highRange !== undefined) return 'OK';
+  return '';
+};
+
 const inwardSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
   commodityId: z.string().min(1, 'Commodity is required'),
@@ -25,13 +36,42 @@ const inwardSchema = z.object({
   stackNo: z.string().optional(),
   lotNo: z.string().optional(),
   gatePass: z.string().optional(),
+  vehicleNumber: z.string().optional(),
+  transportationName: z.string().optional(),
+  driverName: z.string().optional(),
+  note: z.string().optional(),
   inwardDate: z.string().min(1, 'Inward date is required'),
   outwardDate: z.string().min(1, 'Outward date is required'),
+  isAssayingRequired: z.boolean().default(false),
+  assayerId: z.string().optional(),
+  assayingDate: z.string().optional(),
+  assayingExpiryDate: z.string().optional(),
+  marketValuePerMT: z.coerce.number().min(0, 'Cannot be negative').optional(),
+  gradingResults: z.any().optional(),
 }).refine((data) => {
   return new Date(data.outwardDate) > new Date(data.inwardDate);
 }, {
   message: "Outward date must be after inward date",
   path: ["outwardDate"],
+}).refine((data) => {
+  if (data.isAssayingRequired && data.assayingDate && data.inwardDate) {
+    // Strip time portions for fair date comparison
+    const assaying = new Date(data.assayingDate).setHours(0,0,0,0);
+    const inward = new Date(data.inwardDate).setHours(0,0,0,0);
+    return assaying >= inward;
+  }
+  return true;
+}, {
+  message: "Assaying Date must be on or after the Inward Date",
+  path: ["assayingDate"],
+}).refine((data) => {
+  if (data.isAssayingRequired && data.assayingDate && data.assayingExpiryDate) {
+    return new Date(data.assayingExpiryDate) >= new Date(data.assayingDate);
+  }
+  return true;
+}, {
+  message: "Expiry Date must not be earlier than Assaying Date",
+  path: ["assayingExpiryDate"],
 });
 
 type InwardFormValues = z.infer<typeof inwardSchema>;
@@ -40,10 +80,11 @@ interface InwardFormProps {
   clients: any[];
   commodities: any[];
   warehouses: any[];
+  assayers?: any[];
   onSuccess?: () => void;
 }
 
-export default function InwardForm({ clients, commodities, warehouses, onSuccess }: InwardFormProps) {
+export default function InwardForm({ clients, commodities, warehouses, assayers = [], onSuccess }: InwardFormProps) {
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [isPending, startTransition] = useTransition();
@@ -75,6 +116,7 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
     formState: { errors },
     reset,
   } = useForm<InwardFormValues>({
+    mode: 'onChange',
     resolver: zodResolver(inwardSchema) as Resolver<InwardFormValues>,
     defaultValues: {
       clientId: searchParams.get('clientId') || '',
@@ -87,6 +129,16 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
       stackNo: '',
       lotNo: '',
       gatePass: '',
+      vehicleNumber: '',
+      transportationName: '',
+      driverName: '',
+      note: '',
+      isAssayingRequired: false,
+      assayerId: '',
+      assayingDate: '',
+      assayingExpiryDate: '',
+      marketValuePerMT: undefined,
+      gradingResults: [],
     },
   });
 
@@ -171,8 +223,19 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
           stackNo: data.stackNo,
           lotNo: data.lotNo,
           gatePass: data.gatePass,
+          vehicleNumber: data.vehicleNumber,
+          transportationName: data.transportationName,
+          driverName: data.driverName,
+          note: data.note,
           date: data.inwardDate, // ISO string
           outwardDate: data.outwardDate, // ISO string
+          isAssayingRequired: data.isAssayingRequired,
+          assayerId: data.assayerId || undefined,
+          assayingDate: data.assayingDate || undefined,
+          assayingExpiryDate: data.assayingExpiryDate || undefined,
+          marketValuePerMT: data.marketValuePerMT,
+          totalMarketValue: data.marketValuePerMT && data.quantityMT ? data.marketValuePerMT * data.quantityMT : 0,
+          gradingResults: data.gradingResults,
         });
 
         if (res.success) {
@@ -191,6 +254,16 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
             stackNo: '',
             lotNo: '',
             gatePass: '',
+            vehicleNumber: '',
+            transportationName: '',
+            driverName: '',
+            note: '',
+            isAssayingRequired: false,
+            assayerId: '',
+            assayingDate: '',
+            assayingExpiryDate: '',
+            marketValuePerMT: undefined,
+            gradingResults: [],
           });
           
           router.refresh();
@@ -384,7 +457,238 @@ export default function InwardForm({ clients, commodities, warehouses, onSuccess
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-6">
+          <div className="space-y-2">
+            <label htmlFor="marketValuePerMT" className="text-sm font-semibold text-slate-700">Market Value per MT (₹)</label>
+            <Controller
+              name="marketValuePerMT"
+              control={control}
+              render={({ field }) => (
+                <Input 
+                  id="marketValuePerMT"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className={errors.marketValuePerMT ? 'border-red-500 bg-white' : 'bg-white'}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                />
+              )}
+            />
+            {errors.marketValuePerMT && <p className="text-xs text-red-500">{errors.marketValuePerMT.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Total Market Value</label>
+            <div className="h-10 px-3 py-2 bg-slate-100 border border-slate-200 rounded-md text-slate-700 flex items-center font-medium">
+              {watchedValues.quantityMT && watchedValues.marketValuePerMT 
+                ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(watchedValues.quantityMT * watchedValues.marketValuePerMT)
+                : '₹0.00'
+              }
+            </div>
+          </div>
+        </div>
+
+
+        <div className="border-t pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">Assaying & Grading</h4>
+              <p className="text-xs text-slate-500">Record quality parameters for this inward stock</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-700">Assaying Required?</span>
+              <Controller
+                name="isAssayingRequired"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="assayingRequired" 
+                        checked={field.value === true} 
+                        onChange={() => field.onChange(true)} 
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-slate-700">Yes</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="assayingRequired" 
+                        checked={field.value === false} 
+                        onChange={() => {
+                          field.onChange(false);
+                          // Clear values when changing to No to ensure validation passes and old values aren't submitted
+                          setValue('assayerId', '');
+                          setValue('assayingDate', '');
+                          setValue('assayingExpiryDate', '');
+                          setValue('gradingResults', []);
+                        }} 
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-slate-700">No</span>
+                    </label>
+                  </div>
+                )}
+              />
+
+            </div>
+          </div>
+
+          {watchedValues.isAssayingRequired && (
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Select Assayer *</label>
+                <Controller
+                  name="assayerId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Choose an active assayer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assayers && assayers.length > 0 ? (
+                          assayers.filter(a => a.status === 'Active').map(a => (
+                            <SelectItem key={a._id.toString()} value={a._id.toString()}>
+                              {a.name} ({a.licenceNumber})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>No active assayers found</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="assayingDate" className="text-sm font-semibold text-slate-700">Assaying Date</label>
+                  <Input 
+                    id="assayingDate"
+                    type="date"
+                    className={errors.assayingDate ? 'border-red-500 bg-white' : 'bg-white'}
+                    {...register('assayingDate')}
+                  />
+                  {errors.assayingDate && <p className="text-xs text-red-500">{errors.assayingDate.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="assayingExpiryDate" className="text-sm font-semibold text-slate-700">Expiry Date</label>
+                  <Input 
+                    id="assayingExpiryDate"
+                    type="date"
+                    className={errors.assayingExpiryDate ? 'border-red-500 bg-white' : 'bg-white'}
+                    {...register('assayingExpiryDate')}
+                  />
+                  {errors.assayingExpiryDate && <p className="text-xs text-red-500">{errors.assayingExpiryDate.message}</p>}
+                </div>
+              </div>
+
+
+              {watchedValues.commodityId && commodities.find(c => c._id === watchedValues.commodityId)?.gradingParameters?.length > 0 ? (
+                <div className="space-y-3 pt-2">
+                  <label className="text-sm font-semibold text-slate-700">Grading Results</label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {commodities.find(c => c._id === watchedValues.commodityId).gradingParameters.map((param: any, idx: number) => (
+                      <div key={idx} className="flex flex-col md:flex-row md:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="flex-1">
+                          <span className="font-semibold text-sm text-slate-800 block">{param.name}</span>
+                          <span className="text-xs text-slate-500">
+                            {param.remarks ? `Std: ${param.remarks}` : ''}
+                            {param.lowRange !== undefined && param.highRange !== undefined ? ` | Range: ${param.lowRange} - ${param.highRange}` : ''}
+                          </span>
+                        </div>
+                        <div className="w-full md:w-1/3 flex items-center gap-2">
+                          <Controller
+                            name={`gradingResults.${idx}.observedValue`}
+                            control={control}
+                            render={({ field }) => (
+                              <Input 
+                                placeholder="Observed Value" 
+                                value={field.value || ''}
+                                onChange={e => {
+                                  field.onChange(e.target.value);
+                                  setValue(`gradingResults.${idx}.parameterName`, param.name);
+                                  const status = getGradingStatus(e.target.value, param.lowRange, param.highRange);
+                                  setValue(`gradingResults.${idx}.status`, status || '');
+                                }}
+                              />
+                            )}
+                          />
+                          {(() => {
+                            const currentVal = watchedValues.gradingResults?.[idx]?.observedValue;
+                            const status = getGradingStatus(currentVal, param.lowRange, param.highRange);
+                            if (!status) return null;
+                            
+                            let colorClass = "bg-slate-100 text-slate-800 border-slate-200";
+                            if (status === 'OK') colorClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                            else if (status === 'LOW' || status === 'HIGH') colorClass = "bg-red-50 text-red-700 border-red-200";
+                            
+                            return (
+                              <div className={`px-3 py-2 rounded-md border text-xs font-bold w-16 text-center ${colorClass}`}>
+                                {status}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    No grading parameters defined for the selected commodity. You can add them in Commodity Master.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t pt-6">
+          <div className="space-y-2">
+            <label htmlFor="vehicleNumber" className="text-sm font-semibold text-slate-700">Vehicle Number</label>
+            <Input 
+              id="vehicleNumber"
+              {...register('vehicleNumber')}
+              type="text" 
+              placeholder="e.g., MH 12 AB 1234"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="transportationName" className="text-sm font-semibold text-slate-700">Transportation Name</label>
+            <Input 
+              id="transportationName"
+              {...register('transportationName')}
+              type="text" 
+              placeholder="e.g., Fast Freight Inc."
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="driverName" className="text-sm font-semibold text-slate-700">Driver Name / Number</label>
+            <Input 
+              id="driverName"
+              {...register('driverName')}
+              type="text" 
+              placeholder="e.g., John Doe - 9876543210"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-6">
+            <div className="space-y-2">
+                <label htmlFor="note" className="text-sm font-semibold text-slate-700">Additional Note</label>
+                <textarea 
+                    id="note"
+                    {...register('note')}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[40px]"
+                    placeholder="Enter any additional notes or remarks"
+                />
+            </div>
             <div className="space-y-2">
                 <label htmlFor={inwardDateId} className="text-sm font-semibold text-slate-700">Inward Date *</label>
                 <Input 

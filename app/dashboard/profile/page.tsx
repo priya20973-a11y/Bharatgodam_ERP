@@ -71,6 +71,10 @@ interface ProfileData {
   invoiceSuffix?: string;
   invoiceStartingNumber?: number;
   invoicePadding?: number;
+  storageReceiptPrefix?: string;
+  storageReceiptSuffix?: string;
+  storageReceiptStartingNumber?: number;
+  storageReceiptPadding?: number;
 }
 
 const initialProfileForm = {
@@ -98,6 +102,10 @@ const initialProfileForm = {
   invoiceSuffix: '',
   invoiceStartingNumber: 1,
   invoicePadding: 4,
+  storageReceiptPrefix: '',
+  storageReceiptSuffix: '',
+  storageReceiptStartingNumber: 1,
+  storageReceiptPadding: 4,
 };
 
 const initialPasswordForm = {
@@ -168,6 +176,10 @@ export default function ProfilePage() {
         invoiceSuffix: data.user.invoiceSuffix || '',
         invoiceStartingNumber: data.user.invoiceStartingNumber || 1,
         invoicePadding: data.user.invoicePadding || 4,
+        storageReceiptPrefix: data.user.storageReceiptPrefix || '',
+        storageReceiptSuffix: data.user.storageReceiptSuffix || '',
+        storageReceiptStartingNumber: data.user.storageReceiptStartingNumber || 1,
+        storageReceiptPadding: data.user.storageReceiptPadding || 4,
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -686,6 +698,67 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 lg:col-span-2">
+              <h3 className="font-semibold text-slate-800">Storage Receipt Settings</h3>
+              
+              <div className="grid gap-6 lg:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Prefix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.storageReceiptPrefix}
+                    onChange={(event) => setProfileForm({ ...profileForm, storageReceiptPrefix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. SR-"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Suffix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.storageReceiptSuffix}
+                    onChange={(event) => setProfileForm({ ...profileForm, storageReceiptSuffix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. /2026"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Starting Number</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={profileForm.storageReceiptStartingNumber}
+                    onChange={(event) => setProfileForm({ ...profileForm, storageReceiptStartingNumber: Number(event.target.value) || 1 })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Padding / Number Length</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={profileForm.storageReceiptPadding}
+                    onChange={(event) => setProfileForm({ ...profileForm, storageReceiptPadding: Number(event.target.value) || 4 })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. 4 for 0001"
+                  />
+                </label>
+
+                <div className="lg:col-span-2 rounded-md bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-sm font-medium text-blue-900 mb-1">Live Preview</p>
+                  <p className="text-slate-700 font-mono text-sm">
+                    {profileForm.storageReceiptPrefix || ''}
+                    {String(profileForm.storageReceiptStartingNumber).padStart(profileForm.storageReceiptPadding || 4, '0')}
+                    {profileForm.storageReceiptSuffix || ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">IEC Code (Optional)</span>
               <input
@@ -806,6 +879,10 @@ export default function ProfilePage() {
                 invoiceSuffix: profile?.invoiceSuffix || '',
                 invoiceStartingNumber: profile?.invoiceStartingNumber || 1,
                 invoicePadding: profile?.invoicePadding || 4,
+                storageReceiptPrefix: profile?.storageReceiptPrefix || '',
+                storageReceiptSuffix: profile?.storageReceiptSuffix || '',
+                storageReceiptStartingNumber: profile?.storageReceiptStartingNumber || 1,
+                storageReceiptPadding: profile?.storageReceiptPadding || 4,
               });
               setMessage(null);
               setError(null);

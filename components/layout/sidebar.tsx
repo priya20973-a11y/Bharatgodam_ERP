@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail, Layers, Shield } from 'lucide-react';
+import { Home, LayoutDashboard, Package, Users, ArrowDownToLine, ArrowUpFromLine, FileText, Menu, X, Box, BarChart2, DollarSign, Receipt, Settings, UserCheck, Upload, Mail, Layers, Shield, Award } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import type { Session } from 'next-auth';
 import { hasWspPermission, WspModuleId } from '@/lib/wsp-permissions';
@@ -18,9 +18,14 @@ const wspNavItems: NavItem[] = [
   { name: 'Client Master', href: '/dashboard/clients', icon: Users, moduleId: 'clientMaster' },
   { name: 'Warehouse Inventory', href: '/dashboard/warehouse', icon: Layers, moduleId: 'warehouseInventory' },
   { name: 'Inward Transaction', href: '/dashboard/inward', icon: ArrowDownToLine, moduleId: 'inward' },
+  { name: 'Assaying / Grading', href: '/dashboard/assaying', icon: Award, moduleId: 'inward' },
   { name: 'Outward Transaction', href: '/dashboard/outward', icon: ArrowUpFromLine, moduleId: 'outward' },
+  { name: 'Pledge', href: '/dashboard/pledges', icon: FileText, moduleId: 'outward' }, // Added Pledges for Loan module
+  { name: 'Pledgee Master', href: '/dashboard/pledgees', icon: Users, moduleId: 'outward' },
+  { name: 'Assayer Master', href: '/dashboard/assayer', icon: UserCheck, moduleId: 'outward' },
   { name: 'Bulk Upload', href: '/dashboard/bulk-transactions', icon: Upload, moduleId: 'bulkUpload' },
   { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2, moduleId: 'transactionReport' },
+  { name: 'Stock Report', href: '/dashboard/stock-report', icon: BarChart2, moduleId: 'transactionReport' },
   { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt, moduleId: 'invoice' },
   { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText, moduleId: 'ledger' },
   { name: 'Revenue split for Storage Charges', href: '/dashboard/revenue', icon: DollarSign, moduleId: 'revenueSplit' },
@@ -51,6 +56,7 @@ export default function Sidebar({ session }: SidebarProps) {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Warehouse Inventory', href: '/dashboard/warehouse', icon: Layers },
     { name: 'Transactions Report', href: '/dashboard/transactions-report', icon: BarChart2 },
+    { name: 'Stock Report', href: '/dashboard/stock-report', icon: BarChart2 },
     { name: 'Client Invoices', href: '/dashboard/client-invoices', icon: Receipt },
     { name: 'Client Ledger', href: '/dashboard/ledger', icon: FileText },
   ];

@@ -35,6 +35,7 @@ interface ClientFormState {
   state: string;
   commodityIds: string[];
   email?: string;
+  customClientId?: string;
 }
 
 export default function ClientForm({ client, availableCommodities, onSuccess, isColdStorage = false }: ClientFormProps) {
@@ -52,6 +53,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
     state: client?.state || '',
     commodityIds: client?.commodityIds || [],
     email: client?.email || '',
+    customClientId: client?.customClientId || '',
   });
 
   const isNAValue = (value: string) => value.trim().toUpperCase() === 'NA';
@@ -127,6 +129,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
       state: client?.state || '',
       commodityIds: client?.commodityIds || [],
       email: client?.email || '',
+      customClientId: client?.customClientId || '',
     });
   }, [client]);
 
@@ -152,6 +155,7 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
         state: formData.state,
         commodityIds: formData.commodityIds,
         email: formData.email,
+        customClientId: formData.customClientId,
       };
 
       const res = client
@@ -207,6 +211,16 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
             className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
           />
           {errors.email && <p className="mt-1 text-xs font-semibold text-red-600">{errors.email}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-800 block">Client ID</label>
+          <Input
+            type="text"
+            value={formData.customClientId || ''}
+            onChange={(e) => setFormData({ ...formData, customClientId: e.target.value })}
+            placeholder="e.g. CLI-001 (Optional)"
+            className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
+          />
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-slate-800 block">{t('clients.clientType')}</label>

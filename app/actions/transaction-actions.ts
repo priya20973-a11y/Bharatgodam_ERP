@@ -172,7 +172,24 @@ export async function getStockBalance(clientId: string, commodityId: string, war
   const totalInwardValue = inwardResult[0]?.total || 0;
   const totalOutwardValue = outwardResult[0]?.total || 0;
 
-  return totalInwardValue - totalOutwardValue;
+  // Subtract pledged quantity
+  const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+  const pledgeAgg = Pledge.aggregate([
+    { $match: { clientId: new mongoose.Types.ObjectId(clientId), status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+    { $unwind: '$items' },
+    { 
+      $match: { 
+        'items.storageType': 'DRY',
+        'items.commodityId': new mongoose.Types.ObjectId(commodityId),
+        'items.warehouseId': new mongoose.Types.ObjectId(warehouseId)
+      } 
+    },
+    { $group: { _id: null, total: { $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] } } } }
+  ]);
+  const pledgeResult = session ? await pledgeAgg.session(session).exec() : await pledgeAgg.exec();
+  const totalPledged = pledgeResult[0]?.total || 0;
+
+  return totalInwardValue - totalOutwardValue - totalPledged;
 }
 
 /**
@@ -248,8 +265,28 @@ export async function validateOutwardStock(
 
   availableStockOnDate = Math.round(availableStockOnDate * 10000) / 10000;
 
-  if (quantityMT > availableStockOnDate) {
-    throw new Error(`Insufficient stock available on selected date. Available stock on ${formattedDate} is ${availableStockOnDate} MT.`);
+  // Subtract pledged quantity
+  const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+  const pledgeAgg = Pledge.aggregate([
+    { $match: { clientId: clientObjectId, status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+    { $unwind: '$items' },
+    { 
+      $match: { 
+        'items.storageType': 'DRY',
+        'items.commodityId': commodityObjectId,
+        'items.warehouseId': warehouseObjectId
+      } 
+    },
+    { $group: { _id: null, total: { $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] } } } }
+  ]);
+  const pledgeResult = session ? await pledgeAgg.session(session).exec() : await pledgeAgg.exec();
+  const totalPledged = pledgeResult[0]?.total || 0;
+
+  if (quantityMT > availableStockOnDate - totalPledged) {
+    if (totalPledged > 0) {
+      throw new Error(`This stock is pledged and cannot be outwarded until the pledge is released. Requested: ${quantityMT} MT, Available: ${availableStockOnDate - totalPledged} MT (Pledged: ${totalPledged} MT)`);
+    }
+    throw new Error(`Insufficient stock available on selected date. Requested: ${quantityMT} MT, Available stock on ${formattedDate} is ${availableStockOnDate} MT.`);
   }
 
   // Check historical negative balance
@@ -268,9 +305,12 @@ export async function validateOutwardStock(
   let runningBalance = 0;
   for (const d of sortedDates) {
     runningBalance += dateBalances.get(d)!;
-    if (runningBalance < -0.0001) {
+    if (runningBalance - totalPledged < -0.0001) {
       const dParts = d.split('-');
       const dFormatted = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
+      if (totalPledged > 0) {
+        throw new Error(`Transaction would cause available stock to become negative on ${dFormatted} due to pledged stock.`);
+      }
       throw new Error(`Transaction would cause stock to become negative on ${dFormatted}.`);
     }
   }
@@ -288,9 +328,24 @@ export async function processInward(data: {
   stackNo?: string;
   lotNo?: string;
   gatePass?: string;
+  vehicleNumber?: string;
+  transportationName?: string;
+  driverName?: string;
+  note?: string;
   date?: string | Date;
   outwardDate: string | Date;
   isColdStorage?: boolean;
+  isAssayingRequired?: boolean;
+  assayerId?: string;
+  assayingDate?: string | Date;
+  assayingExpiryDate?: string | Date;
+  marketValuePerMT?: number;
+  totalMarketValue?: number;
+  gradingResults?: {
+    parameterName: string;
+    observedValue: string;
+    status?: string;
+  }[];
 }) {
   if (!data.isColdStorage) {
     await requireWspActionPermission('inward');
@@ -302,6 +357,24 @@ export async function processInward(data: {
   try {
     const inwardDate = data.date ? new Date(data.date) : new Date();
     const outwardDate = new Date(data.outwardDate);
+
+    // Date Validation for Dry Storage Assaying
+    if (!data.isColdStorage && data.isAssayingRequired) {
+      if (data.assayingDate) {
+        const assaying = new Date(data.assayingDate).setHours(0,0,0,0);
+        const inward = new Date(inwardDate).setHours(0,0,0,0);
+        if (assaying < inward) {
+          throw new Error('Assaying Date must be on or after the Inward Date.');
+        }
+
+        if (data.assayingExpiryDate) {
+          const expiry = new Date(data.assayingExpiryDate).setHours(0,0,0,0);
+          if (assaying > expiry) {
+            throw new Error('Expiry Date must not be earlier than Assaying Date.');
+          }
+        }
+      }
+    }
 
     // 0. Fetch Commodity for Rate
     const commodityQuery = Commodity.findById(data.commodityId);
@@ -321,11 +394,48 @@ export async function processInward(data: {
       throw new Error('Warehouse is deactivated and cannot be used for new transactions');
     }
 
+    const db = mongoose.connection.db;
+    if (!db) throw new Error('Database connection not established');
+
+    let receiptNumber = '';
+    if (!data.isColdStorage && authSession?.user?.id) {
+      const userId = new mongoose.Types.ObjectId(authSession.user.id);
+      const userDoc = await db.collection('users').findOne({ _id: userId });
+      
+      if (userDoc) {
+        let currentSeq = userDoc.storageReceiptCurrentNumber || userDoc.storageReceiptStartingNumber || 1;
+        let isUnique = false;
+        
+        const prefix = userDoc.storageReceiptPrefix || '';
+        const suffix = userDoc.storageReceiptSuffix || '';
+        const padding = userDoc.storageReceiptPadding || 4;
+        
+        while (!isUnique) {
+          const generatedReceipt = `${prefix}${String(currentSeq).padStart(padding, '0')}${suffix}`;
+          const existing = await db.collection('inwards').findOne({ receiptNumber: generatedReceipt, userId });
+          if (!existing) {
+            isUnique = true;
+            receiptNumber = generatedReceipt;
+          } else {
+            currentSeq++;
+          }
+        }
+        
+        await db.collection('users').updateOne(
+           { _id: userId },
+           { $set: { storageReceiptCurrentNumber: currentSeq + 1 } }
+        );
+      }
+    }
+
     // 2. Create Inward Record
     const inwardPayload = appendOwnershipForMongo({
       ...data,
       date: inwardDate,
       outwardDate: outwardDate,
+      receiptNumber: receiptNumber || undefined,
+      assayerId: data.assayerId ? new mongoose.Types.ObjectId(data.assayerId) : undefined,
+      gradingStatus: data.isAssayingRequired ? 'PENDING' : undefined,
     }, authSession);
 
     const [newInward] = session
@@ -361,15 +471,18 @@ export async function processInward(data: {
       stackNo: data.stackNo,
       lotNo: data.lotNo,
       gatePass: data.gatePass || `GP-${Date.now()}`,
+      vehicleNumber: data.vehicleNumber,
+      transportationName: data.transportationName,
+      driverName: data.driverName,
+      note: data.note,
       status: 'COMPLETED',
       sourceType: 'inward',
       sourceId: newInward._id?.toString(),
+      receiptNumber: receiptNumber || undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     }, authSession);
 
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('Database connection not established');
 
     await db.collection('transactions').insertOne(
       inwardTransaction,

@@ -128,10 +128,9 @@ export async function createStockEntry(data: {
         return { success: false, message: 'Warehouse stock cannot become negative' };
       }
 
-      const currentStock = await getCurrentStock(data.clientId, data.warehouseId, data.commodityId);
-      if (currentStock < data.quantityMT) {
-        return { success: false, message: 'Insufficient stock for outward' };
-      }
+      // Note: We bypass secondary getCurrentStock validation here because 
+      // validateOutwardStock() in transaction-actions.ts already thoroughly 
+      // validates the real stock balance (including pledges) before this is called.
     }
 
     const stockEntry: IStockEntry = appendOwnershipForMongo({

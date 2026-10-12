@@ -42,6 +42,10 @@ export async function GET() {
         coldLanguage: user.coldLanguage || 'en',
         storageChargeSacCode: user.storageChargeSacCode || null,
         invoiceSequenceType: user.invoiceSequenceType || 'CONTINUOUS',
+        storageReceiptPrefix: user.storageReceiptPrefix || '',
+        storageReceiptSuffix: user.storageReceiptSuffix || '',
+        storageReceiptStartingNumber: user.storageReceiptStartingNumber || 1,
+        storageReceiptPadding: user.storageReceiptPadding || 4,
       },
     });
   } catch (error: any) {
@@ -86,7 +90,11 @@ export async function PATCH(req: Request) {
       invoicePrefix,
       invoiceSuffix,
       invoiceStartingNumber,
-      invoicePadding
+      invoicePadding,
+      storageReceiptPrefix,
+      storageReceiptSuffix,
+      storageReceiptStartingNumber,
+      storageReceiptPadding
     } = body;
 
     const db = await getDb();
@@ -217,6 +225,10 @@ export async function PATCH(req: Request) {
       if (invoiceSuffix !== undefined) updates.invoiceSuffix = invoiceSuffix || '';
       if (invoiceStartingNumber !== undefined) updates.invoiceStartingNumber = invoiceStartingNumber || 1;
       if (invoicePadding !== undefined) updates.invoicePadding = invoicePadding || 4;
+      if (storageReceiptPrefix !== undefined) updates.storageReceiptPrefix = storageReceiptPrefix || '';
+      if (storageReceiptSuffix !== undefined) updates.storageReceiptSuffix = storageReceiptSuffix || '';
+      if (storageReceiptStartingNumber !== undefined) updates.storageReceiptStartingNumber = storageReceiptStartingNumber || 1;
+      if (storageReceiptPadding !== undefined) updates.storageReceiptPadding = storageReceiptPadding || 4;
     }
     if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
@@ -273,6 +285,10 @@ export async function PATCH(req: Request) {
         invoiceSuffix: user.invoiceSuffix || '',
         invoiceStartingNumber: user.invoiceStartingNumber || 1,
         invoicePadding: user.invoicePadding || 4,
+        storageReceiptPrefix: user.storageReceiptPrefix || '',
+        storageReceiptSuffix: user.storageReceiptSuffix || '',
+        storageReceiptStartingNumber: user.storageReceiptStartingNumber || 1,
+        storageReceiptPadding: user.storageReceiptPadding || 4,
       },
     });
   } catch (error: any) {

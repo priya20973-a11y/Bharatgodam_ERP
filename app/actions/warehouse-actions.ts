@@ -61,6 +61,7 @@ export async function createWarehouse(data: {
   name: string;
   address: string;
   totalCapacity: number;
+  insurances?: any[];
 }) {
   await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
@@ -113,6 +114,7 @@ export async function updateWarehouse(id: string, data: Partial<{
   address: string;
   totalCapacity: number;
   status: string;
+  insurances: any[];
 }>) {
   await requireWspActionPermission('warehouseMaster');
   await connectToDatabase();
