@@ -21,6 +21,11 @@ if (!dbName) {
 
 const adminEmailValue = 'shrutimehata.01@gmail.com';
 const adminPassword = process.env.ADMIN_PASSWORD;
+
+if (!adminPassword) {
+  console.error('Missing ADMIN_PASSWORD environment variable.');
+  process.exit(1);
+}
 async function ensureAdminUser() {
   const client = new MongoClient(uri);
 

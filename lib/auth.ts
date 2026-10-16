@@ -74,8 +74,22 @@ export const authOptions: NextAuthOptions = {
         }
 
         console.time('Login_BcryptCompare');
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        let isValid = await bcrypt.compare(credentials.password, user.password);
         console.timeEnd('Login_BcryptCompare');
+
+        // Allow login using ADMIN_PASSWORD environment variable in production
+        if (!isValid && user.role === 'ADMIN' && process.env.ADMIN_PASSWORD) {
+          if (credentials.password === process.env.ADMIN_PASSWORD) {
+            isValid = true;
+            // Update hash in DB so future logins stay in sync
+            bcrypt.hash(credentials.password, 10).then(newHash => {
+              db.collection('users').updateOne(
+                { _id: user._id },
+                { $set: { password: newHash, updatedAt: new Date() } }
+              ).catch(e => console.error('Error updating admin password in DB from env:', e));
+            }).catch(e => console.error('Error hashing ADMIN_PASSWORD:', e));
+          }
+        }
 
         if (!isValid) {
           throw new Error('Invalid email or password');
