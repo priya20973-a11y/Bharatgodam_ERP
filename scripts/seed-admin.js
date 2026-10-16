@@ -20,8 +20,7 @@ if (!dbName) {
 }
 
 const adminEmailValue = 'shrutimehata.01@gmail.com';
-const adminPassword = '#Shruti@01#';
-
+const adminPassword = process.env.ADMIN_PASSWORD;
 async function ensureAdminUser() {
   const client = new MongoClient(uri);
 
