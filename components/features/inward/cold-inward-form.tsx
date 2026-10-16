@@ -845,7 +845,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                     setClientSections(newClients);
                   }
                 }}
-                options={commonCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})` }))}
+                options={commonCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})${c.unit ? ` [${c.unit}${c.siUnit ? ` / ${c.siUnit}` : ''}]` : ''}` }))}
                 placeholder={t('inward.selectCommodity')}
               />
             </div>
@@ -902,7 +902,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
                       updateClientFields(cIdx, fieldsToUpdate);
                     }}
-                    options={clientAllowedCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})` }))}
+                    options={clientAllowedCommodities.map(c => ({ value: c._id, label: `${c.name} (${c.type})${c.unit ? ` [${c.unit}${c.siUnit ? ` / ${c.siUnit}` : ''}]` : ''}` }))}
                     placeholder={t('inward.selectCommodity')}
                   />
                 </div>

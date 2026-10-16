@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -10,13 +10,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Printer, Download, QrCode, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  Printer, 
+  Download, 
+  QrCode, 
+  Loader2, 
+  ChevronLeft, 
+  ChevronRight,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  X
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import QrCodeModal from "./qr-code-modal";
 import { ensureInwardQrId } from "@/app/actions/cold-inward-actions";
 import { toast } from "react-hot-toast";
-import { useState } from "react";
 
 interface ColdInwardListProps {
   inwards: any[];
@@ -47,7 +57,60 @@ export default function ColdInwardList({
   const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
   const [generatingQrId, setGeneratingQrId] = useState<string | null>(null);
 
-  const groupedInwards = inwards;
+  // Date column sorting state: 'desc' (newest first) or 'asc' (oldest first)
+  const [dateSortOrder, setDateSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // Client name search state
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+
+  // Lot No search state
+  const [lotSearchQuery, setLotSearchQuery] = useState('');
+
+  const toggleDateSort = () => {
+    setDateSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+  };
+
+  const getTxDateMs = (item: any): number => {
+    if (item.date) {
+      const d = new Date(item.date).getTime();
+      if (!isNaN(d)) return d;
+    }
+    if (item.createdAt) {
+      const d = new Date(item.createdAt).getTime();
+      if (!isNaN(d)) return d;
+    }
+    return 0;
+  };
+
+  // Filtered and sorted inwards
+  const processedInwards = useMemo(() => {
+    let list = inwards || [];
+
+    // Filter by client name (case-insensitive partial matching)
+    if (clientSearchQuery.trim()) {
+      const q = clientSearchQuery.trim().toLowerCase();
+      list = list.filter((w) => {
+        const clientName = (w.clientId?.name || '').toLowerCase();
+        return clientName.includes(q);
+      });
+    }
+
+    // Filter by lot number (case-insensitive partial matching)
+    if (lotSearchQuery.trim()) {
+      const q = lotSearchQuery.trim().toLowerCase();
+      list = list.filter((w) => {
+        const lot = String(w.lotNo || w.lotNumber || '').toLowerCase();
+        return lot.includes(q);
+      });
+    }
+
+    // Sort by actual transaction date
+    return [...list].sort((a, b) => {
+      const timeA = getTxDateMs(a);
+      const timeB = getTxDateMs(b);
+      return dateSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    });
+  }, [inwards, clientSearchQuery, lotSearchQuery, dateSortOrder]);
 
   const getFloorName = (warehouse: any, chamberName: any, floorNo: any) => {
     if (!warehouse || !warehouse.chambers) return floorNo ?? '-';
@@ -64,12 +127,26 @@ export default function ColdInwardList({
 
   const exportCsv = async () => {
     setIsExporting(true);
-    let exportData = groupedInwards;
+    let exportData = processedInwards;
     
     if (fetchFullDataset) {
       try {
         toast.loading("Preparing CSV...", { id: 'csv-export' });
-        exportData = await fetchFullDataset();
+        const full = await fetchFullDataset();
+        let list = full || [];
+        if (clientSearchQuery.trim()) {
+          const q = clientSearchQuery.trim().toLowerCase();
+          list = list.filter((w: any) => (w.clientId?.name || '').toLowerCase().includes(q));
+        }
+        if (lotSearchQuery.trim()) {
+          const q = lotSearchQuery.trim().toLowerCase();
+          list = list.filter((w: any) => String(w.lotNo || w.lotNumber || '').toLowerCase().includes(q));
+        }
+        exportData = [...list].sort((a, b) => {
+          const timeA = getTxDateMs(a);
+          const timeB = getTxDateMs(b);
+          return dateSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+        });
         toast.dismiss('csv-export');
       } catch (err) {
         toast.dismiss('csv-export');
@@ -86,6 +163,7 @@ export default function ColdInwardList({
       'Large Bag',
       'Small Bag',
       t('inward.commodityHeader') || 'Commodity',
+      t('inward.lotNo') || 'Lot No',
       t('inward.warehouseHeader') || 'Warehouse',
       t('inward.chamberHeader') || 'Chamber',
       t('inward.floorHeader') || 'Floor',
@@ -103,6 +181,7 @@ export default function ColdInwardList({
       const largeBag = w.largeBag || 0;
       const smallBag = w.smallBag || 0;
       const commodity = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : 'Unknown';
+      const lotNo = w.lotNo || '-';
       const warehouse = w.warehouseId?.name || '-';
       const chamber = w.stackAllocations?.map((s: any) => String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')).join('; ') || String(w.chamberName || w.chamberNo).replace(/^Chamber\s+/i, '');
       const floor = w.stackAllocations?.map((s: any) => getFloorName(w.warehouseId, s.chamberName || s.chamberNo, s.floorNo)).join('; ') || getFloorName(w.warehouseId, w.chamberName || w.chamberNo, w.floorNo);
@@ -110,7 +189,7 @@ export default function ColdInwardList({
       const grade = w.gradingType || '-';
       const qty = (w.originalQuantityKg ?? w.quantityKg) || 0;
       const bags = (w.originalBagsCount ?? w.bagsCount) || 0;
-      return [date, client, farmer, village, largeBag, smallBag, commodity, warehouse, chamber, floor, stack, grade, qty, bags]
+      return [date, client, farmer, village, largeBag, smallBag, commodity, lotNo, warehouse, chamber, floor, stack, grade, qty, bags]
         .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
     
@@ -163,28 +242,133 @@ export default function ColdInwardList({
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">
-            <TableHead className="font-semibold">{t('inward.dateHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('inward.clientNameHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('inward.commodityHeader')}</TableHead>
-            <TableHead className="font-semibold">{t('inward.warehouseHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.chamberHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.floorHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.stackHeader')}</TableHead>
-            <TableHead className="font-semibold">Grade</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.quantityHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.bagsHeader')}</TableHead>
-            <TableHead className="text-right font-semibold">{t('inward.actions')}</TableHead>
+            <TableHead className="font-semibold whitespace-nowrap align-middle">
+              <button
+                type="button"
+                onClick={toggleDateSort}
+                className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-indigo-600 focus:outline-none transition-colors group cursor-pointer"
+                title={`Sort by Date: currently ${dateSortOrder === 'asc' ? 'Oldest to Newest' : 'Newest to Oldest'} (click to toggle)`}
+              >
+                <span>{t('inward.dateHeader')}</span>
+                <span className="inline-flex items-center text-xs font-medium text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                  {dateSortOrder === 'asc' ? (
+                    <>
+                      <ArrowUp className="h-3.5 w-3.5 mr-0.5" /> Asc
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDown className="h-3.5 w-3.5 mr-0.5" /> Desc
+                    </>
+                  )}
+                </span>
+              </button>
+            </TableHead>
+            <TableHead className="font-semibold min-w-[220px] align-middle">
+              <div className="flex flex-col gap-1.5 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-800">{t('inward.clientNameHeader')}</span>
+                  {clientSearchQuery && (
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 font-medium px-1.5 py-0.5 rounded border border-indigo-200">
+                      Filtered
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search client name..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="h-7 w-full pl-8 pr-7 rounded border border-slate-300 bg-white text-xs font-normal text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                  />
+                  {clientSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setClientSearchQuery('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer rounded-full hover:bg-slate-100"
+                      title="Clear client search"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </TableHead>
+            <TableHead className="font-semibold align-middle">{t('inward.commodityHeader')}</TableHead>
+            <TableHead className="font-semibold min-w-[170px] align-middle">
+              <div className="flex flex-col gap-1.5 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-800">{t('inward.lotNo') || 'Lot No'}</span>
+                  {lotSearchQuery && (
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 font-medium px-1.5 py-0.5 rounded border border-indigo-200">
+                      Filtered
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search lot no..."
+                    value={lotSearchQuery}
+                    onChange={(e) => setLotSearchQuery(e.target.value)}
+                    className="h-7 w-full pl-8 pr-7 rounded border border-slate-300 bg-white text-xs font-normal text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                  />
+                  {lotSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setLotSearchQuery('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer rounded-full hover:bg-slate-100"
+                      title="Clear lot search"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </TableHead>
+            <TableHead className="font-semibold align-middle">{t('inward.warehouseHeader')}</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.chamberHeader')}</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.floorHeader')}</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.stackHeader')}</TableHead>
+            <TableHead className="font-semibold align-middle">Grade</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.quantityHeader')}</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.bagsHeader')}</TableHead>
+            <TableHead className="text-right font-semibold align-middle">{t('inward.actions')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groupedInwards.length === 0 ? (
+          {processedInwards.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center text-slate-500">
-                {t('inward.noInwardFound')}
+              <TableCell colSpan={12} className="h-24 text-center text-slate-500">
+                {(clientSearchQuery || lotSearchQuery) ? (
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <p>
+                      No inward transactions found matching
+                      {clientSearchQuery && <> client &quot;{clientSearchQuery}&quot;</>}
+                      {clientSearchQuery && lotSearchQuery && <> and</>}
+                      {lotSearchQuery && <> lot no &quot;{lotSearchQuery}&quot;</>}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setClientSearchQuery('');
+                        setLotSearchQuery('');
+                      }}
+                      className="text-xs h-7"
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : (
+                  t('inward.noInwardFound')
+                )}
               </TableCell>
             </TableRow>
           ) : (
-            groupedInwards.map((w) => {
+            processedInwards.map((w) => {
               const commodityDisplay = w.commodityId ? `${w.commodityId.name} (${w.commodityId.type})` : t('clients.unknown');
               return (
                 <TableRow key={w._id.toString()} className="hover:bg-slate-50/50 transition-colors">
@@ -197,6 +381,7 @@ export default function ColdInwardList({
                     {w.villageName && <div className="text-xs font-normal text-slate-500 mt-0.5">Village: {w.villageName}</div>}
                   </TableCell>
                   <TableCell className="text-slate-700">{commodityDisplay}</TableCell>
+                  <TableCell className="font-medium text-slate-900">{w.lotNo || '-'}</TableCell>
                   <TableCell className="text-slate-700">{w.warehouseId?.name || '-'}</TableCell>
                   <TableCell className="text-right text-slate-700">
                     {w.stackAllocations?.map((s: any, i: number) => <div key={i}>{String(s.chamberName || formatNumber(s.chamberNo)).replace(/^Chamber\s+/i, '')}</div>) || String(w.chamberName || formatNumber(w.chamberNo)).replace(/^Chamber\s+/i, '')}
@@ -264,7 +449,11 @@ export default function ColdInwardList({
               <option value={100}>100</option>
             </select>
             <span className="text-xs text-slate-500 ml-2">
-              Showing {pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.total, pagination.page * pagination.limit)} of {pagination.total} records
+              {(clientSearchQuery || lotSearchQuery) ? (
+                <>Showing {processedInwards.length} matching records on this page (filtered from {pagination.total} total)</>
+              ) : (
+                <>Showing {pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.total, pagination.page * pagination.limit)} of {pagination.total} records</>
+              )}
             </span>
           </div>
 

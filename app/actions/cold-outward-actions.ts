@@ -12,6 +12,7 @@ import { appendOwnership, getTenantFilter, requireSession, getWarehouseFilter } 
 import mongoose from 'mongoose';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
+import { calculateStorageCharge, validateQuantityAndPricing } from '@/lib/utils/cold-unit-conversion';
 import { logColdActivity } from '@/lib/cold-logger';
 
 export async function getColdOutwards(limit: number = 250) {
@@ -20,9 +21,10 @@ export async function getColdOutwards(limit: number = 250) {
   
   let query = ColdOutward.find({ ...getTenantFilter(session), ...getWarehouseFilter(session) })
     .populate('clientId', 'name')
-    .populate('commodityId', 'name type')
+    .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
     .populate('warehouseId', 'name warehouseId')
     .populate('carryOverClientId', 'name')
+    .populate('inwardId', 'lotNo receiptNumber marko farmerName farmerId')
     .sort({ date: -1, createdAt: -1 });
 
   if (limit > 0) {
@@ -30,11 +32,47 @@ export async function getColdOutwards(limit: number = 250) {
   }
 
   const outwards = await query.lean();
+  const rawOutwards = JSON.parse(JSON.stringify(outwards));
 
+  // Resolve transfers for any inwardId missing lotNo
+  const missingLotInwardIds = rawOutwards
+    .filter((o: any) => o.inwardId && !o.inwardId.lotNo && !o.lotNo)
+    .map((o: any) => o.inwardId._id || o.inwardId);
+
+  if (missingLotInwardIds.length > 0) {
+    const transfers = await ColdTransfer.find({ newInwardId: { $in: missingLotInwardIds } })
+      .populate('originalInwardId', 'lotNo receiptNumber marko farmerName farmerId')
+      .lean();
     
+    const transferMap = new Map();
+    transfers.forEach((tr: any) => {
+      if (tr.newInwardId && tr.originalInwardId) {
+        transferMap.set(tr.newInwardId.toString(), tr.originalInwardId);
+      }
+    });
+
+    rawOutwards.forEach((o: any) => {
+      const inwId = (o.inwardId?._id || o.inwardId)?.toString();
+      if (inwId && transferMap.has(inwId)) {
+        const orig = transferMap.get(inwId);
+        if (typeof o.inwardId === 'object' && o.inwardId !== null) {
+          o.inwardId.lotNo = o.inwardId.lotNo || orig.lotNo;
+        } else {
+          o.lotNo = o.lotNo || orig.lotNo;
+        }
+      }
+    });
+  }
+
+  rawOutwards.forEach((o: any) => {
+    if (!o.lotNo && o.inwardId?.lotNo) {
+      o.lotNo = o.inwardId.lotNo;
+    }
+  });
+
   const groups: any[] = [];
   
-  for (const out of JSON.parse(JSON.stringify(outwards))) {
+  for (const out of rawOutwards) {
     let existingGroup = null;
     
     if (out.batchId) {
@@ -159,7 +197,7 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
   }
 
   const inwards = await ColdInward.find(inwardMatch)
-    .populate('commodityId', 'name type unit')
+    .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
     .populate('warehouseId')
     .sort({ date: -1, createdAt: -1 })
     .lean();
@@ -171,7 +209,7 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
   }).populate({
     path: 'inwardId',
     populate: [
-      { path: 'commodityId', select: 'name type unit' },
+      { path: 'commodityId', select: 'name type unit siUnit priceCalculationBasedOn' },
       { path: 'warehouseId' }
     ]
   }).lean();
@@ -480,29 +518,34 @@ export async function createColdOutward(data: any) {
           if (!pLarge) rentReason = 'Price Per Unit not set';
         }
 
-        // Store the base unit rate on the data object so it gets saved to the model
-        data.unitRate = baseUnitRate;
-
-        // Rent Calculation
-        const unit = (commodity.unit || 'KG').toUpperCase();
-        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
-
-        if (isKg) {
-          if (commodity.priceType === 'Different Price') {
-            // Even if unit is KG, 'Different Price' might still apply per kg proportionally, but here we just fallback to the previous logic 
-            // Wait, previous logic for createColdOutward was actually doing bagsLarge * pLarge
-            rentRs = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-          } else {
-            rentRs = quantityKg * baseUnitRate;
-          }
-        } else {
-          // Unit != KG -> Calculate using storage units
-          if (commodity.priceType === 'Different Price') {
-            rentRs = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-          } else {
-            rentRs = totalBags * baseUnitRate;
-          }
+        const unitValidation = validateQuantityAndPricing(
+          commodity,
+          Number(data.quantityKg) || 0,
+          totalBags
+        );
+        if (!unitValidation.valid && unitValidation.error) {
+          rentReason = unitValidation.error;
         }
+
+        const chargeResult = calculateStorageCharge({
+          rate: season.pricePerKg || 0,
+          rateLarge: season.priceLarge,
+          rateSmall: season.priceSmall,
+          rateMixed: season.priceMixed,
+          priceType: commodity.priceType || 'Same Price',
+          gradingType: commodity.gradingType,
+          commodity,
+          quantityKg: Number(data.quantityKg) || 0,
+          bagsLarge,
+          bagsSmall,
+          bagsMixed,
+          totalBags,
+        });
+
+        baseUnitRate = chargeResult.rateUsed;
+        rentRs = chargeResult.amount;
+        data.unitRate = baseUnitRate;
+        data.unit = commodity.unit || 'KG';
 
         if (commodity.rentType === 'Per Month') {
           const perMonthResult = calculatePerMonthRent({
@@ -511,6 +554,8 @@ export async function createColdOutward(data: any) {
             seasonalPrices: commodity.seasonalPrices,
             priceType: commodity.priceType || 'Same Price',
             unit: commodity.unit || 'KG',
+            siUnit: commodity.siUnit,
+            priceCalculationBasedOn: commodity.priceCalculationBasedOn,
             rentCalculationOn: commodity.rentCalculationOn,
             gradingType: commodity.gradingType,
             quantityKg: Number(data.quantityKg) || 0,
@@ -529,6 +574,8 @@ export async function createColdOutward(data: any) {
             seasonalPrices: commodity.seasonalPrices,
             priceType: commodity.priceType || 'Same Price',
             unit: commodity.unit || 'KG',
+            siUnit: commodity.siUnit,
+            priceCalculationBasedOn: commodity.priceCalculationBasedOn,
             rentCalculationOn: commodity.rentCalculationOn,
             gradingType: commodity.gradingType,
             quantityKg: Number(data.quantityKg) || 0,
@@ -702,42 +749,23 @@ export async function createBatchColdOutwards(payload: any) {
             if (!baseUnitRate) rentReason = 'Price Per Unit not set';
           }
 
-          const unit = (commodity.unit || 'KG').toUpperCase();
-          const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
+          const chargeResult = calculateStorageCharge({
+            rate: season.pricePerKg || 0,
+            rateLarge: season.priceLarge,
+            rateSmall: season.priceSmall,
+            rateMixed: season.priceMixed,
+            priceType: commodity.priceType || 'Same Price',
+            gradingType: commodity.gradingType,
+            commodity,
+            quantityKg,
+            bagsLarge,
+            bagsSmall,
+            bagsMixed,
+            totalBags,
+          });
 
-          if (isKg) {
-            let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-            if (totalBags > 0) {
-              largeWeight = (bagsLarge / totalBags) * quantityKg;
-              smallWeight = (bagsSmall / totalBags) * quantityKg;
-              mixedWeight = (bagsMixed / totalBags) * quantityKg;
-            } else {
-              largeWeight = quantityKg; // Fallback
-            }
-
-            if (commodity.priceType === 'Different Price') {
-              if (commodity.gradingType === 'Wet') {
-                const rateLarge = (largeWeight / 81) * pLarge * 4;
-                const rateSmall = (smallWeight / 81) * pSmall * 4;
-                const rateMixed = (mixedWeight / 81) * pMixed * 4;
-                rentRs = rateLarge + rateSmall + rateMixed;
-              } else {
-                const rateLarge = largeWeight * pLarge;
-                const rateSmall = smallWeight * pSmall;
-                const rateMixed = mixedWeight * pMixed;
-                rentRs = rateLarge + rateSmall + rateMixed;
-              }
-            } else {
-              rentRs = quantityKg * baseUnitRate;
-            }
-          } else {
-            // Storage Unit != KG
-            if (commodity.priceType === 'Different Price') {
-              rentRs = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-            } else {
-              rentRs = totalBags * baseUnitRate;
-            }
-          }
+          baseUnitRate = chargeResult.rateUsed;
+          rentRs = chargeResult.amount;
 
           if (commodity.rentType === 'Per Month') {
             const perMonthResult = calculatePerMonthRent({
@@ -746,6 +774,8 @@ export async function createBatchColdOutwards(payload: any) {
               seasonalPrices: commodity.seasonalPrices,
               priceType: commodity.priceType || 'Same Price',
               unit: commodity.unit || 'KG',
+              siUnit: commodity.siUnit,
+              priceCalculationBasedOn: commodity.priceCalculationBasedOn,
               rentCalculationOn: commodity.rentCalculationOn,
               gradingType: commodity.gradingType,
               quantityKg: Number(item.quantityKg) || 0,
@@ -764,6 +794,8 @@ export async function createBatchColdOutwards(payload: any) {
               seasonalPrices: commodity.seasonalPrices,
               priceType: commodity.priceType || 'Same Price',
               unit: commodity.unit || 'KG',
+              siUnit: commodity.siUnit,
+              priceCalculationBasedOn: commodity.priceCalculationBasedOn,
               rentCalculationOn: commodity.rentCalculationOn,
               gradingType: commodity.gradingType,
               quantityKg: Number(item.quantityKg) || 0,
@@ -787,6 +819,7 @@ export async function createBatchColdOutwards(payload: any) {
 
       const outward = await ColdOutward.create(appendOwnership({
         ...item,
+        lotNo: item.lotNo || inward?.lotNo || undefined,
         receiptNumber: batchReceiptNumber,
         batchId: payload.batchId || batchId,
         date: outDate,
@@ -888,7 +921,7 @@ export async function resolveQRForColdOutward(qrCodeString: string) {
       transfer = await ColdTransfer.findOne({ _id: idOrQrId, ...tenantFilter })
         .populate('fromClientId', 'name')
         .populate('toClientId', 'name')
-        .populate('commodityId', 'name type unit')
+        .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
         .populate('warehouseId', 'name chambers')
         .lean();
     }
@@ -901,14 +934,14 @@ export async function resolveQRForColdOutward(qrCodeString: string) {
     let newInward: any = null;
     if (transfer.newInwardId) {
       newInward = await ColdInward.findById(transfer.newInwardId)
-        .populate('commodityId', 'name type unit')
+        .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
         .populate('warehouseId')
         .lean();
     }
 
     if (!newInward && transfer.originalInwardId) {
       newInward = await ColdInward.findById(transfer.originalInwardId)
-        .populate('commodityId', 'name type unit')
+        .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
         .populate('warehouseId')
         .lean();
     }
@@ -946,14 +979,14 @@ export async function resolveQRForColdOutward(qrCodeString: string) {
   if (isInwardUrl || !isTransferUrl) {
     inward = await ColdInward.findOne({ qrId: idOrQrId, ...tenantFilter })
       .populate('clientId', 'name')
-      .populate('commodityId', 'name type unit')
+      .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
       .populate('warehouseId')
       .lean();
 
     if (!inward && mongoose.Types.ObjectId.isValid(idOrQrId)) {
       inward = await ColdInward.findOne({ _id: idOrQrId, ...tenantFilter })
         .populate('clientId', 'name')
-        .populate('commodityId', 'name type unit')
+        .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn')
         .populate('warehouseId')
         .lean();
     }

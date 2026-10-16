@@ -13,6 +13,8 @@ export interface IColdCommodity extends Document {
   name: string;
   type: string;
   unit: string;
+  siUnit?: string;
+  priceCalculationBasedOn?: 'Unit' | 'SI Unit';
   rentCalculationOn?: 'Kg' | 'Bag';
   rentType?: 'One Time' | 'Per Month' | 'Daily Rate';
   hsnCode?: string;
@@ -43,7 +45,9 @@ const ColdCommoditySchema: Schema = new Schema(
   {
     name: { type: String, required: true, uppercase: true },
     type: { type: String, required: true },
-    unit: { type: String, required: true, default: 'KG', uppercase: true },
+    unit: { type: String, required: true, default: 'Bag' },
+    siUnit: { type: String, required: false, default: 'kg' },
+    priceCalculationBasedOn: { type: String, enum: ['Unit', 'SI Unit'], default: 'Unit' },
     rentCalculationOn: { type: String, enum: ['Kg', 'Bag'], default: 'Kg' },
     rentType: { type: String, enum: ['One Time', 'Per Month', 'Daily Rate'], default: 'One Time' },
     hsnCode: { type: String, required: false },

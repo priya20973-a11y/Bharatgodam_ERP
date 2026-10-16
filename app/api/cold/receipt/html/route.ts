@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (type === 'inward') {
       transaction = await ColdInward.findOne({ _id: id, ...getTenantFilterForMongo(session) })
         .populate('clientId', 'name address village')
-        .populate('commodityId', 'name type seasonalPrices')
+        .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn seasonalPrices')
         .populate('warehouseId');
         
       if (transaction) {
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
           .populate('clientId', 'name address village')
           .populate('carryOverClientId', 'name address village')
-          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transactions.length > 0) {
           transaction = transactions[0]; // For common fields
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
           .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
           .populate('clientId', 'name address village')
           .populate('carryOverClientId', 'name address village')
-          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId');
         if (transaction) {
           if (transaction.batchId) {
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
               .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
               .populate('clientId', 'name address village')
               .populate('carryOverClientId', 'name address village')
-              .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+              .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId');
           } else {
             // Group transactions created at the same time for the same client
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
               .populate('inwardId', 'receiptNumber _id date marko lotNo farmerName farmerId')
               .populate('clientId', 'name address village')
               .populate('carryOverClientId', 'name address village')
-              .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+              .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
               .populate('warehouseId')
               .sort({ createdAt: 1 });
           }
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
         transactions = await ColdTransfer.find({ batchId, ...getTenantFilterForMongo(session) })
           .populate('fromClientId', 'name address village')
           .populate('toClientId', 'name address village')
-          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId')
           .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo')
           .sort({ createdAt: 1 });
@@ -183,14 +183,14 @@ export async function GET(request: NextRequest) {
         transaction = await ColdTransfer.findOne({ _id: id, ...getTenantFilterForMongo(session) })
           .populate('fromClientId', 'name address village')
           .populate('toClientId', 'name address village')
-          .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+          .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
           .populate('warehouseId')
           .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo');
         if (transaction && transaction.batchId) {
           transactions = await ColdTransfer.find({ batchId: transaction.batchId, ...getTenantFilterForMongo(session) })
             .populate('fromClientId', 'name address village')
             .populate('toClientId', 'name address village')
-            .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType rentType gradingType')
+            .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType rentType gradingType')
             .populate('warehouseId')
             .populate('originalInwardId', 'farmerName farmerId referencePersons quantityKg receiptNumber lotNo')
             .sort({ createdAt: 1 });

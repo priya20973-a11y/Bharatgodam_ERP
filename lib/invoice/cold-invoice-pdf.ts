@@ -113,6 +113,7 @@ export function generateColdInvoiceHTML(
       totalBags: totalBags,
       days: days,
       rate: rate,
+      pricingUnit: it.pricingUnit || it.unit || 'KG',
       lotNo: it.lotNo || it.inwardId?.lotNo || '-',
       calculationPath: it.calculationPath || '',
       subtotal: subtotal
@@ -628,7 +629,7 @@ export function generateColdInvoiceHTML(
           <th class="text-center" style="width: 75px;">Outward</th>
           <th class="text-right" style="width: 80px;">Qty (Kg)</th>
           <th class="text-center" style="width: 55px;">Bags</th>
-          <th class="text-right" style="width: 75px;">Rate (₹)/KG</th>
+          <th class="text-right" style="width: 85px;">Rate (₹)</th>
           <th class="text-right" style="width: 90px;">Amount (₹)</th>
         </tr>
       </thead>
@@ -669,7 +670,7 @@ export function generateColdInvoiceHTML(
             <td class="text-center">${item.outwardDate}</td>
             <td class="text-right font-semibold">${formatNumber(item.inwardKg, 2)}</td>
             <td class="text-center font-semibold">${item.totalBags}</td>
-            <td class="text-right">${item.rate > 0 ? formatNumber(item.rate, 2) : 'Variable'}</td>
+            <td class="text-right">${item.rate > 0 ? `${formatNumber(item.rate, 2)}${item.pricingUnit ? ` <span style="font-size: 7.5pt; color: #64748b;">/${item.pricingUnit}</span>` : ''}` : 'Variable'}</td>
             <td class="text-right font-bold">${formatCurrency(item.subtotal, false)}</td>
           </tr>
         `).join('')}

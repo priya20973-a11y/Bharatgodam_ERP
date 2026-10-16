@@ -58,14 +58,20 @@ async function createClientUserAccount(db: any, clientName: string, clientType: 
 }
 
 function validateClientPayload(payload: {
-  mobile: string;
+  mobile?: string;
   panNumber: string;
   aadharNumber: string;
   gstNumber: string;
-}) {
-  const mobile = payload.mobile.trim();
-  if (!mobile) return 'Mobile number is required';
-  if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+}, isColdStorage: boolean = false) {
+  const mobile = (payload.mobile || '').trim();
+  if (isColdStorage) {
+    if (mobile && !isNAValue(mobile) && !mobileRegex.test(mobile)) {
+      return 'Mobile number must be 10 digits or NA';
+    }
+  } else {
+    if (!mobile) return 'Mobile number is required';
+    if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
+  }
 
   const pan = payload.panNumber.trim();
   if (!pan) return 'PAN number is required';
@@ -210,12 +216,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, type, address, state, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds, customClientId } = body;
+    const { name, type, address, state, mobile, panNumber, aadharNumber, gstNumber, otherDetails, commodityIds, customClientId, isColdStorage } = body;
 
-    if (!name || !type || !address || !mobile || !panNumber || !aadharNumber || !gstNumber) {
+    const isCold = isColdStorage === true || (session.user as any)?.storagePlan === 'COLD';
+
+    if (!name || !type || !address || (!isCold && !mobile) || !panNumber || !aadharNumber || !gstNumber) {
       return NextResponse.json({
         success: false,
-        message: 'Missing required fields: name, type, address, mobile, panNumber, aadharNumber, gstNumber'
+        message: isCold
+          ? 'Missing required fields: name, type, address, panNumber, aadharNumber, gstNumber'
+          : 'Missing required fields: name, type, address, mobile, panNumber, aadharNumber, gstNumber'
       }, { status: 400 });
     }
 
@@ -226,7 +236,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const payloadError = validateClientPayload({ mobile, panNumber, aadharNumber, gstNumber });
+    const payloadError = validateClientPayload({ mobile, panNumber, aadharNumber, gstNumber }, isCold);
     if (payloadError) {
       return NextResponse.json({ success: false, message: payloadError }, { status: 400 });
     }
@@ -291,7 +301,7 @@ export async function POST(request: Request) {
       type,
       address,
       state: state || '',
-      mobile,
+      mobile: isCold && (!mobile || isNAValue(mobile)) ? 'NA' : (mobile || 'NA'),
       panNumber,
       aadharNumber,
       gstNumber,

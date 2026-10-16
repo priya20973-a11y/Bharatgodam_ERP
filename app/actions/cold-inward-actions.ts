@@ -338,19 +338,26 @@ export async function searchColdInwardByLotNo(lotNo: string) {
   return null;
 }
 
-export async function searchMultipleColdInwardsByLotNo(lotNo: string) {
-  if (!lotNo || typeof lotNo !== 'string') return [];
-  
+export async function searchMultipleColdInwardsByLotNo(lotNo?: string) {
   await connectToDatabase();
   const session = await requireSession();
   
-  const inwards = await ColdInward.find({ 
-    lotNo: { $regex: new RegExp(lotNo.trim(), 'i') },
+  const query: any = { 
     remainingQuantityKg: { $gt: 0 },
     ...getTenantFilter(session)
-  })
+  };
+
+  if (lotNo && typeof lotNo === 'string' && lotNo.trim()) {
+    const s = lotNo.trim();
+    const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.lotNo = { $regex: new RegExp(escaped, 'i') };
+  } else {
+    query.lotNo = { $exists: true, $ne: '' };
+  }
+
+  const inwards = await ColdInward.find(query)
     .sort({ createdAt: -1 })
-    .limit(30)
+    .limit(50)
     .populate('clientId', 'name mobile')
     .populate('commodityId', 'name type gradingType')
     .populate('warehouseId', 'name')

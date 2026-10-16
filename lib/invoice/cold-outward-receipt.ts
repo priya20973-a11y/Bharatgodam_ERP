@@ -4,6 +4,7 @@ import { en } from '@/lib/i18n/cold/en';
 import { gu } from '@/lib/i18n/cold/gu';
 import { getDynamicUnitLabel } from '@/lib/utils';
 import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
+import { calculateStorageCharge, getActivePricingUnit, convertKgToUnit } from '@/lib/utils/cold-unit-conversion';
 
 export function generateColdOutwardReceiptHTML(
   batchData: any | any[],
@@ -72,6 +73,8 @@ export function generateColdOutwardReceiptHTML(
         seasonalPrices: commodity.seasonalPrices,
         priceType: commodity.priceType || 'Same Price',
         unit: commodity.unit || unitStr,
+        siUnit: commodity.siUnit,
+        priceCalculationBasedOn: commodity.priceCalculationBasedOn,
         rentCalculationOn: commodity.rentCalculationOn,
         gradingType: commodity.gradingType,
         quantityKg: totalQuantityKg,
@@ -100,6 +103,8 @@ export function generateColdOutwardReceiptHTML(
         seasonalPrices: commodity.seasonalPrices,
         priceType: commodity.priceType || 'Same Price',
         unit: commodity.unit || unitStr,
+        siUnit: commodity.siUnit,
+        priceCalculationBasedOn: commodity.priceCalculationBasedOn,
         rentCalculationOn: commodity.rentCalculationOn,
         gradingType: commodity.gradingType,
         quantityKg: totalQuantityKg,
@@ -112,7 +117,7 @@ export function generateColdOutwardReceiptHTML(
       return dailyResult.totalRent;
     }
 
-    // For non-Per-Month commodities, keep the original calculation
+    // For non-Per-Month commodities, keep the original calculation with unit conversion
     return outwards.reduce((acc, curr) => {
       let activeUnitRate = curr.unitRate || 0;
 
@@ -121,20 +126,33 @@ export function generateColdOutwardReceiptHTML(
         const outDate = curr.date ? new Date(curr.date) : new Date();
         const outTime = outDate.getTime();
         const season = commodity.seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || commodity.seasonalPrices[0];
-        if (commodity.priceType === 'Different Price') {
-          activeUnitRate = season.priceLarge || activeUnitRate;
-        } else {
-          activeUnitRate = season.pricePerKg || activeUnitRate;
+        if (season) {
+          const charge = calculateStorageCharge({
+            rate: season.pricePerKg || 0,
+            rateLarge: season.priceLarge,
+            rateSmall: season.priceSmall,
+            rateMixed: season.priceMixed,
+            priceType: commodity.priceType || 'Same Price',
+            gradingType: commodity.gradingType,
+            commodity,
+            quantityKg: curr.quantityKg || 0,
+            bagsLarge: curr.bagsCount || 0,
+            bagsSmall: curr.jin || 0,
+            bagsMixed: curr.mixed || 0,
+            totalBags: curr.totalBags || ((curr.bagsCount || 0) + (curr.jin || 0) + (curr.mixed || 0)),
+          });
+          activeUnitRateUsed = charge.rateUsed;
+          return acc + charge.amount;
         }
       }
 
       if (activeUnitRate > 0) {
         activeUnitRateUsed = activeUnitRate;
-        const unit = (unitStr || 'KG').toUpperCase();
-        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity?.rentCalculationOn !== 'Bag';
+        const activePricing = getActivePricingUnit(commodity);
         let calculatedRent = 0;
-        if (isKg) {
-          calculatedRent = ((curr.quantityKg || 0) * activeUnitRate);
+        if (activePricing.isWeight) {
+          const weightInUnit = convertKgToUnit(curr.quantityKg || 0, activePricing.pricingUnit);
+          calculatedRent = weightInUnit * activeUnitRate;
         } else {
           calculatedRent = ((curr.totalBags || 0) * activeUnitRate);
         }

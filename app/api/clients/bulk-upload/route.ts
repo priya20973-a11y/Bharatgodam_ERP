@@ -115,17 +115,17 @@ export async function POST(request: NextRequest) {
 
         if (isColdStorage) {
           const mobileStr = (row.mobile || '').trim();
-          if (!mobileStr || mobileStr.toUpperCase() === 'NA') {
-            throw new Error('Mobile number is required for Cold Storage clients and cannot be NA');
-          }
+          let existingClient = null;
 
-          await connectToDatabase();
-          const session = await requireSession();
-          
-          const existingClient = await Client.findOne({
-             mobile: mobileStr,
-             ...getTenantFilter(session)
-          });
+          if (mobileStr && mobileStr.toUpperCase() !== 'NA') {
+            await connectToDatabase();
+            const session = await requireSession();
+            
+            existingClient = await Client.findOne({
+               mobile: mobileStr,
+               ...getTenantFilter(session)
+            });
+          }
 
           if (existingClient) {
             const dataToUpdate = { ...dataToCreate };

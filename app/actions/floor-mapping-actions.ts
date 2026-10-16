@@ -8,6 +8,7 @@ import ColdTransfer from '@/lib/models/ColdTransfer';
 import { hasPermission } from '@/lib/permissions';
 import { requireSession, getTenantFilter, getWarehouseFilter } from '@/lib/ownership';
 import { Types } from 'mongoose';
+import { formatChamberDisplay, formatFloorName, formatFloorDisplay } from '@/lib/utils/cold-naming';
 
 export async function getFloorInventory(warehouseId: string, chamberName: string, floorNo: number) {
   try {
@@ -233,6 +234,69 @@ export async function getFloorInventory(warehouseId: string, chamberName: string
   } catch (error: any) {
     console.error('getFloorInventory Error:', error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function getWarehouseQRs(warehouseId: string) {
+  try {
+    await connectToDatabase();
+    const session = await requireSession();
+    const tenantFilter = getTenantFilter(session);
+
+    const warehouse = await ColdWarehouse.findOne({
+      _id: warehouseId,
+      ...tenantFilter,
+      ...getWarehouseFilter(session, '_id'),
+    }).lean();
+
+    if (!warehouse) {
+      return { success: false, error: 'Warehouse not found' };
+    }
+
+    const stacks: Array<{
+      chamberName: string;
+      chamberDisplay: string;
+      floorNo: number;
+      floorName: string;
+      floorDisplay: string;
+      stackNo: number;
+      locationId: string;
+    }> = [];
+
+    const chambers = warehouse.chambers || [];
+    for (const c of chambers) {
+      const chamberName = (c.name || c.chamberNo?.toString() || 'Chamber').toString();
+      const chamberDisplay = formatChamberDisplay(c.name || c.chamberNo, c.chamberNo);
+      const floors = c.floors || [];
+      for (const f of floors) {
+        const floorName = f.name || formatFloorName(null, f.floorNo);
+        const floorDisplay = formatFloorDisplay(f.name, f.floorNo);
+        const floorStacks = f.stacks || [];
+        for (const s of floorStacks) {
+          stacks.push({
+            chamberName,
+            chamberDisplay,
+            floorNo: f.floorNo,
+            floorName,
+            floorDisplay,
+            stackNo: s.stackNo,
+            locationId: `${chamberDisplay}/${floorDisplay}/S${s.stackNo}`,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        warehouseId: warehouse._id.toString(),
+        warehouseName: warehouse.name,
+        stacks,
+      },
+    };
+  } catch (err: any) {
+    console.error('getWarehouseQRs error:', err);
+    return { success: false, error: err.message || 'Failed to fetch warehouse QR codes' };
   }
 }
 

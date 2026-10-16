@@ -115,8 +115,14 @@ export default function ColdCommodityListWrapper({ initialCommodities }: Props) 
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
                     {commodity.type}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">
-                    {commodity.unit}
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700" title="Business Unit">
+                    Unit: {commodity.unit}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-100 text-sky-700" title="SI Unit">
+                    SI: {commodity.siUnit || 'kg'}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800" title="Price Calculation Based On">
+                    Calc: {commodity.priceCalculationBasedOn || 'Unit'}
                   </span>
                   {commodity.hsnCode && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
@@ -133,24 +139,27 @@ export default function ColdCommodityListWrapper({ initialCommodities }: Props) 
                 {t('commodities.seasonalPricing')}
               </h4>
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 max-h-32 overflow-y-auto space-y-2">
-                {commodity.seasonalPrices?.map((season: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-600">
-                      {new Date(season.fromDate).toLocaleDateString('en-GB')} - {new Date(season.toDate).toLocaleDateString('en-GB')}
-                    </span>
-                    <div className="flex flex-col items-end">
-                      {commodity.priceType === 'Different Price' ? (
-                        <span className="font-bold text-green-700 text-xs">
-                          L: ₹{(season.priceLarge || 0).toFixed(2)} | S: ₹{(season.priceSmall || 0).toFixed(2)} | M: ₹{(season.priceMixed || 0).toFixed(2)} / {commodity.unit || 'KG'}
-                        </span>
-                      ) : (
-                        <span className="font-bold text-green-700">
-                          ₹{(season.pricePerKg || 0).toFixed(2)} / {commodity.unit || 'KG'}
-                        </span>
-                      )}
+                {commodity.seasonalPrices?.map((season: any, idx: number) => {
+                  const pricingUnit = commodity.priceCalculationBasedOn === 'SI Unit' ? (commodity.siUnit || 'kg') : (commodity.unit || 'Unit');
+                  return (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-600">
+                        {new Date(season.fromDate).toLocaleDateString('en-GB')} - {new Date(season.toDate).toLocaleDateString('en-GB')}
+                      </span>
+                      <div className="flex flex-col items-end">
+                        {commodity.priceType === 'Different Price' ? (
+                          <span className="font-bold text-green-700 text-xs">
+                            L: ₹{(season.priceLarge || 0).toFixed(2)} | S: ₹{(season.priceSmall || 0).toFixed(2)} | M: ₹{(season.priceMixed || 0).toFixed(2)} / {pricingUnit}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-green-700">
+                            ₹{(season.pricePerKg || 0).toFixed(2)} / {pricingUnit}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!commodity.seasonalPrices || commodity.seasonalPrices.length === 0) && (
                   <p className="text-xs text-slate-500 italic">{t('commodities.noPricesConfigured')}</p>
                 )}

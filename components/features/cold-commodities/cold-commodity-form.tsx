@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { addColdCommodity, updateColdCommodity } from '@/app/actions/cold-commodities';
-import { fetchActiveColdUnits } from '@/app/actions/cold-units';
+import { fetchColdUnitsForCommodityMaster } from '@/app/actions/cold-units';
 import { toast } from 'react-hot-toast';
 import { X, Loader2, IndianRupee, Layers, Plus, Trash2 } from 'lucide-react';
 import { ISeasonalPrice } from '@/lib/models/ColdCommodity';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 import { ColdNumberInput } from '@/components/ui/cold-number-input';
+import { STANDARD_BUSINESS_UNITS } from '@/lib/utils/cold-unit-conversion';
 
 type ModalProps = {
   isOpen: boolean;
@@ -25,7 +26,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [hsnCode, setHsnCode] = useState(initialData?.hsnCode || '');
-  const [unit, setUnit] = useState(initialData?.unit || '');
+  const [unit, setUnit] = useState(initialData?.unit || 'Bag');
+  const [siUnit, setSiUnit] = useState(initialData?.siUnit || 'kg');
+  const [priceCalculationBasedOn, setPriceCalculationBasedOn] = useState<'Unit' | 'SI Unit'>(initialData?.priceCalculationBasedOn || 'Unit');
   const [rentCalculationOn, setRentCalculationOn] = useState<string>('Kg');
   const [rentType, setRentType] = useState<string>('One Time');
   const [qualityParameters, setQualityParameters] = useState<{name: string, lowerLimit: number, upperLimit: number}[]>([]);
@@ -33,29 +36,98 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
   const [gradingChargeRate, setGradingChargeRate] = useState<number | ''>('');
   const [priceType, setPriceType] = useState<'Same Price' | 'Different Price' | ''>('');
   const [seasonalPrices, setSeasonalPrices] = useState<ISeasonalPrice[]>([]);
-  const [availableUnits, setAvailableUnits] = useState<any[]>([]);
+  const [unitMasterOptions, setUnitMasterOptions] = useState<{
+    units: Array<{ label: string; value: string; name: string; code: string }>;
+    siUnits: Array<{ label: string; value: string; name: string; code: string }>;
+  }>({
+    units: [],
+    siUnits: [],
+  });
 
   useEffect(() => {
     if (isOpen) {
-      fetchActiveColdUnits().then(res => {
+      fetchColdUnitsForCommodityMaster().then(res => {
         if (res.success && res.data) {
-          setAvailableUnits(res.data);
-          if (!initialData && res.data.some((u: any) => u.code === 'KG')) {
-             setUnit('KG');
-          } else if (!initialData && res.data.length > 0) {
-             setUnit(res.data[0].code);
-          }
+          setUnitMasterOptions(res.data);
         }
       });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen]);
+
+  const computedUnitOptions = React.useMemo(() => {
+    const list: Array<{ label: string; value: string }> = [];
+    const seen = new Set<string>();
+
+    // 1. Add all active Unit entries from Unit Master
+    for (const u of unitMasterOptions.units) {
+      const val = u.value || u.code;
+      if (val && !seen.has(val.toLowerCase())) {
+        seen.add(val.toLowerCase());
+        list.push({ label: u.label || `${u.name} (${val})`, value: val });
+      }
+    }
+
+    // 2. Include standard business units if not already in list
+    for (const s of STANDARD_BUSINESS_UNITS) {
+      if (!seen.has(s.toLowerCase())) {
+        seen.add(s.toLowerCase());
+        list.push({ label: s, value: s });
+      }
+    }
+
+    // 3. Include current selected unit if any
+    if (unit && !seen.has(unit.toLowerCase())) {
+      seen.add(unit.toLowerCase());
+      list.push({ label: unit, value: unit });
+    }
+
+    return list;
+  }, [unitMasterOptions.units, unit]);
+
+  const computedSiUnitOptions = React.useMemo(() => {
+    const list: Array<{ label: string; value: string }> = [];
+    const seen = new Set<string>();
+
+    // 1. Add all active SI Unit entries from Unit Master
+    for (const u of unitMasterOptions.siUnits) {
+      const val = u.value || u.code;
+      if (val && !seen.has(val.toLowerCase())) {
+        seen.add(val.toLowerCase());
+        list.push({ label: u.label || `${u.name} (${val})`, value: val });
+      }
+    }
+
+    // 2. Fallback defaults if none configured yet
+    const defaults = [
+      { label: 'Kilogram (kg)', value: 'kg' },
+      { label: 'Gram (g)', value: 'g' },
+      { label: 'Metric Tonne (tonne)', value: 'tonne' },
+      { label: 'Quintal (quintal)', value: 'quintal' },
+    ];
+    for (const d of defaults) {
+      if (!seen.has(d.value.toLowerCase())) {
+        seen.add(d.value.toLowerCase());
+        list.push(d);
+      }
+    }
+
+    // 3. Include current selected siUnit if any
+    if (siUnit && !seen.has(siUnit.toLowerCase())) {
+      seen.add(siUnit.toLowerCase());
+      list.push({ label: siUnit, value: siUnit });
+    }
+
+    return list;
+  }, [unitMasterOptions.siUnits, siUnit]);
 
   useEffect(() => {
     if (initialData && isOpen) {
       setName(initialData.name || '');
       setType(initialData.type || '');
       setHsnCode(initialData.hsnCode || '');
-      setUnit(initialData.unit || 'KG');
+      setUnit(initialData.unit || 'Bag');
+      setSiUnit(initialData.siUnit || 'kg');
+      setPriceCalculationBasedOn(initialData.priceCalculationBasedOn || 'Unit');
       setRentCalculationOn(initialData.rentCalculationOn || 'Kg');
       setRentType(initialData.rentType || 'One Time');
       setQualityParameters(initialData.qualityParameters || []);
@@ -71,7 +143,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
       setName('');
       setType('');
       setHsnCode('');
-      setUnit('KG');
+      setUnit('Bag');
+      setSiUnit('kg');
+      setPriceCalculationBasedOn('Unit');
       setRentCalculationOn('Kg');
       setRentType('One Time');
       setQualityParameters([]);
@@ -103,6 +177,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
   const validate = () => {
     if (!name.trim()) return t('common.error');
     if (!type.trim()) return t('common.error');
+    if (!unit.trim()) return 'Please select a Unit.';
+    if (!siUnit.trim()) return 'Please select an SI Unit.';
+    if (!priceCalculationBasedOn) return 'Please select Price Calculation Based On.';
     if (gradingChargeType && gradingChargeRate === '') return 'Please enter a valid grading charge rate.';
     if (seasonalPrices.length === 0) return t('common.error');
 
@@ -120,7 +197,7 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
       }
       if (priceType !== 'Different Price') {
         const pKg = Number(p.pricePerKg);
-        if (isNaN(pKg) || pKg <= 0) return 'Price per KG is required and must be greater than 0.';
+        if (isNaN(pKg) || pKg <= 0) return 'Price rate is required and must be greater than 0.';
       } else if (priceType === 'Different Price') {
         const pL = Number(p.priceLarge);
         const pS = Number(p.priceSmall);
@@ -155,7 +232,9 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
         name: name.trim().toUpperCase(),
         type: type.trim(),
         unit: unit,
-        rentCalculationOn: (unit.toUpperCase() === 'KG' || unit.toUpperCase() === 'KILOGRAM' || unit.toUpperCase() === 'KGS') ? rentCalculationOn : undefined,
+        siUnit: siUnit,
+        priceCalculationBasedOn: priceCalculationBasedOn,
+        rentCalculationOn: (priceCalculationBasedOn === 'Unit' && (unit.toLowerCase() === 'bag' || unit.toLowerCase() === 'box')) ? 'Bag' : rentCalculationOn,
         rentType,
         hsnCode: hsnCode.trim() || undefined,
         qualityParameters,
@@ -254,35 +333,60 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-1">
-                <label className="text-sm font-semibold text-slate-700">{t('commodities.unitConstraint')} <span className="text-red-500">*</span></label>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Unit <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
                 >
-                  <option value="" disabled>
-                    {availableUnits.length === 0 ? 'No active units available' : 'Select a Unit'}
-                  </option>
-                  {availableUnits.map(u => (
-                    <option key={u._id} value={u.code}>{u.code} ({u.name})</option>
+                  {computedUnitOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                <p className="text-[11px] text-slate-500">Business unit from Unit Master (e.g., Bag, Kg, Quintal, MT, Box)</p>
               </div>
 
-              {(unit.toUpperCase() === 'KG' || unit.toUpperCase() === 'KILOGRAM' || unit.toUpperCase() === 'KGS') && (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Calculate Rent According To</label>
-                  <select
-                    value={rentCalculationOn}
-                    onChange={(e) => setRentCalculationOn(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-                  >
-                    <option value="Kg">Kg</option>
-                    <option value="Bag">Bag</option>
-                  </select>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  SI Unit <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={siUnit}
+                  onChange={(e) => setSiUnit(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                >
+                  {computedSiUnitOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500">Standard measurement unit from Unit Master (e.g., kg, g, tonne, quintal)</p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Price Calculation Based On <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={priceCalculationBasedOn}
+                  onChange={(e) => setPriceCalculationBasedOn(e.target.value as 'Unit' | 'SI Unit')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                >
+                  <option value="Unit">Unit – Calculate the price according to the selected Unit ({unit || 'Unit'})</option>
+                  <option value="SI Unit">SI Unit – Calculate the price according to the selected SI Unit ({siUnit || 'kg'})</option>
+                </select>
+                <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 flex items-center justify-between mt-1">
+                  <div>
+                    <span className="font-bold">Active Calculation: </span>
+                    Storage charges will be calculated using <strong>{priceCalculationBasedOn === 'SI Unit' ? `SI Unit (${siUnit})` : `Unit (${unit})`}</strong> and its configured price.
+                  </div>
+                  <span className="px-2 py-0.5 bg-indigo-200 text-indigo-800 rounded font-bold text-[11px] uppercase">
+                    {priceCalculationBasedOn === 'SI Unit' ? siUnit : unit}
+                  </span>
                 </div>
-              )}
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Rent Type</label>
@@ -464,8 +568,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
 
                     <div className="w-full sm:w-auto flex flex-wrap items-end gap-2 shrink-0">
                       {priceType !== 'Different Price' && (
-                        <div className="space-y-1 relative w-32">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Price / {unit || 'KG'}</label>
+                        <div className="space-y-1 relative w-36">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
+                            Price / {priceCalculationBasedOn === 'SI Unit' ? (siUnit || 'kg') : (unit || 'Unit')}
+                          </label>
                           <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <ColdNumberInput
@@ -479,8 +585,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
 
                       {priceType === 'Different Price' && (
                         <>
-                          <div className="space-y-1 relative w-32">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Large Price / {unit || 'KG'}</label>
+                          <div className="space-y-1 relative w-36">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
+                              Large / {priceCalculationBasedOn === 'SI Unit' ? (siUnit || 'kg') : (unit || 'Unit')}
+                            </label>
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                               <ColdNumberInput
@@ -490,8 +598,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                               />
                             </div>
                           </div>
-                          <div className="space-y-1 relative w-32">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Small Price / {unit || 'KG'}</label>
+                          <div className="space-y-1 relative w-36">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
+                              Small / {priceCalculationBasedOn === 'SI Unit' ? (siUnit || 'kg') : (unit || 'Unit')}
+                            </label>
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                               <ColdNumberInput
@@ -501,8 +611,10 @@ export default function ColdCommodityForm({ isOpen, onClose, initialData, onSucc
                               />
                             </div>
                           </div>
-                          <div className="space-y-1 relative w-32">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Mixed Price / {unit || 'KG'}</label>
+                          <div className="space-y-1 relative w-36">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
+                              Mixed / {priceCalculationBasedOn === 'SI Unit' ? (siUnit || 'kg') : (unit || 'Unit')}
+                            </label>
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                               <ColdNumberInput

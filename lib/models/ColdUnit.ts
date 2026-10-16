@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IColdUnit extends Document {
   name: string;
   code: string;
+  unitType?: 'Unit' | 'SI Unit' | 'Both';
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -13,15 +14,18 @@ const ColdUnitSchema = new Schema<IColdUnit>(
     name: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     code: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
-      uppercase: true,
+    },
+    unitType: {
+      type: String,
+      enum: ['Unit', 'SI Unit', 'Both'],
+      default: 'Unit',
+      required: true,
     },
     isActive: {
       type: Boolean,
@@ -33,8 +37,8 @@ const ColdUnitSchema = new Schema<IColdUnit>(
   }
 );
 
-ColdUnitSchema.index({ userId: 1 });
-ColdUnitSchema.index({ userEmail: 1 });
+ColdUnitSchema.index({ unitType: 1, name: 1 });
+ColdUnitSchema.index({ unitType: 1, code: 1 });
 
 const ColdUnit: Model<IColdUnit> =
   mongoose.models.ColdUnit || mongoose.model<IColdUnit>('ColdUnit', ColdUnitSchema);

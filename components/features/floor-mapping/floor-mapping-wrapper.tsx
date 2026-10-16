@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { getFloorInventory } from '@/app/actions/floor-mapping-actions';
 import FloorGrid from './floor-grid';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
-import { QrCodeIcon } from 'lucide-react';
+import { QrCodeIcon, Download } from 'lucide-react';
 import { formatChamberName, formatFloorName, formatChamberDisplay, formatFloorDisplay } from '@/lib/utils/cold-naming';
+import { Toaster, toast } from 'react-hot-toast';
 
 export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] }) {
   const { t } = useColdTranslation();
@@ -109,8 +110,35 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
     window.open(`/print/stack-qr?${params.toString()}`, '_blank');
   };
 
+  const handleDownloadAllWarehouseQRs = () => {
+    if (!selectedWarehouseId) {
+      toast.error('Please select a warehouse first.');
+      return;
+    }
+
+    if (!activeWarehouse) {
+      toast.error('Selected warehouse details not found.');
+      return;
+    }
+
+    // Check if the warehouse has any mapped stacks
+    const chambers = activeWarehouse.chambers || [];
+    const hasStacks = chambers.some((c: any) =>
+      c.floors?.some((f: any) => f.stacks && f.stacks.length > 0)
+    );
+
+    if (!hasStacks) {
+      toast.error('No mapped floors or stacks found for this warehouse.');
+      return;
+    }
+
+    // Only open QR HTML in new tab
+    window.open(`/print/warehouse-qrs?warehouseId=${selectedWarehouseId}`, '_blank');
+  };
+
   return (
     <div className="space-y-6">
+      <Toaster position="top-right" />
       <div className="bg-white p-4 rounded-lg shadow-sm border flex flex-col md:flex-row gap-4 items-end">
         <div className="space-y-2 flex-1">
           <label className="text-sm font-medium text-slate-700">{t('inward.warehouse') || 'Warehouse'}</label>
@@ -158,6 +186,20 @@ export default function FloorMappingWrapper({ warehouses }: { warehouses: any[] 
             </Select>
 
           </div>
+        </div>
+
+        {/* Download All QR Codes Button */}
+        <div className="w-full md:w-auto shrink-0">
+          <Button
+            type="button"
+            onClick={handleDownloadAllWarehouseQRs}
+            disabled={!selectedWarehouseId}
+            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+            title={selectedWarehouseId ? 'Download All QR Codes for selected warehouse' : 'Please select a warehouse first'}
+          >
+            <Download className="w-4 h-4" />
+            <span>Download All QR Codes</span>
+          </Button>
         </div>
       </div>
 

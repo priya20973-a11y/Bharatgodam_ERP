@@ -423,6 +423,7 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                   <th className="p-3 border text-center">Outward Date</th>
                   <th className="p-3 border text-right">Inward Qty (Kg)</th>
                   <th className="p-3 border text-center">Bags</th>
+                  <th className="p-3 border text-right">Rate</th>
                   <th className="p-3 border text-right">Storage Rent (₹)</th>
                 </tr>
               </thead>
@@ -432,6 +433,10 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                     <td className="p-3 border text-center font-medium text-slate-500">{idx + 1}</td>
                     <td className="p-3 border">
                       <div className="font-semibold text-slate-900">{item.commodityName}</div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {item.unit && <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">Unit: {item.unit}</span>}
+                        {item.siUnit && <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">SI: {item.siUnit}</span>}
+                      </div>
                       {item.calculationPath && <div className="text-xs text-slate-500 mt-0.5">{item.calculationPath}</div>}
                     </td>
                     <td className="p-3 border text-center text-slate-700">{item.lotNo || '-'}</td>
@@ -439,6 +444,11 @@ export default function ColdInvoiceGenerator({ warehouses, clients, userDetails 
                     <td className="p-3 border text-center">{item.outwardDate ? new Date(item.outwardDate).toLocaleDateString('en-GB') : '-'}</td>
                     <td className="p-3 border text-right font-medium">{item.quantityKg.toFixed(2)} Kg</td>
                     <td className="p-3 border text-center font-medium">{item.totalBags || (item.bagsLarge + item.bagsSmall + item.bagsMixed) || '-'}</td>
+                    <td className="p-3 border text-right font-medium text-slate-700">
+                      {item.rateApplied > 0 ? (
+                        <span>₹{item.rateApplied.toFixed(2)}{item.pricingUnit ? <span className="text-xs text-slate-500"> / {item.pricingUnit}</span> : ''}</span>
+                      ) : '-'}
+                    </td>
                     <td className="p-3 border text-right font-bold text-slate-900">₹{item.subtotal.toFixed(2)}</td>
                   </tr>
                 ))}

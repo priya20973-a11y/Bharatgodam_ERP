@@ -13,6 +13,7 @@ export interface IColdOutward extends Document {
   clientModel?: string;
   commodityId: mongoose.Types.ObjectId;
   receiptNumber?: string;
+  lotNo?: string;
   warehouseId: mongoose.Types.ObjectId;
   chamberName: string;
   chamberNo?: number;
@@ -83,6 +84,7 @@ const ColdOutwardSchema: Schema = new Schema(
     clientModel: { type: String, enum: ['Client', 'ColdWarehouse'], default: 'Client' },
     commodityId: { type: Schema.Types.ObjectId, ref: 'ColdCommodity', required: true },
     receiptNumber: { type: String, required: false },
+    lotNo: { type: String, required: false },
     warehouseId: { type: Schema.Types.ObjectId, ref: 'ColdWarehouse', required: true },
     chamberName: { type: String, required: true },
     chamberNo: { type: Number, required: false },
@@ -146,6 +148,7 @@ ColdOutwardSchema.index({ userEmail: 1, date: -1, createdAt: -1 });
 ColdOutwardSchema.index({ warehouseId: 1, date: -1 });
 ColdOutwardSchema.index({ clientId: 1, date: -1 });
 ColdOutwardSchema.index({ receiptNumber: 1 });
+ColdOutwardSchema.index({ lotNo: 1 });
 ColdOutwardSchema.index({ batchId: 1 });
 
 const ColdOutward: Model<IColdOutward> =

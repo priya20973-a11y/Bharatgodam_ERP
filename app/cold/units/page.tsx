@@ -1,3 +1,6 @@
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import { fetchColdUnits } from '@/app/actions/cold-units';
 import ColdUnitListWrapper from '@/components/features/cold-units/cold-unit-list-wrapper';
 
@@ -8,6 +11,12 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function ColdUnitsPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || (session.user as any)?.role !== 'ADMIN') {
+    redirect('/cold/dashboard');
+  }
+
   const result = await fetchColdUnits();
   const initialUnits = result.success ? result.data : [];
 

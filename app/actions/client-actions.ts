@@ -74,9 +74,9 @@ function validateClientData(data: {
   if (data.mobile !== undefined) {
     const mobile = data.mobile.trim();
     if (isColdStorage) {
-      if (!mobile) return 'Mobile number is required';
-      if (isNAValue(mobile)) return 'Mobile number is mandatory and cannot be NA';
-      if (!mobileRegex.test(mobile)) return 'Mobile number must be 10 digits';
+      if (mobile && !isNAValue(mobile) && !mobileRegex.test(mobile)) {
+        return 'Mobile number must be 10 digits or NA';
+      }
     } else {
       if (!mobile) return 'Mobile number is required';
       if (!isNAValue(mobile) && !mobileRegex.test(mobile)) return 'Mobile number must be 10 digits or NA';
@@ -194,7 +194,18 @@ export async function createClient(data: {
     const session = await requireSession();
     const nameValue = data.name.trim();
     const baseNameKey = nameValue.toUpperCase();
-    const nameKey = isColdStorage ? `${baseNameKey}_${data.mobile.trim()}` : baseNameKey;
+    const rawMobile = data.mobile ? data.mobile.trim() : '';
+    const mobileValue = isColdStorage && (!rawMobile || isNAValue(rawMobile)) ? 'NA' : rawMobile;
+
+    const newClientId = new mongoose.Types.ObjectId();
+    let nameKey = baseNameKey;
+    if (isColdStorage) {
+      if (mobileValue && mobileValue !== 'NA') {
+        nameKey = `${baseNameKey}_${mobileValue}`;
+      } else {
+        nameKey = `${baseNameKey}_NA_${newClientId.toString()}`;
+      }
+    }
 
     const email = normalizeEmail(session.user.email);
     const ownerFilter: any = {
@@ -212,11 +223,13 @@ export async function createClient(data: {
     };
 
     if (isColdStorage) {
-      const existingClientByMobile = await Client.findOne({
-        $and: [ownerFilter, { mobile: data.mobile.trim() }]
-      });
-      if (existingClientByMobile) {
-        return { success: false, error: 'Mobile number already exists for another client' };
+      if (mobileValue !== 'NA') {
+        const existingClientByMobile = await Client.findOne({
+          $and: [ownerFilter, { mobile: mobileValue }]
+        });
+        if (existingClientByMobile) {
+          return { success: false, error: 'Mobile number already exists for another client' };
+        }
       }
 
       if (data.aadharNumber && !isNAValue(data.aadharNumber)) {
@@ -258,7 +271,13 @@ export async function createClient(data: {
       }
     }
 
-    const client = await Client.create(appendOwnership({ ...data, name: nameValue, nameKey, customClientId: data.customClientId?.trim() }, session));
+    const client = await Client.create(appendOwnership({
+      ...data,
+      ...(isColdStorage ? { _id: newClientId, mobile: mobileValue } : {}),
+      name: nameValue,
+      nameKey,
+      customClientId: data.customClientId?.trim()
+    }, session));
 
     await logActivity({
       actionType: 'CREATE',
@@ -310,12 +329,28 @@ export async function updateClient(id: string, data: Partial<{
     }
 
     const session = await requireSession();
-    if (data.name) {
-      const nameValue = data.name.trim();
-      const baseNameKey = nameValue.toUpperCase();
-      const nameKey = isColdStorage && data.mobile ? `${baseNameKey}_${data.mobile.trim()}` : baseNameKey;
-      data.name = nameValue;
-      data.nameKey = nameKey;
+    if (data.name || data.mobile !== undefined) {
+      const nameValue = (data.name || '').trim();
+      const baseNameKey = nameValue ? nameValue.toUpperCase() : '';
+      const rawMobile = data.mobile !== undefined ? data.mobile.trim() : undefined;
+      const mobileValue = isColdStorage && rawMobile !== undefined ? ((!rawMobile || isNAValue(rawMobile)) ? 'NA' : rawMobile) : rawMobile;
+
+      let nameKey = baseNameKey;
+      if (isColdStorage) {
+        if (data.mobile !== undefined) {
+          data.mobile = mobileValue;
+        }
+        if (nameValue) {
+          data.name = nameValue;
+          nameKey = mobileValue && mobileValue !== 'NA' ? `${baseNameKey}_${mobileValue}` : `${baseNameKey}_NA_${id}`;
+          data.nameKey = nameKey;
+        }
+      } else {
+        if (nameValue) {
+          data.name = nameValue;
+          data.nameKey = baseNameKey;
+        }
+      }
 
       const email = normalizeEmail(session.user.email);
       const ownerFilter: any = {
@@ -332,7 +367,7 @@ export async function updateClient(id: string, data: Partial<{
         ]
       };
       if (isColdStorage) {
-        if (data.mobile) {
+        if (data.mobile && !isNAValue(data.mobile)) {
           const existingClientByMobile = await Client.findOne({
             _id: { $ne: id },
             $and: [ownerFilter, { mobile: data.mobile.trim() }]

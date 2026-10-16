@@ -11,6 +11,7 @@ import { getTenantFilter, requireSession, getWarehouseFilter } from '@/lib/owner
 import { getStackAvailableCapacity } from './cold-inward-actions';
 import mongoose from 'mongoose';
 import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
+import { calculateStorageCharge, validateQuantityAndPricing } from '@/lib/utils/cold-unit-conversion';
 import { logColdActivity } from '@/lib/cold-logger';
 export async function getColdTransactionFilters() {
   await connectToDatabase();
@@ -195,19 +196,19 @@ export async function getColdTransactions(params: any = {}) {
   const [inwards, outwards, transfers] = await Promise.all([
     ColdInward.find({ _id: { $in: iIds } })
       .populate('clientId', 'name clientType')
-      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('commodityId', 'name type gradingType rentCalculationOn unit siUnit priceCalculationBasedOn')
       .populate('warehouseId', 'name warehouseId chambers')
       .lean(),
     ColdOutward.find({ _id: { $in: oIds } })
       .populate('clientId', 'name clientType')
-      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('commodityId', 'name type gradingType rentCalculationOn unit siUnit priceCalculationBasedOn')
       .populate('warehouseId', 'name warehouseId chambers')
       .populate('inwardId', 'lotNo')
       .lean(),
     ColdTransfer.find({ _id: { $in: tIds } })
       .populate('fromClientId', 'name clientType')
       .populate('toClientId', 'name clientType')
-      .populate('commodityId', 'name type gradingType rentCalculationOn')
+      .populate('commodityId', 'name type gradingType rentCalculationOn unit siUnit priceCalculationBasedOn')
       .populate('warehouseId', 'name warehouseId chambers')
       .populate('originalInwardId', 'lotNo')
       .lean()
@@ -288,7 +289,14 @@ export async function getColdTransactions(params: any = {}) {
       date: t.date,
       client: clientData,
       previousClient: previousClientData,
-      commodity: { _id: t.commodityId?._id?.toString(), name: t.commodityId?.name, type: t.commodityId?.type },
+      commodity: { 
+        _id: t.commodityId?._id?.toString(), 
+        name: t.commodityId?.name, 
+        type: t.commodityId?.type,
+        unit: t.commodityId?.unit,
+        siUnit: t.commodityId?.siUnit,
+        priceCalculationBasedOn: t.commodityId?.priceCalculationBasedOn
+      },
       warehouse: { _id: t.warehouseId?._id?.toString(), name: t.warehouseId?.name },
       stackAllocations: processedAllocations,
       chamberNo: processedAllocations.map((s: any) => String(s.chamberName || s.chamberNo).replace(/^Chamber\s+/i, '')).join('; '),
@@ -296,6 +304,9 @@ export async function getColdTransactions(params: any = {}) {
       stackNo: processedAllocations.map((s: any) => s.stackNo).join('; '),
       quantityKg: t.quantityKg,
       netWeightLoss: t.netWeightLoss,
+      unit: t.unit || t.commodityId?.unit || 'KG',
+      siUnit: t.commodityId?.siUnit || 'kg',
+      priceCalculationBasedOn: t.commodityId?.priceCalculationBasedOn || 'Unit',
       bagsCount: t.totalBags !== undefined ? t.totalBags : t.bagsCount,
       grade: t.grade,
       gradingType: t.gradingType || t.commodityId?.gradingType,
@@ -615,42 +626,31 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
             if (!baseUnitRate) rentReason = 'Price Per Unit not set';
           }
 
-          const unit = (commodity.unit || 'KG').toUpperCase();
-          const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
-
-          if (isKg) {
-            let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-            if (totalBags > 0) {
-              largeWeight = (bagsLarge / totalBags) * quantityKg;
-              smallWeight = (bagsSmall / totalBags) * quantityKg;
-              mixedWeight = (bagsMixed / totalBags) * quantityKg;
-            } else {
-              largeWeight = quantityKg; // Fallback
-            }
-
-            if (commodity.priceType === 'Different Price') {
-              if (commodity.gradingType === 'Wet') {
-                const rateLarge = (largeWeight / 81) * pLarge * 4;
-                const rateSmall = (smallWeight / 81) * pSmall * 4;
-                const rateMixed = (mixedWeight / 81) * pMixed * 4;
-                rentRs = rateLarge + rateSmall + rateMixed;
-              } else {
-                const rateLarge = largeWeight * pLarge;
-                const rateSmall = smallWeight * pSmall;
-                const rateMixed = mixedWeight * pMixed;
-                rentRs = rateLarge + rateSmall + rateMixed;
-              }
-            } else {
-              rentRs = quantityKg * baseUnitRate;
-            }
-          } else {
-            // Storage Unit != KG
-            if (commodity.priceType === 'Different Price') {
-              rentRs = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-            } else {
-              rentRs = totalBags * baseUnitRate;
-            }
+          const unitValidation = validateQuantityAndPricing(
+            commodity,
+            quantityKg,
+            totalBags
+          );
+          if (!unitValidation.valid && unitValidation.error) {
+            rentReason = unitValidation.error;
           }
+
+          const chargeResult = calculateStorageCharge({
+            rate: season.pricePerKg || 0,
+            rateLarge: season.priceLarge,
+            rateSmall: season.priceSmall,
+            rateMixed: season.priceMixed,
+            priceType: commodity.priceType || 'Same Price',
+            gradingType: commodity.gradingType,
+            commodity,
+            quantityKg,
+            bagsLarge,
+            bagsSmall,
+            bagsMixed,
+            totalBags,
+          });
+
+          rentRs = chargeResult.amount;
 
           if (commodity.rentType === 'Per Month') {
             const perMonthResult = calculatePerMonthRent({
@@ -659,13 +659,15 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
               seasonalPrices: commodity.seasonalPrices,
               priceType: commodity.priceType || 'Same Price',
               unit: commodity.unit || 'KG',
+              siUnit: commodity.siUnit,
+              priceCalculationBasedOn: commodity.priceCalculationBasedOn,
               rentCalculationOn: commodity.rentCalculationOn,
               gradingType: commodity.gradingType,
-              quantityKg: Number(data.quantityKg) || 0,
-              bagsLarge: Number(data.bagsCount) || 0,
-              bagsSmall: Number(data.jin) || 0,
-              bagsMixed: Number(data.mixed) || 0,
-              totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+              quantityKg,
+              bagsLarge,
+              bagsSmall,
+              bagsMixed,
+              totalBags,
             });
             rentRs = perMonthResult.totalRent;
             if (!rentReason) rentReason = perMonthResult.rentReason;
@@ -676,13 +678,15 @@ export async function updateColdTransaction(id: string, type: 'INWARD' | 'OUTWAR
               seasonalPrices: commodity.seasonalPrices,
               priceType: commodity.priceType || 'Same Price',
               unit: commodity.unit || 'KG',
+              siUnit: commodity.siUnit,
+              priceCalculationBasedOn: commodity.priceCalculationBasedOn,
               rentCalculationOn: commodity.rentCalculationOn,
               gradingType: commodity.gradingType,
-              quantityKg: Number(data.quantityKg) || 0,
-              bagsLarge: Number(data.bagsCount) || 0,
-              bagsSmall: Number(data.jin) || 0,
-              bagsMixed: Number(data.mixed) || 0,
-              totalBags: (Number(data.bagsCount) || 0) + (Number(data.jin) || 0) + (Number(data.mixed) || 0),
+              quantityKg,
+              bagsLarge,
+              bagsSmall,
+              bagsMixed,
+              totalBags,
             });
             rentRs = dailyResult.totalRent;
             if (!rentReason) rentReason = dailyResult.rentReason;

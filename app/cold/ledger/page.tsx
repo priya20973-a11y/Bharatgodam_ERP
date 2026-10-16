@@ -6,9 +6,10 @@ import { ColdClientLedger } from '@/components/features/ledger/cold-client-ledge
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, ChevronRight, ArrowLeft, Landmark } from 'lucide-react';
+import { Search, ChevronRight, ArrowLeft, Landmark, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
 
 import { toGujaratiDigits } from '@/lib/utils/cold-numbers';
@@ -228,24 +229,29 @@ export default function LedgerDashboard() {
     };
   }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
 
+  const clientOptions = useMemo(() => {
+    return clients.map((c: any) => ({
+      value: c._id,
+      label: `${c.name}${c.type ? ` (${c.type})` : ''}${c.mobile ? ` - ${c.mobile}` : ''}`
+    }));
+  }, [clients]);
+
   const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.type.toLowerCase().includes(search.toLowerCase())
+    (c.type && c.type.toLowerCase().includes(search.toLowerCase())) ||
+    (c.mobile && c.mobile.includes(search))
   );
 
   if (selectedClient) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => setSelectedClient(null)} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" /> {t('ledger.backToDirectory')}
-        </Button>
-
-        <div className="space-y-6">
-          <ColdClientLedger
-            clientId={selectedClient._id}
-            clientName={selectedClient.name}
-          />
-        </div>
+        <ColdClientLedger
+          clientId={selectedClient._id}
+          clientName={selectedClient.name}
+          clients={clients}
+          onSelectClient={(c) => setSelectedClient(c)}
+          onBack={() => setSelectedClient(null)}
+        />
       </div>
     );
   }
@@ -259,10 +265,57 @@ export default function LedgerDashboard() {
         </div>
       </div>
 
+      {/* Searchable Client Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm items-center justify-between">
+        <div className="relative flex-1 w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder={t('ledger.searchPlaceholder') || 'Search by client name, type, or mobile...'}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-8"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              title="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="w-full sm:w-72">
+          <SearchableSelect
+            options={clientOptions}
+            value=""
+            onValueChange={(val) => {
+              const client = clients.find(c => c._id === val);
+              if (client) setSelectedClient(client);
+            }}
+            placeholder="Select Client..."
+          />
+        </div>
+      </div>
+
       {selectedTab === 'clients' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
             [1, 2, 3].map(i => <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-xl" />)
+          ) : filteredClients.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+              <p className="text-base font-medium">No clients found matching &quot;{search}&quot;</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearch('')}
+                className="mt-3 text-xs"
+              >
+                Clear Search
+              </Button>
+            </div>
           ) : (
             filteredClients.map((client, index) => (
               <Card 

@@ -31,6 +31,8 @@ export async function fetchColdCommodities() {
       name: item.name,
       type: item.type,
       unit: item.unit,
+      siUnit: item.siUnit || 'kg',
+      priceCalculationBasedOn: item.priceCalculationBasedOn || 'Unit',
       rentCalculationOn: item.rentCalculationOn,
       rentType: item.rentType,
       hsnCode: item.hsnCode,
@@ -88,7 +90,7 @@ function validateSeasonalPrices(prices: ISeasonalPrice[], priceType?: string): {
   return { valid: true };
 }
 
-export async function addColdCommodity(data: { name: string; type: string; unit?: string; rentCalculationOn?: string; rentType?: string; hsnCode?: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+export async function addColdCommodity(data: { name: string; type: string; unit?: string; siUnit?: string; priceCalculationBasedOn?: string; rentCalculationOn?: string; rentType?: string; hsnCode?: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
   await connectToDatabase();
   try {
     console.log('addColdCommodity received:', JSON.stringify(data, null, 2));
@@ -125,7 +127,9 @@ export async function addColdCommodity(data: { name: string; type: string; unit?
     const item = await ColdCommodity.create(appendOwnership({ 
       name: nameVal,
       type: data.type.trim(),
-      unit: data.unit || 'KG',
+      unit: data.unit || 'Bag',
+      siUnit: data.siUnit || 'kg',
+      priceCalculationBasedOn: data.priceCalculationBasedOn || 'Unit',
       rentCalculationOn: data.rentCalculationOn,
       rentType: data.rentType,
       hsnCode: data.hsnCode,
@@ -156,7 +160,7 @@ export async function addColdCommodity(data: { name: string; type: string; unit?
   }
 }
 
-export async function updateColdCommodity(id: string, data: { name: string; type: string; unit?: string; rentCalculationOn?: string; rentType?: string; hsnCode?: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
+export async function updateColdCommodity(id: string, data: { name: string; type: string; unit?: string; siUnit?: string; priceCalculationBasedOn?: string; rentCalculationOn?: string; rentType?: string; hsnCode?: string; qualityParameters?: any[]; gradingCharge?: any; priceType?: string; seasonalPrices: ISeasonalPrice[] }) {
   await connectToDatabase();
   try {
     const session = await requireSession();
@@ -197,7 +201,9 @@ export async function updateColdCommodity(id: string, data: { name: string; type
       { 
         name: nameVal,
         type: data.type.trim(),
-        unit: data.unit || 'KG',
+        unit: data.unit || 'Bag',
+        siUnit: data.siUnit || 'kg',
+        priceCalculationBasedOn: data.priceCalculationBasedOn || 'Unit',
         rentCalculationOn: data.rentCalculationOn,
         rentType: data.rentType,
         hsnCode: data.hsnCode,

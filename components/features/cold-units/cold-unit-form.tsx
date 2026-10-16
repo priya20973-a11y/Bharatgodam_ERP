@@ -18,16 +18,19 @@ export default function ColdUnitForm({ isOpen, onClose, initialData, onSuccessOp
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [unitType, setUnitType] = useState<'Unit' | 'SI Unit'>('Unit');
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
     if (initialData && isOpen) {
       setName(initialData.name || '');
       setCode(initialData.code || '');
+      setUnitType(initialData.unitType === 'SI Unit' ? 'SI Unit' : 'Unit');
       setIsActive(initialData.isActive !== false);
     } else if (isOpen) {
       setName('');
       setCode('');
+      setUnitType('Unit');
       setIsActive(true);
     }
   }, [initialData, isOpen]);
@@ -52,7 +55,8 @@ export default function ColdUnitForm({ isOpen, onClose, initialData, onSuccessOp
     try {
       const data = {
         name: name.trim(),
-        code: code.trim().toUpperCase(),
+        code: code.trim(),
+        unitType,
         isActive
       };
 
@@ -94,8 +98,45 @@ export default function ColdUnitForm({ isOpen, onClose, initialData, onSuccessOp
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
           <div className="space-y-4">
             <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Unit Option / Type <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setUnitType('Unit')}
+                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                    unitType === 'Unit'
+                      ? 'border-indigo-600 bg-indigo-50/80 text-indigo-700 ring-2 ring-indigo-500/20 font-semibold shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-sm font-bold">Unit</span>
+                  <span className="text-[11px] opacity-80 mt-0.5">Business Unit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUnitType('SI Unit')}
+                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                    unitType === 'SI Unit'
+                      ? 'border-purple-600 bg-purple-50/80 text-purple-700 ring-2 ring-purple-500/20 font-semibold shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-sm font-bold">SI Unit</span>
+                  <span className="text-[11px] opacity-80 mt-0.5">Standard Measurement</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {unitType === 'Unit'
+                  ? 'Configured as a business packaging/trading unit (e.g., Bag, Kg, Quintal, MT, Box).'
+                  : 'Configured as a standard SI measurement unit (e.g., kg, g, tonne, quintal).'}
+              </p>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Unit Name
+                Unit Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -103,22 +144,23 @@ export default function ColdUnitForm({ isOpen, onClose, initialData, onSuccessOp
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                placeholder="e.g. Kilogram"
+                placeholder={unitType === 'Unit' ? 'e.g. Bag, Box, Kilogram' : 'e.g. Kilogram, Gram, Metric Tonne'}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Unit Code
+                Unit Code <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                placeholder="e.g. KG"
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono"
+                placeholder={unitType === 'Unit' ? 'e.g. Bag, MT, Box, Kg' : 'e.g. kg, g, tonne, quintal'}
               />
+              <p className="text-[11px] text-slate-500 mt-1">This code is used in calculations and receipts.</p>
             </div>
 
             <div className="space-y-1">

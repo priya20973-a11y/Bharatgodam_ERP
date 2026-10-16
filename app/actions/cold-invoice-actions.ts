@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import { differenceInDays } from 'date-fns';
 import { generateReceiptNumber } from '@/lib/receipt-generator';
 import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
+import { calculateStorageCharge, getActivePricingUnit, convertKgToUnit } from '@/lib/utils/cold-unit-conversion';
 import { logColdActivity } from '@/lib/cold-logger';
 
 export async function generateColdClientInvoicePreview(
@@ -42,7 +43,7 @@ export async function generateColdClientInvoicePreview(
   }
 
   const outwards = await ColdOutward.find(outwardsQuery)
-    .populate('commodityId', 'name type unit rentCalculationOn seasonalPrices priceType')
+    .populate('commodityId', 'name type unit siUnit priceCalculationBasedOn rentCalculationOn seasonalPrices priceType gradingType rentType hsnCode')
     .populate('carryOverClientId', 'name')
     .populate({
       path: 'inwardId',
@@ -105,28 +106,21 @@ export async function generateColdClientInvoicePreview(
         ) || commodity.seasonalPrices?.[0];
         const pricePerKg = seasonalPrice?.pricePerKg || 0;
 
-        const unit = (commodity.unit || 'KG').toUpperCase();
-        const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
-
-        if (isKg) {
-          if (commodity.priceType === 'Different Price') {
-            const pLarge = seasonalPrice?.priceLarge || 0;
-            const pSmall = seasonalPrice?.priceSmall || 0;
-            const pMixed = seasonalPrice?.priceMixed || 0;
-            rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-          } else {
-            rent = quantityKg * pricePerKg;
-          }
-        } else {
-          if (commodity.priceType === 'Different Price') {
-            const pLarge = seasonalPrice?.priceLarge || 0;
-            const pSmall = seasonalPrice?.priceSmall || 0;
-            const pMixed = seasonalPrice?.priceMixed || 0;
-            rent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-          } else {
-            rent = totalBags * pricePerKg;
-          }
-        }
+        const chargeResult = calculateStorageCharge({
+          rate: pricePerKg,
+          rateLarge: seasonalPrice?.priceLarge,
+          rateSmall: seasonalPrice?.priceSmall,
+          rateMixed: seasonalPrice?.priceMixed,
+          priceType: commodity.priceType || 'Same Price',
+          gradingType: (commodity as any).gradingType,
+          commodity,
+          quantityKg,
+          bagsLarge,
+          bagsSmall,
+          bagsMixed,
+          totalBags,
+        });
+        rent = chargeResult.amount;
 
         if (commodity.rentType === 'Per Month') {
           const perMonthResult = calculatePerMonthRent({
@@ -135,6 +129,8 @@ export async function generateColdClientInvoicePreview(
             seasonalPrices: commodity.seasonalPrices,
             priceType: commodity.priceType || 'Same Price',
             unit: commodity.unit || 'KG',
+            siUnit: commodity.siUnit,
+            priceCalculationBasedOn: commodity.priceCalculationBasedOn,
             rentCalculationOn: commodity.rentCalculationOn,
             gradingType: (commodity as any).gradingType,
             quantityKg,
@@ -153,6 +149,8 @@ export async function generateColdClientInvoicePreview(
             seasonalPrices: commodity.seasonalPrices,
             priceType: commodity.priceType || 'Same Price',
             unit: commodity.unit || 'KG',
+            siUnit: commodity.siUnit,
+            priceCalculationBasedOn: commodity.priceCalculationBasedOn,
             rentCalculationOn: commodity.rentCalculationOn,
             gradingType: (commodity as any).gradingType,
             quantityKg,
@@ -176,11 +174,13 @@ export async function generateColdClientInvoicePreview(
 
     let rateApplied = Number(oPrimary.unitRate || oPrimary.rateApplied || 0);
     if (rateApplied === 0 && totalRent > 0 && commodity.priceType !== 'Different Price') {
-      const unit = (commodity.unit || 'KG').toUpperCase();
-      const isKg = (unit === 'KG' || unit === 'KILOGRAM' || unit === 'KGS') && commodity.rentCalculationOn !== 'Bag';
-      if (isKg && totalQuantityKg > 0) {
-        rateApplied = Number((totalRent / totalQuantityKg).toFixed(4));
-      } else if (!isKg && totalTotalBags > 0) {
+      const activePricing = getActivePricingUnit(commodity);
+      if (activePricing.isWeight) {
+        const qtyInUnit = convertKgToUnit(totalQuantityKg, activePricing.pricingUnit);
+        if (qtyInUnit > 0) {
+          rateApplied = Number((totalRent / qtyInUnit).toFixed(4));
+        }
+      } else if (totalTotalBags > 0) {
         rateApplied = Number((totalRent / totalTotalBags).toFixed(4));
       }
     }
@@ -196,6 +196,9 @@ export async function generateColdClientInvoicePreview(
       commodityId: commodity._id.toString(),
       commodityName: commodity.name + (commodity.type ? ` (${commodity.type})` : '') + (commodity.rentType === 'Per Month' ? ' (Per Month)' : commodity.rentType === 'Daily Rate' ? ' (Daily Rate)' : '') + (oPrimary.isCarryOver && oPrimary.carryOverClientId?.name ? ` - C/o: ${oPrimary.carryOverClientId.name}` : ''),
       hsnCode: commodity.hsnCode || '',
+      unit: commodity.unit || 'KG',
+      siUnit: commodity.siUnit || 'kg',
+      pricingUnit: getActivePricingUnit(commodity).pricingUnit,
       quantityKg: inward?.quantityKg || totalQuantityKg,
       outwardKg: totalQuantityKg,
       balanceKg: Math.max(0, (inward?.quantityKg || totalQuantityKg) - totalQuantityKg),

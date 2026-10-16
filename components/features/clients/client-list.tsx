@@ -16,11 +16,12 @@ import { useColdTranslation } from '@/components/providers/cold-language-provide
 interface ClientListProps {
   clients: any[];
   commodities?: any[];
+  searchQuery?: string;
   onEdit: (client: any) => void;
   onDelete: (id: string) => void;
 }
 
-export default function ClientList({ clients, commodities = [], onEdit, onDelete }: ClientListProps) {
+export default function ClientList({ clients, commodities = [], searchQuery, onEdit, onDelete }: ClientListProps) {
   const { t, formatNumber } = useColdTranslation();
   const commodityMap = new Map(commodities.map((item) => [
     item._id?.toString() || item.id, 
@@ -48,7 +49,13 @@ export default function ClientList({ clients, commodities = [], onEdit, onDelete
           {clients.length === 0 ? (
             <TableRow>
               <TableCell colSpan={10} className="h-24 text-center">
-                {t('clients.noClients')}
+                {searchQuery ? (
+                  <span className="text-slate-500">
+                    {t('clients.noMatchingClients') || `No clients found matching "${searchQuery}".`}
+                  </span>
+                ) : (
+                  t('clients.noClients')
+                )}
               </TableCell>
             </TableRow>
           ) : (

@@ -9,6 +9,8 @@
  *          cold-outward-receipt (gate pass)
  */
 
+import { calculateStorageCharge } from './cold-unit-conversion';
+
 export interface MonthBreakdownEntry {
   month: string;        // e.g. "Apr 2026"
   year: number;
@@ -40,6 +42,10 @@ export interface PerMonthRentParams {
   priceType: 'Same Price' | 'Different Price' | string;
   /** commodity.unit — e.g. 'KG', 'BOX', 'BAG' */
   unit: string;
+  /** commodity.siUnit — e.g. 'kg', 'g', 'tonne', 'quintal' */
+  siUnit?: string;
+  /** commodity.priceCalculationBasedOn — 'Unit' or 'SI Unit' */
+  priceCalculationBasedOn?: string;
   /** commodity.rentCalculationOn — 'Kg' or 'Bag' */
   rentCalculationOn?: string;
   /** commodity.gradingType — e.g. 'Wet' for special wet formula */
@@ -87,7 +93,7 @@ function findSeasonForMonth(
  *
  * - Iterates from inward calendar month to outward calendar month, inclusive.
  * - Every touched month = 1 full month charge (no partial months).
- * - Each month uses its own seasonal price.
+ * - Each month uses its own seasonal price and respects configured pricing unit.
  */
 export function calculatePerMonthRent(params: PerMonthRentParams): PerMonthRentResult {
   const {
@@ -96,6 +102,8 @@ export function calculatePerMonthRent(params: PerMonthRentParams): PerMonthRentR
     seasonalPrices,
     priceType,
     unit,
+    siUnit,
+    priceCalculationBasedOn,
     rentCalculationOn,
     gradingType,
     quantityKg,
@@ -125,9 +133,6 @@ export function calculatePerMonthRent(params: PerMonthRentParams): PerMonthRentR
   const endMonth = endDate.getMonth();
   const endYear = endDate.getFullYear();
 
-  const unitUpper = (unit || 'KG').toUpperCase();
-  const isKg = (unitUpper === 'KG' || unitUpper === 'KILOGRAM' || unitUpper === 'KGS') && rentCalculationOn !== 'Bag';
-
   const breakdown: MonthBreakdownEntry[] = [];
   let totalRent = 0;
 
@@ -143,49 +148,24 @@ export function calculatePerMonthRent(params: PerMonthRentParams): PerMonthRentR
     let quantityUsed = 0;
 
     if (season) {
-      if (priceType === 'Different Price') {
-        const pLarge = season.priceLarge || 0;
-        const pSmall = season.priceSmall || 0;
-        const pMixed = season.priceMixed || 0;
-        rateUsed = pLarge; // Display the primary rate
+      const charge = calculateStorageCharge({
+        rate: season.pricePerKg || 0,
+        rateLarge: season.priceLarge,
+        rateSmall: season.priceSmall,
+        rateMixed: season.priceMixed,
+        priceType,
+        gradingType,
+        commodity: { unit, siUnit, priceCalculationBasedOn, rentCalculationOn },
+        quantityKg,
+        bagsLarge,
+        bagsSmall,
+        bagsMixed,
+        totalBags,
+      });
 
-        if (isKg) {
-          // For KG-based different price, distribute weight proportionally across bag types
-          let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-          if (totalBags > 0) {
-            largeWeight = (bagsLarge / totalBags) * quantityKg;
-            smallWeight = (bagsSmall / totalBags) * quantityKg;
-            mixedWeight = (bagsMixed / totalBags) * quantityKg;
-          } else {
-            largeWeight = quantityKg;
-          }
-
-          if (gradingType === 'Wet') {
-            monthAmount = ((largeWeight / 81) * pLarge * 4) +
-                          ((smallWeight / 81) * pSmall * 4) +
-                          ((mixedWeight / 81) * pMixed * 4);
-          } else {
-            monthAmount = (largeWeight * pLarge) + (smallWeight * pSmall) + (mixedWeight * pMixed);
-          }
-          quantityUsed = quantityKg;
-        } else {
-          // Bag-based different price
-          monthAmount = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-          quantityUsed = totalBags;
-        }
-      } else {
-        // Same Price
-        const pricePerUnit = season.pricePerKg || 0;
-        rateUsed = pricePerUnit;
-
-        if (isKg) {
-          monthAmount = quantityKg * pricePerUnit;
-          quantityUsed = quantityKg;
-        } else {
-          monthAmount = totalBags * pricePerUnit;
-          quantityUsed = totalBags;
-        }
-      }
+      monthAmount = charge.amount;
+      rateUsed = charge.rateUsed;
+      quantityUsed = charge.quantityUsed;
     }
 
     breakdown.push({
@@ -224,6 +204,8 @@ export function calculateDailyRateRent(params: PerMonthRentParams): PerMonthRent
     seasonalPrices,
     priceType,
     unit,
+    siUnit,
+    priceCalculationBasedOn,
     rentCalculationOn,
     gradingType,
     quantityKg,
@@ -253,62 +235,38 @@ export function calculateDailyRateRent(params: PerMonthRentParams): PerMonthRent
     diffDays = 1; // Minimum 1 day rent
   }
 
-  const unitUpper = (unit || 'KG').toUpperCase();
-  const isKg = (unitUpper === 'KG' || unitUpper === 'KILOGRAM' || unitUpper === 'KGS') && rentCalculationOn !== 'Bag';
-
   let totalRent = 0;
   let rateUsed = 0;
   let quantityUsed = 0;
+  let singleDayAmount = 0;
   
-  // For daily rate, we just use the rate active on the outward date.
+  // For daily rate, we use the rate active on the outward date.
   const outTime = outD.getTime();
   const season = seasonalPrices.find((s: any) => outTime >= new Date(s.fromDate).getTime() && outTime <= new Date(s.toDate).getTime()) || seasonalPrices[0];
 
   if (season) {
-    if (priceType === 'Different Price') {
-      const pLarge = season.priceLarge || 0;
-      const pSmall = season.priceSmall || 0;
-      const pMixed = season.priceMixed || 0;
-      rateUsed = pLarge;
+    const charge = calculateStorageCharge({
+      rate: season.pricePerKg || 0,
+      rateLarge: season.priceLarge,
+      rateSmall: season.priceSmall,
+      rateMixed: season.priceMixed,
+      priceType,
+      gradingType,
+      commodity: { unit, siUnit, priceCalculationBasedOn, rentCalculationOn },
+      quantityKg,
+      bagsLarge,
+      bagsSmall,
+      bagsMixed,
+      totalBags,
+    });
 
-      if (isKg) {
-        let largeWeight = 0, smallWeight = 0, mixedWeight = 0;
-        if (totalBags > 0) {
-          largeWeight = (bagsLarge / totalBags) * quantityKg;
-          smallWeight = (bagsSmall / totalBags) * quantityKg;
-          mixedWeight = (bagsMixed / totalBags) * quantityKg;
-        } else {
-          largeWeight = quantityKg;
-        }
-
-        if (gradingType === 'Wet') {
-          totalRent = ((largeWeight / 81) * pLarge * 4) +
-                      ((smallWeight / 81) * pSmall * 4) +
-                      ((mixedWeight / 81) * pMixed * 4);
-        } else {
-          totalRent = (largeWeight * pLarge) + (smallWeight * pSmall) + (mixedWeight * pMixed);
-        }
-        quantityUsed = quantityKg;
-      } else {
-        totalRent = (bagsLarge * pLarge) + (bagsSmall * pSmall) + (bagsMixed * pMixed);
-        quantityUsed = totalBags;
-      }
-    } else {
-      const pricePerUnit = season.pricePerKg || 0;
-      rateUsed = pricePerUnit;
-
-      if (isKg) {
-        totalRent = quantityKg * pricePerUnit;
-        quantityUsed = quantityKg;
-      } else {
-        totalRent = totalBags * pricePerUnit;
-        quantityUsed = totalBags;
-      }
-    }
+    singleDayAmount = charge.amount;
+    rateUsed = charge.rateUsed;
+    quantityUsed = charge.quantityUsed;
   }
 
   // Multiply by number of days for Daily Rate
-  totalRent = totalRent * diffDays;
+  totalRent = singleDayAmount * diffDays;
 
   const rentReason = `Daily Rate: ${diffDays} day(s) @ ₹${rateUsed.toFixed(2)}`;
   

@@ -308,89 +308,101 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
 
   return (
     <div className="space-y-4">
-      <div className={`grid grid-cols-1 md:grid-cols-4 ${isDailyReport ? 'lg:grid-cols-9' : 'lg:grid-cols-9'} gap-4`}>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder={t('transactions.searchTransactions')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder="Search Receipt No..."
-            value={receiptSearch}
-            onChange={(e) => setReceiptSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder="Search Lot No..."
-            value={lotNoSearch}
-            onChange={(e) => setLotNoSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        
-        <Select value={clientFilter} onValueChange={setClientFilter}>
-          <SelectTrigger><SelectValue placeholder={t('transactions.allClients')} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">{t('transactions.allClients')}</SelectItem>
-            {clients.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={warehouseFilter} onValueChange={(val) => { setWarehouseFilter(val); setChamberFilter('ALL'); }}>
-          <SelectTrigger><SelectValue placeholder={t('transactions.allWarehouses')} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">{t('transactions.allWarehouses')}</SelectItem>
-            {warehouses.map((w: any) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={chamberFilter} onValueChange={setChamberFilter} disabled={warehouseFilter === 'ALL'}>
-          <SelectTrigger><SelectValue placeholder="All Chambers" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Chambers</SelectItem>
-            {chambers.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        {isDailyReport ? (
-          <div className="flex flex-col space-y-1 md:col-span-2">
-            <div className="flex space-x-2">
-              <Input type="date" value={fromDateFilter} onChange={e => setFromDateFilter(e.target.value)} title="From Date" className="w-full" />
-              <Input type="date" value={toDateFilter} onChange={e => setToDateFilter(e.target.value)} title="To Date" className="w-full" />
-            </div>
+      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm space-y-3">
+        {/* Search Inputs Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder={t('transactions.searchTransactions') || "Search Transaction..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-3 w-full"
+            />
           </div>
-        ) : (
-          <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger><SelectValue placeholder={t('transactions.allMonths')} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">{t('transactions.allMonths')}</SelectItem>
-              {months.map((m: any) => <SelectItem key={m} value={m}>{format(new Date(`${m}-01`), 'MMM yyyy')}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
 
-        <Button
-          onClick={() => setIsDailyReport(!isDailyReport)}
-          variant={isDailyReport ? "default" : "outline"}
-          className={`font-bold flex items-center justify-center ${isDailyReport ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
-        >
-          Daily Report
-        </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder="Search Receipt No..."
+              value={receiptSearch}
+              onChange={(e) => setReceiptSearch(e.target.value)}
+              className="pl-9 pr-3 w-full"
+            />
+          </div>
 
-        <Button variant="outline" onClick={exportCSV} className="w-full">
-          <Download className="mr-2 h-4 w-4" /> {t('transactions.exportCsv')}
-        </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder="Search Lot No..."
+              value={lotNoSearch}
+              onChange={(e) => setLotNoSearch(e.target.value)}
+              className="pl-9 pr-3 w-full"
+            />
+          </div>
+        </div>
+
+        {/* Filters and Actions Row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[150px]">
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger><SelectValue placeholder={t('transactions.allClients')} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('transactions.allClients')}</SelectItem>
+                {clients.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1 min-w-[150px]">
+            <Select value={warehouseFilter} onValueChange={(val) => { setWarehouseFilter(val); setChamberFilter('ALL'); }}>
+              <SelectTrigger><SelectValue placeholder={t('transactions.allWarehouses')} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('transactions.allWarehouses')}</SelectItem>
+                {warehouses.map((w: any) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1 min-w-[150px]">
+            <Select value={chamberFilter} onValueChange={setChamberFilter} disabled={warehouseFilter === 'ALL'}>
+              <SelectTrigger><SelectValue placeholder="All Chambers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Chambers</SelectItem>
+                {chambers.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isDailyReport ? (
+            <div className="flex items-center space-x-2 flex-1 min-w-[240px]">
+              <Input type="date" value={fromDateFilter} onChange={e => setFromDateFilter(e.target.value)} title="From Date" className="w-full text-xs sm:text-sm" />
+              <Input type="date" value={toDateFilter} onChange={e => setToDateFilter(e.target.value)} title="To Date" className="w-full text-xs sm:text-sm" />
+            </div>
+          ) : (
+            <div className="flex-1 min-w-[150px]">
+              <Select value={monthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger><SelectValue placeholder={t('transactions.allMonths')} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">{t('transactions.allMonths')}</SelectItem>
+                  {months.map((m: any) => <SelectItem key={m} value={m}>{format(new Date(`${m}-01`), 'MMM yyyy')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <Button
+            onClick={() => setIsDailyReport(!isDailyReport)}
+            variant={isDailyReport ? "default" : "outline"}
+            className={`font-semibold shrink-0 w-full sm:w-auto ${isDailyReport ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+          >
+            Daily Report
+          </Button>
+
+          <Button variant="outline" onClick={exportCSV} className="shrink-0 w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> {t('transactions.exportCsv')}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border bg-white shadow-sm overflow-hidden">
@@ -477,7 +489,21 @@ export default function ColdTransactionReport({ filterOptions }: ColdTransaction
                     )}
                     {txn.farmerName && <div className="text-xs font-normal text-slate-500 mt-0.5">{t('outward.farmerPrefix')}{txn.farmerName}</div>}
                   </TableCell>
-                  <TableCell className="text-slate-700">{txn.commodity?.name} ({txn.commodity?.type})</TableCell>
+                  <TableCell className="text-slate-700">
+                    <div className="font-medium">{txn.commodity?.name} ({txn.commodity?.type})</div>
+                    {txn.commodity?.unit && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                          {txn.commodity.unit}{txn.commodity.siUnit ? ` / ${txn.commodity.siUnit}` : ''}
+                        </span>
+                        {txn.commodity.priceCalculationBasedOn && (
+                          <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200 font-medium">
+                            Calc: {txn.commodity.priceCalculationBasedOn}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-slate-600 text-xs">
                     <div className="space-y-1">
                       <span className="font-semibold text-slate-800">{txn.warehouse?.name}</span>

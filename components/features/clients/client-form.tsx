@@ -66,12 +66,16 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
     const aadhar = formData.aadharNumber.trim();
     const gst = formData.gstNumber.trim();
 
-    if (!mobile) {
-      validationErrors.mobile = 'Mobile number is required';
-    } else if (isColdStorage && isNAValue(mobile)) {
-      validationErrors.mobile = 'Mobile number cannot be NA in Cold Storage';
-    } else if (!isNAValue(mobile) && !/^[0-9]{10}$/.test(mobile)) {
-      validationErrors.mobile = 'Mobile number must be exactly 10 digits';
+    if (isColdStorage) {
+      if (mobile && !isNAValue(mobile) && !/^[0-9]{10}$/.test(mobile)) {
+        validationErrors.mobile = 'Mobile number must be 10 digits or NA';
+      }
+    } else {
+      if (!mobile) {
+        validationErrors.mobile = 'Mobile number is required';
+      } else if (!isNAValue(mobile) && !/^[0-9]{10}$/.test(mobile)) {
+        validationErrors.mobile = 'Mobile number must be exactly 10 digits';
+      }
     }
 
     if (!pan) {
@@ -144,11 +148,12 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
     }
 
     try {
+      const mobileVal = formData.mobile.trim();
       const payload = {
         name: formData.name,
         address: formData.address,
         clientType: formData.clientType,
-        mobile: formData.mobile,
+        mobile: isColdStorage && (!mobileVal || isNAValue(mobileVal)) ? 'NA' : (mobileVal || formData.mobile),
         panNumber: formData.panNumber,
         aadharNumber: formData.aadharNumber,
         gstNumber: formData.gstNumber,
@@ -267,12 +272,14 @@ export default function ClientForm({ client, availableCommodities, onSuccess, is
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-800 block">{t('clients.mobileReq')}</label>
+          <label className="text-sm font-semibold text-slate-800 block">
+            {isColdStorage ? `${t('clients.mobile')} (Optional / NA)` : t('clients.mobileReq')}
+          </label>
           <Input 
-            required 
+            required={!isColdStorage} 
             value={formData.mobile} 
             onChange={(e) => handleFieldChange('mobile', e.target.value)} 
-            placeholder={t('clients.placeholderMobile')} 
+            placeholder={isColdStorage ? (t('clients.placeholderMobile') || '9876543210 or NA') : t('clients.placeholderMobile')} 
             className="bg-white text-slate-900 font-medium placeholder:text-slate-400 border-slate-300 focus:border-indigo-600 focus:ring-indigo-600"
           />
           {errors.mobile && <p className="mt-1 text-xs font-semibold text-red-600">{errors.mobile}</p>}
