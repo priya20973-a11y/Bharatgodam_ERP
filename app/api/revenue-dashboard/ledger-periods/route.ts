@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getClientRevenueAnalytics } from '@/app/actions/transaction-actions';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/revenue-dashboard/ledger-periods
  * Fetch ledger-derived invoice periods for revenue sharing page detail table
@@ -26,6 +29,10 @@ export async function GET(request: Request) {
       success: true,
       count: periods.length,
       periods,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      }
     });
   } catch (error) {
     console.error('Error fetching ledger periods via analytics engine:', error);

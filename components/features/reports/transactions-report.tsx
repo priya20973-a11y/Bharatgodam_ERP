@@ -59,6 +59,7 @@ export interface TransactionRecord {
   transportationName?: string;
   driverName?: string;
   note?: string;
+  notes?: string;
   receiptNumber?: string;
 }
 
@@ -549,7 +550,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       accessorKey: 'note',
       header: 'Note',
       cell: ({ row }) => {
-        const value = row.getValue('note');
+        const value = row.getValue('note') || (row.original as any).notes;
         if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
         return <span>{String(value)}</span>;
       },
@@ -704,7 +705,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         'Vehicle Number': item.vehicleNumber || '',
         'Transportation': item.transportationName || '',
         'Driver Name': item.driverName || '',
-        'Note': item.note || '',
+        'Note': item.notes || item.note || '',
         'Stack No': item.stackNo || '',
         'Lot No': item.lotNo || '',
         'Created': item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '-',

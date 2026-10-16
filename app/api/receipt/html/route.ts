@@ -60,6 +60,23 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Receipt/Inward not found', { status: 404 });
     }
 
+    if (!(inward as any).notes && !(inward as any).note) {
+      try {
+        const tx = await mongoose.connection.db?.collection('transactions').findOne({
+          $or: [
+            { sourceId: inward._id.toString() },
+            { _id: inward._id }
+          ]
+        });
+        if (tx && (tx.notes || tx.note)) {
+          (inward as any).notes = tx.notes || tx.note;
+          (inward as any).note = tx.note || tx.notes;
+        }
+      } catch (e) {
+        // ignore fallback check
+      }
+    }
+
     const inwardId = inward._id;
 
     // Fetch Outwards (Withdrawal History)

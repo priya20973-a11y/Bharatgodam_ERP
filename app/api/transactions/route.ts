@@ -855,7 +855,24 @@ export async function PATCH(request: Request) {
       }
 
       if (revenueMatchClauses.length > 0) {
-        const newOwnerShare = Math.round(totalRentCalculated * 0.6 * 100) / 100;
+        let whRec: any = null;
+        if (transaction.warehouseId || transaction.warehouseName) {
+          const matchOr: any[] = [];
+          if (transaction.warehouseId) {
+            try { matchOr.push({ _id: new ObjectId(String(transaction.warehouseId)) }); } catch {}
+            matchOr.push({ warehouseId: transaction.warehouseId });
+          }
+          if (transaction.warehouseName) {
+            matchOr.push({ name: transaction.warehouseName });
+          }
+          if (matchOr.length > 0) {
+            whRec = await db.collection('warehouses').findOne({ $or: matchOr });
+          }
+        }
+
+        const whType = whRec?.warehouseType || 'Owner';
+        const ownerPercent = whType === 'Rented' ? 0 : (whRec?.ownerEarnings ?? (whRec?.ownerEquity ?? 60));
+        const newOwnerShare = whType === 'Rented' ? 0 : Math.round(totalRentCalculated * (ownerPercent / 100) * 100) / 100;
         const newPlatformShare = Math.round((totalRentCalculated - newOwnerShare) * 100) / 100;
 
         await db.collection('revenuedistributions').updateMany(

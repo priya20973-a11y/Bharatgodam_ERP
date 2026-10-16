@@ -332,6 +332,7 @@ export async function processInward(data: {
   transportationName?: string;
   driverName?: string;
   note?: string;
+  notes?: string;
   date?: string | Date;
   outwardDate: string | Date;
   isColdStorage?: boolean;
@@ -428,9 +429,13 @@ export async function processInward(data: {
       }
     }
 
+    const notesValue = (data.notes !== undefined ? data.notes : data.note) || undefined;
+
     // 2. Create Inward Record
     const inwardPayload = appendOwnershipForMongo({
       ...data,
+      note: notesValue,
+      notes: notesValue,
       date: inwardDate,
       outwardDate: outwardDate,
       receiptNumber: receiptNumber || undefined,
@@ -474,7 +479,8 @@ export async function processInward(data: {
       vehicleNumber: data.vehicleNumber,
       transportationName: data.transportationName,
       driverName: data.driverName,
-      note: data.note,
+      note: notesValue,
+      notes: notesValue,
       status: 'COMPLETED',
       sourceType: 'inward',
       sourceId: newInward._id?.toString(),
@@ -517,7 +523,10 @@ export async function processInward(data: {
       ledgerEntry,
       session ? { session } : undefined
     );
-    const ownerShare = Math.round(totalAmount * 0.6 * 100) / 100;
+    const whType = warehouse.warehouseType || 'Owner';
+    const ownerPercent = whType === 'Rented' ? 0 : (warehouse.ownerEarnings ?? (warehouse.ownerEquity ?? 60));
+    const platformPercent = whType === 'Rented' ? 100 : (warehouse.platformCommission ?? (100 - ownerPercent));
+    const ownerShare = whType === 'Rented' ? 0 : Math.round(totalAmount * (ownerPercent / 100) * 100) / 100;
     const platformShare = Math.round((totalAmount - ownerShare) * 100) / 100;
 
     if (session) {
@@ -849,7 +858,12 @@ export async function processOutward(data: {
  */
 export async function getClientRevenueAnalytics(warehouseId?: string, month?: string) {
   try {
-    const session = await getServerSession(authOptions);
+    let session: any = null;
+    try {
+      session = await getServerSession(authOptions);
+    } catch {
+      // In standalone script or background context without request headers
+    }
     const isAdminUser = isAdmin(session);
     const tenantFilter = getTenantFilterForMongo(session);
     const ownershipFilter = appendOwnershipForMongo({}, session);
@@ -908,11 +922,53 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
     const allOutwards = await db.collection('outwards').find(outwardFilter).toArray();
 
     // Dictionaries for fast lookup
-    const warehouses = await db.collection('warehouses').find({ _id: { $in: Array.from(warehouseIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
-    const commodities = await db.collection('commodities').find({ _id: { $in: Array.from(commodityIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
-    const clients = await db.collection('clients').find({ _id: { $in: Array.from(clientIds).map(id => new mongoose.Types.ObjectId(id)) } }).toArray();
+    const warehouses = await db.collection('warehouses').find({}).toArray();
+    const commodities = await db.collection('commodities').find({ _id: { $in: Array.from(commodityIds).map(id => {
+      try { return new mongoose.Types.ObjectId(id); } catch { return id as any; }
+    }) } }).toArray();
+    const clients = await db.collection('clients').find({ _id: { $in: Array.from(clientIds).map(id => {
+      try { return new mongoose.Types.ObjectId(id); } catch { return id as any; }
+    }) } }).toArray();
 
-    const warehouseMap = new Map(warehouses.map((w: any) => [w._id.toString(), w.name]));
+    const warehouseMap = new Map<string, string>();
+    const warehouseConfigMap = new Map<string, {
+      name: string;
+      type: 'Rented' | 'Owner';
+      platformCommission: number;
+      ownerEarnings: number;
+    }>();
+
+    warehouses.forEach((w: any) => {
+      const idStr = w._id.toString();
+      const nameStr = w.name || '';
+      warehouseMap.set(idStr, nameStr);
+      if (w.warehouseId) warehouseMap.set(w.warehouseId, nameStr);
+      warehouseMap.set(nameStr, nameStr);
+
+      const whType = (w.warehouseType || 'Owner') as 'Rented' | 'Owner';
+      const oe = whType === 'Rented'
+        ? 0
+        : (w.ownerEarnings !== undefined
+            ? Number(w.ownerEarnings)
+            : (w.ownerEquity !== undefined ? Number(w.ownerEquity) : 60));
+      const pc = whType === 'Rented'
+        ? 100
+        : (w.platformCommission !== undefined
+            ? Number(w.platformCommission)
+            : (100 - oe));
+
+      const conf = {
+        name: nameStr,
+        type: whType,
+        platformCommission: pc,
+        ownerEarnings: oe,
+      };
+
+      warehouseConfigMap.set(idStr, conf);
+      if (w.warehouseId) warehouseConfigMap.set(w.warehouseId, conf);
+      warehouseConfigMap.set(nameStr, conf);
+      warehouseConfigMap.set(nameStr.toLowerCase(), conf);
+    });
     const commodityMap = new Map(commodities.map((c: any) => [c._id.toString(), c.name]));
     const commodityRateMap = new Map(commodities.map((c: any) => [
       c._id.toString(),
@@ -948,8 +1004,15 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
     for (const [comboKey, data] of comboMap.entries()) {
       const [clientIdStr, warehouseIdStr, commodityIdStr] = comboKey.split('-');
+      let whObjId: any = warehouseIdStr;
+      try {
+        if (mongoose.Types.ObjectId.isValid(warehouseIdStr)) {
+          whObjId = new mongoose.Types.ObjectId(warehouseIdStr);
+        }
+      } catch {}
+
       const warehouseData = warehouseRevenueData.get(warehouseIdStr) || {
-        warehouseId: new mongoose.Types.ObjectId(warehouseIdStr),
+        warehouseId: whObjId,
         warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown Warehouse',
         monthlyCharges: new Map<string, number>(),
         totalRevenue: 0
@@ -1010,13 +1073,25 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
             warehouseData.monthlyCharges.set(monthKey, currentMonthCharge + billing.totalAmount);
             warehouseData.totalRevenue += billing.totalAmount;
 
+            const whConf = warehouseConfigMap.get(warehouseIdStr) ||
+              warehouseConfigMap.get(warehouseMap.get(warehouseIdStr) || '') ||
+              warehouseConfigMap.get((warehouseMap.get(warehouseIdStr) || '').toLowerCase()) || {
+                name: warehouseMap.get(warehouseIdStr) || 'Unknown',
+                type: 'Owner' as const,
+                platformCommission: 40,
+                ownerEarnings: 60,
+              };
+
             billing.periods.forEach((period: any) => {
               ledgerPeriods.push({
                 id: `p-${Math.random().toString(36).substr(2, 9)}`,
                 clientName: clientMap.get(clientIdStr) || 'Unknown',
                 clientId: clientIdStr,
-                warehouseName: warehouseMap.get(warehouseIdStr) || 'Unknown',
+                warehouseName: whConf.name,
                 warehouseId: warehouseIdStr,
+                warehouseType: whConf.type,
+                platformCommission: whConf.platformCommission,
+                ownerEarnings: whConf.ownerEarnings,
                 commodityName: commodityMap.get(commodityIdStr) || 'Unknown',
                 commodityId: commodityIdStr,
                 periodStart: period.startDate,
@@ -1043,6 +1118,20 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
 
     const warehouseRevenue = Array.from(warehouseRevenueData.values())
       .map(item => {
+        const whId = item.warehouseId.toString();
+        const whConf = warehouseConfigMap.get(whId) ||
+          warehouseConfigMap.get(item.warehouseName) ||
+          warehouseConfigMap.get(item.warehouseName?.toLowerCase()) || {
+            name: item.warehouseName,
+            type: 'Owner' as const,
+            platformCommission: 40,
+            ownerEarnings: 60,
+          };
+
+        const isRented = whConf.type === 'Rented';
+        const ownerPercent = isRented ? 0 : whConf.ownerEarnings;
+        const platformPercent = isRented ? 100 : whConf.platformCommission;
+
         const monthlyCharges: { [key: string]: number } = {};
         item.monthlyCharges.forEach((charge: number, monthKey: string) => {
           if (!month || month === 'ALL' || monthKey === month) {
@@ -1051,21 +1140,28 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
         });
 
         const filteredTotalRevenue = Object.values(monthlyCharges).reduce((sum, charge) => sum + charge, 0);
+        const roundedTotalRevenue = Math.round(filteredTotalRevenue * 100) / 100;
+
+        const ownerShare = isRented ? 0 : Math.round(roundedTotalRevenue * (ownerPercent / 100) * 100) / 100;
+        const platformShare = isRented ? roundedTotalRevenue : Math.round(roundedTotalRevenue * (platformPercent / 100) * 100) / 100;
 
         return {
-          warehouseId: item.warehouseId.toString(),
+          warehouseId: whId,
           warehouseName: item.warehouseName,
+          warehouseType: whConf.type,
+          platformCommission: platformPercent,
+          ownerEarnings: ownerPercent,
           monthlyCharges,
-          totalRevenue: Math.round(filteredTotalRevenue * 100) / 100,
-          ownerShare: Math.round(filteredTotalRevenue * 0.6 * 100) / 100,
-          platformShare: Math.round(filteredTotalRevenue * 0.4 * 100) / 100
+          totalRevenue: roundedTotalRevenue,
+          ownerShare,
+          platformShare
         };
       })
       .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
 
-    const totalRevenue = warehouseRevenue.reduce((sum, row) => sum + row.totalRevenue, 0);
-    const ownerEarnings = Math.round(totalRevenue * 0.6 * 100) / 100;
-    const platformCommissions = Math.round(totalRevenue * 0.4 * 100) / 100;
+    const totalRevenue = Math.round(warehouseRevenue.reduce((sum, row) => sum + row.totalRevenue, 0) * 100) / 100;
+    const ownerEarnings = Math.round(warehouseRevenue.reduce((sum, row) => sum + row.ownerShare, 0) * 100) / 100;
+    const platformCommissions = Math.round(warehouseRevenue.reduce((sum, row) => sum + row.platformShare, 0) * 100) / 100;
 
     return {
       summary: {

@@ -47,9 +47,26 @@ export async function getWarehouses(options?: { includeInactive?: boolean }) {
       }
     }
 
+    const whType = (w.warehouseType || 'Owner') as 'Rented' | 'Owner';
+    const oe = whType === 'Rented' 
+      ? 0 
+      : (w.ownerEarnings !== undefined 
+          ? Number(w.ownerEarnings) 
+          : (w.ownerEquity !== undefined ? Number(w.ownerEquity) : 60));
+    const pc = whType === 'Rented' 
+      ? 100 
+      : (w.platformCommission !== undefined 
+          ? Number(w.platformCommission) 
+          : (100 - oe));
+
     return {
       ...w.toObject?.() || w,
+      rawName: w.name,
       name: displayName,
+      warehouseType: whType,
+      platformCommission: pc,
+      ownerEarnings: oe,
+      ownerEquity: oe,
       wspName,
       addedBy,
     };
@@ -61,6 +78,9 @@ export async function createWarehouse(data: {
   name: string;
   address: string;
   totalCapacity: number;
+  warehouseType?: 'Rented' | 'Owner';
+  platformCommission?: number;
+  ownerEarnings?: number;
   insurances?: any[];
 }) {
   await requireWspActionPermission('warehouseMaster');
@@ -68,6 +88,23 @@ export async function createWarehouse(data: {
   try {
     const session = await requireSession();
     
+    const warehouseType = data.warehouseType || 'Owner';
+    let platformCommission = data.platformCommission !== undefined ? Number(data.platformCommission) : 40;
+    let ownerEarnings = data.ownerEarnings !== undefined ? Number(data.ownerEarnings) : 60;
+
+    if (warehouseType === 'Rented') {
+      platformCommission = 100;
+      ownerEarnings = 0;
+    } else {
+      if (isNaN(platformCommission) || isNaN(ownerEarnings) || platformCommission < 0 || platformCommission > 100 || ownerEarnings < 0 || ownerEarnings > 100) {
+        return { success: false, error: 'Platform Commission and Owner Earnings must be numbers between 0 and 100.' };
+      }
+      const total = Number((platformCommission + ownerEarnings).toFixed(2));
+      if (total !== 100) {
+        return { success: false, error: `Platform Commission (${platformCommission}%) and Owner Earnings (${ownerEarnings}%) must equal exactly 100%. Current total: ${total}%.` };
+      }
+    }
+
     const email = session.user.email?.trim().toLowerCase() || null;
     const ownerFilter: any = {
       $or: [
@@ -87,10 +124,28 @@ export async function createWarehouse(data: {
 
     const warehouse = await Warehouse.create(appendOwnership({
       ...data,
+      warehouseType,
+      platformCommission,
+      ownerEarnings,
+      ownerEquity: ownerEarnings,
       occupiedCapacity: 0,
       status: 'ACTIVE',
     }, session));
     
+    // Direct MongoDB persistence to guarantee all fields bypass any Mongoose cache
+    const db = await getDb();
+    await db.collection('warehouses').updateOne(
+      { _id: warehouse._id },
+      {
+        $set: {
+          warehouseType,
+          platformCommission,
+          ownerEarnings,
+          ownerEquity: ownerEarnings,
+        }
+      }
+    );
+
     await logActivity({
       actionType: 'CREATE',
       module: 'Warehouse Master',
@@ -102,6 +157,7 @@ export async function createWarehouse(data: {
     });
 
     revalidatePath('/dashboard/warehouses');
+    revalidatePath('/dashboard/revenue');
     return { success: true, data: JSON.parse(JSON.stringify(warehouse)) };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -113,6 +169,9 @@ export async function updateWarehouse(id: string, data: Partial<{
   name: string;
   address: string;
   totalCapacity: number;
+  warehouseType: 'Rented' | 'Owner';
+  platformCommission: number;
+  ownerEarnings: number;
   status: string;
   insurances: any[];
 }>) {
@@ -125,6 +184,29 @@ export async function updateWarehouse(id: string, data: Partial<{
     const warehouse = await Warehouse.findOne({ _id: id, ...getTenantFilter(session) });
     if (!warehouse) {
       throw new Error('Warehouse not found');
+    }
+
+    if (data.warehouseType !== undefined || data.platformCommission !== undefined || data.ownerEarnings !== undefined) {
+      const warehouseType = data.warehouseType || warehouse.warehouseType || 'Owner';
+      if (warehouseType === 'Rented') {
+        data.warehouseType = 'Rented';
+        data.platformCommission = 100;
+        data.ownerEarnings = 0;
+      } else {
+        const pc = data.platformCommission !== undefined ? Number(data.platformCommission) : (warehouse.platformCommission ?? 40);
+        const oe = data.ownerEarnings !== undefined ? Number(data.ownerEarnings) : (warehouse.ownerEarnings ?? 60);
+
+        if (isNaN(pc) || isNaN(oe) || pc < 0 || pc > 100 || oe < 0 || oe > 100) {
+          throw new Error('Platform Commission and Owner Earnings must be numbers between 0 and 100.');
+        }
+        const total = Number((pc + oe).toFixed(2));
+        if (total !== 100) {
+          throw new Error(`Platform Commission (${pc}%) and Owner Earnings (${oe}%) must equal exactly 100%. Current total: ${total}%.`);
+        }
+        data.warehouseType = 'Owner';
+        data.platformCommission = pc;
+        data.ownerEarnings = oe;
+      }
     }
 
     if (data.name) {
@@ -161,9 +243,38 @@ export async function updateWarehouse(id: string, data: Partial<{
       data.status = 'INACTIVE';
     }
 
+    const db = await getDb();
+    let targetObjectId: any;
+    try {
+      targetObjectId = new mongoose.Types.ObjectId(id);
+    } catch {
+      targetObjectId = id;
+    }
+
+    const updateDoc: any = {
+      ...(data.warehouseType !== undefined ? { warehouseType: data.warehouseType } : {}),
+      ...(data.platformCommission !== undefined ? { platformCommission: data.platformCommission } : {}),
+      ...(data.ownerEarnings !== undefined ? { ownerEarnings: data.ownerEarnings, ownerEquity: data.ownerEarnings } : {}),
+      ...(data.name ? { name: data.name } : {}),
+      ...(data.address ? { address: data.address } : {}),
+      ...(data.warehouseId !== undefined ? { warehouseId: data.warehouseId } : {}),
+      ...(data.totalCapacity !== undefined ? { totalCapacity: data.totalCapacity } : {}),
+      ...(data.status ? { status: data.status } : {}),
+      ...(data.insurances ? { insurances: data.insurances } : {}),
+      updatedAt: new Date(),
+    };
+
+    await db.collection('warehouses').updateOne(
+      { _id: targetObjectId },
+      { $set: updateDoc }
+    );
+
     const updatedWarehouse = await Warehouse.findOneAndUpdate(
       { _id: id, ...getTenantFilter(session) },
-      data,
+      {
+        ...data,
+        ...(data.ownerEarnings !== undefined ? { ownerEquity: data.ownerEarnings } : {}),
+      },
       { new: true }
     );
 
@@ -183,6 +294,7 @@ export async function updateWarehouse(id: string, data: Partial<{
     });
 
     revalidatePath('/dashboard/warehouses');
+    revalidatePath('/dashboard/revenue');
     return { success: true, data: JSON.parse(JSON.stringify(updatedWarehouse)) };
   } catch (error: any) {
     return { success: false, error: error.message };

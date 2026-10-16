@@ -21,6 +21,9 @@ export interface IWarehouse {
   name: string;
   ownerName: string;
   ownerEquity: number; // Percentage (e.g., 60 for 60%)
+  warehouseType?: 'Rented' | 'Owner';
+  platformCommission?: number;
+  ownerEarnings?: number;
   location: string;
   capacity: number;
   occupiedCapacity: number; // Current occupied capacity in MT

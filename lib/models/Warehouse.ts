@@ -17,6 +17,10 @@ export interface IWarehouse extends Document {
   totalCapacity: number; // in MT
   occupiedCapacity: number; // in MT
   status: 'ACTIVE' | 'INACTIVE' | 'FULL';
+  warehouseType?: 'Rented' | 'Owner';
+  platformCommission?: number;
+  ownerEarnings?: number;
+  ownerEquity?: number;
   insurances?: IInsurance[];
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
@@ -46,16 +50,43 @@ const WarehouseSchema: Schema = new Schema(
       enum: ['ACTIVE', 'INACTIVE', 'FULL'],
       default: 'ACTIVE',
     },
+    warehouseType: {
+      type: String,
+      enum: ['Rented', 'Owner'],
+      default: 'Owner',
+    },
+    platformCommission: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 40,
+    },
+    ownerEarnings: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 60,
+    },
+    ownerEquity: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 60,
+    },
     insurances: { type: [InsuranceSchema], required: false, default: [] },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 WarehouseSchema.index({ userId: 1, name: 1 }, { unique: true });
 WarehouseSchema.index({ userEmail: 1, name: 1 });
 WarehouseSchema.index({ status: 1 });
+
+if (mongoose.models.Warehouse) {
+  delete (mongoose.models as any).Warehouse;
+}
 
 const Warehouse: Model<IWarehouse> =
   mongoose.models.Warehouse || mongoose.model<IWarehouse>('Warehouse', WarehouseSchema);

@@ -71,7 +71,13 @@ const getRevenueDistributionData = async (userId: string, month: number, year: n
           totalRevenue: 1,
           invoiceCount: 1,
           ownerName: { $ifNull: ['$warehouse.ownerName', 'Unknown Owner'] },
-          ownerEquity: { $ifNull: ['$warehouse.ownerEquity', 60] },
+          ownerEquity: {
+            $cond: [
+              { $eq: [{ $ifNull: ['$warehouse.warehouseType', 'Owner'] }, 'Rented'] },
+              0,
+              { $ifNull: ['$warehouse.ownerEarnings', { $ifNull: ['$warehouse.ownerEquity', 60] }] }
+            ]
+          },
           warehouseId: '$warehouse._id'
         }
       },

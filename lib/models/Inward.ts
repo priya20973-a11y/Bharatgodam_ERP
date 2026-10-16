@@ -13,6 +13,7 @@ export interface IInward extends Document {
   transportationName?: string;
   driverName?: string;
   note?: string;
+  notes?: string;
   date: Date;
   outwardDate?: Date;
   qrId?: string;
@@ -60,6 +61,7 @@ const InwardSchema: Schema = new Schema(
     transportationName: { type: String, trim: true },
     driverName: { type: String, trim: true },
     note: { type: String, trim: true },
+    notes: { type: String, trim: true },
     date: { type: Date, default: Date.now },
     outwardDate: { type: Date },
     qrId: { type: String, unique: true, sparse: true },

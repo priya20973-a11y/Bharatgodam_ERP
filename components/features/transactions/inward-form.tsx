@@ -40,6 +40,7 @@ const inwardSchema = z.object({
   transportationName: z.string().optional(),
   driverName: z.string().optional(),
   note: z.string().optional(),
+  notes: z.string().optional(),
   inwardDate: z.string().min(1, 'Inward date is required'),
   outwardDate: z.string().min(1, 'Outward date is required'),
   isAssayingRequired: z.boolean().default(false),
@@ -133,6 +134,7 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
       transportationName: '',
       driverName: '',
       note: '',
+      notes: '',
       isAssayingRequired: false,
       assayerId: '',
       assayingDate: '',
@@ -226,7 +228,8 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
           vehicleNumber: data.vehicleNumber,
           transportationName: data.transportationName,
           driverName: data.driverName,
-          note: data.note,
+          note: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
+          notes: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
           date: data.inwardDate, // ISO string
           outwardDate: data.outwardDate, // ISO string
           isAssayingRequired: data.isAssayingRequired,
@@ -258,6 +261,7 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
             transportationName: '',
             driverName: '',
             note: '',
+            notes: '',
             isAssayingRequired: false,
             assayerId: '',
             assayingDate: '',
@@ -681,12 +685,16 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-6">
             <div className="space-y-2">
-                <label htmlFor="note" className="text-sm font-semibold text-slate-700">Additional Note</label>
+                <label htmlFor="notes" className="text-sm font-semibold text-slate-700">Notes</label>
                 <textarea 
-                    id="note"
-                    {...register('note')}
+                    id="notes"
+                    {...register('notes')}
+                    onChange={(e) => {
+                      register('notes').onChange(e);
+                      setValue('note', e.target.value);
+                    }}
                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[40px]"
-                    placeholder="Enter any additional notes or remarks"
+                    placeholder="Enter notes"
                 />
             </div>
             <div className="space-y-2">

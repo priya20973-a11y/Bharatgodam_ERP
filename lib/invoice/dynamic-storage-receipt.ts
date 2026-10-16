@@ -44,6 +44,19 @@ export async function generateDynamicStorageReceiptHTML(data: {
   // Calculate Market Value
   const totalMarketValue = (Number(inward.quantityMT) || 0) * (Number(inward.marketValuePerMT) || 0);
 
+  // Escape HTML helper
+  const escapeHtml = (str: string) => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  const notesText = (inward.notes || inward.note || '').trim();
+  const notesDisplay = notesText ? escapeHtml(notesText) : '';
+
   // Assaying details
   let gradingRows = '';
   const isAssaying = Boolean(inward.isAssayingRequired);
@@ -331,6 +344,13 @@ export async function generateDynamicStorageReceiptHTML(data: {
     <div style="border: 2px solid #000; padding: 4px; margin-bottom: 10px;">
       The receipt is valid up to ${expiryDate}, being the date of expiry of the declared shelf life.
     </div>
+
+    <table style="border: 2px solid #000; margin-bottom: 10px;">
+      <tr>
+        <td style="width: 15%; font-weight: bold; background-color: #f9f9f9; border-right: 1px solid #000; vertical-align: top; padding: 4px;">Notes</td>
+        <td style="width: 85%; padding: 4px; vertical-align: top; min-height: 20px; white-space: pre-wrap;">${notesDisplay}</td>
+      </tr>
+    </table>
 
     <table style="border: 2px solid #000;">
       <tr>

@@ -5,7 +5,7 @@ import { createWarehouse, updateWarehouse } from '@/app/actions/warehouse-action
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'react-hot-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Building, KeyRound, Percent } from 'lucide-react';
 
 interface WarehouseFormProps {
   warehouse?: any;
@@ -28,6 +28,13 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
     name: warehouse?.name || '',
     address: warehouse?.address || '',
     totalCapacity: warehouse?.totalCapacity || 0,
+    warehouseType: (warehouse?.warehouseType || 'Owner') as 'Rented' | 'Owner',
+    platformCommission: warehouse?.platformCommission !== undefined 
+      ? Number(warehouse.platformCommission) 
+      : (warehouse?.ownerEarnings !== undefined ? 100 - Number(warehouse.ownerEarnings) : (warehouse?.ownerEquity !== undefined ? 100 - Number(warehouse.ownerEquity) : 40)),
+    ownerEarnings: warehouse?.ownerEarnings !== undefined 
+      ? Number(warehouse.ownerEarnings) 
+      : (warehouse?.ownerEquity !== undefined ? Number(warehouse.ownerEquity) : 60),
   });
 
   const formatDateForInput = (dateString?: string) => {
@@ -40,11 +47,19 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
   const [insurances, setInsurances] = useState<Insurance[]>([]);
 
   useEffect(() => {
+    const whType = (warehouse?.warehouseType || 'Owner') as 'Rented' | 'Owner';
     setFormData({
       warehouseId: warehouse?.warehouseId || '',
       name: warehouse?.name || '',
       address: warehouse?.address || '',
       totalCapacity: warehouse?.totalCapacity || 0,
+      warehouseType: whType,
+      platformCommission: warehouse?.platformCommission !== undefined 
+        ? Number(warehouse.platformCommission) 
+        : (whType === 'Rented' ? 100 : (warehouse?.ownerEarnings !== undefined ? 100 - Number(warehouse.ownerEarnings) : (warehouse?.ownerEquity !== undefined ? 100 - Number(warehouse.ownerEquity) : 40))),
+      ownerEarnings: warehouse?.ownerEarnings !== undefined 
+        ? Number(warehouse.ownerEarnings) 
+        : (whType === 'Rented' ? 0 : (warehouse?.ownerEquity !== undefined ? Number(warehouse.ownerEquity) : 60)),
     });
     setInsurances(
       warehouse?.insurances?.map((ins: any) => ({
@@ -82,6 +97,30 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
     setLoading(true);
 
     try {
+      if (formData.warehouseType === 'Owner') {
+        const pc = Number(formData.platformCommission);
+        const oe = Number(formData.ownerEarnings);
+
+        if (isNaN(pc) || isNaN(oe)) {
+          toast.error('Platform Commission and Owner Earnings must be valid numbers');
+          setLoading(false);
+          return;
+        }
+
+        if (pc < 0 || pc > 100 || oe < 0 || oe > 100) {
+          toast.error('Platform Commission and Owner Earnings must be between 0 and 100%');
+          setLoading(false);
+          return;
+        }
+
+        const total = Number((pc + oe).toFixed(2));
+        if (total !== 100) {
+          toast.error(`Total percentage must equal exactly 100% (currently ${total}%)`);
+          setLoading(false);
+          return;
+        }
+      }
+
       const formattedInsurances = insurances.map(ins => ({
         policyName: ins.policyName || undefined,
         companyName: ins.companyName || undefined,
@@ -93,6 +132,8 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
 
       const payload = {
         ...formData,
+        platformCommission: formData.warehouseType === 'Rented' ? 100 : Number(formData.platformCommission),
+        ownerEarnings: formData.warehouseType === 'Rented' ? 0 : Number(formData.ownerEarnings),
         insurances: formattedInsurances,
       };
 
@@ -153,6 +194,134 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
             placeholder="3000"
           />
         </div>
+
+        {/* Warehouse Type Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">Warehouse Type *</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  warehouseType: 'Owner',
+                  platformCommission: prev.platformCommission === 100 && prev.ownerEarnings === 0 ? 40 : prev.platformCommission,
+                  ownerEarnings: prev.platformCommission === 100 && prev.ownerEarnings === 0 ? 60 : prev.ownerEarnings,
+                }));
+              }}
+              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                formData.warehouseType === 'Owner'
+                  ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 ring-2 ring-indigo-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Building className="w-4 h-4" />
+              Owner
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  warehouseType: 'Rented',
+                  platformCommission: 100,
+                  ownerEarnings: 0,
+                }));
+              }}
+              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                formData.warehouseType === 'Rented'
+                  ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 ring-2 ring-indigo-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <KeyRound className="w-4 h-4" />
+              Rented
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            {formData.warehouseType === 'Owner'
+              ? 'Revenue will be split between Platform and Warehouse Owner according to the configured percentages.'
+              : 'Rented facility — storage revenue is not subject to owner revenue split.'}
+          </p>
+        </div>
+
+        {/* Owner Revenue Split Configuration */}
+        {formData.warehouseType === 'Owner' && (
+          <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-semibold text-sm text-slate-800">
+                <Percent className="w-4 h-4 text-indigo-600" />
+                <span>Revenue Split Configuration</span>
+              </div>
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                Number((Number(formData.platformCommission || 0) + Number(formData.ownerEarnings || 0)).toFixed(2)) === 100
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-rose-100 text-rose-700'
+              }`}>
+                Total: {Number((Number(formData.platformCommission || 0) + Number(formData.ownerEarnings || 0)).toFixed(2))}%{' '}
+                {Number((Number(formData.platformCommission || 0) + Number(formData.ownerEarnings || 0)).toFixed(2)) === 100 ? '✓' : '(Must be 100%)'}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Platform Commission (%) *</label>
+                <Input
+                  required
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  value={formData.platformCommission}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                    setFormData(prev => ({ ...prev, platformCommission: val as any }));
+                  }}
+                  placeholder="40"
+                />
+                <p className="text-xs text-slate-500">Management & platform charges.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Owner Earnings (%) *</label>
+                <Input
+                  required
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  value={formData.ownerEarnings}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                    setFormData(prev => ({ ...prev, ownerEarnings: val as any }));
+                  }}
+                  placeholder="60"
+                />
+                <p className="text-xs text-slate-500">Disbursed to warehouse owner.</p>
+              </div>
+            </div>
+
+            {Number((Number(formData.platformCommission || 0) + Number(formData.ownerEarnings || 0)).toFixed(2)) !== 100 && (
+              <div className="flex items-center justify-between text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-200">
+                <span>Total percentage must equal exactly 100%.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pc = Math.min(100, Math.max(0, Number(formData.platformCommission) || 0));
+                    setFormData(prev => ({
+                      ...prev,
+                      platformCommission: pc,
+                      ownerEarnings: Number((100 - pc).toFixed(2))
+                    }));
+                  }}
+                  className="underline font-semibold hover:text-rose-800"
+                >
+                  Balance to 100%
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="pt-4 border-t border-slate-200 space-y-4">

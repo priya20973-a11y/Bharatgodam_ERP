@@ -295,7 +295,7 @@ export default function AssayingViewModal({
           </div>
 
           {/* Logistics & Driver Details */}
-          {(inward.vehicleNumber || inward.transportationName || inward.driverName || inward.note) && (
+          {(inward.vehicleNumber || inward.transportationName || inward.driverName || inward.notes || inward.note) && (
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-indigo-600" /> Logistics & Transport
@@ -314,10 +314,10 @@ export default function AssayingViewModal({
                   <span className="font-semibold text-slate-800">{inward.driverName || '—'}</span>
                 </div>
               </div>
-              {inward.note && (
+              {(inward.notes || inward.note) && (
                 <div className="pt-2 border-t border-slate-100">
-                  <span className="text-xs text-slate-500 block">Inward Remarks / Note</span>
-                  <p className="text-xs text-slate-700 italic mt-0.5">{inward.note}</p>
+                  <span className="text-xs text-slate-500 block">Notes</span>
+                  <p className="text-xs text-slate-700 italic mt-0.5">{inward.notes || inward.note}</p>
                 </div>
               )}
             </div>

@@ -142,14 +142,14 @@ export const StorageReceiptPrintable = React.forwardRef<HTMLDivElement, StorageR
             </div>
           </div>
 
-          {/* Remarks */}
+          {/* Notes */}
           <div className="mb-auto">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-3 flex items-center">
               <span className="bg-slate-900 w-1.5 h-4 mr-2 block"></span>
-              Remarks
+              Notes
             </h3>
             <div className="border border-slate-300 rounded-sm bg-slate-50 p-4 min-h-[60px]">
-              <p className="text-sm text-slate-700 italic">{transaction.note || 'No additional remarks provided at the time of inward.'}</p>
+              <p className="text-sm text-slate-700 italic whitespace-pre-wrap">{transaction.notes || transaction.note || ''}</p>
             </div>
           </div>
 

@@ -47,7 +47,11 @@ const aggregateRevenueData = async (userId: string, month: number, year: number)
             $ifNull: ['$warehouseById.ownerName', 'Unknown Owner'],
           },
           ownerEquityResolved: {
-            $ifNull: ['$warehouseById.ownerEquity', 60],
+            $cond: [
+              { $eq: [{ $ifNull: ['$warehouseById.warehouseType', 'Owner'] }, 'Rented'] },
+              0,
+              { $ifNull: ['$warehouseById.ownerEarnings', { $ifNull: ['$warehouseById.ownerEquity', 60] }] }
+            ]
           },
         },
       },
@@ -78,15 +82,16 @@ const aggregateRevenueData = async (userId: string, month: number, year: number)
     const warehouses = WAREHOUSE_CONFIG.map((warehouse) => {
       const revenueRow = revenueMap.get(warehouse.name);
       const totalRevenuePaise = revenueRow?.totalRevenuePaise ?? 0;
+      const ownerEquity = revenueRow?.ownerEquity ?? warehouse.ownerEquity;
       const distribution = calculateDistribution({
         totalRevenuePaise,
-        ownerEquityPercent: warehouse.ownerEquity,
+        ownerEquityPercent: ownerEquity,
       });
 
       return {
         warehouseName: warehouse.name,
-        ownerName: warehouse.ownerName,
-        ownerEquity: warehouse.ownerEquity,
+        ownerName: revenueRow?.ownerName ?? warehouse.ownerName,
+        ownerEquity: ownerEquity,
         totalRevenue: distribution.totalRevenue,
         ownerShare: distribution.ownerShare,
         operatorShare: distribution.operatorShare,

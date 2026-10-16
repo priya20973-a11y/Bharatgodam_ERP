@@ -89,11 +89,14 @@ export default function WarehouseListWrapper({ initialWarehouses }: { initialWar
         onEdit={(w) => {
           setIsAdding(false);
           setEditingWarehouse({
-            id: w._id,
+            id: w._id || w.id,
             warehouseId: w.warehouseId,
-            name: w.name,
+            name: w.rawName || w.name,
             address: w.address,
             totalCapacity: w.totalCapacity,
+            warehouseType: w.warehouseType || 'Owner',
+            platformCommission: w.platformCommission !== undefined ? w.platformCommission : (w.warehouseType === 'Rented' ? 100 : (w.ownerEarnings !== undefined ? 100 - w.ownerEarnings : (w.ownerEquity !== undefined ? 100 - w.ownerEquity : 40))),
+            ownerEarnings: w.ownerEarnings !== undefined ? w.ownerEarnings : (w.warehouseType === 'Rented' ? 0 : (w.ownerEquity !== undefined ? w.ownerEquity : 60)),
             insurances: w.insurances
           });
         }} 

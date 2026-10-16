@@ -393,7 +393,8 @@ export default async function TransactionsReportWrapper() {
       vehicleNumber: t.vehicleNumber,
       transportationName: t.transportationName,
       driverName: t.driverName,
-      note: t.note,
+      note: t.note || t.notes,
+      notes: t.notes || t.note,
     }));
     const isStaff = (session.user as any).isStaff;
     const userId = isStaff ? (session.user as any).staffId : session.user.id;

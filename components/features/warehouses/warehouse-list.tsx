@@ -34,6 +34,7 @@ export default function WarehouseList({
           <TableRow className="bg-slate-50">
             <TableHead className="font-semibold">Warehouse ID</TableHead>
             <TableHead className="font-semibold">Name</TableHead>
+            <TableHead className="font-semibold">Type</TableHead>
             <TableHead className="font-semibold">Address</TableHead>
             <TableHead className="text-right font-semibold">Total Capacity (MT)</TableHead>
             <TableHead className="text-right font-semibold">Occupied (MT)</TableHead>
@@ -46,7 +47,7 @@ export default function WarehouseList({
         <TableBody>
           {warehouses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={10} className="h-24 text-center text-slate-500">
                 No warehouses found. Start by adding one.
               </TableCell>
             </TableRow>
@@ -57,6 +58,22 @@ export default function WarehouseList({
                 <TableRow key={w._id.toString()} className="hover:bg-slate-50/50 transition-colors">
                   <TableCell className="text-slate-600">{w.warehouseId || '-'}</TableCell>
                   <TableCell className="font-medium text-slate-900">{w.name}</TableCell>
+                  <TableCell>
+                    {w.warehouseType === 'Rented' ? (
+                      <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-300">
+                        Rented
+                      </Badge>
+                    ) : (
+                      <div className="flex flex-col items-start gap-0.5">
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                          Owner
+                        </Badge>
+                        <span className="text-[11px] text-slate-500 font-medium" title="Owner Earnings / Platform Commission">
+                          Owner: {w.ownerEarnings ?? 60}% | Plat: {w.platformCommission ?? 40}%
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[200px] truncate text-slate-600" title={w.address}>{w.address}</TableCell>
                   <TableCell className="text-right text-slate-700">{w.totalCapacity.toLocaleString()}</TableCell>
                   <TableCell className="text-right text-slate-700">{w.occupiedCapacity.toLocaleString()}</TableCell>

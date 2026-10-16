@@ -17,6 +17,7 @@ export default function RevenueDashboard() {
   const [warehouseOptions, setWarehouseOptions] = useState<{ label: string; value: string }[]>([]);
   const [monthOptions, setMonthOptions] = useState<{ label: string; value: string }[]>([]);
   const [warehouseTransactions, setWarehouseTransactions] = useState<any[]>([]);
+  const [allWarehouses, setAllWarehouses] = useState<any[]>([]);
 
   // Generate month options (last 12 months)
   useEffect(() => {
@@ -76,13 +77,15 @@ export default function RevenueDashboard() {
 
   const fetchWarehouseOptions = async () => {
     try {
-      const response = await fetch('/api/warehouses');
+      const response = await fetch('/api/warehouses', { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to load warehouses');
       const result = await response.json();
-      const options = result.warehouses?.map((warehouse: any) => ({
+      const rawWarehouses = result.warehouses || [];
+      setAllWarehouses(rawWarehouses);
+      const options = rawWarehouses.map((warehouse: any) => ({
         label: warehouse.name,
         value: String(warehouse.id || warehouse._id),
-      })) || [];
+      }));
       setWarehouseOptions([{ label: 'All Warehouses', value: 'ALL' }, ...options]);
     } catch (error) {
       console.error('Warehouse load failed:', error);
@@ -96,7 +99,7 @@ export default function RevenueDashboard() {
       if (selectedWarehouse !== 'ALL') params.append('warehouseId', selectedWarehouse);
       if (selectedMonth !== 'ALL') params.append('month', selectedMonth);
       const query = params.toString() ? `?${params.toString()}` : '';
-      const response = await fetch(`/api/revenue-dashboard${query}`);
+      const response = await fetch(`/api/revenue-dashboard${query}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to load revenue analytics');
       const analytics = await response.json();
       setData(analytics);
@@ -131,19 +134,49 @@ export default function RevenueDashboard() {
 
   const exportToCSV = async () => {
     try {
-      type MonthlyCharges = Record<string, number>;
+      const whMap = new Map<string, any>();
+      allWarehouses.forEach((w: any) => {
+        whMap.set(String(w.id || w._id), w);
+        whMap.set(w.name, w);
+        if (w.warehouseId) whMap.set(w.warehouseId, w);
+      });
+      warehouseRevenue.forEach((w: any) => {
+        const idKey = String(w.warehouseId);
+        const nameKey = w.warehouseName;
+        const existing = whMap.get(idKey) || whMap.get(nameKey) || {};
+        const merged = { ...existing, ...w };
+        whMap.set(idKey, merged);
+        whMap.set(nameKey, merged);
+      });
 
       const warehouseMonthTotals = warehouseTransactions
         .filter((period) => selectedMonth === 'ALL' || period.month === selectedMonth)
         .reduce(
-          (acc: Record<string, { warehouseName: string; month: string; amount: number }>, period: any) => {
+          (acc: Record<string, { warehouseId: string; warehouseName: string; month: string; amount: number; warehouseType: string; ownerEarnings: number; platformCommission: number }>, period: any) => {
             const warehouseName = period.warehouseName || 'Unknown Warehouse';
+            const warehouseId = String(period.warehouseId || '');
             const month = period.month || '';
             const key = `${warehouseName}||${month}`;
             const amount = typeof period.rentTotal === 'number' ? period.rentTotal : Number(period.rentTotal || 0);
 
+            const whInfo = whMap.get(warehouseId) || whMap.get(warehouseName);
+            const warehouseType = (whInfo?.warehouseType || period.warehouseType || 'Owner') as string;
+            const isRented = warehouseType === 'Rented';
+            const ownerEarnings = isRented
+              ? 0
+              : (whInfo?.ownerEarnings !== undefined
+                  ? Number(whInfo.ownerEarnings)
+                  : (whInfo?.ownerEquity !== undefined
+                      ? Number(whInfo.ownerEquity)
+                      : (period.ownerEarnings !== undefined ? Number(period.ownerEarnings) : 60)));
+            const platformCommission = isRented
+              ? 100
+              : (whInfo?.platformCommission !== undefined
+                  ? Number(whInfo.platformCommission)
+                  : (period.platformCommission !== undefined ? Number(period.platformCommission) : (100 - ownerEarnings)));
+
             if (!acc[key]) {
-              acc[key] = { warehouseName, month, amount: 0 };
+              acc[key] = { warehouseId, warehouseName, month, amount: 0, warehouseType, ownerEarnings, platformCommission };
             }
             acc[key].amount += amount;
             return acc;
@@ -151,41 +184,90 @@ export default function RevenueDashboard() {
           {}
         );
 
-      const summaryRows = Object.values(warehouseMonthTotals).map((item) => ({
-        'Row Type': 'Revenue Summary',
-        'Warehouse Name': item.warehouseName,
-        'Client Name': '',
-        Month: formatMonthLabel(item.month),
-        Date: '',
-        Direction: '',
-        Commodity: '',
-        'Quantity': '',
-        'Unit': '',
-        'Gate Pass': '',
-        Status: '',
-        'Rent (₹)': Math.round(item.amount * 100) / 100,
-        'Owner Share (₹)': Math.round(item.amount * 0.6 * 100) / 100,
-        'Platform Share (₹)': Math.round(item.amount * 0.4 * 100) / 100,
-      }));
+      let summaryRowsData = Object.values(warehouseMonthTotals);
+      if (summaryRowsData.length === 0 && revenueRows.length > 0) {
+        summaryRowsData = revenueRows.map((r: any) => ({
+          warehouseId: r.warehouseId,
+          warehouseName: r.warehouseName,
+          month: r.monthKey,
+          amount: r.rent,
+          warehouseType: r.warehouseType,
+          ownerEarnings: r.ownerPercent,
+          platformCommission: r.platformPercent,
+        }));
+      }
+
+      const summaryRows = summaryRowsData.map((item) => {
+        const isRented = item.warehouseType === 'Rented';
+        const ownerPercent = isRented ? 0 : item.ownerEarnings;
+        const platformPercent = isRented ? 100 : item.platformCommission;
+        const rentAmount = Math.round(item.amount * 100) / 100;
+        const ownerShare = isRented ? 0 : Math.round(rentAmount * (ownerPercent / 100) * 100) / 100;
+        const platformShare = isRented ? rentAmount : Math.round(rentAmount * (platformPercent / 100) * 100) / 100;
+
+        return {
+          'Row Type': 'Revenue Summary',
+          'Warehouse Name': item.warehouseName,
+          'Warehouse Type': item.warehouseType,
+          'Client Name': '',
+          Month: formatMonthLabel(item.month),
+          Date: '',
+          Direction: '',
+          Commodity: '',
+          'Quantity': '',
+          'Unit': '',
+          'Gate Pass': '',
+          Status: '',
+          'Rent (₹)': rentAmount,
+          'Owner Earnings (%)': isRented ? '0%' : `${ownerPercent}%`,
+          'Owner Share (₹)': ownerShare,
+          'Platform Commission (%)': isRented ? '100%' : `${platformPercent}%`,
+          'Platform Share (₹)': platformShare,
+        };
+      });
 
       const transactionRows = warehouseTransactions
         .filter((period) => selectedMonth === 'ALL' || period.month === selectedMonth)
-        .map((period) => ({
-          'Row Type': 'Ledger Period',
-          'Warehouse Name': period.warehouseName || '',
-          'Client Name': period.clientName || '',
-          Month: formatMonthLabel(period.month),
-          Date: `${period.periodStart} to ${period.periodEnd}`,
-          Direction: 'Storage',
-          Commodity: period.commodityName || '',
-          'Quantity': typeof period.quantityMT === 'number' ? period.quantityMT.toFixed(2) : (period.bagsCount || ''),
-          'Unit': period.unit || 'MT',
-          'Gate Pass': period.gatePass || '',
-          Status: period.status || '',
-          'Rent (₹)': typeof period.rentTotal === 'number' ? period.rentTotal.toFixed(2) : '',
-          'Owner Share (₹)': '',
-          'Platform Share (₹)': '',
-        }));
+        .map((period) => {
+          const whInfo = whMap.get(String(period.warehouseId || '')) || whMap.get(period.warehouseName);
+          const warehouseType = (whInfo?.warehouseType || period.warehouseType || 'Owner') as string;
+          const isRented = warehouseType === 'Rented';
+          const ownerPercent = isRented
+            ? 0
+            : (whInfo?.ownerEarnings !== undefined
+                ? Number(whInfo.ownerEarnings)
+                : (whInfo?.ownerEquity !== undefined
+                    ? Number(whInfo.ownerEquity)
+                    : (period.ownerEarnings !== undefined ? Number(period.ownerEarnings) : 60)));
+          const platformPercent = isRented
+            ? 100
+            : (whInfo?.platformCommission !== undefined
+                ? Number(whInfo.platformCommission)
+                : (period.platformCommission !== undefined ? Number(period.platformCommission) : (100 - ownerPercent)));
+          const rentAmount = typeof period.rentTotal === 'number' ? period.rentTotal : Number(period.rentTotal || 0);
+          const ownerShare = isRented ? 0 : Math.round(rentAmount * (ownerPercent / 100) * 100) / 100;
+          const platformShare = isRented ? rentAmount : Math.round(rentAmount * (platformPercent / 100) * 100) / 100;
+
+          return {
+            'Row Type': 'Ledger Period',
+            'Warehouse Name': period.warehouseName || '',
+            'Warehouse Type': warehouseType,
+            'Client Name': period.clientName || '',
+            Month: formatMonthLabel(period.month),
+            Date: `${period.periodStart} to ${period.periodEnd}`,
+            Direction: 'Storage',
+            Commodity: period.commodityName || '',
+            'Quantity': typeof period.quantityMT === 'number' ? period.quantityMT.toFixed(2) : (period.bagsCount || ''),
+            'Unit': period.unit || 'MT',
+            'Gate Pass': period.gatePass || '',
+            Status: period.status || '',
+            'Rent (₹)': typeof period.rentTotal === 'number' ? period.rentTotal.toFixed(2) : '',
+            'Owner Earnings (%)': isRented ? '0%' : `${ownerPercent}%`,
+            'Owner Share (₹)': ownerShare,
+            'Platform Commission (%)': isRented ? '100%' : `${platformPercent}%`,
+            'Platform Share (₹)': platformShare,
+          };
+        });
 
       const rows = [...summaryRows, ...transactionRows];
       if (rows.length === 0) {
@@ -196,6 +278,7 @@ export default function RevenueDashboard() {
       const header = [
         'Row Type',
         'Warehouse Name',
+        'Warehouse Type',
         'Client Name',
         'Month',
         'Date',
@@ -206,7 +289,9 @@ export default function RevenueDashboard() {
         'Gate Pass',
         'Status',
         'Rent (₹)',
+        'Owner Earnings (%)',
         'Owner Share (₹)',
+        'Platform Commission (%)',
         'Platform Share (₹)',
       ];
 
@@ -240,30 +325,94 @@ export default function RevenueDashboard() {
     }
   };
 
-  const revenueRows = warehouseRevenue.flatMap((item: any) =>
-  Object.entries(item.monthlyCharges as Record<string, number>)
-    .filter(([monthKey]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
-    .map(([monthKey, rent]) => ({
-      warehouseId: item.warehouseId,
-      warehouseName: item.warehouseName,
-      monthKey,
-      monthLabel: formatMonthLabel(monthKey),
-      rent,
-      ownerShare: Math.round(rent * 0.6 * 100) / 100,
-      platformShare: Math.round(rent * 0.4 * 100) / 100,
-    }))
-).sort((a, b) => {
-  if (a.warehouseName !== b.warehouseName) {
-    return a.warehouseName.localeCompare(b.warehouseName);
-  }
-  return a.monthKey.localeCompare(b.monthKey);
-});
+  const revenueRows = warehouseRevenue.flatMap((item: any) => {
+    const whDb = allWarehouses.find(
+      (w: any) => String(w.id || w._id) === String(item.warehouseId) || w.name === item.warehouseName
+    );
+    const resolvedType = (item.warehouseType || whDb?.warehouseType || 'Owner') as 'Rented' | 'Owner';
+    const isRented = resolvedType === 'Rented';
+    const ownerPercent = isRented
+      ? 0
+      : (whDb?.ownerEarnings !== undefined
+          ? Number(whDb.ownerEarnings)
+          : (whDb?.ownerEquity !== undefined
+              ? Number(whDb.ownerEquity)
+              : (item.ownerEarnings !== undefined ? Number(item.ownerEarnings) : 60)));
+    const platformPercent = isRented
+      ? 100
+      : (whDb?.platformCommission !== undefined
+          ? Number(whDb.platformCommission)
+          : (item.platformCommission !== undefined ? Number(item.platformCommission) : (100 - ownerPercent)));
+
+    return Object.entries(item.monthlyCharges as Record<string, number>)
+      .filter(([monthKey]) => selectedMonth === 'ALL' || monthKey === selectedMonth)
+      .map(([monthKey, rent]) => {
+        const ownerShare = isRented ? 0 : Math.round(rent * (ownerPercent / 100) * 100) / 100;
+        const platformShare = isRented ? Math.round(rent * 100) / 100 : Math.round(rent * (platformPercent / 100) * 100) / 100;
+
+        return {
+          warehouseId: item.warehouseId,
+          warehouseName: item.warehouseName,
+          warehouseType: resolvedType,
+          ownerPercent,
+          platformPercent,
+          monthKey,
+          monthLabel: formatMonthLabel(monthKey),
+          rent,
+          ownerShare,
+          platformShare,
+        };
+      });
+  }).sort((a, b) => {
+    if (a.warehouseName !== b.warehouseName) {
+      return a.warehouseName.localeCompare(b.warehouseName);
+    }
+    return a.monthKey.localeCompare(b.monthKey);
+  });
+
+  const selectedWhObj = selectedWarehouse !== 'ALL' 
+    ? (
+        allWarehouses.find((w: any) => String(w.id || w._id) === selectedWarehouse || w.name === selectedWarehouse) ||
+        warehouseRevenue.find((w: any) => String(w.warehouseId) === selectedWarehouse || w.warehouseName === selectedWarehouse) ||
+        null
+      )
+    : null;
+
+  const selectedWhType = (selectedWhObj?.warehouseType || 'Owner') as 'Rented' | 'Owner';
+  const selectedWhOe = selectedWhType === 'Rented'
+    ? 0
+    : (selectedWhObj?.ownerEarnings !== undefined
+        ? Number(selectedWhObj.ownerEarnings)
+        : (selectedWhObj?.ownerEquity !== undefined
+            ? Number(selectedWhObj.ownerEquity)
+            : (selectedWhObj?.platformCommission !== undefined ? 100 - Number(selectedWhObj.platformCommission) : 60)));
+  const selectedWhPc = selectedWhType === 'Rented'
+    ? 100
+    : (selectedWhObj?.platformCommission !== undefined
+        ? Number(selectedWhObj.platformCommission)
+        : (100 - selectedWhOe));
+
+  const ownerCardTitle = selectedWhObj
+    ? (selectedWhType === 'Rented' ? 'Owner Earnings (N/A - Rented)' : `Owner Earnings (${selectedWhOe}%)`)
+    : 'Owner Earnings';
+
+  const platformCardTitle = selectedWhObj
+    ? (selectedWhType === 'Rented' ? 'Platform Revenue (100%)' : `Platform Comm. (${selectedWhPc}%)`)
+    : 'Platform Commission';
+
+  const displayOwnerEarnings = selectedWhObj && summary.totalRevenue > 0
+    ? (selectedWhType === 'Rented' ? 0 : (summary.ownerEarnings || Math.round(summary.totalRevenue * (selectedWhOe / 100) * 100) / 100))
+    : summary.ownerEarnings;
+
+  const displayPlatformCommissions = selectedWhObj && summary.totalRevenue > 0
+    ? (selectedWhType === 'Rented' ? summary.totalRevenue : (summary.platformCommissions || Math.round(summary.totalRevenue * (selectedWhPc / 100) * 100) / 100))
+    : summary.platformCommissions;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Revenue split for Storage Charges</h1>
-        <p className="text-slate-500">Monitor the 60/40 Revenue split for Storage Charges between Warehouse Owners and the Platform.</p>
+        <p className="text-slate-500">Monitor the configurable revenue split for Storage Charges between Warehouse Owners and the Platform.</p>
       </div>
 
       {/* Summary Cards */}
@@ -283,11 +432,11 @@ export default function RevenueDashboard() {
         <Card className="bg-white border-l-4 border-l-emerald-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2 uppercase tracking-wider">
-              <Wallet className="h-4 w-4" /> Owner Earnings (60%)
+              <Wallet className="h-4 w-4" /> {ownerCardTitle}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-emerald-600">₹{summary.ownerEarnings.toLocaleString('en-IN')}</div>
+            <div className="text-3xl font-black text-emerald-600">₹{displayOwnerEarnings.toLocaleString('en-IN')}</div>
             <p className="text-xs text-slate-400 mt-1">Net profit disbursed to warehouse operators.</p>
           </CardContent>
         </Card>
@@ -295,11 +444,11 @@ export default function RevenueDashboard() {
         <Card className="bg-white border-l-4 border-l-amber-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2 uppercase tracking-wider">
-              <HandCoins className="h-4 w-4" /> Platform Comm. (40%)
+              <HandCoins className="h-4 w-4" /> {platformCardTitle}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-amber-600">₹{summary.platformCommissions.toLocaleString('en-IN')}</div>
+            <div className="text-3xl font-black text-amber-600">₹{displayPlatformCommissions.toLocaleString('en-IN')}</div>
             <p className="text-xs text-slate-400 mt-1">Management fees and platform service charges.</p>
           </CardContent>
         </Card>
@@ -358,10 +507,11 @@ export default function RevenueDashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Warehouse Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Month</TableHead>
                 <TableHead className="text-right">Rent (₹)</TableHead>
-                <TableHead className="text-emerald-600">Owner (60%)</TableHead>
-                <TableHead className="text-amber-600">Platform (40%)</TableHead>
+                <TableHead className="text-emerald-600">Owner Share</TableHead>
+                <TableHead className="text-amber-600">Platform Share</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -370,15 +520,38 @@ export default function RevenueDashboard() {
                   <TableCell className="font-medium text-slate-900">
                     {item.warehouseName}
                   </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      item.warehouseType === 'Rented'
+                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                        : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    }`}>
+                      {item.warehouseType}
+                    </span>
+                  </TableCell>
                   <TableCell>{item.monthLabel}</TableCell>
                   <TableCell className="text-right">₹{formatRent(item.rent)}</TableCell>
-                  <TableCell className="text-emerald-600 font-bold">₹{formatRent(item.ownerShare)}</TableCell>
-                  <TableCell className="text-amber-600 font-bold">₹{formatRent(item.platformShare)}</TableCell>
+                  <TableCell className="text-emerald-600 font-bold">
+                    {item.warehouseType === 'Rented' ? (
+                      <span className="text-slate-400 font-normal">₹0 (0%)</span>
+                    ) : (
+                      <>
+                        ₹{formatRent(item.ownerShare)}
+                        <span className="ml-1 text-xs text-slate-500 font-normal">({item.ownerPercent}%)</span>
+                      </>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-amber-600 font-bold">
+                    ₹{formatRent(item.platformShare)}
+                    <span className="ml-1 text-xs text-slate-500 font-normal">
+                      ({item.platformPercent}%)
+                    </span>
+                  </TableCell>
                 </TableRow>
               ))}
               {revenueRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-slate-400 italic">
+                  <TableCell colSpan={6} className="text-center py-12 text-slate-400 italic">
                     No revenue data found for the selected period.
                   </TableCell>
                 </TableRow>
