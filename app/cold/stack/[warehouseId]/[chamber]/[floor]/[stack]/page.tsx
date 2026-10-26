@@ -15,6 +15,18 @@ export default async function StackDetailsPage({ params }: { params: Promise<{ w
 
   const data = res.data;
 
+  const isStandardSiUnit = (u?: string) => {
+    if (!u) return false;
+    const lower = u.trim().toLowerCase();
+    return ['kg', 'kilogram', 'kgs', 'g', 'gram', 'tonne', 'ton', 't', 'mt', 'quintal', 'qtl'].includes(lower);
+  };
+
+  const getSiUnitLabel = (stock: any) => {
+    if (stock.siUnit) return stock.siUnit;
+    if (isStandardSiUnit(stock.unit)) return stock.unit;
+    return 'kg';
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -95,7 +107,7 @@ export default async function StackDetailsPage({ params }: { params: Promise<{ w
                         {stock.stockType}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{stock.quantity} {stock.unit}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-700">{stock.quantity.toLocaleString()} {getSiUnitLabel(stock)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -53,6 +53,14 @@ export default function StackDetailsModal({ isOpen, onClose, warehouseId, chambe
     }
   };
 
+  const getSiUnitLabel = (stock: any) => {
+    if (stock.siUnit) return stock.siUnit;
+    const u = (stock.unit || '').trim().toLowerCase();
+    const siUnits = ['kg', 'kilogram', 'kgs', 'g', 'gram', 'tonne', 'ton', 't', 'mt', 'quintal', 'qtl'];
+    if (siUnits.includes(u)) return stock.unit;
+    return 'kg';
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl bg-white text-slate-900 max-h-[90vh] overflow-y-auto">
@@ -158,7 +166,7 @@ export default function StackDetailsModal({ isOpen, onClose, warehouseId, chambe
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-right font-bold text-slate-700">
-                            {stock.quantity.toLocaleString()} {stock.unit}
+                            {stock.quantity.toLocaleString()} {getSiUnitLabel(stock)}
                           </td>
                         </tr>
                       ))}

@@ -67,7 +67,7 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
     ...getTenantFilter(session)
   })
     .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type')
+    .populate('commodityId', 'name type siUnit')
     .lean();
 
   const outwardCriteria = {
@@ -87,12 +87,12 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
 
   const outwardsDocs = await ColdOutward.find(outwardCriteria)
     .populate('clientId', 'name clientType')
-    .populate('commodityId', 'name type')
+    .populate('commodityId', 'name type siUnit')
     .populate({
       path: 'inwardId',
       populate: [
         { path: 'clientId', select: 'name clientType' },
-        { path: 'commodityId', select: 'name type' }
+        { path: 'commodityId', select: 'name type siUnit' }
       ]
     })
     .lean();
@@ -116,7 +116,7 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
   if (missingInwardIds.length > 0) {
     const extraInwards = await ColdInward.find({ _id: { $in: missingInwardIds }, ...getTenantFilter(session) })
       .populate('clientId', 'name clientType')
-      .populate('commodityId', 'name type')
+      .populate('commodityId', 'name type siUnit')
       .lean();
     extraInwards.forEach(inward => allInwardsMap.set(inward._id.toString(), inward));
   }
@@ -208,13 +208,17 @@ export async function getStackDetails(warehouseId: string, chamberName: string, 
 
         if (allocAvailable > 0) {
           occupied += allocAvailable;
+          const commodityObj = inward.commodityId as any;
+          const siUnit = commodityObj?.siUnit || 'kg';
+
           currentStockList.push({
             clientId: inward.clientId?._id?.toString(),
             clientName: getResolvedClientName(inward),
             commodityId: inward.commodityId?._id?.toString(),
             commodityName: getResolvedCommodityDisplay(inward),
             quantity: allocAvailable,
-            unit: inward.unit || 'KG',
+            unit: siUnit,
+            siUnit: siUnit,
             stockType: (inward.clientId as any)?.clientType === 'PURCHASE' ? 'Purchase' : (alloc.stockType || 'Self')
           });
         }

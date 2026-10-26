@@ -70,17 +70,33 @@ export function generateColdTransactionReceiptHTML(
 
   const unitStr = data.unit || data.commodityId?.unit || 'KG';
   const grossWeight = formatNum(data.grossWeight || 0) + ' KG';
-  const emptyWeight = formatNum(data.emptyWeight || 0) + ' KG';
+  const emptyWeight = formatNum((Number(data.emptyWeight) || 0).toFixed(2)) + ' KG';
   let calculatedSelfQty = Number(data.selfQuantityKg) || 0;
   let calculatedPurchaseQty = Number(data.purchaseQuantityKg) || 0;
   let calculatedStockType = data.stockType || 'Self';
   let actualNetWeight = Number(data.quantityKg) || 0;
 
-  if (data.stacksInfo && data.stacksInfo.length > 0) {
+  const stacksList = (data.stacksInfo && data.stacksInfo.length > 0)
+    ? data.stacksInfo
+    : (data.stackAllocations && data.stackAllocations.length > 0
+      ? data.stackAllocations.map((a: any) => ({
+          stockType: a.stockType || 'Self',
+          chamberNo: a.chamberName || a.chamberNo,
+          floorNo: a.floorNo,
+          stackNo: a.stackNo,
+          bagsCount: a.bagsCount || a.allocatedBags || 0,
+          isStockShifting: a.isStockShifting,
+          quantityKg: a.allocatedWeight || a.quantityKg
+        }))
+      : null);
+
+  const stackCount = stacksList ? stacksList.length : 1;
+
+  if (stacksList && stacksList.length > 0) {
     calculatedSelfQty = 0;
     calculatedPurchaseQty = 0;
 
-    data.stacksInfo.forEach((s: any) => {
+    stacksList.forEach((s: any) => {
       const sType = s.stockType || 'Self';
       const sQty = Number(s.quantityKg) || 0;
       if (sType === 'Purchase') {
@@ -136,9 +152,147 @@ export function generateColdTransactionReceiptHTML(
     ? (lang === 'gu' ? 'ભાડા પાવતી' : 'RENT RECEIPT')
     : (lang === 'gu' ? 'જાવક પાવતી' : 'OUTWARD RECEIPT');
 
+  const isHighStack = stackCount >= 14;
+  const isMedStack = stackCount >= 9 && stackCount < 14;
+  const isLowMedStack = stackCount >= 5 && stackCount < 9;
+
+  let cfg = {
+    containerPadding: '12px',
+    headerPadding: '5px',
+    headerMarginBottom: '8px',
+    titleFontSize: '24px',
+    subTitleFontSize: '11px',
+    logoWidth: '60px',
+    qrWidth: '85px',
+    badgeContainerMarginBottom: '8px',
+    badgeFontSize: '15px',
+    badgePadding: '2px 15px',
+    receiptInfoMarginBottom: '10px',
+    receiptInfoFontSize: '13px',
+    formRowMarginBottom: '6px',
+    formRowFontSize: '13px',
+    tableMarginTop: '8px',
+    tableMarginBottom: '6px',
+    tableCellPadding: '4px',
+    tableCellFontSize: '12px',
+    stackTablePadding: '4px',
+    stackTableFontSize: '12px',
+    weightMarginBottom: '8px',
+    weightMarginTop: '6px',
+    weightFontSize: '13px',
+    declarationMarginTop: '8px',
+    declarationFontSize: '10px',
+    signaturesMarginTop: '16px',
+    signaturesFontSize: '13px',
+    signatureLineWidth: '100px',
+    duplicateScale: '0.92',
+    rotateWrapperHeight: '138mm',
+  };
+
+  if (isHighStack) {
+    cfg = {
+      containerPadding: '8px 10px',
+      headerPadding: '3px 4px',
+      headerMarginBottom: '4px',
+      titleFontSize: '18px',
+      subTitleFontSize: '9px',
+      logoWidth: '45px',
+      qrWidth: '62px',
+      badgeContainerMarginBottom: '3px',
+      badgeFontSize: '12px',
+      badgePadding: '1px 10px',
+      receiptInfoMarginBottom: '4px',
+      receiptInfoFontSize: '11px',
+      formRowMarginBottom: '2.5px',
+      formRowFontSize: '10.5px',
+      tableMarginTop: '4px',
+      tableMarginBottom: '3px',
+      tableCellPadding: '1.5px 3px',
+      tableCellFontSize: '9.5px',
+      stackTablePadding: '1.5px 2px',
+      stackTableFontSize: '9.5px',
+      weightMarginBottom: '3px',
+      weightMarginTop: '3px',
+      weightFontSize: '10.5px',
+      declarationMarginTop: '4px',
+      declarationFontSize: '8.5px',
+      signaturesMarginTop: '8px',
+      signaturesFontSize: '10.5px',
+      signatureLineWidth: '75px',
+      duplicateScale: '0.80',
+      rotateWrapperHeight: '142mm',
+    };
+  } else if (isMedStack) {
+    cfg = {
+      containerPadding: '10px',
+      headerPadding: '4px',
+      headerMarginBottom: '5px',
+      titleFontSize: '20px',
+      subTitleFontSize: '10px',
+      logoWidth: '50px',
+      qrWidth: '70px',
+      badgeContainerMarginBottom: '4px',
+      badgeFontSize: '13px',
+      badgePadding: '1.5px 12px',
+      receiptInfoMarginBottom: '6px',
+      receiptInfoFontSize: '11.5px',
+      formRowMarginBottom: '3.5px',
+      formRowFontSize: '11.5px',
+      tableMarginTop: '5px',
+      tableMarginBottom: '4px',
+      tableCellPadding: '2.5px 3px',
+      tableCellFontSize: '10.5px',
+      stackTablePadding: '2px 2px',
+      stackTableFontSize: '10.5px',
+      weightMarginBottom: '4px',
+      weightMarginTop: '4px',
+      weightFontSize: '11.5px',
+      declarationMarginTop: '5px',
+      declarationFontSize: '9px',
+      signaturesMarginTop: '12px',
+      signaturesFontSize: '11.5px',
+      signatureLineWidth: '85px',
+      duplicateScale: '0.86',
+      rotateWrapperHeight: '140mm',
+    };
+  } else if (isLowMedStack) {
+    cfg = {
+      containerPadding: '10px 12px',
+      headerPadding: '4px 5px',
+      headerMarginBottom: '6px',
+      titleFontSize: '22px',
+      subTitleFontSize: '10.5px',
+      logoWidth: '55px',
+      qrWidth: '75px',
+      badgeContainerMarginBottom: '6px',
+      badgeFontSize: '14px',
+      badgePadding: '2px 14px',
+      receiptInfoMarginBottom: '8px',
+      receiptInfoFontSize: '12px',
+      formRowMarginBottom: '4.5px',
+      formRowFontSize: '12px',
+      tableMarginTop: '6px',
+      tableMarginBottom: '5px',
+      tableCellPadding: '3px 4px',
+      tableCellFontSize: '11.5px',
+      stackTablePadding: '3px 3px',
+      stackTableFontSize: '11.5px',
+      weightMarginBottom: '6px',
+      weightMarginTop: '5px',
+      weightFontSize: '12px',
+      declarationMarginTop: '6px',
+      declarationFontSize: '9.5px',
+      signaturesMarginTop: '15px',
+      signaturesFontSize: '12px',
+      signatureLineWidth: '90px',
+      duplicateScale: '0.89',
+      rotateWrapperHeight: '138mm',
+    };
+  }
+
   return `
 <!DOCTYPE html>
-<html lang="gu">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <title>Cold Storage Receipt</title>
@@ -152,40 +306,55 @@ export function generateColdTransactionReceiptHTML(
       color: #333; 
     }
     
-    @page { size: A5; margin: 0; }
+    @page { 
+      size: A4 portrait; 
+      margin: 0; 
+    }
     
     @media print {
       body {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        margin: 0;
+        padding: 0;
+        background: #fff;
       }
       .hide-on-print { display: none !important; }
       
-      /* Force everything to fit on one page */
       html, body {
-        height: 100%;
-        overflow: hidden;
-        page-break-inside: avoid;
+        width: 100%;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        overflow: visible !important;
       }
       
-      .receipt-container {
-        height: 210mm;
+      #receipt-wrapper {
+        width: 100%;
+        margin: 0 auto;
         page-break-inside: avoid;
         break-inside: avoid;
+      }
+
+      .receipt-container {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        overflow: visible !important;
+        margin: 0 auto;
       }
     }
     
     .receipt-container { 
       width: 148mm; 
-      height: 210mm;
-      max-height: 210mm;
+      min-height: 210mm;
+      max-height: 285mm;
       margin: 0 auto; 
-      padding: 12px; 
+      padding: ${cfg.containerPadding}; 
       background-color: #ffffff;
       border: 1px solid #ccc;
       position: relative;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
     }
     
     body.duplicate-mode @page {
@@ -212,7 +381,7 @@ export function generateColdTransactionReceiptHTML(
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 10mm;
+      gap: 5mm;
       
       overflow: hidden;
       page-break-inside: avoid;
@@ -222,22 +391,22 @@ export function generateColdTransactionReceiptHTML(
     body.duplicate-mode .rotate-wrapper {
       position: relative;
       width: 195mm;
-      height: 135mm;
+      height: ${cfg.rotateWrapperHeight};
       page-break-inside: avoid;
       break-inside: avoid;
     }
     
     body.duplicate-mode .receipt-container {
       width: 148mm !important;
-      height: 210mm !important;
       min-height: 210mm !important;
+      max-height: 285mm !important;
       margin: 0 !important;
       
       position: absolute;
       top: 50%;
       left: 50%;
       transform-origin: center center;
-      transform: translate(-50%, -50%) rotate(-90deg) scale(0.92) !important;
+      transform: translate(-50%, -50%) rotate(-90deg) scale(${cfg.duplicateScale}) !important;
       
       box-sizing: border-box;
     }
@@ -257,7 +426,7 @@ export function generateColdTransactionReceiptHTML(
       color: #0b4b8a;
       font-size: 11px;
       font-weight: 600;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
     
     .header-main {
@@ -265,15 +434,15 @@ export function generateColdTransactionReceiptHTML(
       align-items: center;
       border: 2px solid #b89735;
       background: #fff;
-      padding: 5px;
-      margin-bottom: 8px;
+      padding: ${cfg.headerPadding};
+      margin-bottom: ${cfg.headerMarginBottom};
     }
     
     .logo-area {
-      font-size: 32px;
+      font-size: 24px;
       font-weight: bold;
       color: #0b4b8a;
-      width: 60px;
+      width: ${cfg.logoWidth};
       text-align: center;
       line-height: 1;
       position: relative;
@@ -288,33 +457,36 @@ export function generateColdTransactionReceiptHTML(
     .main-title {
       background-color: #d63333;
       color: #fff;
-      font-size: 24px;
+      font-size: ${cfg.titleFontSize};
       font-weight: 700;
-      padding: 2px 10px;
+      padding: 1px 10px;
       display: inline-block;
       border-radius: 4px;
       margin-bottom: 2px;
+      line-height: 1.2;
     }
     
     .sub-title {
       color: #0b4b8a;
-      font-size: 11px;
+      font-size: ${cfg.subTitleFontSize};
       font-weight: 600;
+      line-height: 1.2;
     }
     
     .badge-container {
       text-align: center;
-      margin-bottom: 8px;
+      margin-bottom: ${cfg.badgeContainerMarginBottom};
     }
     
     .badge {
       background-color: #557960;
       color: #fff;
       display: inline-block;
-      padding: 2px 15px;
+      padding: ${cfg.badgePadding};
       border-radius: 20px;
-      font-size: 15px;
+      font-size: ${cfg.badgeFontSize};
       font-weight: bold;
+      line-height: 1.2;
     }
     
     .receipt-info {
@@ -322,17 +494,18 @@ export function generateColdTransactionReceiptHTML(
       justify-content: space-between;
       color: #d63333;
       font-weight: bold;
-      font-size: 13px;
-      margin-bottom: 10px;
+      font-size: ${cfg.receiptInfoFontSize};
+      margin-bottom: ${cfg.receiptInfoMarginBottom};
     }
     
     .form-row {
       display: flex;
       align-items: flex-end;
-      margin-bottom: 8px;
-      font-size: 13px;
+      margin-bottom: ${cfg.formRowMarginBottom};
+      font-size: ${cfg.formRowFontSize};
       font-weight: 600;
       color: #9e2a2b;
+      line-height: 1.2;
     }
     
     .form-label {
@@ -344,14 +517,14 @@ export function generateColdTransactionReceiptHTML(
       flex: 1;
       border-bottom: 1px solid #333;
       color: #333;
-      padding: 0 5px;
-      min-width: 50px;
+      padding: 0 4px;
+      min-width: 40px;
     }
     
     .grid-container {
       display: flex;
       justify-content: space-between;
-      margin-top: 8px;
+      margin-top: 4px;
     }
     
     .left-grid {
@@ -366,15 +539,16 @@ export function generateColdTransactionReceiptHTML(
       width: 100%;
       border-collapse: collapse;
       border: 1px solid #8b5a2b;
-      margin-bottom: 8px;
+      margin-bottom: ${cfg.tableMarginBottom};
       background-color: transparent;
     }
     
     .data-table td {
       border: 1px solid #8b5a2b;
-      padding: 4px;
-      font-size: 13px;
+      padding: ${cfg.tableCellPadding};
+      font-size: ${cfg.tableCellFontSize};
       font-weight: 600;
+      line-height: 1.2;
     }
     
     .data-table td:first-child {
@@ -389,50 +563,35 @@ export function generateColdTransactionReceiptHTML(
     
     .stack-table th {
       border: 1px solid #8b5a2b;
-      padding: 4px;
-      font-size: 13px;
+      padding: ${cfg.stackTablePadding};
+      font-size: ${cfg.stackTableFontSize};
       background: #fdfbf7;
       color: #9e2a2b;
       text-align: center;
+      line-height: 1.15;
     }
     
     .stack-table td {
       text-align: center !important;
       color: #333 !important;
       width: auto !important;
-    }
-    
-    .footer-note {
-      margin-top: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      text-align: center;
-      line-height: 1.4;
-    }
-    
-    .conditions-box {
-      border: 1px solid #8b5a2b;
-      border-radius: 10px;
-      padding: 5px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 10px;
-      background-color: rgba(255, 255, 255, 0.4);
+      font-size: ${cfg.stackTableFontSize};
+      padding: ${cfg.stackTablePadding};
+      line-height: 1.15;
     }
     
     .signatures {
       display: flex;
       justify-content: space-between;
-      margin-top: 20px;
-      font-size: 13px;
+      margin-top: ${cfg.signaturesMarginTop};
+      font-size: ${cfg.signaturesFontSize};
       color: #9e2a2b;
       font-weight: bold;
     }
     
     .signature-line {
       display: inline-block;
-      width: 100px;
+      width: ${cfg.signatureLineWidth};
       border-bottom: 1px solid #333;
       margin-left: 5px;
     }
@@ -465,7 +624,7 @@ export function generateColdTransactionReceiptHTML(
             <div class="main-title">${warehouseName}</div>
             <div class="sub-title">${warehouseAddress}</div>
           </div>
-          ${qrDataUrl ? `<div style="width: 85px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
+          ${qrDataUrl ? `<div style="width: ${cfg.qrWidth}; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
         </div>
     
     <div class="badge-container">
@@ -535,39 +694,8 @@ export function generateColdTransactionReceiptHTML(
           <div class="form-label">${l.weighbridgeSlipNoLabel}</div>
           <div class="form-value">${wbSlip}</div>
         </div>
-        
-        <table class="data-table stack-table" style="margin-top: 15px;">
-          <tr>
-            <th>Type</th>
-            <th>${l.chamberNoLabel}</th>
-            <th>${l.floorNoLabel}</th>
-            <th>${l.stackNoLabel}</th>
-            <th>${(l.noOfBags || 'No. of Bags').replace(':', '')}</th>
-          </tr>
-          ${data.stacksInfo && data.stacksInfo.length > 0 ? 
-            data.stacksInfo.map((s: any) => `
-            <tr>
-              <td>${s.stockType || 'Self'}</td>
-              <td>${formatNum(s.chamberNo)}</td>
-              <td>${formatNum(s.floorNo)}</td>
-              <td>${formatNum(s.stackNo)}${s.isStockShifting ? ' (Stock Shifting)' : ''}</td>
-              <td>${formatNum(s.bagsCount || s.allocatedBags || 0)}</td>
-            </tr>
-            `).join('')
-          : `
-            <tr>
-              <td>${stockType}</td>
-              <td>${chamber}</td>
-              <td>${floor}</td>
-              <td>${stack}${data.isStockShifting ? ' (Stock Shifting)' : ''}</td>
-              <td>${totalBags}</td>
-            </tr>
-          `}
-        </table>
-      </div>
-      
-      <div class="right-grid">
-        <table class="data-table">
+
+        <table class="data-table" style="margin-top: ${cfg.tableMarginTop};">
           <tr>
             <td>Stock Type</td>
             <td>${stockType}</td>
@@ -598,25 +726,53 @@ export function generateColdTransactionReceiptHTML(
           </tr>
         </table>
         
-        <div style="padding-left: 5px; margin-bottom: 10px;">
-          <span style="color: #9e2a2b; font-weight: bold; font-size: 13px;">${getDynamicUnitLabel(unitStr, 'weight')}</span>
-          <span style="font-weight: bold; font-size: 13px; margin-left: 10px;">${kataBharati}</span>
-        </div>
-        
-        <div style="font-size: 12px; font-weight: 600; line-height: 1.4;">
-          ${note ? `<strong>${l.noteLabel}:</strong> ${note}` : `<strong>${l.noteGunnyBag}</strong>`}
+        <div style="padding-left: 4px; margin-bottom: ${cfg.weightMarginBottom}; margin-top: ${cfg.weightMarginTop};">
+          <span style="color: #9e2a2b; font-weight: bold; font-size: ${cfg.weightFontSize};">${getDynamicUnitLabel(unitStr, 'weight')}</span>
+          <span style="font-weight: bold; font-size: ${cfg.weightFontSize}; margin-left: 8px;">${kataBharati}</span>
         </div>
       </div>
-    </div>
-    
-    <div class="conditions-box">
-      ${l.conditionsBox}
-    </div>
-    
-      <div class="signatures">
-        <div>${l.depositorSignature} <span class="signature-line"></span></div>
-        <div style="margin-right:20px;">${l.managerSignature} <span class="signature-line"></span></div>
+      
+      <div class="right-grid">
+        <table class="data-table stack-table">
+          <tr>
+            <th>Type</th>
+            <th>${l.chamberNoLabel}</th>
+            <th>${l.floorNoLabel}</th>
+            <th>${l.stackNoLabel}</th>
+            <th>${(l.noOfBags || 'No. of Bags').replace(':', '')}</th>
+          </tr>
+          ${stacksList && stacksList.length > 0 ? 
+            stacksList.map((s: any) => `
+            <tr>
+              <td>${s.stockType || 'Self'}</td>
+              <td>${formatNum(s.chamberNo)}</td>
+              <td>${formatNum(s.floorNo)}</td>
+              <td>${formatNum(s.stackNo)}${s.isStockShifting ? ' (Stock Shifting)' : ''}</td>
+              <td>${formatNum(s.bagsCount || s.allocatedBags || 0)}</td>
+            </tr>
+            `).join('')
+          : `
+            <tr>
+              <td>${stockType}</td>
+              <td>${chamber}</td>
+              <td>${floor}</td>
+              <td>${stack}${data.isStockShifting ? ' (Stock Shifting)' : ''}</td>
+              <td>${totalBags}</td>
+            </tr>
+          `}
+        </table>
       </div>
+    </div>
+
+    <div style="margin-top: ${cfg.declarationMarginTop}; font-size: ${cfg.declarationFontSize}; font-weight: 600; text-align: center; color: #333; line-height: 1.25;">
+      <div>${l.conditionsBox}</div>
+      <div style="margin-top: 1.5px;">${note ? `<strong>${l.noteLabel}:</strong> ${note}` : `<strong>${l.noteGunnyBag}</strong>`}</div>
+    </div>
+    
+    <div class="signatures">
+      <div>${l.depositorSignature} <span class="signature-line"></span></div>
+      <div style="margin-right:20px;">${l.managerSignature} <span class="signature-line"></span></div>
+    </div>
     </div>
   </div>
   </div>
