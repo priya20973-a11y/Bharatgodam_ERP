@@ -76,27 +76,11 @@ export function generateColdTransactionReceiptHTML(
   let calculatedStockType = data.stockType || 'Self';
   let actualNetWeight = Number(data.quantityKg) || 0;
 
-  const stacksList = (data.stacksInfo && data.stacksInfo.length > 0)
-    ? data.stacksInfo
-    : (data.stackAllocations && data.stackAllocations.length > 0
-      ? data.stackAllocations.map((a: any) => ({
-          stockType: a.stockType || 'Self',
-          chamberNo: a.chamberName || a.chamberNo,
-          floorNo: a.floorNo,
-          stackNo: a.stackNo,
-          bagsCount: a.bagsCount || a.allocatedBags || 0,
-          isStockShifting: a.isStockShifting,
-          quantityKg: a.allocatedWeight || a.quantityKg
-        }))
-      : null);
-
-  const stackCount = stacksList ? stacksList.length : 1;
-
-  if (stacksList && stacksList.length > 0) {
+  if (data.stacksInfo && data.stacksInfo.length > 0) {
     calculatedSelfQty = 0;
     calculatedPurchaseQty = 0;
 
-    stacksList.forEach((s: any) => {
+    data.stacksInfo.forEach((s: any) => {
       const sType = s.stockType || 'Self';
       const sQty = Number(s.quantityKg) || 0;
       if (sType === 'Purchase') {
@@ -152,147 +136,9 @@ export function generateColdTransactionReceiptHTML(
     ? (lang === 'gu' ? 'ભાડા પાવતી' : 'RENT RECEIPT')
     : (lang === 'gu' ? 'જાવક પાવતી' : 'OUTWARD RECEIPT');
 
-  const isHighStack = stackCount >= 14;
-  const isMedStack = stackCount >= 9 && stackCount < 14;
-  const isLowMedStack = stackCount >= 5 && stackCount < 9;
-
-  let cfg = {
-    containerPadding: '12px',
-    headerPadding: '5px',
-    headerMarginBottom: '8px',
-    titleFontSize: '24px',
-    subTitleFontSize: '11px',
-    logoWidth: '60px',
-    qrWidth: '85px',
-    badgeContainerMarginBottom: '8px',
-    badgeFontSize: '15px',
-    badgePadding: '2px 15px',
-    receiptInfoMarginBottom: '10px',
-    receiptInfoFontSize: '13px',
-    formRowMarginBottom: '6px',
-    formRowFontSize: '13px',
-    tableMarginTop: '8px',
-    tableMarginBottom: '6px',
-    tableCellPadding: '4px',
-    tableCellFontSize: '12px',
-    stackTablePadding: '4px',
-    stackTableFontSize: '12px',
-    weightMarginBottom: '8px',
-    weightMarginTop: '6px',
-    weightFontSize: '13px',
-    declarationMarginTop: '8px',
-    declarationFontSize: '10px',
-    signaturesMarginTop: '16px',
-    signaturesFontSize: '13px',
-    signatureLineWidth: '100px',
-    duplicateScale: '0.92',
-    rotateWrapperHeight: '138mm',
-  };
-
-  if (isHighStack) {
-    cfg = {
-      containerPadding: '8px 10px',
-      headerPadding: '3px 4px',
-      headerMarginBottom: '4px',
-      titleFontSize: '18px',
-      subTitleFontSize: '9px',
-      logoWidth: '45px',
-      qrWidth: '62px',
-      badgeContainerMarginBottom: '3px',
-      badgeFontSize: '12px',
-      badgePadding: '1px 10px',
-      receiptInfoMarginBottom: '4px',
-      receiptInfoFontSize: '11px',
-      formRowMarginBottom: '2.5px',
-      formRowFontSize: '10.5px',
-      tableMarginTop: '4px',
-      tableMarginBottom: '3px',
-      tableCellPadding: '1.5px 3px',
-      tableCellFontSize: '9.5px',
-      stackTablePadding: '1.5px 2px',
-      stackTableFontSize: '9.5px',
-      weightMarginBottom: '3px',
-      weightMarginTop: '3px',
-      weightFontSize: '10.5px',
-      declarationMarginTop: '4px',
-      declarationFontSize: '8.5px',
-      signaturesMarginTop: '8px',
-      signaturesFontSize: '10.5px',
-      signatureLineWidth: '75px',
-      duplicateScale: '0.80',
-      rotateWrapperHeight: '142mm',
-    };
-  } else if (isMedStack) {
-    cfg = {
-      containerPadding: '10px',
-      headerPadding: '4px',
-      headerMarginBottom: '5px',
-      titleFontSize: '20px',
-      subTitleFontSize: '10px',
-      logoWidth: '50px',
-      qrWidth: '70px',
-      badgeContainerMarginBottom: '4px',
-      badgeFontSize: '13px',
-      badgePadding: '1.5px 12px',
-      receiptInfoMarginBottom: '6px',
-      receiptInfoFontSize: '11.5px',
-      formRowMarginBottom: '3.5px',
-      formRowFontSize: '11.5px',
-      tableMarginTop: '5px',
-      tableMarginBottom: '4px',
-      tableCellPadding: '2.5px 3px',
-      tableCellFontSize: '10.5px',
-      stackTablePadding: '2px 2px',
-      stackTableFontSize: '10.5px',
-      weightMarginBottom: '4px',
-      weightMarginTop: '4px',
-      weightFontSize: '11.5px',
-      declarationMarginTop: '5px',
-      declarationFontSize: '9px',
-      signaturesMarginTop: '12px',
-      signaturesFontSize: '11.5px',
-      signatureLineWidth: '85px',
-      duplicateScale: '0.86',
-      rotateWrapperHeight: '140mm',
-    };
-  } else if (isLowMedStack) {
-    cfg = {
-      containerPadding: '10px 12px',
-      headerPadding: '4px 5px',
-      headerMarginBottom: '6px',
-      titleFontSize: '22px',
-      subTitleFontSize: '10.5px',
-      logoWidth: '55px',
-      qrWidth: '75px',
-      badgeContainerMarginBottom: '6px',
-      badgeFontSize: '14px',
-      badgePadding: '2px 14px',
-      receiptInfoMarginBottom: '8px',
-      receiptInfoFontSize: '12px',
-      formRowMarginBottom: '4.5px',
-      formRowFontSize: '12px',
-      tableMarginTop: '6px',
-      tableMarginBottom: '5px',
-      tableCellPadding: '3px 4px',
-      tableCellFontSize: '11.5px',
-      stackTablePadding: '3px 3px',
-      stackTableFontSize: '11.5px',
-      weightMarginBottom: '6px',
-      weightMarginTop: '5px',
-      weightFontSize: '12px',
-      declarationMarginTop: '6px',
-      declarationFontSize: '9.5px',
-      signaturesMarginTop: '15px',
-      signaturesFontSize: '12px',
-      signatureLineWidth: '90px',
-      duplicateScale: '0.89',
-      rotateWrapperHeight: '138mm',
-    };
-  }
-
   return `
 <!DOCTYPE html>
-<html lang="${lang}">
+<html lang="gu">
 <head>
   <meta charset="UTF-8">
   <title>Cold Storage Receipt</title>
@@ -306,55 +152,40 @@ export function generateColdTransactionReceiptHTML(
       color: #333; 
     }
     
-    @page { 
-      size: A4 portrait; 
-      margin: 0; 
-    }
+    @page { size: A5; margin: 0; }
     
     @media print {
       body {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        margin: 0;
-        padding: 0;
-        background: #fff;
       }
       .hide-on-print { display: none !important; }
       
+      /* Force everything to fit on one page */
       html, body {
-        width: 100%;
-        height: auto;
-        margin: 0;
-        padding: 0;
-        overflow: visible !important;
+        height: 100%;
+        overflow: hidden;
+        page-break-inside: avoid;
       }
       
-      #receipt-wrapper {
-        width: 100%;
-        margin: 0 auto;
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
-
       .receipt-container {
+        height: 210mm;
         page-break-inside: avoid;
         break-inside: avoid;
-        overflow: visible !important;
-        margin: 0 auto;
       }
     }
     
     .receipt-container { 
       width: 148mm; 
-      min-height: 210mm;
-      max-height: 285mm;
+      height: 210mm;
+      max-height: 210mm;
       margin: 0 auto; 
-      padding: ${cfg.containerPadding}; 
+      padding: 12px; 
       background-color: #ffffff;
       border: 1px solid #ccc;
       position: relative;
       box-sizing: border-box;
-      overflow: visible;
+      overflow: hidden;
     }
     
     body.duplicate-mode @page {
@@ -381,7 +212,7 @@ export function generateColdTransactionReceiptHTML(
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 5mm;
+      gap: 10mm;
       
       overflow: hidden;
       page-break-inside: avoid;
@@ -391,22 +222,22 @@ export function generateColdTransactionReceiptHTML(
     body.duplicate-mode .rotate-wrapper {
       position: relative;
       width: 195mm;
-      height: ${cfg.rotateWrapperHeight};
+      height: 135mm;
       page-break-inside: avoid;
       break-inside: avoid;
     }
     
     body.duplicate-mode .receipt-container {
       width: 148mm !important;
+      height: 210mm !important;
       min-height: 210mm !important;
-      max-height: 285mm !important;
       margin: 0 !important;
       
       position: absolute;
       top: 50%;
       left: 50%;
       transform-origin: center center;
-      transform: translate(-50%, -50%) rotate(-90deg) scale(${cfg.duplicateScale}) !important;
+      transform: translate(-50%, -50%) rotate(-90deg) scale(0.92) !important;
       
       box-sizing: border-box;
     }
@@ -426,7 +257,7 @@ export function generateColdTransactionReceiptHTML(
       color: #0b4b8a;
       font-size: 11px;
       font-weight: 600;
-      margin-bottom: 3px;
+      margin-bottom: 5px;
     }
     
     .header-main {
@@ -434,15 +265,15 @@ export function generateColdTransactionReceiptHTML(
       align-items: center;
       border: 2px solid #b89735;
       background: #fff;
-      padding: ${cfg.headerPadding};
-      margin-bottom: ${cfg.headerMarginBottom};
+      padding: 5px;
+      margin-bottom: 8px;
     }
     
     .logo-area {
-      font-size: 24px;
+      font-size: 32px;
       font-weight: bold;
       color: #0b4b8a;
-      width: ${cfg.logoWidth};
+      width: 60px;
       text-align: center;
       line-height: 1;
       position: relative;
@@ -457,36 +288,33 @@ export function generateColdTransactionReceiptHTML(
     .main-title {
       background-color: #d63333;
       color: #fff;
-      font-size: ${cfg.titleFontSize};
+      font-size: 24px;
       font-weight: 700;
-      padding: 1px 10px;
+      padding: 2px 10px;
       display: inline-block;
       border-radius: 4px;
       margin-bottom: 2px;
-      line-height: 1.2;
     }
     
     .sub-title {
       color: #0b4b8a;
-      font-size: ${cfg.subTitleFontSize};
+      font-size: 11px;
       font-weight: 600;
-      line-height: 1.2;
     }
     
     .badge-container {
       text-align: center;
-      margin-bottom: ${cfg.badgeContainerMarginBottom};
+      margin-bottom: 8px;
     }
     
     .badge {
       background-color: #557960;
       color: #fff;
       display: inline-block;
-      padding: ${cfg.badgePadding};
+      padding: 2px 15px;
       border-radius: 20px;
-      font-size: ${cfg.badgeFontSize};
+      font-size: 15px;
       font-weight: bold;
-      line-height: 1.2;
     }
     
     .receipt-info {
@@ -494,18 +322,17 @@ export function generateColdTransactionReceiptHTML(
       justify-content: space-between;
       color: #d63333;
       font-weight: bold;
-      font-size: ${cfg.receiptInfoFontSize};
-      margin-bottom: ${cfg.receiptInfoMarginBottom};
+      font-size: 13px;
+      margin-bottom: 10px;
     }
     
     .form-row {
       display: flex;
       align-items: flex-end;
-      margin-bottom: ${cfg.formRowMarginBottom};
-      font-size: ${cfg.formRowFontSize};
+      margin-bottom: 8px;
+      font-size: 13px;
       font-weight: 600;
       color: #9e2a2b;
-      line-height: 1.2;
     }
     
     .form-label {
@@ -517,14 +344,14 @@ export function generateColdTransactionReceiptHTML(
       flex: 1;
       border-bottom: 1px solid #333;
       color: #333;
-      padding: 0 4px;
-      min-width: 40px;
+      padding: 0 5px;
+      min-width: 50px;
     }
     
     .grid-container {
       display: flex;
       justify-content: space-between;
-      margin-top: 4px;
+      margin-top: 8px;
     }
     
     .left-grid {
@@ -539,16 +366,15 @@ export function generateColdTransactionReceiptHTML(
       width: 100%;
       border-collapse: collapse;
       border: 1px solid #8b5a2b;
-      margin-bottom: ${cfg.tableMarginBottom};
+      margin-bottom: 8px;
       background-color: transparent;
     }
     
     .data-table td {
       border: 1px solid #8b5a2b;
-      padding: ${cfg.tableCellPadding};
-      font-size: ${cfg.tableCellFontSize};
+      padding: 4px;
+      font-size: 13px;
       font-weight: 600;
-      line-height: 1.2;
     }
     
     .data-table td:first-child {
@@ -563,35 +389,50 @@ export function generateColdTransactionReceiptHTML(
     
     .stack-table th {
       border: 1px solid #8b5a2b;
-      padding: ${cfg.stackTablePadding};
-      font-size: ${cfg.stackTableFontSize};
+      padding: 4px;
+      font-size: 13px;
       background: #fdfbf7;
       color: #9e2a2b;
       text-align: center;
-      line-height: 1.15;
     }
     
     .stack-table td {
       text-align: center !important;
       color: #333 !important;
       width: auto !important;
-      font-size: ${cfg.stackTableFontSize};
-      padding: ${cfg.stackTablePadding};
-      line-height: 1.15;
+    }
+    
+    .footer-note {
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.4;
+    }
+    
+    .conditions-box {
+      border: 1px solid #8b5a2b;
+      border-radius: 10px;
+      padding: 5px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 10px;
+      background-color: rgba(255, 255, 255, 0.4);
     }
     
     .signatures {
       display: flex;
       justify-content: space-between;
-      margin-top: ${cfg.signaturesMarginTop};
-      font-size: ${cfg.signaturesFontSize};
+      margin-top: 20px;
+      font-size: 13px;
       color: #9e2a2b;
       font-weight: bold;
     }
     
     .signature-line {
       display: inline-block;
-      width: ${cfg.signatureLineWidth};
+      width: 100px;
       border-bottom: 1px solid #333;
       margin-left: 5px;
     }
@@ -624,7 +465,7 @@ export function generateColdTransactionReceiptHTML(
             <div class="main-title">${warehouseName}</div>
             <div class="sub-title">${warehouseAddress}</div>
           </div>
-          ${qrDataUrl ? `<div style="width: ${cfg.qrWidth}; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
+          ${qrDataUrl ? `<div style="width: 85px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
         </div>
     
     <div class="badge-container">
@@ -695,7 +536,7 @@ export function generateColdTransactionReceiptHTML(
           <div class="form-value">${wbSlip}</div>
         </div>
 
-        <table class="data-table" style="margin-top: ${cfg.tableMarginTop};">
+        <table class="data-table" style="margin-top: 8px;">
           <tr>
             <td>Stock Type</td>
             <td>${stockType}</td>
@@ -726,9 +567,9 @@ export function generateColdTransactionReceiptHTML(
           </tr>
         </table>
         
-        <div style="padding-left: 4px; margin-bottom: ${cfg.weightMarginBottom}; margin-top: ${cfg.weightMarginTop};">
-          <span style="color: #9e2a2b; font-weight: bold; font-size: ${cfg.weightFontSize};">${getDynamicUnitLabel(unitStr, 'weight')}</span>
-          <span style="font-weight: bold; font-size: ${cfg.weightFontSize}; margin-left: 8px;">${kataBharati}</span>
+        <div style="padding-left: 5px; margin-bottom: 8px; margin-top: 8px;">
+          <span style="color: #9e2a2b; font-weight: bold; font-size: 13px;">${getDynamicUnitLabel(unitStr, 'weight')}</span>
+          <span style="font-weight: bold; font-size: 13px; margin-left: 10px;">${kataBharati}</span>
         </div>
       </div>
       
@@ -741,8 +582,8 @@ export function generateColdTransactionReceiptHTML(
             <th>${l.stackNoLabel}</th>
             <th>${(l.noOfBags || 'No. of Bags').replace(':', '')}</th>
           </tr>
-          ${stacksList && stacksList.length > 0 ? 
-            stacksList.map((s: any) => `
+          ${data.stacksInfo && data.stacksInfo.length > 0 ? 
+            data.stacksInfo.map((s: any) => `
             <tr>
               <td>${s.stockType || 'Self'}</td>
               <td>${formatNum(s.chamberNo)}</td>
@@ -764,7 +605,7 @@ export function generateColdTransactionReceiptHTML(
       </div>
     </div>
 
-    <div style="margin-top: ${cfg.declarationMarginTop}; font-size: ${cfg.declarationFontSize}; font-weight: 600; text-align: center; color: #333; line-height: 1.25;">
+    <div style="margin-top: 8px; font-size: 10px; font-weight: 600; text-align: center; color: #333; line-height: 1.25;">
       <div>${l.conditionsBox}</div>
       <div style="margin-top: 1.5px;">${note ? `<strong>${l.noteLabel}:</strong> ${note}` : `<strong>${l.noteGunnyBag}</strong>`}</div>
     </div>
