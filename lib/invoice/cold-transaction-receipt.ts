@@ -69,7 +69,7 @@ export function generateColdTransactionReceiptHTML(
   const stack = formatNum(data.stackNo || '');
 
   const unitStr = data.unit || data.commodityId?.unit || 'KG';
-  const grossWeight = formatNum(data.grossWeight || 0) + ' KG';
+  const grossWeight = formatNum((Number(data.grossWeight) || 0).toFixed(2)) + ' KG';
   const emptyWeight = formatNum((Number(data.emptyWeight) || 0).toFixed(2)) + ' KG';
   let calculatedSelfQty = Number(data.selfQuantityKg) || 0;
   let calculatedPurchaseQty = Number(data.purchaseQuantityKg) || 0;
@@ -180,7 +180,7 @@ export function generateColdTransactionReceiptHTML(
       height: 210mm;
       max-height: 210mm;
       margin: 0 auto; 
-      padding: 12px; 
+      padding: ${type === 'inward' ? '4px' : '12px'}; 
       background-color: #ffffff;
       border: 1px solid #ccc;
       position: relative;
@@ -263,6 +263,7 @@ export function generateColdTransactionReceiptHTML(
     .header-main {
       display: flex;
       align-items: center;
+      width: 100%;
       border: 2px solid #b89735;
       background: #fff;
       padding: 5px;
@@ -303,7 +304,18 @@ export function generateColdTransactionReceiptHTML(
     }
     
     .badge-container {
+      position: relative;
       text-align: center;
+      margin-bottom: 8px;
+    }
+    
+    .inward-header-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      color: #d63333;
+      font-weight: bold;
+      font-size: 13px;
       margin-bottom: 8px;
     }
     
@@ -451,9 +463,10 @@ export function generateColdTransactionReceiptHTML(
   <div id="receipt-wrapper">
     <div class="rotate-wrapper" id="original-receipt-wrapper">
       <div class="receipt-container" id="original-receipt">
+        ${type !== 'inward' ? `
         <div class="header-top">
           <div>Mo.${mobile}</div>
-        </div>
+        </div>` : ''}
         
         <div class="header-main">
           <div class="logo-area">
@@ -465,9 +478,23 @@ export function generateColdTransactionReceiptHTML(
             <div class="main-title">${warehouseName}</div>
             <div class="sub-title">${warehouseAddress}</div>
           </div>
+          ${type === 'inward' ? `
+          <div style="width: 85px; text-align: center;">
+            ${qrDataUrl ? `<img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges; display: block; margin: 0 auto;" alt="QR Code" />` : ''}
+            <div style="color: #0b4b8a; font-size: 11px; font-weight: 600; margin-top: 2px; white-space: nowrap;">Mo.${mobile}</div>
+          </div>
+          ` : `
           ${qrDataUrl ? `<div style="width: 85px; text-align: right;"><img src="${qrDataUrl}" style="max-width: 100%; height: auto; image-rendering: crisp-edges;" alt="QR Code" /></div>` : ''}
+          `}
         </div>
     
+    ${type === 'inward' ? `
+    <div class="inward-header-row">
+      <div style="text-align: left;">${l.receiptNo} ${receiptNoFormatted}</div>
+      <div style="text-align: center;"><div class="badge">${title}</div></div>
+      <div style="text-align: right;">${l.date} ${dateFormatted}</div>
+    </div>
+    ` : `
     <div class="badge-container">
       <div class="badge">${title}</div>
     </div>
@@ -476,6 +503,7 @@ export function generateColdTransactionReceiptHTML(
       <div>${l.receiptNo} ${receiptNoFormatted}</div>
       <div>${l.date} ${dateFormatted}</div>
     </div>
+    `}
     
     <div class="form-row">
       <div class="form-label">${l.nameShree}</div>
