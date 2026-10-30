@@ -13,11 +13,18 @@ function roundCurrency(value: number) {
 export async function getInternalLedgerData(accountId: string, tenantFilter: any) {
   const db = await getDb();
 
-  const clientObjectId = ObjectId.isValid(accountId) ? new ObjectId(accountId) : null;
+  // Guard: require full 24-char hex before constructing ObjectId to avoid BSONTypeError
+  // for legacy / non-ObjectId client ids.
+  const isValidObjectId = ObjectId.isValid(accountId) && /^[a-fA-F0-9]{24}$/.test(accountId);
+  const clientObjectId = isValidObjectId ? new ObjectId(accountId) : null;
+  console.log(`[LEDGER ENGINE] getInternalLedgerData accountId=${accountId} isValidObjectId=${isValidObjectId}`);
+
   const activeRecordFilter = {
     deletedAt: { $exists: false },
     status: { $nin: ['DELETED', 'CANCELLED'] },
   };
+
+  // Build payment query safely.
   const paymentQuery: any = { ...tenantFilter };
   if (clientObjectId) {
     const clientExists = await db.collection('clients').findOne({ _id: clientObjectId, ...tenantFilter });
@@ -46,9 +53,12 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       .find(paymentQuery)
       .sort({ date: 1 })
       .toArray(),
-    db.collection('invoice_master')
-      .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
-      .toArray(),
+    // Only query invoice_master with ObjectId when the accountId is a valid ObjectId.
+    isValidObjectId
+      ? db.collection('invoice_master')
+          .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
+          .toArray()
+      : Promise.resolve([]),
     db.collection('commodities')
       .find({ ...tenantFilter })
       .toArray(),
@@ -185,8 +195,8 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   const paymentData: Payment[] = paymentsDocs.map((pay) => ({
     _id: pay._id?.toString() || '',
-    date: pay.paymentDate || pay.date,
-    amount: pay.amount,
+    date: pay.paymentDate || pay.date || new Date().toISOString(),
+    amount: Number(pay.amount || 0),
     clientName: pay.clientName || bookings[0]?.clientName || accountId,
   }));
 
