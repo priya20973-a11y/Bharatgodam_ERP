@@ -242,10 +242,17 @@ export default function LedgerDashboard() {
     };
   }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.type.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredClients = useMemo(() => {
+    const query = (search || '').trim().toLowerCase();
+    return clients.filter((c) => {
+      if (!c) return false;
+      if (!query) return true;
+      const name = String(c.name || '').toLowerCase();
+      const type = String(c.clientType || c.type || '').toLowerCase();
+      const mobile = String(c.mobile || '').toLowerCase();
+      return name.includes(query) || type.includes(query) || mobile.includes(query);
+    });
+  }, [clients, search]);
 
   if (selectedClient) {
     return (
@@ -406,7 +413,8 @@ export default function LedgerDashboard() {
                   const anchor = document.createElement('a');
                   anchor.href = url;
                   const monthSuffix = selectedMonthKey === 'all' ? 'all-months' : selectedMonthKey;
-                  anchor.download = `warehouse-ledger-${warehouseReport.warehouseName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${monthSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+                  const safeWarehouseName = (warehouseReport.warehouseName || 'warehouse').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                  anchor.download = `warehouse-ledger-${safeWarehouseName}-${monthSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
                   anchor.click();
                   URL.revokeObjectURL(url);
                 }}
@@ -578,7 +586,7 @@ export default function LedgerDashboard() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">{client.name}</h3>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.type}</Badge>
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.clientType || client.type || 'CLIENT'}</Badge>
                     <p className="text-xs text-slate-400 font-medium">{client.mobile}</p>
                   </div>
                 </CardContent>
