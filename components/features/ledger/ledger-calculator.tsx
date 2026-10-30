@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { LedgerSummary, LedgerStep } from '@/lib/ledger-engine';
@@ -69,11 +69,14 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   const warehouseBreakdowns = ledgerData?.warehouseBreakdowns ?? [];
   const showWarehouseBreakdowns = warehouseBreakdowns.length > 0;
 
-  const formatDecimal = (value: number) =>
-    value.toLocaleString(undefined, {
+  const formatDecimal = (value: number | null | undefined): string => {
+    const n = Number(value);
+    if (value === null || value === undefined || Number.isNaN(n)) return '---';
+    return n.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
 
   const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
