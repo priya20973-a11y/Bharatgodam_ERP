@@ -33,13 +33,40 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     paymentQuery.accountId = accountId;
   }
 
+  const invoiceMasterMatch: any = { status: { $ne: 'PAID' }, ...tenantFilter };
+  if (clientObjectId) {
+    invoiceMasterMatch.$or = [
+      { clientId: clientObjectId },
+      { clientId: accountId },
+    ];
+  } else {
+    invoiceMasterMatch.clientId = accountId;
+  }
+
   const [bookings, transactionDocs, paymentsDocs, invoiceMasters, commoditiesResult, warehousesResult] = await Promise.all([
     db.collection('bookings')
-      .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
+      .find({
+        $or: [
+          { accountId },
+          { clientId: accountId },
+          ...(clientObjectId ? [{ clientId: clientObjectId }] : []),
+        ],
+        direction: { $in: ['INWARD', 'OUTWARD'] },
+        ...tenantFilter,
+        ...activeRecordFilter,
+      })
       .sort({ date: 1 })
       .toArray(),
     db.collection('transactions')
-      .find({ accountId, ...tenantFilter, ...activeRecordFilter })
+      .find({
+        $or: [
+          { accountId },
+          { clientId: accountId },
+          ...(clientObjectId ? [{ clientId: clientObjectId }] : []),
+        ],
+        ...tenantFilter,
+        ...activeRecordFilter,
+      })
       .sort({ date: 1 })
       .toArray(),
     db.collection('payments')
@@ -47,7 +74,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       .sort({ date: 1 })
       .toArray(),
     db.collection('invoice_master')
-      .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
+      .find(invoiceMasterMatch)
       .toArray(),
     db.collection('commodities')
       .find({ ...tenantFilter })
@@ -295,14 +322,18 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   const invoiceOutstandingTotal = invoiceSummaries.reduce((sum, invoice) => sum + invoice.additionalCharges, 0);
 
-  const matchedRecords: MatchedRecord[] = bookings.map((booking) => ({
-    _id: booking._id?.toString() || '',
-    clientName: booking.clientName,
-    date: booking.date,
-    location: booking.location || '',
-    commodity: booking.commodityName || '',
-    totalMT: booking.direction === 'INWARD' ? booking.mt : -booking.mt,
-  }));
+  const matchedRecords: MatchedRecord[] = bookings.map((booking) => {
+    const rawMt = Number(booking.mt ?? booking.quantityMT ?? 0);
+    const safeMt = Number.isNaN(rawMt) ? 0 : rawMt;
+    return {
+      _id: booking._id?.toString() || '',
+      clientName: booking.clientName || 'Unknown',
+      date: booking.date || '',
+      location: booking.location || '',
+      commodity: booking.commodityName || '',
+      totalMT: booking.direction === 'INWARD' ? safeMt : -safeMt,
+    };
+  });
 
   const ledgerSummary = calculateLedger(
     transactionData,

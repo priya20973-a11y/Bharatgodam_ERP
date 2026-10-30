@@ -242,10 +242,14 @@ export default function LedgerDashboard() {
     };
   }, [warehouseReport, selectedMonthKey, filteredTransactionRecords]);
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.type.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredClients = clients.filter(c => {
+    const searchLower = (search || '').toLowerCase().trim();
+    if (!searchLower) return true;
+    const nameMatch = Boolean(c.name && c.name.toLowerCase().includes(searchLower));
+    const typeMatch = Boolean((c.clientType || c.type || '').toLowerCase().includes(searchLower));
+    const mobileMatch = Boolean(c.mobile && c.mobile.toLowerCase().includes(searchLower));
+    return nameMatch || typeMatch || mobileMatch;
+  });
 
   if (selectedClient) {
     return (
@@ -578,7 +582,7 @@ export default function LedgerDashboard() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">{client.name}</h3>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.type}</Badge>
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.clientType || client.type || 'CLIENT'}</Badge>
                     <p className="text-xs text-slate-400 font-medium">{client.mobile}</p>
                   </div>
                 </CardContent>

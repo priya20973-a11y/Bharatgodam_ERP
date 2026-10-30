@@ -60,7 +60,15 @@ export async function GET(
         .toArray(),
       db.collection('invoice_master')
         .aggregate([
-          { $match: { clientId: new ObjectId(trimmedClientId), status: { $ne: 'PAID' }, ...tenantFilter } },
+          {
+            $match: {
+              ...(ObjectId.isValid(trimmedClientId)
+                ? { $or: [{ clientId: new ObjectId(trimmedClientId) }, { clientId: trimmedClientId }] }
+                : { clientId: trimmedClientId }),
+              status: { $ne: 'PAID' },
+              ...tenantFilter,
+            },
+          },
           { $group: { _id: null, totalOutstanding: { $sum: '$totalAmount' } } }
         ])
         .toArray(),
@@ -160,7 +168,7 @@ export async function GET(
       date: booking.date,
       location: booking.location || '',
       commodity: booking.commodityName || '',
-      totalMT: booking.direction === 'INWARD' ? booking.mt : -booking.mt,
+      totalMT: booking.direction === 'INWARD' ? Number(booking.mt ?? booking.quantityMT ?? 0) : -Number(booking.mt ?? booking.quantityMT ?? 0),
     }));
 
     const ledgerSummary = await getInternalLedgerData(accountId, tenantFilter);

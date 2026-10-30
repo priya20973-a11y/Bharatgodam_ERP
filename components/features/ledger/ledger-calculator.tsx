@@ -69,8 +69,8 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   const warehouseBreakdowns = ledgerData?.warehouseBreakdowns ?? [];
   const showWarehouseBreakdowns = warehouseBreakdowns.length > 0;
 
-  const formatDecimal = (value: number) =>
-    value.toLocaleString(undefined, {
+  const formatDecimal = (value: number | undefined | null) =>
+    (Number(value) || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -83,7 +83,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   );
 
   const currentBalances = useMemo(() => {
-    if (!ledgerData || ledgerData.ledgerSteps.length === 0) return {};
+    if (!ledgerData || !Array.isArray(ledgerData.ledgerSteps) || ledgerData.ledgerSteps.length === 0) return {};
     const lastStep = ledgerData.ledgerSteps[ledgerData.ledgerSteps.length - 1];
     return lastStep.inventoryBalances || {};
   }, [ledgerData]);
@@ -95,16 +95,16 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
 
   const summaryTotalPaid = useMemo(() => {
     if (!ledgerData) return 0;
-    return showInvoiceAdjustments ? ledgerData.totalPaid : ledgerData.rentPaid ?? ledgerData.totalPaid;
+    return Number(showInvoiceAdjustments ? ledgerData.totalPaid : ledgerData.rentPaid ?? ledgerData.totalPaid) || 0;
   }, [ledgerData, showInvoiceAdjustments]);
 
   const summaryTotalBalance = useMemo(() => {
     if (!ledgerData) return 0;
     if (showInvoiceAdjustments) {
-      return roundCurrency(ledgerData.totalRent + totalAdditionalCharges - (ledgerData.totalPaid ?? 0));
+      return roundCurrency((Number(ledgerData.totalRent) || 0) + totalAdditionalCharges - (Number(ledgerData.totalPaid) || 0));
     }
     return ledgerData.rentPaid !== undefined
-      ? Math.max(ledgerData.totalRent - ledgerData.rentPaid, 0)
+      ? Math.max((Number(ledgerData.totalRent) || 0) - (Number(ledgerData.rentPaid) || 0), 0)
       : ledgerData.balance;
   }, [ledgerData, showInvoiceAdjustments, totalAdditionalCharges]);
 
@@ -203,7 +203,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     const displayTotalBalance = showInvoiceAdjustments
       ? roundCurrency(ledgerData.totalRent + (ledgerData.invoiceSummaries?.reduce((sum, invoice) => sum + invoice.additionalCharges, 0) || 0) - (ledgerData.totalPaid ?? 0))
       : ledgerData.rentPaid !== undefined
-        ? Math.max(ledgerData.totalRent - ledgerData.rentPaid, 0)
+        ? Math.max((Number(ledgerData.totalRent) || 0) - (Number(ledgerData.rentPaid) || 0), 0)
         : ledgerData.balance;
     lines.push('SUMMARY');
     lines.push(`Total Rent,${formatDecimal(ledgerData.totalRent)}`);

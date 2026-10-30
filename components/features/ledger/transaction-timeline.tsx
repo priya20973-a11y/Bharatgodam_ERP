@@ -14,8 +14,10 @@ interface CommodityTransactionTimelineProps {
   isLoading?: boolean;
 }
 
-function formatDecimal(value: number) {
-  return value.toLocaleString(undefined, {
+function formatDecimal(value: number | undefined | null) {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (num == null || Number.isNaN(num)) return '0.00';
+  return num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

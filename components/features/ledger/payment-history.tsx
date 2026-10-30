@@ -232,7 +232,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                         <Package className="h-3 w-3" />
                         <span>{item.description}</span>
                         <span className="text-slate-500 text-xs">
-                          - ₹{item.amount.toLocaleString('en-IN')}
+                          - ₹{(Number(item.amount) || 0).toLocaleString('en-IN')}
                         </span>
                       </div>
                     </SelectItem>
@@ -245,7 +245,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                     const item = lineItems.find(li => li.id === selectedLineItem);
                     return item ? (
                       <p className="text-xs text-indigo-700">
-                        <strong>Selected:</strong> {item.description} ({item.type}) - <strong>₹{item.amount.toLocaleString('en-IN')}</strong> on {item.date}
+                        <strong>Selected:</strong> {item.description} ({item.type}) - <strong>₹{(Number(item.amount) || 0).toLocaleString('en-IN')}</strong> on {item.date}
                       </p>
                     ) : null;
                   })()}
@@ -334,7 +334,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                     {formatPaymentDateInIST(payment.date || (payment as any).paymentDate)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
-                    ₹{payment.amount.toLocaleString('en-IN')}
+                    ₹{(Number(payment.amount) || 0).toLocaleString('en-IN')}
                   </td>
                   <td className="px-4 py-3 text-left">
                     <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
@@ -361,7 +361,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
               Total Payments:
             </p>
             <p className="text-2xl font-black text-emerald-700">
-              ₹{payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-IN')}
+              ₹{payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0).toLocaleString('en-IN')}
             </p>
           </div>
         </div>
