@@ -179,10 +179,12 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
     ? invoice.transactions
     : invoice.periods || []) as any[]);
 
-  const billingTotal = invoiceRowSource.reduce(
-    (sum, row) => sum + Number(row.rentTotal || 0),
-    0
-  );
+  const billingTotal = invoiceRowSource.length > 0
+    ? invoiceRowSource.reduce(
+        (sum, row) => sum + Number(row.rentTotal || 0),
+        0
+      )
+    : Number(invoice.totalRent || 0);
 
   const taxableAmount = billingTotal + adjustmentTotal;
   let totalTaxAmount = Number(invoice.totalTaxAmount || 0);
@@ -296,6 +298,8 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       direction: p.direction || 'INWARD',
       commodityName: p.commodityName || 'Unknown',
       warehouseName: p.warehouseName || 'Unknown',
+      warehouseId: p.warehouseId || '',
+      customWarehouseId: p.customWarehouseId || '',
       startDate: p.startDate || '',
       endDate: p.endDate || '',
       quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
@@ -309,22 +313,113 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       status: p.status || '',
     }));
 
-  let showWarehouseColumn = false;
+  const warehouseCodeMap = new Map<string, string>();
+
+  if (Array.isArray((invoice as any).warehouses)) {
+    for (const w of (invoice as any).warehouses) {
+      const code = w.warehouseId || '';
+      if (code) {
+        if (w._id) warehouseCodeMap.set(String(w._id), code);
+        if (w.name) warehouseCodeMap.set(w.name.trim(), code);
+        warehouseCodeMap.set(String(code), code);
+      }
+    }
+  }
+
+  const warehouseQueryIds: any[] = [];
+  if (invoice.warehouseId) {
+    invoice.warehouseId.split(',').forEach((id: string) => {
+      const trimmed = id.trim();
+      if (trimmed) {
+        if (ObjectId.isValid(trimmed)) warehouseQueryIds.push(new ObjectId(trimmed));
+        warehouseQueryIds.push(trimmed);
+      }
+    });
+  }
+  for (const r of invoiceRows) {
+    if (r.warehouseId) {
+      const trimmed = String(r.warehouseId).trim();
+      if (trimmed) {
+        if (ObjectId.isValid(trimmed)) warehouseQueryIds.push(new ObjectId(trimmed));
+        warehouseQueryIds.push(trimmed);
+      }
+    }
+  }
+
+  if (warehouseQueryIds.length > 0) {
+    try {
+      const dbWhs = await db.collection('warehouses').find({
+        $or: [
+          { _id: { $in: warehouseQueryIds.filter((id: any) => id instanceof ObjectId) } },
+          { warehouseId: { $in: warehouseQueryIds.map((id: any) => String(id)) } }
+        ]
+      }).toArray();
+      for (const w of dbWhs) {
+        const code = w.warehouseId || '';
+        if (code) {
+          if (w._id) warehouseCodeMap.set(String(w._id), code);
+          if (w.name) warehouseCodeMap.set(w.name.trim(), code);
+          warehouseCodeMap.set(String(code), code);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not query warehouses for code lookup:', e);
+    }
+  }
+
+  const resolveWarehouseId = (row: any): string => {
+    // 1. If row.warehouseName has " - " (e.g. "WH-001 - Patidad Warehouse"), extract the prefix "WH-001"
+    const name = String(row.warehouseName || '').trim();
+    if (name.includes(' - ')) {
+      const prefix = name.split(' - ')[0].trim();
+      if (prefix) return prefix;
+    }
+
+    // 2. Look up by row.warehouseId in warehouseCodeMap
+    if (row.warehouseId && warehouseCodeMap.has(String(row.warehouseId))) {
+      return warehouseCodeMap.get(String(row.warehouseId))!;
+    }
+
+    // 3. Look up by row.warehouseName in warehouseCodeMap
+    if (name && warehouseCodeMap.has(name)) {
+      return warehouseCodeMap.get(name)!;
+    }
+
+    // 4. If row.customWarehouseId exists and is not an ObjectId
+    if (row.customWarehouseId && !/^[a-fA-F0-9]{24}$/.test(String(row.customWarehouseId))) {
+      return String(row.customWarehouseId);
+    }
+
+    // 5. If row.warehouseId is a custom ID (not a 24-char ObjectId)
+    if (row.warehouseId && !/^[a-fA-F0-9]{24}$/.test(String(row.warehouseId))) {
+      return String(row.warehouseId);
+    }
+
+    // 6. If row.warehouseId exists (even if ObjectId), return it rather than the full warehouse name
+    if (row.warehouseId) {
+      return String(row.warehouseId);
+    }
+
+    return '-';
+  };
+
+  const isMultiWarehouseInvoice =
+    ((invoice as any).warehouses && (invoice as any).warehouses.length > 1) ||
+    invoice.warehouseName === 'Multiple Warehouses' ||
+    Boolean(invoice.warehouseId && invoice.warehouseId.includes(',')) ||
+    new Set(invoiceRows.map((r) => r.warehouseName).filter(Boolean)).size > 1;
+
+  let showWarehouseColumn = isMultiWarehouseInvoice;
   
   const invoiceRowsWithId = invoiceRows.map((row) => {
-    let customWarehouseId = '';
-    const name = row.warehouseName || '';
-    if (name.includes(' - ')) {
-      customWarehouseId = name.split(' - ')[0].trim();
-    }
-    
-    if (customWarehouseId) {
+    const warehouseIdOnly = resolveWarehouseId(row);
+    if ((warehouseIdOnly && warehouseIdOnly !== '-') || isMultiWarehouseInvoice) {
       showWarehouseColumn = true;
     }
     
     return {
       ...row,
-      customWarehouseId
+      warehouseIdOnly
     };
   });
 
@@ -334,15 +429,19 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         ? `${row.startDate} to ${row.endDate}`
         : row.date || `${row.startDate || ''}`;
       const r = row as any;
-      const qtyValue = formatQty(r.quantityMT || r.bags || r.bagsCount || 0);
+      const qtyValue = formatQty(r.quantityMT || r.quantity || 0);
       const unitValue = r.unit || 'MT'; // Fallback for legacy
       const rateValue = r.ratePerMTPerDay || r.rate || r.unitRate
         ? `₹${formatAmount(r.ratePerMTPerDay || r.rate || r.unitRate)}`
         : '-';
       const commodityLabel = row.commodityName || 'Unknown';
+      const warehouseDisplay = row.warehouseIdOnly || '-';
       const warehouseCell = showWarehouseColumn 
-        ? `<td>${row.customWarehouseId || ''}</td>` 
+        ? `<td>${warehouseDisplay}</td>` 
         : '';
+      const rawBags = row.bags !== undefined && row.bags !== null ? row.bags : (r.bagCount ?? r.bagsCount ?? '');
+      const bagsNum = rawBags !== '' ? Number(rawBags) : NaN;
+      const bagDisplay = !Number.isNaN(bagsNum) ? bagsNum.toLocaleString('en-IN') : (rawBags ? String(rawBags) : '-');
         
       return `
         <tr>
@@ -350,6 +449,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
           <td>${row.direction}</td>
           <td>${commodityLabel}</td>
           ${warehouseCell}
+          <td class="text-right font-medium">${bagDisplay}</td>
           <td class="text-right">${qtyValue}</td>
           <td class="text-center">${unitValue}</td>
           <td class="text-right">${rateValue}</td>
@@ -810,7 +910,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                   ${(invoice as any).warehouses && (invoice as any).warehouses.length > 0 ? `
                   <div style="margin-top: 10px; font-size: 10px; font-weight: 600; color: #0F2D52;">
                     Warehouses: 
-                    ${(invoice as any).warehouses.map((w: any) => `${w.warehouseId || 'WH'} - ${w.name}`).join(', ')}
+                    ${(invoice as any).warehouses.map((w: any) => w.warehouseId ? `${w.warehouseId} - ${w.name}` : (w.name || 'Warehouse')).join(', ')}
                   </div>
                   ` : ''}
                 </div>
@@ -869,7 +969,8 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                       <th>Date</th>
                       <th>Direction</th>
                       <th>Commodity</th>
-                      ${showWarehouseColumn ? '<th>Warehouse</th>' : ''}
+                      ${showWarehouseColumn ? '<th>Warehouse ID</th>' : ''}
+                      <th class="text-right">Bags</th>
                       <th class="text-right">Quantity</th>
                       <th class="text-center">Unit</th>
                       <th class="text-right">Unit Rate (₹)</th>
@@ -879,7 +980,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
                   <tbody>
                     ${invoiceRowsList}
                     <tr style="border-top: 1px solid #D9DDE3; background-color: #F8FAFC;">
-                      <td colspan="${showWarehouseColumn ? 6 : 5}" style="font-weight: 700; text-align: right;">
+                      <td colspan="${showWarehouseColumn ? 8 : 7}" style="font-weight: 700; text-align: right;">
                         Monthly Storage Rent (SAC|HSN: ${storageChargeSacCode || '-'})
                       </td>
                       <td class="text-right font-medium text-dark" style="font-weight: 700; font-size: 9px;">

@@ -3,7 +3,7 @@
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getTenantFilterForMongo } from '@/lib/ownership';
-import { calculateLedger } from '@/lib/ledger-engine';
+import { calculateLedger, sanitizeClientName, isMongoObjectId, sanitizeTransactionId, resolveTransactionReference } from '@/lib/ledger-engine';
 import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
 
 function roundCurrency(value: number) {
@@ -13,11 +13,55 @@ function roundCurrency(value: number) {
 export async function getInternalLedgerData(accountId: string, tenantFilter: any) {
   const db = await getDb();
 
-  const clientObjectId = ObjectId.isValid(accountId) ? new ObjectId(accountId) : null;
+  // Guard: require full 24-char hex before constructing ObjectId to avoid BSONTypeError
+  // for legacy / non-ObjectId client ids.
+  const isValidObjectId = ObjectId.isValid(accountId) && /^[a-fA-F0-9]{24}$/.test(accountId);
+  const clientObjectId = isValidObjectId ? new ObjectId(accountId) : null;
+  console.log(`[LEDGER ENGINE] getInternalLedgerData accountId=${accountId} isValidObjectId=${isValidObjectId}`);
+
   const activeRecordFilter = {
     deletedAt: { $exists: false },
     status: { $nin: ['DELETED', 'CANCELLED'] },
   };
+
+  // 1. Resolve client name from Client collection (or legacy client_accounts)
+  let resolvedClientName = '';
+  if (clientObjectId) {
+    const clientDoc = await db.collection('clients').findOne({ _id: clientObjectId });
+    const name = clientDoc?.name || clientDoc?.clientName;
+    if (name && !isMongoObjectId(name)) {
+      resolvedClientName = String(name).trim();
+    }
+  }
+
+  if (!resolvedClientName) {
+    const clientDoc = await db.collection('clients').findOne({
+      $or: [
+        { _id: accountId as any },
+        { customClientId: accountId },
+      ]
+    });
+    const name = clientDoc?.name || clientDoc?.clientName;
+    if (name && !isMongoObjectId(name)) {
+      resolvedClientName = String(name).trim();
+    }
+  }
+
+  if (!resolvedClientName) {
+    const legacyDoc = await db.collection('client_accounts').findOne({
+      $or: [
+        ...(clientObjectId ? [{ _id: clientObjectId }] : []),
+        { _id: accountId as any },
+        { clientName: accountId },
+      ]
+    });
+    const name = legacyDoc?.name || legacyDoc?.clientName;
+    if (name && !isMongoObjectId(name)) {
+      resolvedClientName = String(name).trim();
+    }
+  }
+
+  // Build payment query safely.
   const paymentQuery: any = { ...tenantFilter };
   if (clientObjectId) {
     const clientExists = await db.collection('clients').findOne({ _id: clientObjectId, ...tenantFilter });
@@ -46,9 +90,12 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       .find(paymentQuery)
       .sort({ date: 1 })
       .toArray(),
-    db.collection('invoice_master')
-      .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
-      .toArray(),
+    // Only query invoice_master with ObjectId when accountId is a valid 24-hex ObjectId
+    isValidObjectId
+      ? db.collection('invoice_master')
+          .find({ clientId: new ObjectId(accountId), status: { $ne: 'PAID' }, ...tenantFilter })
+          .toArray()
+      : Promise.resolve([]),
     db.collection('commodities')
       .find({ ...tenantFilter })
       .toArray(),
@@ -56,6 +103,80 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       .find({ ...tenantFilter })
       .toArray(),
   ]);
+
+  // Build a lookup map of client IDs to names for any referenced clients
+  const referencedClientIds = new Set<string>();
+  if (accountId) referencedClientIds.add(accountId);
+  bookings.forEach((b: any) => {
+    const cId = b.clientId?.toString?.() || b.accountId?.toString?.();
+    if (cId) referencedClientIds.add(cId);
+    if (b.clientName && isMongoObjectId(b.clientName)) referencedClientIds.add(String(b.clientName).trim());
+  });
+  transactionDocs.forEach((t: any) => {
+    const cId = t.clientId?.toString?.() || t.accountId?.toString?.();
+    if (cId) referencedClientIds.add(cId);
+    if (t.clientName && isMongoObjectId(t.clientName)) referencedClientIds.add(String(t.clientName).trim());
+  });
+
+  const clientNameMap = new Map<string, string>();
+  if (resolvedClientName) {
+    clientNameMap.set(accountId, resolvedClientName);
+    if (clientObjectId) clientNameMap.set(clientObjectId.toString(), resolvedClientName);
+  }
+
+  const idsToLookup = Array.from(referencedClientIds).filter((id) => !clientNameMap.has(id));
+  if (idsToLookup.length > 0) {
+    const validHexIds = idsToLookup
+      .filter((id) => ObjectId.isValid(id) && isMongoObjectId(id))
+      .map((id) => new ObjectId(id));
+
+    const [extraClients, extraLegacy] = await Promise.all([
+      db.collection('clients').find({
+        $or: [
+          { _id: { $in: [...validHexIds, ...idsToLookup as any] } },
+          { customClientId: { $in: idsToLookup } },
+        ]
+      }).project({ name: 1, clientName: 1, customClientId: 1 }).toArray(),
+      db.collection('client_accounts').find({
+        _id: { $in: [...validHexIds, ...idsToLookup as any] }
+      }).project({ name: 1, clientName: 1 }).toArray()
+    ]);
+
+    extraClients.forEach((c: any) => {
+      const name = c.name || c.clientName;
+      if (name && !isMongoObjectId(name)) {
+        if (c._id) clientNameMap.set(c._id.toString(), String(name).trim());
+        if (c.customClientId) clientNameMap.set(c.customClientId, String(name).trim());
+      }
+    });
+
+    extraLegacy.forEach((c: any) => {
+      const name = c.name || c.clientName;
+      if (name && !isMongoObjectId(name)) {
+        if (c._id) clientNameMap.set(c._id.toString(), String(name).trim());
+      }
+    });
+  }
+
+  const resolveRecordClientName = (rec: any): string => {
+    const raw = (rec?.clientName || '').toString().trim();
+    if (raw && !isMongoObjectId(raw) && raw.toLowerCase() !== 'null' && raw.toLowerCase() !== 'undefined') {
+      return raw;
+    }
+    const cId = rec?.clientId?.toString?.() || rec?.accountId?.toString?.() || '';
+    if (cId && clientNameMap.has(cId)) {
+      return clientNameMap.get(cId)!;
+    }
+    if (resolvedClientName) {
+      return resolvedClientName;
+    }
+    return 'Unknown Client';
+  };
+
+  const primaryClientName = resolvedClientName ||
+    resolveRecordClientName(bookings[0]) ||
+    resolveRecordClientName(transactionDocs[0]) ||
+    'Unknown Client';
 
   const invoiceIds = invoiceMasters
     .map((invoice: any) => invoice.invoiceId)
@@ -131,6 +252,96 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     ].join('|');
   };
 
+  // Collect linked inward / outward IDs from transactions & bookings to resolve business receipt numbers
+  const linkedInwardIdHexes: ObjectId[] = [];
+  const linkedOutwardIdHexes: ObjectId[] = [];
+  const linkedInwardIdStrings: string[] = [];
+  const linkedOutwardIdStrings: string[] = [];
+
+  const inspectLinkedIds = (rec: any) => {
+    const sId = rec.sourceId ? String(rec.sourceId).trim() : '';
+    const inId = rec.inwardId ? String(rec.inwardId).trim() : '';
+    const outId = rec.outwardId ? String(rec.outwardId).trim() : '';
+    const dir = String(rec.direction || '').toUpperCase();
+    const srcType = String(rec.sourceType || '').toLowerCase();
+
+    if (inId) {
+      if (isMongoObjectId(inId)) linkedInwardIdHexes.push(new ObjectId(inId));
+      linkedInwardIdStrings.push(inId);
+    }
+    if (outId) {
+      if (isMongoObjectId(outId)) linkedOutwardIdHexes.push(new ObjectId(outId));
+      linkedOutwardIdStrings.push(outId);
+    }
+    if (sId) {
+      if (srcType === 'inward' || dir === 'INWARD') {
+        if (isMongoObjectId(sId)) linkedInwardIdHexes.push(new ObjectId(sId));
+        linkedInwardIdStrings.push(sId);
+      } else if (srcType === 'outward' || dir === 'OUTWARD') {
+        if (isMongoObjectId(sId)) linkedOutwardIdHexes.push(new ObjectId(sId));
+        linkedOutwardIdStrings.push(sId);
+      }
+    }
+  };
+
+  bookings.forEach(inspectLinkedIds);
+  transactionDocs.forEach(inspectLinkedIds);
+
+  const [inwardDocs, outwardDocs, coldInwardDocs, coldOutwardDocs] = await Promise.all([
+    linkedInwardIdHexes.length > 0 || linkedInwardIdStrings.length > 0
+      ? db.collection('inwards').find({
+          _id: { $in: [...linkedInwardIdHexes, ...linkedInwardIdStrings as any] }
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+      : Promise.resolve([]),
+    linkedOutwardIdHexes.length > 0 || linkedOutwardIdStrings.length > 0
+      ? db.collection('outwards').find({
+          _id: { $in: [...linkedOutwardIdHexes, ...linkedOutwardIdStrings as any] }
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+      : Promise.resolve([]),
+    linkedInwardIdHexes.length > 0 || linkedInwardIdStrings.length > 0
+      ? db.collection('coldinwards').find({
+          _id: { $in: [...linkedInwardIdHexes, ...linkedInwardIdStrings as any] }
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+      : Promise.resolve([]),
+    linkedOutwardIdHexes.length > 0 || linkedOutwardIdStrings.length > 0
+      ? db.collection('coldoutwards').find({
+          _id: { $in: [...linkedOutwardIdHexes, ...linkedOutwardIdStrings as any] }
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+      : Promise.resolve([]),
+  ]);
+
+  const linkedReferenceMap = new Map<string, string>();
+  const recordDocReference = (doc: any) => {
+    if (!doc?._id) return;
+    const ref = resolveTransactionReference(doc, '');
+    if (ref) {
+      linkedReferenceMap.set(doc._id.toString(), ref);
+    }
+  };
+  inwardDocs.forEach(recordDocReference);
+  outwardDocs.forEach(recordDocReference);
+  coldInwardDocs.forEach(recordDocReference);
+  coldOutwardDocs.forEach(recordDocReference);
+
+  const resolveRecordTransactionId = (txn: any): string => {
+    // 1. Direct business reference fields on the transaction or booking record
+    const direct = resolveTransactionReference(txn, '');
+    if (direct) return direct;
+
+    // 2. Check linked inward/outward records
+    const inId = txn.inwardId ? String(txn.inwardId).trim() : '';
+    if (inId && linkedReferenceMap.has(inId)) return linkedReferenceMap.get(inId)!;
+
+    const outId = txn.outwardId ? String(txn.outwardId).trim() : '';
+    if (outId && linkedReferenceMap.has(outId)) return linkedReferenceMap.get(outId)!;
+
+    const sId = txn.sourceId ? String(txn.sourceId).trim() : '';
+    if (sId && linkedReferenceMap.has(sId)) return linkedReferenceMap.get(sId)!;
+
+    // 3. Fallback to '-' (never display a 24-character hexadecimal MongoDB ObjectId)
+    return '-';
+  };
+
   const transactionKeys = new Set<string>();
   const transactionData: Transaction[] = [];
 
@@ -144,11 +355,13 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   bookings.forEach((txn) =>
     addTransaction({
       _id: txn._id?.toString() || '',
+      transactionId: resolveRecordTransactionId(txn),
+      receiptNumber: txn.receiptNumber || undefined,
       date: txn.date,
       direction: txn.direction,
       mt: txn.mt,
       clientId: txn.clientId?.toString?.() || undefined,
-      clientName: txn.clientName,
+      clientName: resolveRecordClientName(txn),
       commodityName: txn.commodityName,
       warehouseId: txn.warehouseId?.toString?.() || undefined,
       warehouseName: txn.warehouseId?.toString?.()
@@ -164,11 +377,13 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   transactionDocs.forEach((txn) =>
     addTransaction({
       _id: txn._id?.toString() || '',
+      transactionId: resolveRecordTransactionId(txn),
+      receiptNumber: txn.receiptNumber || undefined,
       date: txn.date,
       direction: txn.direction,
       mt: txn.quantityMT,
       clientId: txn.clientId || undefined,
-      clientName: txn.clientName || bookings[0]?.clientName || accountId,
+      clientName: resolveRecordClientName(txn),
       commodityName: txn.commodityName,
       warehouseId: txn.warehouseId || undefined,
       warehouseName: txn.warehouseId
@@ -181,13 +396,17 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     })
   );
 
-  transactionData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  transactionData.sort((a, b) => {
+    const ta = a.date ? new Date(a.date).getTime() : 0;
+    const tb = b.date ? new Date(b.date).getTime() : 0;
+    return ta - tb;
+  });
 
   const paymentData: Payment[] = paymentsDocs.map((pay) => ({
     _id: pay._id?.toString() || '',
-    date: pay.paymentDate || pay.date,
-    amount: pay.amount,
-    clientName: pay.clientName || bookings[0]?.clientName || accountId,
+    date: pay.paymentDate || pay.date || new Date().toISOString(),
+    amount: Number(pay.amount || 0),
+    clientName: resolveRecordClientName(pay),
   }));
 
   const warehouseGroups = new Map<string, {
@@ -218,7 +437,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     ledgerSummary: calculateLedger(
       group.transactions,
       [],
-      bookings[0]?.clientName || accountId,
+      primaryClientName,
       0,
       commodityRates
     ),
@@ -297,7 +516,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   const matchedRecords: MatchedRecord[] = bookings.map((booking) => ({
     _id: booking._id?.toString() || '',
-    clientName: booking.clientName,
+    clientName: resolveRecordClientName(booking),
     date: booking.date,
     location: booking.location || '',
     commodity: booking.commodityName || '',
@@ -307,13 +526,14 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   const ledgerSummary = calculateLedger(
     transactionData,
     paymentData,
-    bookings[0]?.clientName || accountId,
+    primaryClientName,
     0,
     commodityRates
   );
 
   return {
     ...ledgerSummary,
+    clientName: primaryClientName,
     transactions: transactionData,
     warehouseBreakdowns,
     matchedRecords,

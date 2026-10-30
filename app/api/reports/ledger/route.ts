@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongodb';
 import { appendOwnership, requireSession } from '@/lib/ownership';
+import { sanitizeClientName, isMongoObjectId } from '@/lib/ledger-engine';
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
@@ -132,9 +133,29 @@ export async function POST(req: Request) {
         }))
       : [];
 
+    let safeClientName = sanitizeClientName(clientName, '');
+    if (!safeClientName && accountId) {
+      if (ObjectId.isValid(accountId) && isMongoObjectId(accountId)) {
+        const clientDoc = await db.collection('clients').findOne({ _id: new ObjectId(accountId) });
+        const found = clientDoc?.name || clientDoc?.clientName;
+        if (found && !isMongoObjectId(found)) safeClientName = String(found).trim();
+      }
+      if (!safeClientName) {
+        const clientDoc = await db.collection('clients').findOne({
+          $or: [
+            { _id: accountId as any },
+            { customClientId: accountId },
+          ]
+        });
+        const found = clientDoc?.name || clientDoc?.clientName;
+        if (found && !isMongoObjectId(found)) safeClientName = String(found).trim();
+      }
+    }
+    if (!safeClientName) safeClientName = 'Unknown Client';
+
     const paymentDocument = appendOwnership({
       accountId: accountId?.trim() || null,
-      clientName: clientName?.trim() || '',
+      clientName: safeClientName,
       amount: Number(amount),
       date: parsedPaymentDate,
       paymentDate: parsedPaymentDate,

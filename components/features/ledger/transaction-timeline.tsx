@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Transaction } from '@/lib/ledger-engine';
+import { Transaction, sanitizeClientName, isMongoObjectId, sanitizeTransactionId } from '@/lib/ledger-engine';
 import { ArrowDown, ArrowUp, Package, Calendar } from 'lucide-react';
 
 interface TransactionTimelineProps {
@@ -14,8 +14,11 @@ interface CommodityTransactionTimelineProps {
   isLoading?: boolean;
 }
 
-function formatDecimal(value: number) {
-  return value.toLocaleString(undefined, {
+function formatDecimal(value: any) {
+  if (value === null || value === undefined || value === '') return '0.00';
+  const num = Number(value);
+  if (Number.isNaN(num)) return '0.00';
+  return num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -116,12 +119,25 @@ export const CommodityTransactionTimeline: React.FC<CommodityTransactionTimeline
                     <div className="flex-1 py-1">
                       <div className="flex items-start justify-between mb-1">
                         <div>
-                          <p className="text-sm font-bold text-slate-900">
-                            {isInward ? '📥 Inward' : '📤 Outward'} - {txn.gatePass}
-                          </p>
-                          <p className="text-xs text-slate-600 mt-0.5">
-                            Client: {txn.clientName}
-                          </p>
+                          {(() => {
+                            const refDisplay = sanitizeTransactionId(txn.transactionId || txn.receiptNumber, '');
+                            const gatePassDisplay = txn.gatePass && !isMongoObjectId(txn.gatePass) ? txn.gatePass : '';
+                            return (
+                              <>
+                                <p className="text-sm font-bold text-slate-900">
+                                  {isInward ? '📥 Inward' : '📤 Outward'} {refDisplay ? `· ${refDisplay}` : (gatePassDisplay ? `· ${gatePassDisplay}` : '')}
+                                </p>
+                                <p className="text-xs text-slate-600 mt-0.5">
+                                  Client: {sanitizeClientName(txn.clientName)}
+                                </p>
+                                {refDisplay && gatePassDisplay && gatePassDisplay !== refDisplay && (
+                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                    GP: {gatePassDisplay}
+                                  </p>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         <div className="flex flex-col items-end">
                           <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
@@ -213,10 +229,23 @@ export const TransactionTimeline: React.FC<TransactionTimelineProps> = ({
               <div className="flex-1 py-2">
                 <div className="flex items-start justify-between mb-1">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">
-                      {isInward ? '📥 Inward' : '📤 Outward'} - {txn.gatePass}
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5">{txn.commodityName}</p>
+                    {(() => {
+                      const refDisplay = sanitizeTransactionId(txn.transactionId || txn.receiptNumber, '');
+                      const gatePassDisplay = txn.gatePass && !isMongoObjectId(txn.gatePass) ? txn.gatePass : '';
+                      return (
+                        <>
+                          <p className="text-sm font-bold text-slate-900">
+                            {isInward ? '📥 Inward' : '📤 Outward'} {refDisplay ? `· ${refDisplay}` : (gatePassDisplay ? `· ${gatePassDisplay}` : '')}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-0.5">{txn.commodityName}</p>
+                          {refDisplay && gatePassDisplay && gatePassDisplay !== refDisplay && (
+                            <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                              GP: {gatePassDisplay}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                       <div className="flex flex-col items-end">
                         <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${

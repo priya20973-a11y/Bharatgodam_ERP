@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { format, parse } from 'date-fns';
-import { LedgerStep } from '@/lib/ledger-engine';
+import { LedgerStep, isMongoObjectId, calculateTotalDaysStored } from '@/lib/ledger-engine';
 import { Calendar, Package, TrendingUp } from 'lucide-react';
 
 interface LedgerTableProps {
@@ -10,8 +10,15 @@ interface LedgerTableProps {
   isLoading?: boolean;
 }
 
-function formatDecimal(value: number) {
-  return value.toLocaleString(undefined, {
+function formatDecimal(value: any): string {
+  if (value === null || value === undefined || value === '') {
+    return '0.00';
+  }
+  const num = Number(value);
+  if (Number.isNaN(num)) {
+    return '0.00';
+  }
+  return num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -67,6 +74,9 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
     );
   }
 
+  // Calculate unique calendar days stored across multiple commodities
+  const totalDaysStored = calculateTotalDaysStored(steps);
+
   return (
     <div className="w-full bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
@@ -74,6 +84,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-4 py-3 text-left font-semibold text-slate-700 w-12">#</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700">Commodity</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700">Start Date</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700">End Date</th>
               <th className="px-4 py-3 text-right font-semibold text-slate-700">Days</th>
@@ -88,6 +99,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
               // Explicitly destructure to avoid confusion
               const { 
                 stepNo, 
+                commodity,
                 startDate, 
                 endDate, 
                 daysDifference, 
@@ -109,7 +121,12 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                     {stepNo}
                   </td>
 
-                  {/* Column 2: Start Date */}
+                  {/* Column 2: Commodity */}
+                  <td className="px-4 py-3 text-slate-900 font-medium whitespace-nowrap">
+                    {commodity || '—'}
+                  </td>
+
+                  {/* Column 3: Start Date */}
                   <td className="px-4 py-3 text-slate-700">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -119,7 +136,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                     </div>
                   </td>
 
-                  {/* Column 3: End Date */}
+                  {/* Column 4: End Date */}
                   <td className="px-4 py-3 text-slate-700">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -129,50 +146,62 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                     </div>
                   </td>
 
-                  {/* Column 4: Days Difference */}
+                  {/* Column 5: Days Difference */}
                   <td className="px-4 py-3 text-right font-mono text-slate-900">
-                    {daysDifference}
+                    {daysDifference ?? 0}
                   </td>
 
-                  {/* Column 5: Quantity in MT */}
+                  {/* Column 6: Quantity in MT */}
                   <td className="px-4 py-3 text-right font-mono text-slate-900">
-{typeof quantityMT === 'number' ? formatDecimal(quantityMT) : quantityMT}
-                </td>
-
-                {/* Column 6: Rate per Day per MT */}
-                <td className="px-4 py-3 text-right font-mono text-slate-700">
-                  ₹{typeof ratePerDayPerMT === 'number' ? formatDecimal(ratePerDayPerMT) : ratePerDayPerMT}/day/MT
-                </td>
-
-                {/* Column 7: Total Rent Amount */}
-                <td className="px-4 py-3 text-right font-bold text-emerald-700">
-                  ₹{typeof rentAmount === 'number' ? formatDecimal(rentAmount) : rentAmount}
+                    {formatDecimal(quantityMT)}
                   </td>
 
-                  {/* Column 8: Transaction Type */}
+                  {/* Column 7: Rate per Day per MT */}
+                  <td className="px-4 py-3 text-right font-mono text-slate-700">
+                    ₹{formatDecimal(ratePerDayPerMT)}/day/MT
+                  </td>
+
+                  {/* Column 8: Total Rent Amount */}
+                  <td className="px-4 py-3 text-right font-bold text-emerald-700">
+                    ₹{formatDecimal(rentAmount)}
+                  </td>
+
+                  {/* Column 9: Transaction Details & Reference */}
                   <td className="px-4 py-3 text-xs">
                     {transaction ? (
                       <div className="flex flex-col gap-1 items-start">
-                        <span
-                          className={`inline-block px-2 py-1 rounded font-semibold ${
-                            transaction.direction === 'INWARD'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-orange-100 text-orange-700'
-                          }`}
-                        >
-                          {transaction.direction}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded font-semibold text-[11px] ${
+                              transaction.direction === 'INWARD'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-orange-100 text-orange-700'
+                            }`}
+                          >
+                            {transaction.direction}
+                          </span>
+                          {transaction.transactionId && transaction.transactionId !== '-' && (
+                            <span className="font-mono font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                              {transaction.transactionId}
+                            </span>
+                          )}
+                        </div>
+                        {transaction.gatePass && transaction.gatePass !== transaction.transactionId && !isMongoObjectId(transaction.gatePass) && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            GP: {transaction.gatePass}
+                          </span>
+                        )}
                         {transaction.partyName && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Party: {transaction.partyName}
                           </span>
                         )}
-                        {transaction.actualWeight !== undefined && (
+                        {transaction.actualWeight != null && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Actual: {formatDecimal(transaction.actualWeight)} MT
                           </span>
                         )}
-                        {transaction.netWeightLoss !== undefined && (
+                        {transaction.netWeightLoss != null && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Loss: {formatDecimal(transaction.netWeightLoss)} MT
                           </span>
@@ -196,7 +225,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
           <span className="font-semibold text-slate-700">Total Days Stored:</span>
         </div>
         <span className="font-mono text-lg font-bold text-slate-900">
-          {steps.reduce((sum, step) => sum + step.daysDifference, 0)} days
+          {totalDaysStored} days
         </span>
       </div>
     </div>

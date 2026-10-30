@@ -48,6 +48,9 @@ interface MonthlyInvoice {
     rentTotal: number;
     status: string;
     commodityName: string;
+    bags?: number | string;
+    warehouseName?: string;
+    warehouseId?: string;
   }>;
   warehouseId?: string;
   warehouseName?: string;
@@ -338,11 +341,13 @@ export default function ClientInvoicesPage() {
                 startDate: period.fromDate,
                 endDate: period.toDate,
                 quantityMT: Number(period.qty ?? 0),
+                bags: period.bags || '',
                 daysTotal: Number(period.days ?? 0),
                 rentTotal: Number(period.rent ?? 0),
                 status: period.status || 'COMPLETED',
                 commodityName: period.commodityName || period.commodity || '',
-                warehouseName: invoiceWarehouseName,
+                warehouseName: period.warehouseName || invoiceWarehouseName,
+                warehouseId: period.warehouseId || invoiceWarehouseId,
               })),
             warehouseId: invoiceWarehouseId,
             warehouseName: invoiceWarehouseName,
@@ -432,9 +437,13 @@ export default function ClientInvoicesPage() {
     const invoiceIdEncoded = encodeURIComponent(invoiceId);
     let warehouseQuery = '';
 
-    // Avoid duplicate warehouse query when the invoice ID already contains the warehouse segment.
-    if (invoice.warehouseId && invoiceId && !invoiceId.endsWith(`-${invoice.warehouseId}`)) {
-      warehouseQuery = `&warehouseId=${encodeURIComponent(invoice.warehouseId)}`;
+    const whIdToPass =
+      invoice.warehouseId ||
+      (selectedWarehouses.length > 0 && !selectedWarehouses.includes('ALL')
+        ? selectedWarehouses.join(',')
+        : '');
+    if (whIdToPass) {
+      warehouseQuery = `&warehouseId=${encodeURIComponent(whIdToPass)}`;
     }
 
     // Only use transaction mode when user explicitly selected it.
@@ -1350,8 +1359,12 @@ export default function ClientInvoicesPage() {
                       <thead className="bg-slate-100">
                         <tr>
                           <th className="px-4 py-2 text-left font-semibold text-slate-700">Commodity</th>
+                          {selectedWarehouses.length > 1 && (
+                            <th className="px-4 py-2 text-left font-semibold text-slate-700">Warehouse ID</th>
+                          )}
                           <th className="px-4 py-2 text-left font-semibold text-slate-700">From Date</th>
                           <th className="px-4 py-2 text-left font-semibold text-slate-700">To Date</th>
+                          <th className="px-4 py-2 text-center font-semibold text-slate-700">Bags</th>
                           <th className="px-4 py-2 text-center font-semibold text-slate-700">Qty (MT)</th>
                           <th className="px-4 py-2 text-center font-semibold text-slate-700">Days</th>
                           <th className="px-4 py-2 text-right font-semibold text-slate-700">Rent (₹)</th>
@@ -1361,8 +1374,27 @@ export default function ClientInvoicesPage() {
                         {(invoice.periods || []).map((period, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="px-4 py-2 font-medium text-slate-900">{period.commodityName}</td>
+                            {selectedWarehouses.length > 1 && (
+                              <td className="px-4 py-2 text-slate-600">
+                                {(() => {
+                                  const wName = period.warehouseName || '';
+                                  if (wName.includes(' - ')) {
+                                    return wName.split(' - ')[0].trim();
+                                  }
+                                  if (period.warehouseId && !/^[a-fA-F0-9]{24}$/.test(period.warehouseId)) {
+                                    return period.warehouseId;
+                                  }
+                                  const matched = warehouses.find(w => w.value === period.warehouseId);
+                                  if (matched?.label?.includes(' - ')) {
+                                    return matched.label.split(' - ')[0].trim();
+                                  }
+                                  return period.warehouseId || '-';
+                                })()}
+                              </td>
+                            )}
                             <td className="px-4 py-2">{period.startDate}</td>
                             <td className="px-4 py-2">{period.endDate}</td>
+                            <td className="px-4 py-2 text-center">{period.bags || '-'}</td>
                             <td className="px-4 py-2 text-center font-medium">{Number(period.quantityMT || 0).toFixed(2)}</td>
                             <td className="px-4 py-2 text-center">{period.daysTotal ?? 0}</td>
                             <td className="px-4 py-2 text-right font-semibold">₹{Number(period.rentTotal || 0).toLocaleString('en-IN')}</td>

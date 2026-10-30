@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo } from '@/lib/ownership';
 import { getInternalLedgerData } from '@/app/actions/internal-ledger';
 import { ObjectId } from 'mongodb';
+import { sanitizeClientName, isMongoObjectId } from '@/lib/ledger-engine';
 import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
 
 export async function GET(
@@ -23,146 +24,23 @@ export async function GET(
     };
 
     const url = new URL(req.url);
-    const clientId = url.pathname.split('/').pop() || '';
-    if (!clientId) {
+    const rawClientId = url.pathname.split('/').pop() || '';
+    if (!rawClientId) {
       return NextResponse.json({ success: false, message: 'Client ID is required' }, { status: 400 });
     }
-    const trimmedClientId = clientId.trim();
+    // Decode URI component in case clientId was URL-encoded by the client
+    const trimmedClientId = decodeURIComponent(rawClientId).trim();
     if (!trimmedClientId) {
       return NextResponse.json({ success: false, message: 'Client ID is required' }, { status: 400 });
     }
 
+    const isValidObjectId = ObjectId.isValid(trimmedClientId) && /^[a-fA-F0-9]{24}$/.test(trimmedClientId);
+    console.log(`[LEDGER API] clientId=${trimmedClientId} isValidObjectId=${isValidObjectId}`);
+
     const db = await getDb();
-
     const accountId = trimmedClientId;
-    const clientIdQuery = ObjectId.isValid(trimmedClientId)
-      ? new ObjectId(trimmedClientId)
-      : trimmedClientId;
 
-    const [bookings, transactionDocs, paymentsDocs, outstandingInvoicesResult, commoditiesResult] = await Promise.all([
-      db.collection('bookings')
-        .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
-        .sort({ date: 1 })
-        .toArray(),
-      db.collection('transactions')
-        .find({ accountId, ...tenantFilter, ...activeRecordFilter })
-        .sort({ date: 1 })
-        .toArray(),
-      db.collection('payments')
-        .find({
-          $or: [
-            { accountId },
-            { clientId: clientIdQuery }
-          ],
-          ...tenantFilter
-        })
-        .sort({ date: 1 })
-        .toArray(),
-      db.collection('invoice_master')
-        .aggregate([
-          { $match: { clientId: new ObjectId(trimmedClientId), status: { $ne: 'PAID' }, ...tenantFilter } },
-          { $group: { _id: null, totalOutstanding: { $sum: '$totalAmount' } } }
-        ])
-        .toArray(),
-      db.collection('commodities')
-        .find({ ...tenantFilter })
-        .toArray(),
-    ]);
-
-    // Create a map of commodity name -> rate per day per MT
-    const normalizeCommodityName = (value: string | undefined | null) =>
-      typeof value === 'string' ? value.trim().toUpperCase() : '';
-
-    const commodityRates = new Map<string, number>();
-    const commodityNameById = new Map<string, string>();
-
-    commoditiesResult.forEach((commodity: any) => {
-      const nameKey = normalizeCommodityName(commodity.name);
-      const rate =
-        Number(commodity.ratePerMtPerDay ?? commodity.ratePerDayPerMT ?? commodity.ratePerMTPerDay ?? commodity.ratePerMTPerDay ?? 0);
-
-      if (nameKey && rate > 0) {
-        commodityRates.set(nameKey, rate);
-        console.log(`[LEDGER] Loaded commodity rate: '${nameKey}' -> ₹${rate}/MT/day`);
-      }
-
-      if (commodity?._id) {
-        commodityNameById.set(commodity._id.toString(), commodity.name || '');
-      }
-    });
-
-    const normalizeTransactionKey = (txn: Transaction & { clientId?: string; warehouseId?: string }) => {
-      const clientKey = (txn.clientId || txn.clientName || '').toString().trim().toUpperCase();
-      const commodityKey = (txn.commodityName || '').toString().trim().toUpperCase();
-      const warehouseKey = (txn.warehouseId || '').toString().trim().toUpperCase();
-
-      return [
-        (txn.date || '').toString().trim(),
-        txn.direction,
-        Number(txn.mt || 0).toFixed(4),
-        clientKey,
-        commodityKey,
-        warehouseKey,
-      ].join('|');
-    };
-
-    const transactionKeys = new Set<string>();
-    const transactionData: Transaction[] = [];
-
-    const addTransaction = (txn: Transaction & { clientId?: string; warehouseId?: string }) => {
-      const key = normalizeTransactionKey(txn);
-      if (transactionKeys.has(key)) return;
-      transactionKeys.add(key);
-      transactionData.push(txn);
-    };
-
-    bookings.forEach((txn) => addTransaction({
-      _id: txn._id?.toString() || '',
-      date: txn.date,
-      direction: txn.direction,
-      mt: txn.mt,
-      clientId: txn.clientId?.toString?.() || undefined,
-      clientName: txn.clientName,
-      commodityName: txn.commodityName,
-      warehouseId: txn.warehouseId?.toString?.() || undefined,
-      gatePass: txn.gatePass,
-    } as Transaction & { clientId?: string; warehouseId?: string }));
-
-    transactionDocs.forEach((txn) => addTransaction({
-      _id: txn._id?.toString() || '',
-      date: txn.date,
-      direction: txn.direction,
-      mt: txn.quantityMT,
-      clientId: txn.clientId || undefined,
-      clientName: txn.clientName || bookings[0]?.clientName || clientId,
-      commodityName: txn.commodityName,
-      warehouseId: txn.warehouseId || undefined,
-      gatePass: txn.gatePass || '',
-    } as Transaction & { clientId?: string; warehouseId?: string }));
-
-    transactionData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    const paymentData: Payment[] = paymentsDocs.map((pay) => ({
-      _id: pay._id?.toString() || '',
-      date: pay.paymentDate || pay.date,
-      amount: pay.amount,
-      clientName: pay.clientName || bookings[0]?.clientName || clientId,
-    }));
-
-    // Calculate outstanding invoices
-    const outstandingInvoices = outstandingInvoicesResult.length > 0 
-      ? outstandingInvoicesResult[0].totalOutstanding || 0 
-      : 0;
-
-    const matchedRecords: MatchedRecord[] = bookings.map((booking) => ({
-      _id: booking._id?.toString() || '',
-      clientName: booking.clientName,
-      date: booking.date,
-      location: booking.location || '',
-      commodity: booking.commodityName || '',
-      totalMT: booking.direction === 'INWARD' ? booking.mt : -booking.mt,
-    }));
-
+    // Delegate to getInternalLedgerData which has full client resolution & audit trail
     const ledgerSummary = await getInternalLedgerData(accountId, tenantFilter);
 
     return NextResponse.json(
@@ -170,9 +48,9 @@ export async function GET(
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('GET /api/reports/ledger/[clientId] error:', error);
+    console.error('[LEDGER API] GET /api/reports/ledger/[clientId] error:', error?.message || error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Server error' },
+      { success: false, message: error?.message || 'Server error' },
       { status: 500 }
     );
   }

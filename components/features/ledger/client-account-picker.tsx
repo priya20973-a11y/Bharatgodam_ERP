@@ -5,6 +5,7 @@ import { searchClientAccounts, createClientAccount } from '@/app/actions/consoli
 import { toast } from 'react-hot-toast';
 import type { IClientAccount } from '@/types/schemas';
 import { ChevronDown, Users, Plus } from 'lucide-react';
+import { sanitizeClientName } from '@/lib/ledger-engine';
 
 interface ClientAccountPickerProps {
   onSelectAccount: (account: IClientAccount) => void;
@@ -166,7 +167,7 @@ export function ClientAccountPicker({
                     className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-start justify-between"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">{account.clientName}</p>
+                      <p className="font-medium text-gray-900">{sanitizeClientName(account.clientName)}</p>
                       <p className="text-xs text-gray-500">ID: {account.bookingId}</p>
                       {account.clientLocation && (
                         <p className="text-xs text-gray-500">{account.clientLocation}</p>
@@ -200,7 +201,7 @@ export function ClientAccountPicker({
       {/* Help Text */}
       <p className="mt-2 text-xs text-gray-500">
         {selectedAccount
-          ? `Selected: ${selectedAccount.clientName} (${selectedAccount.bookingId})`
+          ? `Selected: ${sanitizeClientName(selectedAccount.clientName)} (${selectedAccount.bookingId})`
           : 'Search for existing clients or create a new account'}
       </p>
     </div>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { TimeStateLedgerSummary, TimeStatePeriod } from '@/lib/ledger-time-state-engine';
+import { sanitizeTransactionId } from '@/lib/ledger-engine';
 import { Calendar, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react';
 
 interface TimeStateLedgerTableProps {
@@ -9,11 +10,15 @@ interface TimeStateLedgerTableProps {
   isLoading?: boolean;
 }
 
-const formatDecimal = (value: number) =>
-  value.toLocaleString(undefined, {
+const formatDecimal = (value: any) => {
+  if (value === null || value === undefined || value === '') return '0.00';
+  const num = Number(value);
+  if (Number.isNaN(num)) return '0.00';
+  return num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
 
 /**
  * TIME-STATE SYSTEM Ledger Display Component
@@ -173,7 +178,9 @@ export function TimeStateLedgerTable({ timeStateLedger, isLoading }: TimeStateLe
                         {period.transaction.direction}: {period.transaction.quantity} MT
                       </p>
                       <p className="text-gray-500">{period.transaction.date}</p>
-                      <p className="text-gray-500">GP: {period.transaction.id.substring(0, 8)}</p>
+                      <p className="text-gray-500">
+                        Ref: {sanitizeTransactionId((period.transaction as any).transactionId || (period.transaction as any).receiptNumber || (period.transaction as any).gatePass, '-')}
+                      </p>
                     </div>
                   ) : (
                     <span className="text-gray-400">Continuous Storage</span>

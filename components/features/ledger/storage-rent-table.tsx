@@ -35,13 +35,13 @@ export function StorageRentTable({ rows }: StorageRentTableProps) {
           {rows.map((row, index) => (
             <tr key={`${row.commodity}-${row.fromDate}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
               <td className="px-4 py-3 font-medium text-slate-900">
-                <>{row.commodity} <span className="text-xs text-slate-500">({row.rate.toFixed(0)} PER MT)</span></>
+                <>{row.commodity} <span className="text-xs text-slate-500">({Number(row.rate || 0).toFixed(0)} PER MT)</span></>
               </td>
               <td className="px-4 py-3">{row.fromDate}</td>
               <td className="px-4 py-3">{row.toDate}</td>
-              <td className="px-4 py-3 text-center font-medium">{row.qty.toFixed(2)}</td>
+              <td className="px-4 py-3 text-center font-medium">{Number(row.qty || 0).toFixed(2)}</td>
               <td className="px-4 py-3 text-center">{row.days}</td>
-              <td className="px-4 py-3 text-right font-semibold">₹{row.rent.toLocaleString('en-IN')}</td>
+              <td className="px-4 py-3 text-right font-semibold">₹{Number(row.rent || 0).toLocaleString('en-IN')}</td>
               <td className="px-4 py-3 text-center">
                 <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                   {row.status}

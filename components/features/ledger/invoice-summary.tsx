@@ -48,7 +48,7 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
               {totalLabel}
             </p>
             <p className="text-3xl font-black text-indigo-900">
-              ₹{displayTotal.toLocaleString('en-IN')}
+              ₹{Number(displayTotal || 0).toLocaleString('en-IN')}
             </p>
           </div>
           <div className="h-10 w-10 rounded-lg bg-indigo-200 flex items-center justify-center">
@@ -68,7 +68,7 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
               Total Paid
             </p>
             <p className="text-3xl font-black text-emerald-900">
-              ₹{totalPaid.toLocaleString('en-IN')}
+              ₹{Number(totalPaid || 0).toLocaleString('en-IN')}
             </p>
           </div>
           <div className="h-10 w-10 rounded-lg bg-emerald-200 flex items-center justify-center">
@@ -110,7 +110,7 @@ export const InvoiceSummary: React.FC<InvoiceSummaryProps> = ({
                 ? 'text-purple-900'
                 : 'text-teal-900'
             }`}>
-              ₹{Math.abs(totalBalance).toLocaleString('en-IN')}
+              ₹{Math.abs(Number(totalBalance || 0)).toLocaleString('en-IN')}
             </p>
           </div>
           <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${

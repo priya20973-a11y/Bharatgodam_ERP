@@ -6,6 +6,8 @@
 
 export interface Transaction {
   _id: string;
+  transactionId?: string;
+  receiptNumber?: string;
   date: string; // ISO date string
   direction: 'INWARD' | 'OUTWARD';
   mt: number;
@@ -21,6 +23,8 @@ export interface Transaction {
 
 export interface Payment {
   _id: string;
+  transactionId?: string;
+  receiptNumber?: string;
   date: string; // ISO date string
   amount: number;
   clientName: string;
@@ -38,6 +42,8 @@ export interface LedgerStep {
   rentAmount: number;
   transaction?: {
     id: string;
+    transactionId?: string;
+    receiptNumber?: string;
     direction: 'INWARD' | 'OUTWARD';
     gatePass: string;
     actualWeight?: number;
@@ -120,9 +126,81 @@ export interface AggregatedLedgerSummary extends LedgerSummary {
 const DEFAULT_RATE_PER_DAY_PER_MT = 10;
 
 /**
+ * Check if a value is a 24-character hexadecimal MongoDB ObjectId string
+ */
+export function isMongoObjectId(val: any): boolean {
+  if (!val) return false;
+  const str = typeof val === 'string' ? val.trim() : String(val || '').trim();
+  return /^[0-9a-fA-F]{24}$/.test(str);
+}
+
+/**
+ * Sanitize client name so that MongoDB ObjectIds, null, undefined, or empty strings
+ * are never displayed as client names.
+ */
+export function sanitizeClientName(name: any, fallback = 'Unknown Client'): string {
+  if (!name || typeof name !== 'string') return fallback;
+  const trimmed = name.trim();
+  if (!trimmed || isMongoObjectId(trimmed) || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') {
+    return fallback;
+  }
+  return trimmed;
+}
+
+/**
+ * Sanitize transaction ID / reference so that MongoDB ObjectIds, null, undefined,
+ * or empty strings are never displayed as business transaction identifiers.
+ * Returns fallback (default '-') if invalid, empty, or a 24-hex MongoDB ObjectId.
+ */
+export function sanitizeTransactionId(txId: any, fallback = '-'): string {
+  if (!txId) return fallback;
+  const str = typeof txId === 'string' ? txId.trim() : String(txId || '').trim();
+  if (!str || isMongoObjectId(str) || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') {
+    return fallback;
+  }
+  return str;
+}
+
+/**
+ * Resolve the best business transaction reference from available fields on a record.
+ * Checks business reference fields in priority order, rejecting any raw MongoDB ObjectIds.
+ */
+export function resolveTransactionReference(record: any, fallback = '-'): string {
+  if (!record) return fallback;
+  const candidates = [
+    record.transactionId,
+    record.transactionNumber,
+    record.transactionNo,
+    record.receiptNumber,
+    record.receiptNo,
+    record.referenceNumber,
+    record.referenceNo,
+    record.inwardReceiptNumber,
+    record.outwardReceiptNumber,
+    record.gatePass,
+    record.gatePassNo,
+    record.doNumber,
+    record.cadNo,
+    record.cdfNo,
+    record.weighbridgeSlipNo,
+    record.slipNo,
+    record.batchId,
+    record.lotNo,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      const sanitized = sanitizeTransactionId(candidate, '');
+      if (sanitized) return sanitized;
+    }
+  }
+  return fallback;
+}
+
+/**
  * Parse ISO date string or Date object to Date object, handling timezone correctly
  */
-function parseDate(dateStr: string | Date): Date {
+export function parseDate(dateStr: string | Date): Date {
   if (dateStr instanceof Date) {
     return new Date(Date.UTC(dateStr.getUTCFullYear(), dateStr.getUTCMonth(), dateStr.getUTCDate()));
   }
@@ -154,7 +232,7 @@ function parseDate(dateStr: string | Date): Date {
 /**
  * Format a date to YYYY-MM-DD string, handling both Date objects and strings
  */
-function formatDateToString(date: string | Date): string {
+export function formatDateToString(date: string | Date): string {
   if (date instanceof Date) {
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -170,7 +248,7 @@ function formatDateToString(date: string | Date): string {
 /**
  * Calculate days between two dates (inclusive of start, exclusive of end)
  */
-function calculateDaysDifference(startDate: Date, endDate: Date): number {
+export function calculateDaysDifference(startDate: Date, endDate: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
 }
@@ -178,8 +256,147 @@ function calculateDaysDifference(startDate: Date, endDate: Date): number {
 /**
  * Round to 2 decimal places for currency
  */
-function roundCurrency(value: number): number {
+export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export function normalizeCommodityName(value: string | undefined | null): string {
+  return typeof value === 'string' ? value.trim().toUpperCase() : '';
+}
+
+/**
+ * Consolidates consecutive ledger entries for the same commodity and inward/stock reference
+ * when quantity, rate, and pricing conditions remain unchanged.
+ * - Shows one row with earliest Start Date and latest End Date.
+ * - Recalculates total Days and Rent Amount.
+ * - Keeps separate rows whenever quantity, rate, stock reference, or pricing conditions change.
+ */
+export function consolidateLedgerSteps(rawSteps: LedgerStep[]): LedgerStep[] {
+  if (rawSteps.length === 0) return [];
+
+  // Group steps by commodity
+  const commodityGroups = new Map<string, LedgerStep[]>();
+  for (const step of rawSteps) {
+    const key = normalizeCommodityName(step.commodity);
+    if (!commodityGroups.has(key)) {
+      commodityGroups.set(key, []);
+    }
+    commodityGroups.get(key)!.push(step);
+  }
+
+  const consolidatedList: LedgerStep[] = [];
+
+  for (const steps of commodityGroups.values()) {
+    // Sort steps chronologically
+    steps.sort((a, b) => {
+      const sa = parseDate(a.startDate).getTime();
+      const sb = parseDate(b.startDate).getTime();
+      return sa - sb;
+    });
+
+    const mergedForCommodity: LedgerStep[] = [];
+
+    for (const current of steps) {
+      if (mergedForCommodity.length === 0) {
+        mergedForCommodity.push({ ...current });
+        continue;
+      }
+
+      const prev = mergedForCommodity[mergedForCommodity.length - 1];
+
+      // Check consolidation criteria:
+      // 1. Same commodity
+      const sameCommodity = normalizeCommodityName(prev.commodity) === normalizeCommodityName(current.commodity);
+      // 2. Consecutive dates: prev.endDate === current.startDate
+      const consecutive = prev.endDate === current.startDate;
+      // 3. Same quantity (within floating point precision)
+      const sameQuantity = Math.abs(Number(prev.quantityMT || 0) - Number(current.quantityMT || 0)) < 0.0001;
+      // 4. Same rent rate
+      const sameRate = Math.abs(Number(prev.ratePerDayPerMT || 0) - Number(current.ratePerDayPerMT || 0)) < 0.0001;
+
+      // 5. Inward / Stock Reference check:
+      // If current introduces a new distinct stock reference, keep separate rows.
+      const prevRef = prev.transaction ? sanitizeTransactionId(prev.transaction.transactionId || prev.transaction.receiptNumber || prev.transaction.gatePass, '') : '';
+      const currRef = current.transaction ? sanitizeTransactionId(current.transaction.transactionId || current.transaction.receiptNumber || current.transaction.gatePass, '') : '';
+      const sameStockRef = !currRef || currRef === prevRef;
+
+      if (sameCommodity && consecutive && sameQuantity && sameRate && sameStockRef) {
+        // Consolidate current into prev:
+        // - Earliest start date is prev.startDate (already set)
+        // - Latest end date is current.endDate
+        prev.endDate = current.endDate;
+        // Recalculate total Days and Rent Amount
+        prev.daysDifference = calculateDaysDifference(parseDate(prev.startDate), parseDate(current.endDate));
+        prev.rentAmount = roundCurrency(prev.quantityMT * prev.ratePerDayPerMT * prev.daysDifference);
+        // Preserve inventory balances from the latest step
+        if (current.inventoryBalances) {
+          prev.inventoryBalances = { ...current.inventoryBalances };
+        }
+        // If prev had no transaction and current has one, inherit
+        if (!prev.transaction && current.transaction) {
+          prev.transaction = current.transaction;
+        }
+      } else {
+        mergedForCommodity.push({ ...current });
+      }
+    }
+
+    consolidatedList.push(...mergedForCommodity);
+  }
+
+  // Sort consolidated steps chronologically by startDate
+  consolidatedList.sort((a, b) => {
+    const startA = parseDate(a.startDate).getTime();
+    const startB = parseDate(b.startDate).getTime();
+    if (startA !== startB) return startA - startB;
+
+    const endA = parseDate(a.endDate).getTime();
+    const endB = parseDate(b.endDate).getTime();
+    if (endA !== endB) return endA - endB;
+
+    return (a.commodity || '').localeCompare(b.commodity || '');
+  });
+
+  // Re-number stepNo sequentially
+  consolidatedList.forEach((step, idx) => {
+    step.stepNo = idx + 1;
+  });
+
+  return consolidatedList;
+}
+
+/**
+ * Calculates unique calendar days stored across multiple commodities,
+ * taking the union of overlapping intervals so days are not duplicated.
+ */
+export function calculateTotalDaysStored(steps: LedgerStep[]): number {
+  if (steps.length === 0) return 0;
+
+  const intervals: { start: number; end: number }[] = steps
+    .map((s) => ({
+      start: parseDate(s.startDate).getTime(),
+      end: parseDate(s.endDate).getTime(),
+    }))
+    .filter((inv) => inv.end > inv.start);
+
+  if (intervals.length === 0) return 0;
+
+  intervals.sort((a, b) => a.start - b.start);
+
+  const merged: { start: number; end: number }[] = [intervals[0]];
+  for (let i = 1; i < intervals.length; i++) {
+    const current = intervals[i];
+    const prev = merged[merged.length - 1];
+
+    if (current.start <= prev.end) {
+      prev.end = Math.max(prev.end, current.end);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return merged.reduce((total, inv) => total + Math.ceil((inv.end - inv.start) / msPerDay), 0);
 }
 
 /**
@@ -194,14 +411,15 @@ export function calculateLedger(
   _outstandingInvoices: number = 0,
   commodityRates: Map<string, number> = new Map()
 ): LedgerSummary {
-  // Sort transactions by date
+  const safeClientName = sanitizeClientName(clientName);
+  // Sort transactions by date — guard against missing/invalid date fields.
   const sortedTransactions = [...transactions].sort((a, b) => {
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
+    const ta = a.date ? new Date(a.date).getTime() : 0;
+    const tb = b.date ? new Date(b.date).getTime() : 0;
+    return ta - tb;
   });
 
   void _outstandingInvoices;
-
-  const normalizeCommodityName = (value: string): string => value?.trim().toUpperCase();
 
   // Helper function to get rate for a commodity
   const getRate = (commodityName: string): number => {
@@ -211,14 +429,54 @@ export function calculateLedger(
     return rate;
   };
 
-  const ledgerSteps: LedgerStep[] = [];
+  const commodityDisplayNames = new Map<string, string>();
+  sortedTransactions.forEach((t) => {
+    const norm = normalizeCommodityName(t.commodityName);
+    if (norm && !commodityDisplayNames.has(norm)) {
+      commodityDisplayNames.set(norm, t.commodityName || norm);
+    }
+  });
+
+  // Map transactions by start date and commodity to attach to ledger steps accurately
+  const transactionsByDateAndCommodity = new Map<string, Transaction[]>();
+  for (const txn of sortedTransactions) {
+    const dStr = formatDateToString(txn.date);
+    const cNorm = normalizeCommodityName(txn.commodityName);
+    const key = `${dStr}|${cNorm}`;
+    if (!transactionsByDateAndCommodity.has(key)) {
+      transactionsByDateAndCommodity.set(key, []);
+    }
+    transactionsByDateAndCommodity.get(key)!.push(txn);
+  }
+
+  const getTransactionPayload = (startDateStr: string, commodityNorm: string) => {
+    const key = `${startDateStr}|${commodityNorm}`;
+    const txns = transactionsByDateAndCommodity.get(key);
+    if (!txns || txns.length === 0) return undefined;
+    const latestTxn = txns[txns.length - 1];
+    const resolvedTxId = sanitizeTransactionId(
+      latestTxn.transactionId || latestTxn.receiptNumber || latestTxn.gatePass,
+      '-'
+    );
+    return {
+      id: latestTxn._id,
+      transactionId: resolvedTxId,
+      receiptNumber: latestTxn.receiptNumber,
+      direction: latestTxn.direction,
+      gatePass: latestTxn.gatePass || '',
+      actualWeight: latestTxn.actualWeight,
+      netWeightLoss: latestTxn.netWeightLoss,
+      partyName: latestTxn.partyName,
+    };
+  };
+
+  const rawSteps: LedgerStep[] = [];
   const inventory = new Map<string, number>();
-  let stepNo = 1;
 
   // If no transactions, return empty ledger
   if (sortedTransactions.length === 0) {
     return {
-      clientName,
+      clientName: safeClientName,
       ledgerSteps: [],
       totalRent: 0,
       totalPaid: payments.reduce((sum, p) => sum + p.amount, 0),
@@ -254,28 +512,30 @@ export function calculateLedger(
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 
-        // Calculate rent for this bucket
-        let bucketRent = 0;
-        for (const [commodity, qty] of inventory) {
-          const commodityRate = getRate(commodity);
-          bucketRent += qty * commodityRate * bucketDays;
+        // Option 2: Separate row for each active commodity with qty > 0
+        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty > 0);
+
+        for (const [commodityKey, qty] of activeCommodities) {
+          const commodityRate = getRate(commodityKey);
+          const itemRent = roundCurrency(qty * commodityRate * bucketDays);
+          const displayName = commodityDisplayNames.get(commodityKey) || commodityKey;
+          const startStr = formatDateToString(cursor);
+          const txnPayload = getTransactionPayload(startStr, commodityKey);
+
+          rawSteps.push({
+            stepNo: 0,
+            startDate: startStr,
+            endDate: formatDateToString(bucketEnd),
+            daysDifference: bucketDays,
+            quantityMT: qty,
+            commodity: displayName,
+            inventoryBalances: Object.fromEntries(inventory),
+            ratePerDayPerMT: commodityRate,
+            rentAmount: itemRent,
+            transaction: txnPayload,
+          });
         }
-        const rentAmount = roundCurrency(bucketRent);
-        const totalQuantity = Array.from(inventory.values()).reduce((sum, q) => sum + q, 0);
 
-        ledgerSteps.push({
-          stepNo,
-          startDate: formatDateToString(cursor),
-          endDate: formatDateToString(bucketEnd),
-          daysDifference: bucketDays,
-          quantityMT: totalQuantity,
-          commodity: sortedTransactions[i - 1].commodityName,
-          inventoryBalances: Object.fromEntries(inventory),
-          ratePerDayPerMT: getRate(sortedTransactions[i - 1].commodityName),
-          rentAmount,
-        });
-
-        stepNo++;
         cursor = bucketEnd;
       }
     }
@@ -287,19 +547,6 @@ export function calculateLedger(
       inventory.set(commodity, currentQty + currentTxn.mt);
     } else {
       inventory.set(commodity, Math.max(0, currentQty - currentTxn.mt)); // Prevent negative
-    }
-
-    // Add transaction record
-    const lastStep = ledgerSteps[ledgerSteps.length - 1];
-    if (lastStep) {
-      lastStep.transaction = {
-        id: currentTxn._id,
-        direction: currentTxn.direction,
-        gatePass: currentTxn.gatePass || '',
-        actualWeight: currentTxn.actualWeight,
-        netWeightLoss: currentTxn.netWeightLoss,
-        partyName: currentTxn.partyName,
-      };
     }
   }
 
@@ -321,35 +568,47 @@ export function calculateLedger(
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 
-        let bucketRent = 0;
-        for (const [commodity, qty] of inventory) {
-          const commodityRate = getRate(commodity);
-          bucketRent += qty * commodityRate * bucketDays;
+        // Option 2: Separate row for each active commodity with qty > 0
+        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty > 0);
+
+        for (const [commodityKey, qty] of activeCommodities) {
+          const commodityRate = getRate(commodityKey);
+          const itemRent = roundCurrency(qty * commodityRate * bucketDays);
+          const displayName = commodityDisplayNames.get(commodityKey) || commodityKey;
+          const startStr = formatDateToString(cursor);
+          const txnPayload = getTransactionPayload(startStr, commodityKey);
+
+          rawSteps.push({
+            stepNo: 0,
+            startDate: startStr,
+            endDate: formatDateToString(bucketEnd),
+            daysDifference: bucketDays,
+            quantityMT: qty,
+            commodity: displayName,
+            inventoryBalances: Object.fromEntries(inventory),
+            ratePerDayPerMT: commodityRate,
+            rentAmount: itemRent,
+            transaction: txnPayload,
+          });
         }
 
-        const rentAmount = roundCurrency(bucketRent);
-
-        ledgerSteps.push({
-          stepNo,
-          startDate: formatDateToString(cursor),
-          endDate: formatDateToString(bucketEnd),
-          daysDifference: bucketDays,
-          quantityMT: totalQuantity,
-          commodity: sortedTransactions[sortedTransactions.length - 1].commodityName,
-          inventoryBalances: Object.fromEntries(inventory),
-          ratePerDayPerMT: getRate(sortedTransactions[sortedTransactions.length - 1].commodityName),
-          rentAmount,
-        });
-
-        stepNo++;
         cursor = bucketEnd;
       }
     }
   }
 
+  // Consolidate consecutive entries for the same commodity and inward/stock reference
+  // when quantity, rent rate, and pricing conditions remain unchanged.
+  const ledgerSteps = consolidateLedgerSteps(rawSteps);
+
   // Calculate totals
   const totalRent = roundCurrency(ledgerSteps.reduce((sum, step) => sum + step.rentAmount, 0));
-  const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Guard against undefined date on payments to prevent NaN sort.
+  const sortedPayments = [...payments].sort((a, b) => {
+    const pa = a.date ? new Date(a.date).getTime() : 0;
+    const pb = b.date ? new Date(b.date).getTime() : 0;
+    return pa - pb;
+  });
   const totalPaid = roundCurrency(sortedPayments.reduce((sum, p) => sum + p.amount, 0));
   const rentPaid = roundCurrency(Math.min(totalPaid, totalRent));
 
@@ -360,7 +619,7 @@ export function calculateLedger(
   calculationDate.setHours(0, 0, 0, 0);
 
   return {
-    clientName,
+    clientName: safeClientName,
     ledgerSteps,
     totalRent,
     totalPaid,
@@ -376,24 +635,35 @@ export function calculateLedger(
  */
 export function exportLedgerAsCSV(summary: LedgerSummary): string {
   const lines: string[] = [];
-  
-  lines.push(`Client Name,${summary.clientName}`);
-  lines.push(`Calculation Date,${summary.calculationDate}`);
+  const formatCSVCell = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+  const safeClient = sanitizeClientName(summary.clientName);
+
+  lines.push(`Client Name,${formatCSVCell(safeClient)}`);
+  lines.push(`Calculation Date,${formatCSVCell(summary.calculationDate)}`);
   lines.push('');
   lines.push('LEDGER STEPS');
-  lines.push('Step No,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹)');
+  lines.push('Step No,Commodity,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Transaction Id,Gate Pass');
   
   summary.ledgerSteps.forEach(step => {
-    lines.push(
-      `${step.stepNo},${step.startDate},${step.endDate},${step.daysDifference},${step.quantityMT},${step.ratePerDayPerMT},${step.rentAmount}`
-    );
+    lines.push([
+      step.stepNo,
+      step.commodity || '-',
+      step.startDate,
+      step.endDate,
+      step.daysDifference,
+      step.quantityMT,
+      step.ratePerDayPerMT,
+      step.rentAmount,
+      sanitizeTransactionId(step.transaction?.transactionId, '-'),
+      step.transaction?.gatePass || '-'
+    ].map(formatCSVCell).join(','));
   });
   
   lines.push('');
   lines.push('SUMMARY');
-  lines.push(`Total Rent,${summary.totalRent}`);
-  lines.push(`Total Paid,${summary.totalPaid}`);
-  lines.push(`Outstanding Balance,${summary.balance}`);
+  lines.push(`Total Rent,${formatCSVCell(summary.totalRent)}`);
+  lines.push(`Total Paid,${formatCSVCell(summary.totalPaid)}`);
+  lines.push(`Outstanding Balance,${formatCSVCell(summary.balance)}`);
   
   return lines.join('\n');
 }

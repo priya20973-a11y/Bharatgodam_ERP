@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { sanitizeClientName } from '@/lib/ledger-engine';
 
 interface ClientLedgerCardProps {
   client: any;
@@ -30,15 +31,15 @@ export function ClientLedgerCard({
       <CardHeader className="bg-slate-50 border-b px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle className="text-lg font-semibold text-slate-900">{client.name}</CardTitle>
+            <CardTitle className="text-lg font-semibold text-slate-900">{sanitizeClientName(client.name)}</CardTitle>
             <p className="text-sm text-slate-500">{client.address || client.type || 'Client account'}</p>
           </div>
 
           <div className="flex flex-col sm:items-end gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Outstanding</span>
-              <Badge variant={outstanding > 0 ? 'destructive' : 'secondary'}>
-                ₹{Math.abs(outstanding).toLocaleString('en-IN')}
+              <Badge variant={Number(outstanding || 0) > 0 ? 'destructive' : 'secondary'}>
+                ₹{Math.abs(Number(outstanding || 0)).toLocaleString('en-IN')}
               </Badge>
             </div>
             <div className="flex gap-2 flex-wrap">

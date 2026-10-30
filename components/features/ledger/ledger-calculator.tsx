@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { LedgerSummary, LedgerStep } from '@/lib/ledger-engine';
+import { LedgerSummary, LedgerStep, sanitizeClientName, isMongoObjectId, sanitizeTransactionId } from '@/lib/ledger-engine';
 import { LedgerTable } from './ledger-table';
 import { InvoiceSummary } from './invoice-summary';
 import { CommodityTransactionTimeline } from './transaction-timeline';
@@ -52,7 +52,7 @@ interface LedgerCalculatorProps {
 
 export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   clientId,
-  clientName = clientId,
+  clientName,
   showInvoiceAdjustments = false,
 }) => {
   // Prevent rendering if clientId is empty
@@ -66,14 +66,27 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
   const [transactions, setTransactions] = useState<any[]>([]);
   const [lineItems, setLineItems] = useState<any[]>([]);
 
+  // Safely resolve the human-readable client name, never displaying a MongoDB ObjectId
+  const displayClientName = useMemo(() => {
+    const fromData = sanitizeClientName(ledgerData?.clientName, '');
+    if (fromData) return fromData;
+    const fromProp = sanitizeClientName(clientName, '');
+    if (fromProp) return fromProp;
+    return 'Unknown Client';
+  }, [ledgerData?.clientName, clientName]);
+
   const warehouseBreakdowns = ledgerData?.warehouseBreakdowns ?? [];
   const showWarehouseBreakdowns = warehouseBreakdowns.length > 0;
 
-  const formatDecimal = (value: number) =>
-    value.toLocaleString(undefined, {
+  const formatDecimal = (value: any) => {
+    if (value === null || value === undefined || value === '') return '0.00';
+    const num = Number(value);
+    if (Number.isNaN(num)) return '0.00';
+    return num.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
 
   const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
@@ -168,34 +181,43 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       return;
     }
 
-    // Generate CSV
+    const safeClient = displayClientName;
+    const formatCSVCell = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+    // Generate CSV with proper escaping for currency values containing commas
     const lines: string[] = [];
-    lines.push(`Client Name,${ledgerData.clientName}`);
-    lines.push(`Calculation Date,${ledgerData.calculationDate}`);
+    lines.push(`Client Name,${formatCSVCell(safeClient)}`);
+    lines.push(`Calculation Date,${formatCSVCell(ledgerData.calculationDate)}`);
     if (ledgerData.isAggregated && ledgerData.matchedRecords) {
-      lines.push(`Aggregated Records,${ledgerData.recordCount || 1}`);
+      lines.push(`Aggregated Records,${formatCSVCell(ledgerData.recordCount || 1)}`);
       ledgerData.matchedRecords.forEach((record) => {
-        lines.push(`  - ${record.clientName} (${record.date})`);
+        const recClient = sanitizeClientName(record.clientName, safeClient);
+        lines.push(`  - ${recClient} (${record.date || ''})`);
       });
     }
     lines.push('');
     lines.push('LEDGER STEPS');
-    lines.push(
-      'Step No,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹)'
-    );
+    // Single, well-aligned header row (11 columns matching data rows exactly)
+    lines.push('Step No,Commodity,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Rent Days,Transaction Id,Transaction GatePass');
 
-    // Optionally filter ledger steps by selected month
     const stepsToExport = ledgerData.ledgerSteps;
-
-    lines.push('Step No,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Rent Days,Transaction Id,Transaction GatePass');
     stepsToExport.forEach((step) => {
-      const txId = step.transaction?.id || '';
-      const gatePass = step.transaction?.gatePass || '';
-      lines.push(
-        `${step.stepNo},${step.startDate},${step.endDate},${step.daysDifference},${formatDecimal(
-          step.quantityMT
-        )},${formatDecimal(step.ratePerDayPerMT)},${formatDecimal(step.rentAmount)},${step.daysDifference || ''},${txId},${gatePass}`
-      );
+      const txId = sanitizeTransactionId(step.transaction?.transactionId, '-');
+      const rawGatePass = step.transaction?.gatePass || '';
+      const gatePass = isMongoObjectId(rawGatePass) ? '-' : (rawGatePass || '-');
+      lines.push([
+        step.stepNo,
+        step.commodity || '-',
+        step.startDate,
+        step.endDate,
+        step.daysDifference,
+        formatDecimal(step.quantityMT),
+        formatDecimal(step.ratePerDayPerMT),
+        formatDecimal(step.rentAmount),
+        step.daysDifference || '',
+        txId,
+        gatePass
+      ].map(formatCSVCell).join(','));
     });
 
     lines.push('');
@@ -205,27 +227,31 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       : ledgerData.rentPaid !== undefined
         ? Math.max(ledgerData.totalRent - ledgerData.rentPaid, 0)
         : ledgerData.balance;
+
     lines.push('SUMMARY');
-    lines.push(`Total Rent,${formatDecimal(ledgerData.totalRent)}`);
-    lines.push(`Total Paid,${formatDecimal(displayTotalPaid)}`);
+    lines.push(`Total Rent,${formatCSVCell(formatDecimal(ledgerData.totalRent))}`);
+    lines.push(`Total Paid,${formatCSVCell(formatDecimal(displayTotalPaid))}`);
     if (showInvoiceAdjustments && adjustmentInvoices.length > 0) {
-      lines.push(`Total Additional Charges,${formatDecimal(totalAdditionalCharges)}`);
+      lines.push(`Total Additional Charges,${formatCSVCell(formatDecimal(totalAdditionalCharges))}`);
     }
-    lines.push(`Outstanding Balance,${formatDecimal(displayTotalBalance)}`);
+    lines.push(`Outstanding Balance,${formatCSVCell(formatDecimal(displayTotalBalance))}`);
 
     if (showInvoiceAdjustments && adjustmentInvoices.length > 0) {
       lines.push('');
       lines.push('INVOICE ADJUSTMENTS');
-      lines.push('Invoice Id,Invoice Month,Status,Invoice Amount,Additional Charges,Total Invoice Amount');
+      lines.push('Invoice Id,Invoice Month,Status,Invoice Amount (₹),Additional Charges (₹),Total Invoice Amount (₹)');
       adjustmentInvoices.forEach((invoice) => {
-        lines.push(
-          `${invoice.invoiceId},${invoice.invoiceMonth || ''},${invoice.status || ''},${formatDecimal(
-            invoice.totalAmount
-          )},${formatDecimal(invoice.additionalCharges)},${formatDecimal(invoice.totalInvoiceAmount)}`
-        );
+        lines.push([
+          invoice.invoiceId,
+          invoice.invoiceMonth || '',
+          invoice.status || '',
+          formatDecimal(invoice.totalAmount),
+          formatDecimal(invoice.additionalCharges),
+          formatDecimal(invoice.totalInvoiceAmount)
+        ].map(formatCSVCell).join(','));
       });
       if (ledgerData.invoiceOutstandingTotal !== undefined) {
-        lines.push(`Total Invoice Outstanding,${formatDecimal(ledgerData.invoiceOutstandingTotal)}`);
+        lines.push(`Total Invoice Outstanding,${formatCSVCell(formatDecimal(ledgerData.invoiceOutstandingTotal))}`);
       }
     }
 
@@ -235,7 +261,8 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     const a = document.createElement('a');
     a.href = url;
     const datePart = new Date().toISOString().split('T')[0];
-    a.download = `ledger-${clientId}-${datePart}.csv`;
+    const safeFilenamePart = safeClient.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    a.download = `ledger-${safeFilenamePart}-${datePart}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     
@@ -269,7 +296,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
         <div>
           <h1 className="text-3xl font-black text-slate-900">Ledger Report</h1>
           <p className="text-slate-600 mt-1">
-            {clientName} - {ledgerData?.calculationDate || 'Loading...'}
+            {displayClientName} - {ledgerData?.calculationDate || 'Loading...'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -431,10 +458,12 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
                         .filter((step) => step.transaction)
                         .map((step) => ({
                           _id: step.transaction?.id || '',
+                          transactionId: sanitizeTransactionId(step.transaction?.transactionId, '-'),
+                          receiptNumber: step.transaction?.receiptNumber,
                           date: step.startDate,
                           direction: step.transaction?.direction || 'INWARD',
                           mt: step.quantityMT,
-                          clientName: ledgerData.clientName,
+                          clientName: displayClientName,
                           commodityName: step.commodity || 'Various',
                           gatePass: step.transaction?.gatePass || '',
                           rentAmount: step.rentAmount,
@@ -489,7 +518,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
           {ledgerData && (
             <PaymentHistory
               payments={ledgerData.paymentHistory}
-              clientName={ledgerData.clientName}
+              clientName={displayClientName}
               accountId={clientId}
               isLoading={isLoading}
               onPaymentAdded={fetchLedger}

@@ -15,6 +15,7 @@ export interface ClientMonthlyLedgerRow {
   fromDate: string;
   toDate: string;
   qty: number;
+  bags?: number | string;
   days: number;
   rent: number;
   status: string;
@@ -436,6 +437,7 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
         fromDate: row.startDate,
         toDate: row.endDate,
         qty: roundedQty,
+        bags: row.bags || '',
         days: row.daysTotal,
         rent: roundCurrency(row.rentTotal || 0),
         status: row.status,

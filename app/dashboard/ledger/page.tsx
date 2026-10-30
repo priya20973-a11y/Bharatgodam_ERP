@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getClients } from '@/app/actions/client-actions';
 import { useSession } from 'next-auth/react';
 import { LedgerCalculator } from '@/components/features/ledger';
+import { sanitizeClientName, sanitizeTransactionId } from '@/lib/ledger-engine';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -264,7 +265,7 @@ export default function LedgerDashboard() {
         <div className="space-y-6">
           <LedgerCalculator
             clientId={selectedClient._id}
-            clientName={selectedClient.name}
+            clientName={sanitizeClientName(selectedClient.name)}
             showInvoiceAdjustments={true}
           />
         </div>
@@ -361,51 +362,57 @@ export default function LedgerDashboard() {
                 disabled={!selectedWarehouseId || warehouseLoading || !warehouseReport}
                 onClick={() => {
                   if (!warehouseReport) return;
+                  const formatCSVValue = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
                   const lines: string[] = [];
                   lines.push('Warehouse Ledger Report');
-                  lines.push(`Warehouse Name,${warehouseReport.warehouseName}`);
-                  lines.push(`Generated At,${new Date().toISOString()}`);
-                  lines.push(`Total Clients,${filteredSummary.totalClients}`);
-                  lines.push(`Total Commodities,${selectedMonthKey === 'all' ? warehouseReport.totalCommodities : filteredCommoditySummaries.length}`);
-                  lines.push(`Total Inward (MT),${filteredSummary.totalInwardMT}`);
-                  lines.push(`Total Outward (MT),${filteredSummary.totalOutwardMT}`);
-                  lines.push(`Net Balance (MT),${filteredSummary.netMT}`);
+                  lines.push(`Warehouse Name,${formatCSVValue(warehouseReport.warehouseName)}`);
+                  lines.push(`Generated At,${formatCSVValue(new Date().toISOString())}`);
+                  lines.push(`Total Clients,${formatCSVValue(filteredSummary.totalClients)}`);
+                  lines.push(`Total Commodities,${formatCSVValue(selectedMonthKey === 'all' ? warehouseReport.totalCommodities : filteredCommoditySummaries.length)}`);
+                  lines.push(`Total Inward (MT),${formatCSVValue(filteredSummary.totalInwardMT)}`);
+                  lines.push(`Total Outward (MT),${formatCSVValue(filteredSummary.totalOutwardMT)}`);
+                  lines.push(`Net Balance (MT),${formatCSVValue(filteredSummary.netMT)}`);
                   lines.push('');
                   lines.push('Transaction Date,Client,Commodity,Direction,MT,Source,Transaction ID');
 
                   (filteredTransactionRecords || []).forEach((tx: any) => {
+                    const businessTxId = sanitizeTransactionId(tx.transactionId || tx.receiptNumber, '-');
                     lines.push([
                       tx.date || '',
-                      tx.clientName || '',
+                      sanitizeClientName(tx.clientName),
                       tx.commodityName || '',
                       tx.direction || '',
                       Number(tx.mt || 0).toFixed(2),
                       tx.source || 'ledger',
-                      tx._id || '',
-                    ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+                      businessTxId,
+                    ].map(formatCSVValue).join(','));
                   });
 
                   lines.push('');
                   lines.push('Client,Commodity,Inward MT,Outward MT,Balance MT,Total Rent (₹),Current Inventory (MT),Transaction Count');
                   (selectedMonthKey === 'all' ? warehouseReport.clientLedgerSummaries : filteredClientSummaries || []).forEach((row: any) => {
                     lines.push([
-                      row.clientName,
-                      row.commodityName,
+                      sanitizeClientName(row.clientName),
+                      row.commodityName || '',
                       Number(row.inwardMT || 0).toFixed(2),
                       Number(row.outwardMT || 0).toFixed(2),
                       Number(row.balanceMT || 0).toFixed(2),
                       Number(row.totalRent || 0).toFixed(2),
                       Number(row.currentInventory || 0).toFixed(2),
                       row.transactionCount || 0,
-                    ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
+                    ].map(formatCSVValue).join(','));
                   });
 
                   lines.push('');
                   lines.push('Commodity,Inward MT,Outward MT,Net MT,Client Count');
                   (selectedMonthKey === 'all' ? warehouseReport.commoditySummaries : filteredCommoditySummaries).forEach((commodity: any) => {
-                    lines.push(
-                      `${commodity.commodityName},${commodity.inwardMT.toFixed(2)},${commodity.outwardMT.toFixed(2)},${commodity.balanceMT.toFixed(2)},${commodity.clientCount}`
-                    );
+                    lines.push([
+                      commodity.commodityName || '',
+                      Number(commodity.inwardMT || 0).toFixed(2),
+                      Number(commodity.outwardMT || 0).toFixed(2),
+                      Number(commodity.balanceMT || 0).toFixed(2),
+                      commodity.clientCount || 0,
+                    ].map(formatCSVValue).join(','));
                   });
 
                   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -452,7 +459,7 @@ export default function LedgerDashboard() {
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <p className="text-sm text-slate-500">Net balance (MT)</p>
-                  <p className="mt-2 text-lg font-semibold text-slate-900">{filteredSummary.netMT.toFixed(2)}</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{Number(filteredSummary?.netMT || 0).toFixed(2)}</p>
                 </div>
               </div>
 
@@ -476,11 +483,11 @@ export default function LedgerDashboard() {
                     <tbody>
                       {(selectedMonthKey === 'all' ? warehouseReport.clientSummaries : filteredClientSummaries).map((row: any) => (
                         <tr key={`${row.clientName}-${row.commodityName}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-900">{row.clientName}</td>
+                          <td className="px-4 py-3 text-slate-900">{sanitizeClientName(row.clientName)}</td>
                           <td className="px-4 py-3 text-slate-700">{row.commodityName}</td>
-                          <td className="px-4 py-3 text-right text-green-700">{row.inwardMT.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-red-700">{row.outwardMT.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{row.balanceMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-green-700">{Number(row.inwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-red-700">{Number(row.outwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(row.balanceMT || 0).toFixed(2)}</td>
                           <td className="px-4 py-3 text-right text-slate-700">{row.transactionCount}</td>
                         </tr>
                       ))}
@@ -511,7 +518,7 @@ export default function LedgerDashboard() {
                     <tbody>
                       {filteredClientLedgerSummaries.map((item: any) => (
                         <tr key={`${item.clientName}-${item.commodityName}-detail`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-900">{item.clientName}</td>
+                          <td className="px-4 py-3 text-slate-900">{sanitizeClientName(item.clientName)}</td>
                           <td className="px-4 py-3 text-slate-700">{item.commodityName}</td>
                           <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(item.totalRent || 0).toFixed(2)}</td>
                           <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(item.currentInventory || 0).toFixed(2)}</td>
@@ -546,9 +553,9 @@ export default function LedgerDashboard() {
                       {filteredCommoditySummaries.map((commodity: any) => (
                         <tr key={commodity.commodityName} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-3 text-slate-900">{commodity.commodityName}</td>
-                          <td className="px-4 py-3 text-right text-green-700">{commodity.inwardMT.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-red-700">{commodity.outwardMT.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{commodity.balanceMT.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-green-700">{Number(commodity.inwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-red-700">{Number(commodity.outwardMT || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">{Number(commodity.balanceMT || 0).toFixed(2)}</td>
                           <td className="px-4 py-3 text-right text-slate-700">{commodity.clientCount}</td>
                         </tr>
                       ))}
@@ -584,7 +591,7 @@ export default function LedgerDashboard() {
                     </div>
                     <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">{client.name}</h3>
+                  <h3 className="text-xl font-bold text-slate-900">{sanitizeClientName(client.name)}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">{client.clientType || client.type || 'CLIENT'}</Badge>
                     <p className="text-xs text-slate-400 font-medium">{client.mobile}</p>

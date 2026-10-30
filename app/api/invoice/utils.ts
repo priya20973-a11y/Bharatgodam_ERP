@@ -415,6 +415,8 @@ export async function findInvoiceMasterByIdentifier(
           invoiceWarehouseId
         );
 
+        const isMultiWh = Boolean(invoiceWarehouseId && invoiceWarehouseId.includes(','));
+
         if (exactWarehouseMatch) {
           invoiceMaster = await db
             .collection('invoice_master')
@@ -425,7 +427,9 @@ export async function findInvoiceMasterByIdentifier(
             });
         }
 
-        if (!invoiceMaster) {
+        // Only fall back to partial warehouse match for single-warehouse requests.
+        // For multiple warehouses, do not pick an arbitrary single-warehouse invoice master.
+        if (!invoiceMaster && !isMultiWh) {
           const query: any = {
             ...baseQuery,
             invoiceMonth,
@@ -436,7 +440,7 @@ export async function findInvoiceMasterByIdentifier(
             .findOne(query);
         }
 
-        if (!invoiceMaster) {
+        if (!invoiceMaster && !isMultiWh) {
           const legacyQuery: any = {
             ...baseQuery,
             month: invoiceMonth,
@@ -861,7 +865,39 @@ export async function buildMonthlyInvoiceFromLedger(
     return null;
   }
 
-  const ledgerInvoice = ledgerResult.data.months[0];
+  const matchingMonths = (ledgerResult.data?.months || []).filter(
+    (m: any) => m.month === invoiceMonth || m.month.startsWith(invoiceMonth)
+  );
+
+  if (!matchingMonths.length) {
+    return null;
+  }
+
+  const combinedRows = matchingMonths.flatMap((m: any) => m.rows || []);
+  const combinedTotalRent = Math.round(
+    matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.totalRent ?? 0), 0) * 100
+  ) / 100;
+  const combinedPreviousBalance = Math.round(
+    Number(matchingMonths[0].summary?.previousBalance ?? 0) * 100
+  ) / 100;
+  const combinedPayments = Math.round(
+    matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.payments ?? 0), 0) * 100
+  ) / 100;
+  const combinedOutstanding = Math.round(
+    matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.outstanding ?? 0), 0) * 100
+  ) / 100;
+
+  const ledgerInvoice = {
+    ...matchingMonths[0],
+    rows: combinedRows,
+    summary: {
+      ...matchingMonths[0].summary,
+      totalRent: combinedTotalRent,
+      previousBalance: combinedPreviousBalance,
+      payments: combinedPayments,
+      outstanding: combinedOutstanding,
+    },
+  };
 
   const client = await findClientDocument(
     db,
@@ -1028,10 +1064,33 @@ export async function buildMonthlyInvoiceFromLedger(
     tenantFilter
   );
 
-  const transactionRows = transformTransactionsToBillingRows(
+  let transactionRows = transformTransactionsToBillingRows(
     transactions,
     invoiceMonth
   );
+
+  if ((!transactionRows || !transactionRows.length) && isMultipleWarehouses) {
+    const fallbackRows: any[] = [];
+    for (const singleWarehouseId of warehouseIdsArray) {
+      const partialTransactions = await getTransactionsForInvoiceMonth(
+        db,
+        clientId,
+        singleWarehouseId,
+        invoiceMonth,
+        tenantFilter
+      );
+      const partialRows = transformTransactionsToBillingRows(
+        partialTransactions,
+        invoiceMonth
+      );
+      if (partialRows.length) {
+        fallbackRows.push(...partialRows);
+      }
+    }
+    if (fallbackRows.length) {
+      transactionRows = fallbackRows;
+    }
+  }
 
   // Use transaction rows for display (shows INWARD/OUTWARD direction),
   // but use ledger totals for the summary (matches dashboard calculation).
@@ -1047,6 +1106,9 @@ export async function buildMonthlyInvoiceFromLedger(
           status: item.status || 'COMPLETED',
           commodityName: item.commodity || '',
           rate: Number(item.rate ?? 0),
+          warehouseName: item.warehouseName || '',
+          warehouseId: item.warehouseId || '',
+          bags: item.bags || '',
         }));
 
   const previousBalance = Number(
@@ -1410,6 +1472,7 @@ function buildOpeningBalanceRows(
     {
       commodityName: string;
       warehouseName: string;
+      warehouseId?: string;
       quantityMT: number;
       bags: number;
       ratePerDay: number;
@@ -1444,6 +1507,7 @@ function buildOpeningBalanceRows(
       balanceMap.set(commodityKey, {
         commodityName: txn.commodityName || 'Unknown',
         warehouseName: txn.warehouseName || 'Unknown',
+        warehouseId: txn.warehouseId ? String(txn.warehouseId) : undefined,
         quantityMT,
         bags,
         ratePerDay: ratePerDay || 0,
@@ -1475,6 +1539,7 @@ function buildOpeningBalanceRows(
       endDate: billingEndDateStr,
       commodityName: balance.commodityName,
       warehouseName: balance.warehouseName,
+      warehouseId: balance.warehouseId,
       quantityMT: balance.quantityMT,
       quantity: balance.quantityMT,
       bags: balance.bags || '',
@@ -1593,6 +1658,7 @@ export function transformTransactionsToBillingRows(
           endDate,
           commodityName: txn.commodityName || 'Unknown',
           warehouseName: txn.warehouseName || 'Unknown',
+          warehouseId: txn.warehouseId ? String(txn.warehouseId) : undefined,
           quantityMT,
           quantity: quantityMT,
           bags: bagCountValue,
@@ -1638,20 +1704,36 @@ export async function resolveMonthlyInvoiceFromId(
 
   const isTransactionMode = invoiceMode === 'transactions';
 
+  let resolvedWh = warehouseId;
+  if (!resolvedWh && id?.includes('-')) {
+    const parts = id.split('-');
+    if (parts.length >= 4) {
+      resolvedWh = parts.slice(3).join('-');
+    }
+  }
+
+  const isMultiWh = Boolean(resolvedWh && resolvedWh.includes(','));
+
   const invoiceMaster =
     await findInvoiceMasterByIdentifier(
       db,
       id,
       tenantFilter,
       isTransactionMode ? 'transactions' : undefined,
-      warehouseId
+      resolvedWh
     );
+
+  // If multiple warehouses were requested, but the matched master only covers a single warehouse,
+  // do not use that single warehouse invoice master for this combined request.
+  const effectiveInvoiceMaster = (isMultiWh && invoiceMaster && (!invoiceMaster.warehouseIds || invoiceMaster.warehouseIds.length <= 1))
+    ? null
+    : invoiceMaster;
 
   async function tryBuildTransactionInvoice(invoiceIdentifier: string) {
     return await buildMonthlyInvoiceFromTransactions(
       db,
       invoiceIdentifier,
-      warehouseId,
+      resolvedWh,
       tenantFilter
     );
   }
@@ -1660,7 +1742,7 @@ export async function resolveMonthlyInvoiceFromId(
     return await buildMonthlyInvoiceFromLedger(
       db,
       id,
-      warehouseId,
+      resolvedWh,
       tenantFilter
     );
   }
@@ -1679,14 +1761,14 @@ export async function resolveMonthlyInvoiceFromId(
     return null;
   }
 
-  if (invoiceMaster?.invoiceType === 'transaction') {
+  if (effectiveInvoiceMaster?.invoiceType === 'transaction') {
     // Prefer ledger — it matches dashboard calculation.
     const ledgerInvoice = await tryBuildLedgerInvoice();
     if (ledgerInvoice) {
       return ledgerInvoice;
     }
     const invoiceIdentifier =
-      buildTransactionInvoiceIdentifierFromMaster(invoiceMaster) || id;
+      buildTransactionInvoiceIdentifierFromMaster(effectiveInvoiceMaster) || id;
     const transactionInvoice = await tryBuildTransactionInvoice(
       invoiceIdentifier
     );
@@ -1696,7 +1778,7 @@ export async function resolveMonthlyInvoiceFromId(
     return null;
   }
 
-  if (!invoiceMaster && looksLikeTransactionInvoiceIdentifier(id)) {
+  if (!effectiveInvoiceMaster && (looksLikeTransactionInvoiceIdentifier(id) || isMultiWh)) {
     // Try ledger first — it matches dashboard calculation.
     // Only fall back to transaction-based if ledger returns nothing.
     const ledgerInvoice = await tryBuildLedgerInvoice();
@@ -1712,7 +1794,7 @@ export async function resolveMonthlyInvoiceFromId(
   const adjustments = await findInvoiceAdjustments(
     db,
     id,
-    invoiceMaster?._id?.toString()
+    effectiveInvoiceMaster?._id?.toString()
   );
 
   const additionalChargeItems =
@@ -1721,15 +1803,15 @@ export async function resolveMonthlyInvoiceFromId(
   const additionalCharges =
     sumAdjustmentItems(additionalChargeItems);
 
-  if (invoiceMaster) {
+  if (effectiveInvoiceMaster) {
     const client = await db.collection('clients').findOne({
-      _id: invoiceMaster.clientId,
+      _id: effectiveInvoiceMaster.clientId,
       ...tenantFilter,
     });
 
     const { warehouse, warehouses } = await resolveInvoiceMasterWarehouses(
       db,
-      invoiceMaster,
+      effectiveInvoiceMaster,
       tenantFilter
     );
 
@@ -1738,36 +1820,35 @@ export async function resolveMonthlyInvoiceFromId(
     if (
       !warehouse &&
       !(
-        Array.isArray(invoiceMaster.warehouseIds) &&
-        invoiceMaster.warehouseIds.length > 0
+        Array.isArray(effectiveInvoiceMaster.warehouseIds) &&
+        effectiveInvoiceMaster.warehouseIds.length > 0
       )
     ) {
       return null;
     }
 
-    const invoiceWarehouseId = invoiceMaster.warehouseId
-      ? invoiceMaster.warehouseId.toString?.()
-        ? invoiceMaster.warehouseId.toString()
-        : String(invoiceMaster.warehouseId)
-      : Array.isArray(invoiceMaster.warehouseIds) &&
-        invoiceMaster.warehouseIds.length > 0
-      ? invoiceMaster.warehouseIds
+    const invoiceWarehouseId = effectiveInvoiceMaster.warehouseId
+      ? effectiveInvoiceMaster.warehouseId.toString?.()
+        ? effectiveInvoiceMaster.warehouseId.toString()
+        : String(effectiveInvoiceMaster.warehouseId)
+      : Array.isArray(effectiveInvoiceMaster.warehouseIds) &&
+        effectiveInvoiceMaster.warehouseIds.length > 0
+      ? effectiveInvoiceMaster.warehouseIds
           .map((id: any) =>
             id?.toString?.() ? id.toString() : String(id || '')
           )
           .filter(Boolean)
           .join(',')
-      : undefined;
+      : resolvedWh || undefined;
 
-    const invoiceWarehouseName = Array.isArray(invoiceMaster.warehouseIds) &&
-      invoiceMaster.warehouseIds.length > 1
+    const invoiceWarehouseName = (Array.isArray(effectiveInvoiceMaster.warehouseIds) && effectiveInvoiceMaster.warehouseIds.length > 1) || (warehouses && warehouses.length > 1)
       ? 'Multiple Warehouses'
       : warehouse?.name || '';
 
     const lineItems = await db
       .collection('invoice_line_items')
       .find({
-        invoiceMasterId: invoiceMaster._id,
+        invoiceMasterId: effectiveInvoiceMaster._id,
       })
       .toArray();
 
@@ -1775,20 +1856,20 @@ export async function resolveMonthlyInvoiceFromId(
       (await resolveInvoiceCompanyProfile(
         db,
         warehouse,
-        invoiceMaster
+        effectiveInvoiceMaster
       )) || {};
 
     let ledgerInvoice: any = null;
 
     if (
-      invoiceMaster.clientId &&
+      effectiveInvoiceMaster.clientId &&
       invoiceWarehouseId &&
-      invoiceMaster.invoiceMonth
+      effectiveInvoiceMaster.invoiceMonth
     ) {
       const ledgerResult =
         await getClientMonthlyLedger(
-          invoiceMaster.clientId.toString(),
-          invoiceMaster.invoiceMonth,
+          effectiveInvoiceMaster.clientId.toString(),
+          effectiveInvoiceMaster.invoiceMonth,
           invoiceWarehouseId,
           tenantFilter
         );
@@ -1797,8 +1878,36 @@ export async function resolveMonthlyInvoiceFromId(
         ledgerResult.success &&
         ledgerResult.data?.months?.length
       ) {
-        ledgerInvoice =
-          ledgerResult.data.months[0];
+        const matchingMonths = ledgerResult.data.months.filter(
+          (m: any) => m.month === effectiveInvoiceMaster.invoiceMonth || m.month.startsWith(effectiveInvoiceMaster.invoiceMonth)
+        );
+        if (matchingMonths.length > 0) {
+          const combinedRows = matchingMonths.flatMap((m: any) => m.rows || []);
+          const combinedTotalRent = Math.round(
+            matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.totalRent ?? 0), 0) * 100
+          ) / 100;
+          const combinedPreviousBalance = Math.round(
+            Number(matchingMonths[0].summary?.previousBalance ?? 0) * 100
+          ) / 100;
+          const combinedPayments = Math.round(
+            matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.payments ?? 0), 0) * 100
+          ) / 100;
+          const combinedOutstanding = Math.round(
+            matchingMonths.reduce((sum: number, m: any) => sum + Number(m.summary?.outstanding ?? 0), 0) * 100
+          ) / 100;
+
+          ledgerInvoice = {
+            ...matchingMonths[0],
+            rows: combinedRows,
+            summary: {
+              ...matchingMonths[0].summary,
+              totalRent: combinedTotalRent,
+              previousBalance: combinedPreviousBalance,
+              payments: combinedPayments,
+              outstanding: combinedOutstanding,
+            },
+          };
+        }
       }
     }
 
@@ -1806,9 +1915,9 @@ export async function resolveMonthlyInvoiceFromId(
     const transactions =
       await getTransactionsForInvoiceMonth(
         db,
-        invoiceMaster.clientId,
+        effectiveInvoiceMaster.clientId,
         invoiceWarehouseId,
-        invoiceMaster.invoiceMonth,
+        effectiveInvoiceMaster.invoiceMonth,
         tenantFilter
       );
 
@@ -1816,7 +1925,7 @@ export async function resolveMonthlyInvoiceFromId(
     const billingRows =
       transformTransactionsToBillingRows(
         transactions,
-        invoiceMaster.invoiceMonth
+        effectiveInvoiceMaster.invoiceMonth
       );
 
     // Calculate total rent from billing rows
@@ -1830,9 +1939,9 @@ export async function resolveMonthlyInvoiceFromId(
     // DEBUG: show transaction rows count and a small sample to help diagnose rendering
     try {
       console.log('[resolveMonthlyInvoiceFromId] transactionRows:', {
-        invoiceId: invoiceMaster?.invoiceId || id,
-        clientId: invoiceMaster?.clientId?.toString?.(),
-        warehouseId: invoiceMaster?.warehouseId?.toString?.(),
+        invoiceId: effectiveInvoiceMaster?.invoiceId || id,
+        clientId: effectiveInvoiceMaster?.clientId?.toString?.(),
+        warehouseId: effectiveInvoiceMaster?.warehouseId?.toString?.(),
         count: transactionRows.length,
         sample: transactionRows.slice(0, 3),
       });
@@ -1842,7 +1951,7 @@ export async function resolveMonthlyInvoiceFromId(
 
     if (ledgerInvoice) {
       const [yearPart, monthPart] =
-        invoiceMaster.invoiceMonth.split('-');
+        effectiveInvoiceMaster.invoiceMonth.split('-');
 
       const month =
         monthNames[Number(monthPart) - 1] ||
@@ -1863,12 +1972,12 @@ export async function resolveMonthlyInvoiceFromId(
       // Use transaction rows for display so INWARD/OUTWARD entries appear.
       const totalRent = Number(
         ledgerInvoice.summary.totalRent ??
-          invoiceMaster.totalAmount ??
+          effectiveInvoiceMaster.totalAmount ??
           0
       );
       const newBalance = Number(
         ledgerInvoice.summary.outstanding ??
-          invoiceMaster.totalAmount ??
+          effectiveInvoiceMaster.totalAmount ??
           0
       );
 
@@ -1889,15 +1998,18 @@ export async function resolveMonthlyInvoiceFromId(
                 commodityName:
                   item.commodity || '',
                 rate: Number(item.rate ?? 0),
+                warehouseName: item.warehouseName || '',
+                warehouseId: item.warehouseId || '',
+                bags: item.bags || '',
               })
             );
 
       return {
         bookingId:
-          invoiceMaster.clientId?.toString() ||
+          effectiveInvoiceMaster.clientId?.toString() ||
           id,
         invoiceNumber:
-          invoiceMaster.invoiceId || id,
+          effectiveInvoiceMaster.invoiceId || id,
         clientName:
           client.name || client.clientName || '',
         panNumber: resolveClientPan(client),
@@ -1907,8 +2019,9 @@ export async function resolveMonthlyInvoiceFromId(
         periods: displayPeriods,
         transactions: displayPeriods,
         warehouseId:
-          invoiceMaster.warehouseId?.toString(),
-        warehouseName: warehouse.name || '',
+          invoiceWarehouseId || effectiveInvoiceMaster.warehouseId?.toString(),
+        warehouseName: invoiceWarehouseName,
+        warehouses: warehouses,
         ...companyProfile,
         totalRent,
         previousBalance,
@@ -1916,17 +2029,17 @@ export async function resolveMonthlyInvoiceFromId(
         newBalance,
         additionalCharges,
         additionalChargeItems,
-        billingState: invoiceMaster.billingState || '',
-        taxGroup: invoiceMaster.taxGroup || 'No Tax',
-        taxType: invoiceMaster.taxType || '',
-        cgstAmount: Number(invoiceMaster.cgstAmount || 0),
-        sgstAmount: Number(invoiceMaster.sgstAmount || 0),
-        igstAmount: Number(invoiceMaster.igstAmount || 0),
-        totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
-        adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
-        notes: invoiceMaster.notes || '',
+        billingState: effectiveInvoiceMaster.billingState || '',
+        taxGroup: effectiveInvoiceMaster.taxGroup || 'No Tax',
+        taxType: effectiveInvoiceMaster.taxType || '',
+        cgstAmount: Number(effectiveInvoiceMaster.cgstAmount || 0),
+        sgstAmount: Number(effectiveInvoiceMaster.sgstAmount || 0),
+        igstAmount: Number(effectiveInvoiceMaster.igstAmount || 0),
+        totalTaxAmount: Number(effectiveInvoiceMaster.totalTaxAmount || 0),
+        adjustmentAmount: Number(effectiveInvoiceMaster.adjustmentAmount || 0),
+        notes: effectiveInvoiceMaster.notes || '',
         invoiceDate:
-          invoiceMaster.generatedAt
+          effectiveInvoiceMaster.generatedAt
             ?.toISOString()
             .split('T')[0] ||
           new Date().toISOString().split('T')[0],
@@ -1934,7 +2047,7 @@ export async function resolveMonthlyInvoiceFromId(
     }
 
     const [yearPart, monthPart] =
-      invoiceMaster.invoiceMonth.split('-');
+      effectiveInvoiceMaster.invoiceMonth.split('-');
 
     const month =
       monthNames[Number(monthPart) - 1] ||
@@ -1963,6 +2076,9 @@ export async function resolveMonthlyInvoiceFromId(
             status: item.status || 'COMPLETED',
             commodityName:
               item.commodityName || '',
+            warehouseName: item.warehouseName || '',
+            warehouseId: item.warehouseId || '',
+            bags: item.bags || '',
           }));
 
     const totalRentFromPeriods = billingPeriods.reduce(
@@ -1973,9 +2089,9 @@ export async function resolveMonthlyInvoiceFromId(
 
     return {
       bookingId:
-        invoiceMaster._id?.toString() || id,
+        effectiveInvoiceMaster._id?.toString() || id,
       invoiceNumber:
-        invoiceMaster.invoiceId || id,
+        effectiveInvoiceMaster.invoiceId || id,
       clientName:
         client.name || client.clientName || '',
       panNumber: resolveClientPan(client),
@@ -1985,8 +2101,9 @@ export async function resolveMonthlyInvoiceFromId(
       periods: billingPeriods,
       transactions: transactionRows,
       warehouseId:
-        invoiceMaster.warehouseId?.toString(),
-      warehouseName: warehouse.name || '',
+        invoiceWarehouseId || effectiveInvoiceMaster.warehouseId?.toString(),
+      warehouseName: invoiceWarehouseName,
+      warehouses: warehouses,
       ...companyProfile,
       totalRent:
         billingRows.length > 0
@@ -1998,21 +2115,21 @@ export async function resolveMonthlyInvoiceFromId(
         billingRows.length > 0
           ? totalRentFromBilling
           : Number(
-              invoiceMaster.totalAmount ?? 0
+              effectiveInvoiceMaster.totalAmount ?? 0
             ),
       additionalCharges,
       additionalChargeItems,
-      billingState: invoiceMaster.billingState || '',
-      taxGroup: invoiceMaster.taxGroup || 'No Tax',
-      taxType: invoiceMaster.taxType || '',
-      cgstAmount: Number(invoiceMaster.cgstAmount || 0),
-      sgstAmount: Number(invoiceMaster.sgstAmount || 0),
-      igstAmount: Number(invoiceMaster.igstAmount || 0),
-      totalTaxAmount: Number(invoiceMaster.totalTaxAmount || 0),
-      adjustmentAmount: Number(invoiceMaster.adjustmentAmount || 0),
-      notes: invoiceMaster.notes || '',
+      billingState: effectiveInvoiceMaster.billingState || '',
+      taxGroup: effectiveInvoiceMaster.taxGroup || 'No Tax',
+      taxType: effectiveInvoiceMaster.taxType || '',
+      cgstAmount: Number(effectiveInvoiceMaster.cgstAmount || 0),
+      sgstAmount: Number(effectiveInvoiceMaster.sgstAmount || 0),
+      igstAmount: Number(effectiveInvoiceMaster.igstAmount || 0),
+      totalTaxAmount: Number(effectiveInvoiceMaster.totalTaxAmount || 0),
+      adjustmentAmount: Number(effectiveInvoiceMaster.adjustmentAmount || 0),
+      notes: effectiveInvoiceMaster.notes || '',
       invoiceDate:
-        invoiceMaster.generatedAt
+        effectiveInvoiceMaster.generatedAt
           ?.toISOString()
           .split('T')[0] ||
         new Date().toISOString().split('T')[0],
@@ -2023,7 +2140,7 @@ export async function resolveMonthlyInvoiceFromId(
     return await buildMonthlyInvoiceFromTransactions(
       db,
       id,
-      warehouseId,
+      resolvedWh,
       tenantFilter
     );
   }
@@ -2031,7 +2148,7 @@ export async function resolveMonthlyInvoiceFromId(
   return await buildMonthlyInvoiceFromLedger(
     db,
     id,
-    warehouseId,
+    resolvedWh,
     tenantFilter
   );
 }

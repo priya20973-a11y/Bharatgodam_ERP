@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AlertCircle, Users } from 'lucide-react';
+import { sanitizeClientName } from '@/lib/ledger-engine';
 import type { MatchedRecord } from '@/lib/ledger-engine';
 
 interface MatchedRecordsHeaderProps {
@@ -47,7 +48,7 @@ export const MatchedRecordsHeader: React.FC<MatchedRecordsHeaderProps> = ({
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">#{idx + 1}</p>
                       <p className="text-xs text-slate-600 mt-1">
-                        <span className="font-medium">Name:</span> {record.clientName}
+                        <span className="font-medium">Name:</span> {sanitizeClientName(record.clientName)}
                       </p>
                       {record.location && (
                         <p className="text-xs text-slate-600">
@@ -63,10 +64,10 @@ export const MatchedRecordsHeader: React.FC<MatchedRecordsHeaderProps> = ({
                         <span className="font-medium">First Transaction:</span> {record.date}
                       </p>
                     </div>
-                    {record.totalMT !== undefined && (
+                    {record.totalMT != null && (
                       <div className="text-right">
                         <p className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                          {record.totalMT.toFixed(2)} MT
+                          {Number(record.totalMT || 0).toFixed(2)} MT
                         </p>
                       </div>
                     )}
