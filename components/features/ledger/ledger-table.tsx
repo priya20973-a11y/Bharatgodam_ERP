@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { format, parse } from 'date-fns';
@@ -10,10 +10,8 @@ interface LedgerTableProps {
   isLoading?: boolean;
 }
 
-function formatDecimal(value: number | null | undefined): string {
-  const n = Number(value);
-  if (value === null || value === undefined || Number.isNaN(n)) return '---';
-  return n.toLocaleString(undefined, {
+function formatDecimal(value: number) {
+  return value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -169,12 +167,12 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                             Party: {transaction.partyName}
                           </span>
                         )}
-                        {transaction.actualWeight !== undefined && transaction.actualWeight !== null && (
+                        {transaction.actualWeight !== undefined && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Actual: {formatDecimal(transaction.actualWeight)} MT
                           </span>
                         )}
-                        {transaction.netWeightLoss !== undefined && transaction.netWeightLoss !== null && (
+                        {transaction.netWeightLoss !== undefined && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Loss: {formatDecimal(transaction.netWeightLoss)} MT
                           </span>
