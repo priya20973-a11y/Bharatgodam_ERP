@@ -201,7 +201,7 @@ export function calculateLedger(
 
   void _outstandingInvoices;
 
-  const normalizeCommodityName = (value?: string | null): string => (value || '').trim().toUpperCase() || 'UNKNOWN';
+  const normalizeCommodityName = (value: string): string => value?.trim().toUpperCase();
 
   // Helper function to get rate for a commodity
   const getRate = (commodityName: string): number => {
@@ -284,9 +284,9 @@ export function calculateLedger(
     const commodity = normalizeCommodityName(currentTxn.commodityName);
     const currentQty = inventory.get(commodity) || 0;
     if (currentTxn.direction === 'INWARD') {
-      inventory.set(commodity, currentQty + (Number(currentTxn.mt) || 0));
+      inventory.set(commodity, currentQty + currentTxn.mt);
     } else {
-      inventory.set(commodity, Math.max(0, currentQty - (Number(currentTxn.mt) || 0))); // Prevent negative
+      inventory.set(commodity, Math.max(0, currentQty - currentTxn.mt)); // Prevent negative
     }
 
     // Add transaction record

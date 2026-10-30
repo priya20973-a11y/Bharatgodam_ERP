@@ -63,10 +63,10 @@ export const MatchedRecordsHeader: React.FC<MatchedRecordsHeaderProps> = ({
                         <span className="font-medium">First Transaction:</span> {record.date}
                       </p>
                     </div>
-                    {record.totalMT != null && !Number.isNaN(Number(record.totalMT)) && (
+                    {record.totalMT !== undefined && (
                       <div className="text-right">
                         <p className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                          {Number(record.totalMT).toFixed(2)} MT
+                          {record.totalMT.toFixed(2)} MT
                         </p>
                       </div>
                     )}

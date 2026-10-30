@@ -9,8 +9,8 @@ interface TimeStateLedgerTableProps {
   isLoading?: boolean;
 }
 
-const formatDecimal = (value: number | undefined | null) =>
-  (Number(value) || 0).toLocaleString(undefined, {
+const formatDecimal = (value: number) =>
+  value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
