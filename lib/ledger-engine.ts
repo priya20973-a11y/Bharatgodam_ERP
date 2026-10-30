@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Daily Average Inventory Ledger Calculation Engine
  * Implements the "Bucket" algorithm for warehouse storage rent calculation
  * Rent formula: ₹10 per day per MT
@@ -194,16 +194,14 @@ export function calculateLedger(
   _outstandingInvoices: number = 0,
   commodityRates: Map<string, number> = new Map()
 ): LedgerSummary {
-  // Sort transactions by date — guard against missing/invalid date fields.
+  // Sort transactions by date
   const sortedTransactions = [...transactions].sort((a, b) => {
-    const ta = a.date ? new Date(a.date).getTime() : 0;
-    const tb = b.date ? new Date(b.date).getTime() : 0;
-    return ta - tb;
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
   void _outstandingInvoices;
 
-  const normalizeCommodityName = (value: string | undefined | null): string => (typeof value === 'string' ? value : (value ?? '')).trim().toUpperCase();
+  const normalizeCommodityName = (value: string): string => value?.trim().toUpperCase();
 
   // Helper function to get rate for a commodity
   const getRate = (commodityName: string): number => {
@@ -351,12 +349,7 @@ export function calculateLedger(
 
   // Calculate totals
   const totalRent = roundCurrency(ledgerSteps.reduce((sum, step) => sum + step.rentAmount, 0));
-  // Guard against undefined date on payments to prevent NaN sort.
-  const sortedPayments = [...payments].sort((a, b) => {
-    const pa = a.date ? new Date(a.date).getTime() : 0;
-    const pb = b.date ? new Date(b.date).getTime() : 0;
-    return pa - pb;
-  });
+  const sortedPayments = payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const totalPaid = roundCurrency(sortedPayments.reduce((sum, p) => sum + p.amount, 0));
   const rentPaid = roundCurrency(Math.min(totalPaid, totalRent));
 
