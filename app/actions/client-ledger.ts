@@ -8,6 +8,7 @@ import type { IInvoiceMaster, IInvoiceLineItem } from '@/types/schemas';
 import { generateStoragePeriods, type Transaction } from '@/lib/storage-engine';
 import { getTenantFilterForMongo, requireSession } from '@/lib/ownership';
 import { logActivity } from '@/lib/cold-logger';
+import { formatStockQuantity } from '@/lib/utils';
 
 export interface ClientMonthlyLedgerRow {
   commodity: string;
@@ -120,14 +121,14 @@ function mapInvoiceLineItemToLedgerRow(item: IInvoiceLineItem | any, masterStatu
     ? roundCurrency(Number(item.rateApplied))
     : roundCurrency(Number(item.ratePerMTPerDay ?? 0) * 30);
   const rent = roundCurrency(Number(item.totalAmount ?? 0));
-  const calculation = `${roundCurrency(quantity).toFixed(2)} MT × ₹${monthlyRate.toFixed(2)} / MT × ${days} / 30 days`;
+  const calculation = `${formatStockQuantity(quantity)} MT × ₹${monthlyRate.toFixed(2)} / MT × ${days} / 30 days`;
 
   return {
     commodity: item.commodityName || item.commodity || 'Unknown Commodity',
     rate: monthlyRate,
     fromDate: item.periodStart || item.startDate || '',
     toDate: item.periodEnd || item.endDate || '',
-    qty: roundCurrency(quantity),
+    qty: quantity,
     bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount || ''),
     days,
     rent,
@@ -161,7 +162,10 @@ function generateClientMonthlyLedgerFromInvoices(
     const masterId = master._id?.toString();
     if (!masterId) return;
 
-    const masterRows = invoiceItemsByMaster.get(masterId) || [];
+    const masterRows = (invoiceItemsByMaster.get(masterId) || []).filter((item) => {
+      const q = Number(item.averageQuantityMT ?? (item as any).quantityMT ?? 0);
+      return Math.abs(q) >= 1e-9;
+    });
     const monthKey = master.invoiceMonth || '';
     const masterStatus = master.status || 'DRAFT';
 
@@ -186,7 +190,10 @@ function generateClientMonthlyLedgerFromInvoices(
     const masterId = master._id?.toString();
     if (!masterId) return;
 
-    const masterRows = invoiceItemsByMaster.get(masterId) || [];
+    const masterRows = (invoiceItemsByMaster.get(masterId) || []).filter((item) => {
+      const q = Number(item.averageQuantityMT ?? (item as any).quantityMT ?? 0);
+      return Math.abs(q) >= 1e-9;
+    });
     if (masterRows.length === 0) {
       grouped.set(monthKey, grouped.get(monthKey) || []);
       return;
@@ -232,6 +239,7 @@ function splitLedgerEntryByMonth(entry: any): ClientMonthlyLedgerRow[] {
   const start = normalizeDate(entry.periodStartDate || entry.startDate);
   const end = normalizeDate(entry.periodEndDate || entry.endDate);
   const baseQty = Number(entry.quantityMT) || 0;
+  if (Math.abs(baseQty) < 1e-9) return [];
   const dailyRate = Number(entry.ratePerMTPerDay || entry.dailyRate || 0);
   const commodity = entry.commodity?.name || entry.commodityName || 'Unknown Commodity';
   const status = entry.status || 'COMPLETED';
@@ -248,15 +256,14 @@ function splitLedgerEntryByMonth(entry: any): ClientMonthlyLedgerRow[] {
     const days = calculateDays(fromDate, toDate);
     const rent = roundCurrency(baseQty * dailyRate * days);
 
-    const roundedQty = roundCurrency(baseQty);
-    const calculation = `${roundedQty} MT × ₹${monthlyRate.toFixed(2)}/MT × ${days} / 30`;
+    const calculation = `${formatStockQuantity(baseQty)} MT × ₹${monthlyRate.toFixed(2)}/MT × ${days} / 30`;
 
     rows.push({
       commodity,
       rate: monthlyRate,
       fromDate,
       toDate,
-      qty: roundedQty,
+      qty: baseQty,
       bags: entry.bags !== undefined && entry.bags !== null ? entry.bags : (entry.bagsCount || ''),
       days,
       rent,
@@ -416,6 +423,11 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
     const billingRows = transformTransactionsToBillingRows(monthTxns, monthKey);
 
     billingRows.forEach((row: any) => {
+      const actualQty = Number(row.quantityMT ?? row.quantity ?? row.qty ?? 0);
+      if (Math.abs(actualQty) < 1e-9) {
+        return;
+      }
+
       const warehouseKey = warehouseIdsArray.length > 1 ? warehouseId : (row.warehouseId || 'ALL');
       const groupKey = `${monthKey}::${warehouseKey}`;
 
@@ -430,15 +442,14 @@ export async function getClientMonthlyLedger(clientId: string, month?: string, w
 
       const dailyRate = row.rate || 0;
       const monthlyRate = roundCurrency(dailyRate * 30);
-      const roundedQty = roundCurrency(row.quantityMT || 0);
-      const calculation = `${roundedQty.toFixed(2)} MT × ₹${dailyRate.toFixed(2)}/MT/day × ${row.daysTotal || 0} days`;
+      const calculation = `${formatStockQuantity(actualQty)} MT × ₹${dailyRate.toFixed(2)}/MT/day × ${row.daysTotal || 0} days`;
 
       grouped.get(groupKey)?.rows.push({
         commodity: row.commodityName || 'Unknown Commodity',
         rate: monthlyRate,
         fromDate: row.startDate,
         toDate: row.endDate,
-        qty: roundedQty,
+        qty: actualQty,
         bags: row.bags || '',
         days: row.daysTotal,
         rent: roundCurrency(row.rentTotal || 0),

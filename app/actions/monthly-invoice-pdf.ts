@@ -3,6 +3,7 @@
 import { MonthlyInvoiceData } from './monthly-invoices';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { formatStockQuantity } from '@/lib/utils';
 
 function numberToWords(num: number): string {
   if (num === 0) return 'Zero';
@@ -69,7 +70,7 @@ function formatAmount(value: number): string {
 }
 
 function formatQty(value: number): string {
-  return value.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  return formatStockQuantity(value);
 }
 
 function formatInvoiceDate(dateString: string): string {
@@ -291,9 +292,13 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
         </tr>
       `;
 
-  const invoiceRows = ((invoice.transactions?.length
+  const rawInvoiceRows = ((invoice.transactions?.length
     ? invoice.transactions
-    : invoice.periods || []) as any[]).map((p) => ({
+    : invoice.periods || []) as any[]);
+
+  const invoiceRows = rawInvoiceRows
+    .filter((p) => Math.abs(Number(p.quantityMT ?? p.quantity ?? p.qty ?? 0)) >= 1e-9)
+    .map((p) => ({
       date: p.date || p.startDate || '',
       direction: p.direction || 'INWARD',
       commodityName: p.commodityName || 'Unknown',
@@ -302,7 +307,7 @@ export async function generateMonthlyInvoiceHTML(invoice: MonthlyInvoiceData): P
       customWarehouseId: p.customWarehouseId || '',
       startDate: p.startDate || '',
       endDate: p.endDate || '',
-      quantityMT: Number(p.quantityMT ?? p.quantity ?? 0),
+      quantityMT: Number(p.quantityMT ?? p.quantity ?? p.qty ?? 0),
       bags: p.bags !== undefined
         ? p.bags
         : p.bagCount ?? p.bagsCount ?? '',

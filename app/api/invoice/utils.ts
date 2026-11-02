@@ -797,8 +797,8 @@ export async function buildMonthlyInvoiceFromTransactions(
     gstNumber: resolveClientGst(client),
     month,
     year,
-    periods: transactionRows,
-    transactions: transactionRows,
+    periods: transactionRows.filter((p: any) => Math.abs(Number(p.quantityMT || p.quantity || p.qty || 0)) >= 1e-9),
+    transactions: transactionRows.filter((p: any) => Math.abs(Number(p.quantityMT || p.quantity || p.qty || 0)) >= 1e-9),
     warehouseId: resolvedWarehouseId,
     warehouseName: isMultipleWarehouses ? 'Multiple Warehouses' : (resolvedWarehouse?.name || ''),
     warehouses: resolvedWarehouses,
@@ -1102,7 +1102,7 @@ export async function buildMonthlyInvoiceFromLedger(
 
   // Use transaction rows for display (shows INWARD/OUTWARD direction),
   // but use ledger totals for the summary (matches dashboard calculation).
-  const invoicePeriods =
+  const invoicePeriods = (
     transactionRows.length > 0
       ? transactionRows
       : ledgerInvoice.rows.map((item: any) => ({
@@ -1117,7 +1117,8 @@ export async function buildMonthlyInvoiceFromLedger(
           warehouseName: item.warehouseName || '',
           warehouseId: item.warehouseId || '',
           bags: item.bags || '',
-        }));
+        }))
+  ).filter((p: any) => Math.abs(Number(p.quantityMT || p.quantity || p.qty || 0)) >= 1e-9);
 
   const previousBalance = Number(
     ledgerInvoice.summary.previousBalance ?? 0
@@ -1634,7 +1635,7 @@ function buildOpeningBalanceRows(
   }
 
   return Array.from(balanceMap.values())
-    .filter((balance) => balance.quantityMT > 0)
+    .filter((balance) => balance.quantityMT >= 1e-9)
     .map((balance) => ({
       date: monthStartStr,
       startDate: monthStartStr,
@@ -1726,6 +1727,9 @@ export function transformTransactionsToBillingRows(
         const direction = (txn.direction || 'INWARD').toUpperCase();
         const txnDateStr = txn._transactionDateStr;
         const rawQuantity = Number(txn.quantityMT ?? txn.quantity ?? txn.qty ?? 0);
+        if (Math.abs(rawQuantity) < 1e-9) {
+          return null;
+        }
         const quantityMT =
           direction === 'OUTWARD' ? -Math.abs(rawQuantity) : rawQuantity;
         const ratePerDay = Number(
@@ -2087,7 +2091,7 @@ export async function resolveMonthlyInvoiceFromId(
 
       // Use transaction rows for display (shows INWARD/OUTWARD),
       // fall back to ledger rows if no transactions found
-      const displayPeriods =
+      const displayPeriods = (
         transactionRows.length > 0
           ? transactionRows
           : ledgerInvoice.rows.map(
@@ -2107,7 +2111,8 @@ export async function resolveMonthlyInvoiceFromId(
                 bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
             bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
               })
-            );
+            )
+      ).filter((p: any) => Math.abs(Number(p.quantityMT || p.quantity || p.qty || 0)) >= 1e-9);
 
       return {
         bookingId:
@@ -2163,7 +2168,7 @@ export async function resolveMonthlyInvoiceFromId(
       new Date().getFullYear();
 
     // Use transaction-based billing if available
-    const billingPeriods =
+    const billingPeriods = (
       billingRows.length > 0
         ? billingRows
         : lineItems.map((item: any) => ({
@@ -2185,7 +2190,8 @@ export async function resolveMonthlyInvoiceFromId(
             warehouseId: item.warehouseId || '',
             bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
             bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
-          }));
+          }))
+    ).filter((p: any) => Math.abs(Number(p.quantityMT || p.quantity || p.qty || 0)) >= 1e-9);
 
     const totalRentFromPeriods = billingPeriods.reduce(
       (sum: number, row: any) =>

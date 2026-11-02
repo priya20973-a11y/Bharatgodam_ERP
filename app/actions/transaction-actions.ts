@@ -1141,6 +1141,10 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
               };
 
             billing.periods.forEach((period: any) => {
+              const actualQty = Number(period.inventoryMT || 0);
+              if (Math.abs(actualQty) < 1e-9) {
+                return;
+              }
               ledgerPeriods.push({
                 id: `p-${Math.random().toString(36).substr(2, 9)}`,
                 clientName: clientMap.get(clientIdStr) || 'Unknown',
@@ -1155,7 +1159,7 @@ export async function getClientRevenueAnalytics(warehouseId?: string, month?: st
                 periodStart: period.startDate,
                 periodEnd: period.endDate,
                 daysOccupied: period.daysInPeriod,
-                quantityMT: period.inventoryMT,
+                quantityMT: actualQty,
                 bagsCount: 0,
                 gatePass: 'N/A',
                 ratePerMTPerDay: period.dailyRate,

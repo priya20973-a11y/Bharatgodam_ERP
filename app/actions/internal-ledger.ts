@@ -3,7 +3,7 @@
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getTenantFilterForMongo } from '@/lib/ownership';
-import { calculateLedger, sanitizeClientName, isMongoObjectId, sanitizeTransactionId, resolveTransactionReference } from '@/lib/ledger-engine';
+import { calculateLedger, calculateRemainingStock, sanitizeClientName, isMongoObjectId, sanitizeTransactionId, resolveTransactionReference } from '@/lib/ledger-engine';
 import type { Transaction, Payment, MatchedRecord } from '@/lib/ledger-engine';
 
 function roundCurrency(value: number) {
@@ -77,13 +77,22 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     paymentQuery.accountId = accountId;
   }
 
+  const clientMatchConditions: any[] = [
+    { accountId },
+    { clientId: accountId },
+  ];
+  if (clientObjectId) {
+    clientMatchConditions.push({ accountId: clientObjectId });
+    clientMatchConditions.push({ clientId: clientObjectId });
+  }
+
   const [bookings, transactionDocs, paymentsDocs, invoiceMasters, commoditiesResult, warehousesResult] = await Promise.all([
     db.collection('bookings')
-      .find({ accountId, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
+      .find({ $or: clientMatchConditions, direction: { $in: ['INWARD', 'OUTWARD'] }, ...tenantFilter, ...activeRecordFilter })
       .sort({ date: 1 })
       .toArray(),
     db.collection('transactions')
-      .find({ accountId, ...tenantFilter, ...activeRecordFilter })
+      .find({ $or: clientMatchConditions, ...tenantFilter, ...activeRecordFilter })
       .sort({ date: 1 })
       .toArray(),
     db.collection('payments')
@@ -287,11 +296,11 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   bookings.forEach(inspectLinkedIds);
   transactionDocs.forEach(inspectLinkedIds);
 
-  const [inwardDocs, outwardDocs, coldInwardDocs, coldOutwardDocs, clientOutwardDocs] = await Promise.all([
+  const [inwardDocs, outwardDocs, coldInwardDocs, coldOutwardDocs, clientOutwardDocs, clientInwardDocs] = await Promise.all([
     linkedInwardIdHexes.length > 0 || linkedInwardIdStrings.length > 0
       ? db.collection('inwards').find({
           _id: { $in: [...linkedInwardIdHexes, ...linkedInwardIdStrings as any] }
-        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1, bagsCount: 1, bags: 1, date: 1, quantityMT: 1, clientId: 1, commodityId: 1, warehouseId: 1 }).toArray()
       : Promise.resolve([]),
     linkedOutwardIdHexes.length > 0 || linkedOutwardIdStrings.length > 0
       ? db.collection('outwards').find({
@@ -313,6 +322,12 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       ...(clientObjectId ? { clientId: { $in: [clientObjectId, accountId] } } : { clientId: accountId }),
       ...tenantFilter,
       ...activeRecordFilter,
+    }).project({ _id: 1, receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1, bagsCount: 1, bags: 1, date: 1, quantityMT: 1, clientId: 1, commodityId: 1, warehouseId: 1 }).toArray(),
+    // Also fetch inwards for this client account to ensure historical and direct inward transactions get actual bag quantity
+    db.collection('inwards').find({
+      ...(clientObjectId ? { clientId: { $in: [clientObjectId, accountId] } } : { clientId: accountId }),
+      ...tenantFilter,
+      ...activeRecordFilter,
     }).project({ _id: 1, receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1, bagsCount: 1, bags: 1, date: 1, quantityMT: 1, clientId: 1, commodityId: 1, warehouseId: 1 }).toArray()
   ]);
 
@@ -323,6 +338,59 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       outwardDocMap.set(doc._id.toString(), doc);
     }
   });
+
+  const inwardDocMap = new Map<string, any>();
+  const inwardDocList = [...(inwardDocs || []), ...(clientInwardDocs || [])];
+  inwardDocList.forEach((doc: any) => {
+    if (doc?._id) {
+      inwardDocMap.set(doc._id.toString(), doc);
+    }
+  });
+
+  const resolveInwardBags = (txn: any): number | undefined => {
+    const sId = txn.sourceId ? String(txn.sourceId).trim() : '';
+    const inId = txn.inwardId ? String(txn.inwardId).trim() : '';
+    const idStr = txn._id ? String(txn._id).trim() : '';
+
+    let matchedDoc: any = null;
+    if (sId && inwardDocMap.has(sId)) matchedDoc = inwardDocMap.get(sId);
+    else if (inId && inwardDocMap.has(inId)) matchedDoc = inwardDocMap.get(inId);
+    else if (idStr && inwardDocMap.has(idStr)) matchedDoc = inwardDocMap.get(idStr);
+
+    if (!matchedDoc && txn.receiptNumber && String(txn.receiptNumber).trim()) {
+      const rn = String(txn.receiptNumber).trim().toLowerCase();
+      matchedDoc = inwardDocList.find((o: any) => String(o.receiptNumber || '').trim().toLowerCase() === rn);
+    }
+
+    if (!matchedDoc && txn.gatePass && String(txn.gatePass).trim()) {
+      const gp = String(txn.gatePass).trim().toLowerCase();
+      matchedDoc = inwardDocList.find((o: any) => String(o.gatePass || '').trim().toLowerCase() === gp);
+    }
+
+    if (!matchedDoc) {
+      const txnDateStr = txn.date instanceof Date ? txn.date.toISOString().split('T')[0] : String(txn.date || '').split('T')[0];
+      const txnQty = Number(txn.quantityMT ?? txn.mt ?? 0);
+      matchedDoc = inwardDocList.find((o: any) => {
+        const oDateStr = o.date instanceof Date ? o.date.toISOString().split('T')[0] : String(o.date || '').split('T')[0];
+        const oQty = Number(o.quantityMT || 0);
+        return oDateStr === txnDateStr && Math.abs(oQty - txnQty) < 0.001;
+      });
+    }
+
+    if (matchedDoc && matchedDoc.bagsCount !== undefined && matchedDoc.bagsCount !== null && matchedDoc.bagsCount !== '') {
+      return Number(matchedDoc.bagsCount);
+    }
+    if (matchedDoc && matchedDoc.bags !== undefined && matchedDoc.bags !== null && matchedDoc.bags !== '') {
+      return Number(matchedDoc.bags);
+    }
+    if (txn.bagsCount !== undefined && txn.bagsCount !== null && txn.bagsCount !== '') {
+      return Number(txn.bagsCount);
+    }
+    if (txn.bags !== undefined && txn.bags !== null && txn.bags !== '') {
+      return Number(txn.bags);
+    }
+    return undefined;
+  };
 
   const resolveOutwardBags = (txn: any): number | undefined => {
     const sId = txn.sourceId ? String(txn.sourceId).trim() : '';
@@ -405,7 +473,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   bookings.forEach((txn) => {
     const isOutward = txn.direction === 'OUTWARD';
-    const bagsCount = isOutward ? resolveOutwardBags(txn) : (txn.bagsCount !== undefined ? Number(txn.bagsCount) : (txn.bags !== undefined && txn.bags !== '' ? Number(txn.bags) : undefined));
+    const bagsCount = isOutward ? resolveOutwardBags(txn) : resolveInwardBags(txn);
 
     addTransaction({
       _id: txn._id?.toString() || '',
@@ -432,7 +500,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
 
   transactionDocs.forEach((txn) => {
     const isOutward = txn.direction === 'OUTWARD';
-    const bagsCount = isOutward ? resolveOutwardBags(txn) : (txn.bagsCount !== undefined ? Number(txn.bagsCount) : (txn.bags !== undefined && txn.bags !== '' ? Number(txn.bags) : undefined));
+    const bagsCount = isOutward ? resolveOutwardBags(txn) : resolveInwardBags(txn);
 
     addTransaction({
       _id: txn._id?.toString() || '',
@@ -454,6 +522,62 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       partyName: txn.partyName,
       bagsCount: bagsCount,
       bags: bagsCount,
+    });
+  });
+
+  (clientInwardDocs || []).forEach((doc: any) => {
+    const rawBags = doc.bagsCount !== undefined && doc.bagsCount !== null && doc.bagsCount !== ''
+      ? Number(doc.bagsCount)
+      : (doc.bags !== undefined && doc.bags !== null && doc.bags !== '' ? Number(doc.bags) : undefined);
+    const dateStr = doc.date instanceof Date ? doc.date.toISOString().split('T')[0] : String(doc.date || '').split('T')[0];
+    const warehouseIdStr = doc.warehouseId?.toString?.() || undefined;
+
+    addTransaction({
+      _id: doc._id?.toString() || '',
+      transactionId: resolveRecordTransactionId(doc),
+      receiptNumber: doc.receiptNumber || undefined,
+      date: dateStr,
+      direction: 'INWARD',
+      mt: Number(doc.quantityMT || 0),
+      clientId: doc.clientId?.toString?.() || accountId,
+      clientName: primaryClientName,
+      commodityName: doc.commodityId ? (commodityNameById.get(doc.commodityId.toString()) || 'Unknown Commodity') : 'Unknown Commodity',
+      warehouseId: warehouseIdStr,
+      warehouseName: warehouseIdStr ? (warehouseNameById.get(warehouseIdStr) || 'Unknown Warehouse') : 'Unknown Warehouse',
+      gatePass: doc.gatePass || '',
+      actualWeight: doc.actualWeight,
+      netWeightLoss: doc.netWeightLoss,
+      partyName: doc.partyName,
+      bagsCount: rawBags,
+      bags: rawBags,
+    });
+  });
+
+  (clientOutwardDocs || []).forEach((doc: any) => {
+    const rawBags = doc.bagsCount !== undefined && doc.bagsCount !== null && doc.bagsCount !== ''
+      ? Number(doc.bagsCount)
+      : (doc.bags !== undefined && doc.bags !== null && doc.bags !== '' ? Number(doc.bags) : undefined);
+    const dateStr = doc.date instanceof Date ? doc.date.toISOString().split('T')[0] : String(doc.date || '').split('T')[0];
+    const warehouseIdStr = doc.warehouseId?.toString?.() || undefined;
+
+    addTransaction({
+      _id: doc._id?.toString() || '',
+      transactionId: resolveRecordTransactionId(doc),
+      receiptNumber: doc.receiptNumber || undefined,
+      date: dateStr,
+      direction: 'OUTWARD',
+      mt: Number(doc.quantityMT || 0),
+      clientId: doc.clientId?.toString?.() || accountId,
+      clientName: primaryClientName,
+      commodityName: doc.commodityId ? (commodityNameById.get(doc.commodityId.toString()) || 'Unknown Commodity') : 'Unknown Commodity',
+      warehouseId: warehouseIdStr,
+      warehouseName: warehouseIdStr ? (warehouseNameById.get(warehouseIdStr) || 'Unknown Warehouse') : 'Unknown Warehouse',
+      gatePass: doc.gatePass || '',
+      actualWeight: doc.actualWeight,
+      netWeightLoss: doc.netWeightLoss,
+      partyName: doc.partyName,
+      bagsCount: rawBags,
+      bags: rawBags,
     });
   });
 
@@ -495,6 +619,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   const warehouseBreakdowns = Array.from(warehouseGroups.values()).map((group) => ({
     warehouseId: group.warehouseId,
     warehouseName: group.warehouseName,
+    stockSummary: calculateRemainingStock(group.transactions),
     ledgerSummary: calculateLedger(
       group.transactions,
       [],
@@ -592,10 +717,13 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     commodityRates
   );
 
+  const stockSummary = calculateRemainingStock(transactionData);
+
   return {
     ...ledgerSummary,
     clientName: primaryClientName,
     transactions: transactionData,
+    stockSummary,
     warehouseBreakdowns,
     matchedRecords,
     recordCount: matchedRecords.length,

@@ -198,13 +198,16 @@ export function calculateInventoryBasedRent(
     ) {
       const change = relevantChanges[changeIndex];
       currentInventory += change.quantityMT;
+      if (currentInventory < 1e-9) {
+        currentInventory = 0;
+      }
       currentInventory = Math.max(0, currentInventory); // Never go negative
       peakInventory = Math.max(peakInventory, currentInventory);
       changeIndex++;
     }
 
     // Track days with inventory
-    if (currentInventory > 0) {
+    if (currentInventory >= 1e-9) {
       daysWithInventory++;
     }
 
@@ -221,7 +224,7 @@ export function calculateInventoryBasedRent(
       (dateToUse.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    if (daysInPeriod > 0 && currentInventory > 0) {
+    if (daysInPeriod > 0 && currentInventory >= 1e-9) {
       const periodChargePaise = Math.round(
         currentInventory * dailyRate * daysInPeriod * 100
       );

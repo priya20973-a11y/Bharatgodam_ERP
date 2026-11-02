@@ -10,7 +10,7 @@ import { getClientOptions, getFilteredBookings, getWarehouseOptions, getCommodit
 import { getClientMonthlyLedger } from '@/app/actions/client-ledger';
 import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
-import { getDropdownDisplayName } from '@/lib/utils';
+import { getDropdownDisplayName, formatStockQuantity } from '@/lib/utils';
 
 interface AdditionalChargeItem {
   id?: string;
@@ -337,7 +337,9 @@ export default function ClientInvoicesPage() {
             clientName: client?.label || result.data.clientName || '',
             month: invoice.month.split('-')[1].padStart(2, '0'),
             year: parseInt(invoice.month.split('-')[0]),
-              periods: invoice.rows.map((period: any) => ({
+              periods: (invoice.rows || [])
+                .filter((period: any) => Math.abs(Number(period.qty ?? period.quantityMT ?? 0)) >= 1e-9)
+                .map((period: any) => ({
                 startDate: period.fromDate,
                 endDate: period.toDate,
                 quantityMT: Number(period.qty ?? 0),
@@ -374,7 +376,9 @@ export default function ClientInvoicesPage() {
 
         // Populate the transactions table from ledger periods so on-screen display matches ledger/HTML
         const ledgerTransactions = transformedInvoices.flatMap((inv) => {
-          return (inv.periods || []).map((p: any, idx: number) => ({
+          return (inv.periods || [])
+            .filter((p: any) => Math.abs(Number(p.quantityMT || 0)) >= 1e-9)
+            .map((p: any, idx: number) => ({
             _id: `${inv.invoiceId || inv.bookingId || 'inv'}-period-${idx}`,
             date: p.startDate || '',
             direction: 'STORAGE',
@@ -1255,7 +1259,9 @@ export default function ClientInvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {transactions.map((record) => (
+                  {transactions
+                    .filter((record) => Math.abs(Number(record.quantityMT || 0)) >= 1e-9)
+                    .map((record) => (
                     <tr key={record._id} className="bg-white">
                       <td className="px-4 py-2">{typeof record.date === 'string' ? record.date : (record.date instanceof Date ? record.date.toISOString().split('T')[0] : '—')}</td>
                       <td className="px-4 py-2">
@@ -1265,7 +1271,7 @@ export default function ClientInvoicesPage() {
                       </td>
                       <td className="px-4 py-2">{record.commodityName || ''}</td>
                       <td className="px-4 py-2">{record.warehouseName || ''}</td>
-                      <td className="px-4 py-2 text-right font-medium">{Number(record.quantityMT || 0).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right font-medium">{formatStockQuantity(record.quantityMT)}</td>
                       <td className="px-4 py-2 text-center">{record.bags || '-'}</td>
                       <td className="px-4 py-2 text-center">{record.storageDays || 0}</td>
                     </tr>
@@ -1371,7 +1377,9 @@ export default function ClientInvoicesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {(invoice.periods || []).map((period, idx) => (
+                        {(invoice.periods || [])
+                          .filter((period) => Math.abs(Number(period.quantityMT || 0)) >= 1e-9)
+                          .map((period, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="px-4 py-2 font-medium text-slate-900">{period.commodityName}</td>
                             {selectedWarehouses.length > 1 && (
@@ -1395,7 +1403,7 @@ export default function ClientInvoicesPage() {
                             <td className="px-4 py-2">{period.startDate}</td>
                             <td className="px-4 py-2">{period.endDate}</td>
                             <td className="px-4 py-2 text-center">{period.bags || '-'}</td>
-                            <td className="px-4 py-2 text-center font-medium">{Number(period.quantityMT || 0).toFixed(2)}</td>
+                            <td className="px-4 py-2 text-center font-medium">{formatStockQuantity(period.quantityMT)}</td>
                             <td className="px-4 py-2 text-center">{period.daysTotal ?? 0}</td>
                             <td className="px-4 py-2 text-right font-semibold">₹{Number(period.rentTotal || 0).toLocaleString('en-IN')}</td>
                           </tr>

@@ -106,6 +106,43 @@ export interface WarehouseBreakdown {
   ledgerSummary: LedgerSummary;
 }
 
+export interface StockMetric {
+  bags: number;
+  weightMT: number;
+  weightKG?: number;
+}
+
+export interface StockSummaryBreakdownItem {
+  warehouseId: string;
+  warehouseName: string;
+  commodityName: string;
+  inward: StockMetric;
+  outward: StockMetric;
+  remaining: StockMetric;
+  receiptCount: number;
+  outwardCount: number;
+  transactionCount: number;
+  lastTransactionDate?: string;
+  receiptNumbers: string[];
+}
+
+export interface WarehouseStockSummary {
+  warehouseId: string;
+  warehouseName: string;
+  inward: StockMetric;
+  outward: StockMetric;
+  remaining: StockMetric;
+  commodityBreakdown: StockSummaryBreakdownItem[];
+}
+
+export interface TotalRemainingStockSummary {
+  inward: StockMetric;
+  outward: StockMetric;
+  remaining: StockMetric;
+  warehouseSummaries: WarehouseStockSummary[];
+  breakdown: StockSummaryBreakdownItem[];
+}
+
 export interface LedgerSummary {
   clientName: string;
   ledgerSteps: LedgerStep[];
@@ -118,6 +155,7 @@ export interface LedgerSummary {
   invoiceSummaries?: InvoiceAdjustmentSummary[];
   invoiceOutstandingTotal?: number;
   warehouseBreakdowns?: WarehouseBreakdown[];
+  stockSummary?: TotalRemainingStockSummary;
 }
 
 export interface AggregatedLedgerSummary extends LedgerSummary {
@@ -518,8 +556,8 @@ export function calculateLedger(
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 
-        // Option 2: Separate row for each active commodity with qty > 0
-        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty > 0);
+        // Option 2: Separate row for each active commodity with qty > 0 (excluding fully exhausted 0 MT stock)
+        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty >= 1e-9);
 
         for (const [commodityKey, qty] of activeCommodities) {
           const commodityRate = getRate(commodityKey);
@@ -552,7 +590,8 @@ export function calculateLedger(
     if (currentTxn.direction === 'INWARD') {
       inventory.set(commodity, currentQty + currentTxn.mt);
     } else {
-      inventory.set(commodity, Math.max(0, currentQty - currentTxn.mt)); // Prevent negative
+      const nextQty = currentQty - currentTxn.mt;
+      inventory.set(commodity, nextQty < 1e-9 ? 0 : nextQty); // Prevent negative & floating point remnants
     }
   }
 
@@ -564,7 +603,7 @@ export function calculateLedger(
 
     const daysDiff = calculateDaysDifference(lastTxnDate, asOfDate);
     const totalQuantity = Array.from(inventory.values()).reduce((sum, qty) => sum + qty, 0);
-    if (daysDiff > 0 && totalQuantity > 0) {
+    if (daysDiff > 0 && totalQuantity >= 1e-9) {
       // Split final period into month-aligned buckets to ensure each calendar month shows carried-forward rent
       let cursor = new Date(Date.UTC(lastTxnDate.getUTCFullYear(), lastTxnDate.getUTCMonth(), lastTxnDate.getUTCDate()));
       const normalizedEnd = new Date(Date.UTC(asOfDate.getUTCFullYear(), asOfDate.getUTCMonth(), asOfDate.getUTCDate()));
@@ -574,8 +613,8 @@ export function calculateLedger(
         const bucketEnd = nextMonth < normalizedEnd ? nextMonth : normalizedEnd;
         const bucketDays = calculateDaysDifference(cursor, bucketEnd);
 
-        // Option 2: Separate row for each active commodity with qty > 0
-        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty > 0);
+        // Option 2: Separate row for each active commodity with qty > 0 (excluding fully exhausted 0 MT stock)
+        const activeCommodities = Array.from(inventory.entries()).filter(([_, qty]) => qty >= 1e-9);
 
         for (const [commodityKey, qty] of activeCommodities) {
           const commodityRate = getRate(commodityKey);
@@ -672,4 +711,213 @@ export function exportLedgerAsCSV(summary: LedgerSummary): string {
   lines.push(`Outstanding Balance,${formatCSVCell(summary.balance)}`);
   
   return lines.join('\n');
+}
+
+/**
+ * Calculates remaining stock automatically from actual inward and outward transaction records:
+ * Remaining Stock = Total Inward Stock − Total Outward Stock
+ * Includes bags, MT, KG client-wise and warehouse-wise.
+ */
+export function calculateRemainingStock(transactions: Transaction[]): TotalRemainingStockSummary {
+  let totalInwardBags = 0;
+  let totalOutwardBags = 0;
+  let totalInwardMT = 0;
+  let totalOutwardMT = 0;
+
+  const breakdownMap = new Map<string, {
+    warehouseId: string;
+    warehouseName: string;
+    commodityName: string;
+    inwardBags: number;
+    outwardBags: number;
+    inwardMT: number;
+    outwardMT: number;
+    receiptCount: number;
+    outwardCount: number;
+    transactionCount: number;
+    lastTransactionDate?: string;
+    receiptNumbers: Set<string>;
+  }>();
+
+  const warehouseMap = new Map<string, {
+    warehouseId: string;
+    warehouseName: string;
+    inwardBags: number;
+    outwardBags: number;
+    inwardMT: number;
+    outwardMT: number;
+  }>();
+
+  (transactions || []).forEach((txn) => {
+    const direction = (txn.direction || '').toUpperCase();
+    if (direction !== 'INWARD' && direction !== 'OUTWARD') return;
+
+    const mt = Math.abs(Number(txn.mt || 0));
+    const rawBags = txn.bagsCount != null
+      ? Number(txn.bagsCount)
+      : (txn.bags !== undefined && txn.bags !== null && txn.bags !== '' ? Number(txn.bags) : 0);
+    const bags = Number.isFinite(rawBags) ? Math.max(0, rawBags) : 0;
+
+    const warehouseId = txn.warehouseId ? String(txn.warehouseId) : 'general';
+    const warehouseName = txn.warehouseName || (warehouseId === 'general' ? 'General Warehouse' : 'Warehouse');
+    const commodityName = txn.commodityName || 'General Commodity';
+
+    const groupKey = `${warehouseId}|${commodityName}`;
+
+    if (!breakdownMap.has(groupKey)) {
+      breakdownMap.set(groupKey, {
+        warehouseId,
+        warehouseName,
+        commodityName,
+        inwardBags: 0,
+        outwardBags: 0,
+        inwardMT: 0,
+        outwardMT: 0,
+        receiptCount: 0,
+        outwardCount: 0,
+        transactionCount: 0,
+        lastTransactionDate: undefined,
+        receiptNumbers: new Set<string>(),
+      });
+    }
+
+    if (!warehouseMap.has(warehouseId)) {
+      warehouseMap.set(warehouseId, {
+        warehouseId,
+        warehouseName,
+        inwardBags: 0,
+        outwardBags: 0,
+        inwardMT: 0,
+        outwardMT: 0,
+      });
+    }
+
+    const item = breakdownMap.get(groupKey)!;
+    const wh = warehouseMap.get(warehouseId)!;
+
+    item.transactionCount += 1;
+    if (txn.date) {
+      if (!item.lastTransactionDate || txn.date > item.lastTransactionDate) {
+        item.lastTransactionDate = txn.date;
+      }
+    }
+
+    const ref = txn.receiptNumber || txn.transactionId || txn.gatePass;
+    if (ref && ref !== '-' && !isMongoObjectId(ref)) {
+      item.receiptNumbers.add(ref);
+    }
+
+    if (direction === 'INWARD') {
+      totalInwardBags += bags;
+      totalInwardMT += mt;
+      item.inwardBags += bags;
+      item.inwardMT += mt;
+      item.receiptCount += 1;
+      wh.inwardBags += bags;
+      wh.inwardMT += mt;
+    } else {
+      totalOutwardBags += bags;
+      totalOutwardMT += mt;
+      item.outwardBags += bags;
+      item.outwardMT += mt;
+      item.outwardCount += 1;
+      wh.outwardBags += bags;
+      wh.outwardMT += mt;
+    }
+  });
+
+  const remainingBags = totalInwardBags - totalOutwardBags;
+  const rawRemainingMT = totalInwardMT - totalOutwardMT;
+  const remainingMT = Math.abs(rawRemainingMT) < 1e-9 ? 0 : Number(rawRemainingMT.toFixed(4));
+  const remainingKG = Number((remainingMT * 1000).toFixed(2));
+
+  const breakdown: StockSummaryBreakdownItem[] = Array.from(breakdownMap.values()).map((item) => {
+    const remBags = item.inwardBags - item.outwardBags;
+    const rawRemMT = item.inwardMT - item.outwardMT;
+    const remMT = Math.abs(rawRemMT) < 1e-9 ? 0 : Number(rawRemMT.toFixed(4));
+    const remKG = Number((remMT * 1000).toFixed(2));
+    const inMT = Number(item.inwardMT.toFixed(4));
+    const outMT = Number(item.outwardMT.toFixed(4));
+
+    return {
+      warehouseId: item.warehouseId,
+      warehouseName: item.warehouseName,
+      commodityName: item.commodityName,
+      inward: {
+        bags: item.inwardBags,
+        weightMT: inMT,
+        weightKG: Number((inMT * 1000).toFixed(2)),
+      },
+      outward: {
+        bags: item.outwardBags,
+        weightMT: outMT,
+        weightKG: Number((outMT * 1000).toFixed(2)),
+      },
+      remaining: {
+        bags: remBags,
+        weightMT: remMT,
+        weightKG: remKG,
+      },
+      receiptCount: item.receiptCount,
+      outwardCount: item.outwardCount,
+      transactionCount: item.transactionCount,
+      lastTransactionDate: item.lastTransactionDate,
+      receiptNumbers: Array.from(item.receiptNumbers),
+    };
+  }).sort((a, b) => a.warehouseName.localeCompare(b.warehouseName) || a.commodityName.localeCompare(b.commodityName));
+
+  const warehouseSummaries: WarehouseStockSummary[] = Array.from(warehouseMap.values()).map((wh) => {
+    const remBags = wh.inwardBags - wh.outwardBags;
+    const rawWhRemMT = wh.inwardMT - wh.outwardMT;
+    const remMT = Math.abs(rawWhRemMT) < 1e-9 ? 0 : Number(rawWhRemMT.toFixed(4));
+    const remKG = Number((remMT * 1000).toFixed(2));
+    const inMT = Number(wh.inwardMT.toFixed(4));
+    const outMT = Number(wh.outwardMT.toFixed(4));
+
+    const commodityBreakdown = breakdown.filter((b) => b.warehouseId === wh.warehouseId);
+
+    return {
+      warehouseId: wh.warehouseId,
+      warehouseName: wh.warehouseName,
+      inward: {
+        bags: wh.inwardBags,
+        weightMT: inMT,
+        weightKG: Number((inMT * 1000).toFixed(2)),
+      },
+      outward: {
+        bags: wh.outwardBags,
+        weightMT: outMT,
+        weightKG: Number((outMT * 1000).toFixed(2)),
+      },
+      remaining: {
+        bags: remBags,
+        weightMT: remMT,
+        weightKG: remKG,
+      },
+      commodityBreakdown,
+    };
+  }).sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
+
+  const inMT = Number(totalInwardMT.toFixed(4));
+  const outMT = Number(totalOutwardMT.toFixed(4));
+
+  return {
+    inward: {
+      bags: totalInwardBags,
+      weightMT: inMT,
+      weightKG: Number((inMT * 1000).toFixed(2)),
+    },
+    outward: {
+      bags: totalOutwardBags,
+      weightMT: outMT,
+      weightKG: Number((outMT * 1000).toFixed(2)),
+    },
+    remaining: {
+      bags: remainingBags,
+      weightMT: remainingMT,
+      weightKG: remainingKG,
+    },
+    warehouseSummaries,
+    breakdown,
+  };
 }

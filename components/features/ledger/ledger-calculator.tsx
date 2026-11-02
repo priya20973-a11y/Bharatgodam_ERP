@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { LedgerSummary, LedgerStep, sanitizeClientName, isMongoObjectId, sanitizeTransactionId } from '@/lib/ledger-engine';
+import { LedgerSummary, LedgerStep, sanitizeClientName, isMongoObjectId, sanitizeTransactionId, calculateRemainingStock, TotalRemainingStockSummary } from '@/lib/ledger-engine';
 import { LedgerTable } from './ledger-table';
 import { InvoiceSummary } from './invoice-summary';
+import { TotalRemainingStock } from './total-remaining-stock';
 import { CommodityTransactionTimeline } from './transaction-timeline';
 import { PaymentHistory } from './payment-history';
 import { MatchedRecordsHeader } from './matched-records-header';
@@ -34,6 +35,7 @@ interface WarehouseLedgerBreakdown {
   warehouseId: string;
   warehouseName: string;
   ledgerSummary: LedgerSummary;
+  stockSummary?: TotalRemainingStockSummary;
 }
 
 interface AggregatedLedgerData extends LedgerSummary {
@@ -41,6 +43,7 @@ interface AggregatedLedgerData extends LedgerSummary {
   recordCount?: number;
   isAggregated?: boolean;
   transactions?: any[];
+  stockSummary?: TotalRemainingStockSummary;
   warehouseBreakdowns?: WarehouseLedgerBreakdown[];
 }
 
@@ -205,7 +208,7 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       const txId = sanitizeTransactionId(step.transaction?.transactionId, '-');
       const rawGatePass = step.transaction?.gatePass || '';
       const gatePass = isMongoObjectId(rawGatePass) ? '-' : (rawGatePass || '-');
-      const bagsVal = step.transaction?.bagsCount != null
+      const bagsVal = step.transaction?.bagsCount !== undefined && step.transaction?.bagsCount !== null && (step.transaction.bagsCount as any) !== ''
         ? step.transaction.bagsCount
         : (step.transaction?.bags || '-');
       lines.push([
@@ -257,6 +260,31 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
       if (ledgerData.invoiceOutstandingTotal !== undefined) {
         lines.push(`Total Invoice Outstanding,${formatCSVCell(formatDecimal(ledgerData.invoiceOutstandingTotal))}`);
       }
+    }
+
+    const stockToExport = ledgerData.stockSummary || calculateRemainingStock(transactions.length > 0 ? transactions : (ledgerData.transactions || []));
+    lines.push('');
+    lines.push('TOTAL REMAINING STOCK');
+    lines.push('Metric,Inward,Outward,Remaining');
+    lines.push(`Total Bags,${formatCSVCell(stockToExport.inward.bags)},${formatCSVCell(stockToExport.outward.bags)},${formatCSVCell(stockToExport.remaining.bags)}`);
+    lines.push(`Total Weight (MT),${formatCSVCell(formatDecimal(stockToExport.inward.weightMT))},${formatCSVCell(formatDecimal(stockToExport.outward.weightMT))},${formatCSVCell(formatDecimal(stockToExport.remaining.weightMT))}`);
+
+    if (stockToExport.breakdown.length > 0) {
+      lines.push('');
+      lines.push('STOCK BREAKDOWN (WAREHOUSE & COMMODITY)');
+      lines.push('Warehouse,Commodity,Inward Bags,Inward MT,Outward Bags,Outward MT,Remaining Bags,Remaining MT');
+      stockToExport.breakdown.forEach((item) => {
+        lines.push([
+          item.warehouseName,
+          item.commodityName,
+          item.inward.bags,
+          formatDecimal(item.inward.weightMT),
+          item.outward.bags,
+          formatDecimal(item.outward.weightMT),
+          item.remaining.bags,
+          formatDecimal(item.remaining.weightMT),
+        ].map(formatCSVCell).join(','));
+      });
     }
 
     const csv = lines.join('\n');
@@ -339,6 +367,15 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
           totalBalance={summaryTotalBalance}
           additionalCharges={totalAdditionalCharges}
           showInvoiceAdjustments={showInvoiceAdjustments}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* Total Remaining Stock Section */}
+      {ledgerData && (
+        <TotalRemainingStock
+          stockSummary={ledgerData.stockSummary}
+          transactions={transactions.length > 0 ? transactions : ledgerData.transactions}
           isLoading={isLoading}
         />
       )}

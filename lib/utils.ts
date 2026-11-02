@@ -98,3 +98,22 @@ export function calculateRentMonths(inwardDate: Date, outwardDate: Date): number
 
   return Math.max(1, months);
 }
+
+/**
+ * Format stock quantity with accurate decimal precision.
+ * - Never treats small non-zero values (e.g. 0.005 MT) as 0.
+ * - Formats with at least 2 decimal places, and up to the actual number of decimals present (up to 6).
+ */
+export function formatStockQuantity(value: number | string | undefined | null): string {
+  const num = Number(value || 0);
+  if (isNaN(num)) return '0.00';
+  if (Math.abs(num) < 1e-9) return '0.00';
+  const str = String(num);
+  const decimalPart = str.includes('.') ? str.split('.')[1] : '';
+  const decimalPlaces = Math.max(2, Math.min(6, decimalPart.length));
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimalPlaces,
+  });
+}
+

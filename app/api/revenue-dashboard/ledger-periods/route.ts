@@ -21,8 +21,10 @@ export async function GET(request: Request) {
     // Call the robust simulation engine which now returns detailed ledgerPeriods
     const analytics = await getClientRevenueAnalytics(warehouseId, month);
 
-    // Default to empty array if something fails
-    const periods = analytics?.ledgerPeriods || [];
+    // Default to empty array if something fails, filtering out any fully exhausted (0 MT) entries
+    const periods = (analytics?.ledgerPeriods || []).filter(
+      (p: any) => Math.abs(Number(p.quantityMT || p.quantity || 0)) >= 1e-9
+    );
     periods.sort((a: any, b: any) => a.periodStart.localeCompare(b.periodStart));
 
     return NextResponse.json({

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
 import { logRevenueExportAction } from '@/app/actions/revenue';
+import { formatStockQuantity } from '@/lib/utils';
 
 export default function RevenueDashboard() {
   const [data, setData] = useState<{ summary: any; warehouseRevenue: any[] } | null>(null);
@@ -68,7 +69,10 @@ export default function RevenueDashboard() {
         return;
       }
       const json = await response.json();
-      setWarehouseTransactions(json.periods || []);
+      const periods = (json.periods || []).filter(
+        (p: any) => Math.abs(Number(p.quantityMT ?? p.quantity ?? 0)) >= 1e-9
+      );
+      setWarehouseTransactions(periods);
     } catch (error) {
       console.error('Failed to load ledger periods:', error);
       setWarehouseTransactions([]);
@@ -227,7 +231,7 @@ export default function RevenueDashboard() {
       });
 
       const transactionRows = warehouseTransactions
-        .filter((period) => selectedMonth === 'ALL' || period.month === selectedMonth)
+        .filter((period) => (selectedMonth === 'ALL' || period.month === selectedMonth) && Math.abs(Number(period.quantityMT ?? period.quantity ?? 0)) >= 1e-9)
         .map((period) => {
           const whInfo = whMap.get(String(period.warehouseId || '')) || whMap.get(period.warehouseName);
           const warehouseType = (whInfo?.warehouseType || period.warehouseType || 'Owner') as string;
@@ -247,6 +251,10 @@ export default function RevenueDashboard() {
           const rentAmount = typeof period.rentTotal === 'number' ? period.rentTotal : Number(period.rentTotal || 0);
           const ownerShare = isRented ? 0 : Math.round(rentAmount * (ownerPercent / 100) * 100) / 100;
           const platformShare = isRented ? rentAmount : Math.round(rentAmount * (platformPercent / 100) * 100) / 100;
+          const rawQty = period.quantityMT ?? period.quantity;
+          const qtyDisplay = rawQty !== undefined && rawQty !== null && rawQty !== ''
+            ? formatStockQuantity(rawQty)
+            : (period.bagsCount || '');
 
           return {
             'Row Type': 'Ledger Period',
@@ -257,7 +265,7 @@ export default function RevenueDashboard() {
             Date: `${period.periodStart} to ${period.periodEnd}`,
             Direction: 'Storage',
             Commodity: period.commodityName || '',
-            'Quantity': typeof period.quantityMT === 'number' ? period.quantityMT.toFixed(2) : (period.bagsCount || ''),
+            'Quantity': qtyDisplay,
             'Unit': period.unit || 'MT',
             'Gate Pass': period.gatePass || '',
             Status: period.status || '',
