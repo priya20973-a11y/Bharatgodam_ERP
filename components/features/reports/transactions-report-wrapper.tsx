@@ -361,41 +361,94 @@ export default async function TransactionsReportWrapper() {
       ...legacyRecords,
     ];
 
+    const outwardsMap = new Map<string, any>();
+    outwards.forEach((out: any) => {
+      if (out._id) {
+        outwardsMap.set(out._id.toString(), out);
+      }
+    });
+
+    const resolveOutwardBagsForReport = (t: any): number | undefined => {
+      const isOutward = (t.direction || t.type || t.sourceType || '').toString().toUpperCase() === 'OUTWARD';
+      if (!isOutward) {
+        if (t.bagsCount !== undefined && t.bagsCount !== null && t.bagsCount !== '') return Number(t.bagsCount);
+        if (t.bags !== undefined && t.bags !== null && t.bags !== '') return Number(t.bags);
+        return undefined;
+      }
+
+      const sId = t.sourceId?.toString() || '';
+      const idStr = t._id?.toString() || '';
+      let matched = outwardsMap.get(sId) || outwardsMap.get(idStr);
+
+      if (!matched && t.gatePass && String(t.gatePass).trim()) {
+        const gp = String(t.gatePass).trim().toLowerCase();
+        matched = outwards.find((o: any) => String(o.gatePass || '').trim().toLowerCase() === gp);
+      }
+
+      if (!matched) {
+        const tDate = getRecordDate(t);
+        const tQty = Number(t.quantityMT || t.quantity || 0);
+        matched = outwards.find((o: any) => {
+          const oDate = normalizeDateValue(o.date || o.createdAt || '');
+          const oQty = Number(o.quantityMT || 0);
+          const sameClient = normalizeId(o.clientId) === (normalizeId(t.clientId) || normalizeId(t.client?._id));
+          const sameCommodity = normalizeId(o.commodityId) === (normalizeId(t.commodityId) || normalizeId(t.commodity?._id));
+          const sameWarehouse = normalizeId(o.warehouseId) === (normalizeId(t.warehouseId) || normalizeId(t.warehouse?._id));
+          return sameClient && sameCommodity && sameWarehouse && oDate === tDate && Math.abs(oQty - tQty) < 0.001;
+        });
+      }
+
+      if (matched && matched.bagsCount !== undefined && matched.bagsCount !== null && matched.bagsCount !== '') {
+        return Number(matched.bagsCount);
+      }
+      if (t.bagsCount !== undefined && t.bagsCount !== null && t.bagsCount !== '') {
+        return Number(t.bagsCount);
+      }
+      if (t.bags !== undefined && t.bags !== null && t.bags !== '') {
+        return Number(t.bags);
+      }
+      return undefined;
+    };
+
     const isAdminUser = isAdmin(session);
 
     const combinedTransactions = (isAdmin(session)
       ? baseCombinedRecords.filter(isValidTransactionRecord)
       : baseCombinedRecords
-    ).map((t: any) => ({
-      _id: t._id?.toString(),
-      sourceType: t.sourceType || 'transactions',
-      direction: t.direction || t.type || 'INWARD',
-      date: t.direction === 'OUTWARD' ? (t.actualOutwardDate || t.inwardDate || t.date || t.createdAt) : (t.inwardDate || t.date || t.createdAt),
-      clientName: t.clientName || t.client?.name || '',
-      clientId: t.clientId?.toString() || t.client?._id?.toString() || '',
-      clientIdentifier: t.client?.customClientId || '',
-      commodityName: t.commodityName || t.commodity?.name || '',
-      commodityId: t.commodityId?.toString() || t.commodity?._id?.toString() || '',
-      // Display CURRENT warehouse name from the lookup, fall back to stored name
-      warehouseName: t.warehouse?.name || t.warehouseName || '',
-      warehouseId: t.warehouseId?.toString() || t.warehouse?._id?.toString() || '',
-      quantityMT: t.quantityMT || t.quantity || 0,
-      actualWeight: t.actualWeight,
-      netWeightLoss: t.netWeightLoss,
-      bagsCount: t.bagsCount,
-      gatePass: t.gatePass,
-      partyName: t.partyName,
-      stackNo: t.stackNo,
-      lotNo: t.lotNo,
-      status: t.status || 'COMPLETED',
-      createdAt: t.createdAt || t.updatedAt || t.date,
-      receiptNumber: t.receiptNumber,
-      vehicleNumber: t.vehicleNumber,
-      transportationName: t.transportationName,
-      driverName: t.driverName,
-      note: t.note || t.notes,
-      notes: t.notes || t.note,
-    }));
+    ).map((t: any) => {
+      const resolvedBags = resolveOutwardBagsForReport(t);
+      return {
+        _id: t._id?.toString(),
+        sourceType: t.sourceType || 'transactions',
+        direction: t.direction || t.type || 'INWARD',
+        date: t.direction === 'OUTWARD' ? (t.actualOutwardDate || t.inwardDate || t.date || t.createdAt) : (t.inwardDate || t.date || t.createdAt),
+        clientName: t.clientName || t.client?.name || '',
+        clientId: t.clientId?.toString() || t.client?._id?.toString() || '',
+        clientIdentifier: t.client?.customClientId || '',
+        commodityName: t.commodityName || t.commodity?.name || '',
+        commodityId: t.commodityId?.toString() || t.commodity?._id?.toString() || '',
+        // Display CURRENT warehouse name from the lookup, fall back to stored name
+        warehouseName: t.warehouse?.name || t.warehouseName || '',
+        warehouseId: t.warehouseId?.toString() || t.warehouse?._id?.toString() || '',
+        quantityMT: t.quantityMT || t.quantity || 0,
+        actualWeight: t.actualWeight,
+        netWeightLoss: t.netWeightLoss,
+        bagsCount: resolvedBags,
+        bags: resolvedBags,
+        gatePass: t.gatePass,
+        partyName: t.partyName,
+        stackNo: t.stackNo,
+        lotNo: t.lotNo,
+        status: t.status || 'COMPLETED',
+        createdAt: t.createdAt || t.updatedAt || t.date,
+        receiptNumber: t.receiptNumber,
+        vehicleNumber: t.vehicleNumber,
+        transportationName: t.transportationName,
+        driverName: t.driverName,
+        note: t.note || t.notes,
+        notes: t.notes || t.note,
+      };
+    });
     const isStaff = (session.user as any).isStaff;
     const userId = isStaff ? (session.user as any).staffId : session.user.id;
     const userProfile = await db.collection('users').findOne({ _id: new ObjectId(userId) });

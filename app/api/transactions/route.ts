@@ -317,6 +317,8 @@ export async function POST(request: Request) {
       commodityName,  // NEW: commodity name
       gatePass,       // NEW: gate pass reference
       quantityMT,     // NEW: alias for quantity with MT unit
+      bagsCount,
+      bags,
     } = body;
 
     // Validate required fields
@@ -492,11 +494,16 @@ export async function POST(request: Request) {
         ? commodityFromMaster.ratePerMtMonth / 30
         : 10);
 
+    const bagsVal = bagsCount !== undefined && bagsCount !== null && bagsCount !== ''
+      ? Number(bagsCount)
+      : (bags !== undefined && bags !== null && bags !== '' ? Number(bags) : undefined);
+
     const transaction = appendOwnershipForMongo({
       accountId: accountId,
       direction: direction,
       date: normalizeDateToYYYYMMDD(date),
       quantityMT: qty,
+      ...(bagsVal !== undefined && !Number.isNaN(bagsVal) ? { bagsCount: bagsVal, bags: bagsVal } : {}),
       commodityName: commodityFromMaster.name,
       commodityId: commodityFromMaster._id.toString(),
       gatePass: gatePass || `GP-${Date.now()}`,
@@ -622,7 +629,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { transactionId, date, quantityMT, sourceType } = body;
+    const { transactionId, date, quantityMT, bagsCount, bags, sourceType } = body;
 
     if (!transactionId || !date || quantityMT === undefined) {
       return NextResponse.json({ success: false, message: 'transactionId, date and quantityMT are required' }, { status: 400 });
@@ -642,6 +649,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
     }
 
+    const bagsVal = bagsCount !== undefined && bagsCount !== null && bagsCount !== ''
+      ? Number(bagsCount)
+      : (bags !== undefined && bags !== null && bags !== '' ? Number(bags) : undefined);
+
     const db = await getDb();
     const transaction = await getTransactionInfo(db, transactionId, sourceType);
     if (!transaction) {
@@ -652,6 +663,16 @@ export async function PATCH(request: Request) {
       // If older records stored direction differently, still allow
     }
 
+    const updateTxFields: any = {
+      date: normalizeDateToYYYYMMDD(date),
+      quantityMT: parsedQuantity,
+      updatedAt: new Date(),
+    };
+    if (bagsVal !== undefined && !Number.isNaN(bagsVal)) {
+      updateTxFields.bagsCount = bagsVal;
+      updateTxFields.bags = bagsVal;
+    }
+
     await db.collection('transactions').updateMany(
       { 
         $or: [
@@ -660,11 +681,7 @@ export async function PATCH(request: Request) {
         ]
       },
       {
-        $set: {
-          date: normalizeDateToYYYYMMDD(date),
-          quantityMT: parsedQuantity,
-          updatedAt: new Date(),
-        },
+        $set: updateTxFields,
       }
     );
 
@@ -672,27 +689,25 @@ export async function PATCH(request: Request) {
     try {
       const srcType = (transaction.sourceType || '').toLowerCase();
       const objectId = new ObjectId(transaction._id);
+      const docUpdate: any = {
+        date: parsedDate,
+        quantityMT: parsedQuantity,
+        updatedAt: new Date(),
+      };
+      if (bagsVal !== undefined && !Number.isNaN(bagsVal)) {
+        docUpdate.bagsCount = bagsVal;
+        docUpdate.bags = bagsVal;
+      }
+
       if (srcType === 'inward') {
         await db.collection('inwards').updateOne(
           { _id: objectId },
-          {
-            $set: {
-              date: parsedDate,
-              quantityMT: parsedQuantity,
-              updatedAt: new Date(),
-            }
-          }
+          { $set: docUpdate }
         );
       } else if (srcType === 'outward') {
         await db.collection('outwards').updateOne(
           { _id: objectId },
-          {
-            $set: {
-              date: parsedDate,
-              quantityMT: parsedQuantity,
-              updatedAt: new Date(),
-            }
-          }
+          { $set: docUpdate }
         );
       }
 
@@ -700,23 +715,11 @@ export async function PATCH(request: Request) {
         const sourceObjectId = new ObjectId(transaction.sourceId);
         await db.collection('inwards').updateOne(
           { _id: sourceObjectId },
-          {
-            $set: {
-              date: parsedDate,
-              quantityMT: parsedQuantity,
-              updatedAt: new Date(),
-            }
-          }
+          { $set: docUpdate }
         );
         await db.collection('outwards').updateOne(
           { _id: sourceObjectId },
-          {
-            $set: {
-              date: parsedDate,
-              quantityMT: parsedQuantity,
-              updatedAt: new Date(),
-            }
-          }
+          { $set: docUpdate }
         );
       }
     } catch (syncDocError) {

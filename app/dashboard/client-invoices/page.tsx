@@ -341,7 +341,7 @@ export default function ClientInvoicesPage() {
                 startDate: period.fromDate,
                 endDate: period.toDate,
                 quantityMT: Number(period.qty ?? 0),
-                bags: period.bags || '',
+                bags: period.bags !== undefined && period.bags !== null ? period.bags : (period.bagsCount || ''),
                 daysTotal: Number(period.days ?? 0),
                 rentTotal: Number(period.rent ?? 0),
                 status: period.status || 'COMPLETED',
@@ -381,7 +381,7 @@ export default function ClientInvoicesPage() {
             commodityName: p.commodityName || '',
             warehouseName: p.warehouseName || inv.warehouseName || '',
             quantityMT: Number(p.quantityMT || 0),
-            bags: p.bags || '',
+            bags: p.bags !== undefined && p.bags !== null ? p.bags : (p.bagsCount || ''),
             storageDays: p.daysTotal ?? 0,
           }));
         });
@@ -1266,7 +1266,7 @@ export default function ClientInvoicesPage() {
                       <td className="px-4 py-2">{record.commodityName || ''}</td>
                       <td className="px-4 py-2">{record.warehouseName || ''}</td>
                       <td className="px-4 py-2 text-right font-medium">{Number(record.quantityMT || 0).toFixed(2)}</td>
-                      <td className="px-4 py-2 text-center">{record.bags || 0}</td>
+                      <td className="px-4 py-2 text-center">{record.bags || '-'}</td>
                       <td className="px-4 py-2 text-center">{record.storageDays || 0}</td>
                     </tr>
                   ))}

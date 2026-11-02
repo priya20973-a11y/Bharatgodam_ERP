@@ -130,6 +130,11 @@ export const CommodityTransactionTimeline: React.FC<CommodityTransactionTimeline
                                 <p className="text-xs text-slate-600 mt-0.5">
                                   Client: {sanitizeClientName(txn.clientName)}
                                 </p>
+                                {(txn.bagsCount != null || (txn.bags != null && txn.bags !== '')) && (
+                                  <p className="text-xs text-slate-600 font-medium mt-0.5">
+                                    Bags: {txn.bagsCount ?? txn.bags}
+                                  </p>
+                                )}
                                 {refDisplay && gatePassDisplay && gatePassDisplay !== refDisplay && (
                                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">
                                     GP: {gatePassDisplay}

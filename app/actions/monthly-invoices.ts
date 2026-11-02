@@ -27,6 +27,8 @@ export interface MonthlyInvoiceData {
     rate?: number;
     direction?: string;
     gatePass?: string;
+    bags?: number | string;
+    bagsCount?: number;
   }>;
   transactions?: Array<{
     date: string;
@@ -34,6 +36,8 @@ export interface MonthlyInvoiceData {
     commodityName: string;
     quantityMT: number;
     gatePass?: string;
+    bags?: number | string;
+    bagsCount?: number;
   }>;
   warehouseId?: string;
   warehouseName?: string;

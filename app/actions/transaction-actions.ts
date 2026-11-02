@@ -720,6 +720,8 @@ export async function processOutward(data: {
       type: 'OUTWARD',
       date: outwardDate,
       quantityMT: data.quantityMT,
+      bagsCount: data.bagsCount !== undefined && data.bagsCount !== null ? Number(data.bagsCount) : undefined,
+      bags: data.bagsCount !== undefined && data.bagsCount !== null ? Number(data.bagsCount) : undefined,
       actualWeight: data.actualWeight,
       netWeightLoss: data.netWeightLoss,
       stackNo: data.stackNo,
@@ -849,6 +851,62 @@ export async function processOutward(data: {
         console.error('[processOutward] failed to end session', endError);
       }
     }
+  }
+}
+
+/**
+ * Backfills missing bagsCount in transactions collection for outward transactions from outwards collection.
+ */
+export async function syncHistoricalOutwardBags(dbInstance?: any) {
+  try {
+    const db = dbInstance || mongoose.connection.db;
+    if (!db) return { success: false, message: 'Database connection not established' };
+    const outwards = await db.collection('outwards').find({ bagsCount: { $exists: true, $ne: null } }).toArray();
+    let updatedCount = 0;
+    for (const out of outwards) {
+      if (out.bagsCount === undefined || out.bagsCount === null) continue;
+      const bagsNum = Number(out.bagsCount);
+      const outIdStr = out._id.toString();
+      const res = await db.collection('transactions').updateMany(
+        {
+          $and: [
+            {
+              $or: [
+                { sourceId: outIdStr },
+                { sourceId: out._id },
+                { _id: out._id },
+                {
+                  direction: 'OUTWARD',
+                  clientId: out.clientId?.toString?.() || out.clientId,
+                  commodityId: out.commodityId?.toString?.() || out.commodityId,
+                  warehouseId: out.warehouseId?.toString?.() || out.warehouseId,
+                  quantityMT: out.quantityMT,
+                }
+              ]
+            },
+            {
+              $or: [
+                { bagsCount: { $exists: false } },
+                { bagsCount: null },
+                { bags: { $exists: false } },
+                { bags: null }
+              ]
+            }
+          ]
+        },
+        {
+          $set: {
+            bagsCount: bagsNum,
+            bags: bagsNum,
+          }
+        }
+      );
+      updatedCount += res.modifiedCount || 0;
+    }
+    return { success: true, updatedCount };
+  } catch (err) {
+    console.error('[syncHistoricalOutwardBags] error syncing outward bags:', err);
+    return { success: false, error: String(err) };
   }
 }
 

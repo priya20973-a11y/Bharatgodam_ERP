@@ -19,6 +19,8 @@ export interface Transaction {
   warehouseId?: string;
   warehouseName?: string;
   partyName?: string;
+  bagsCount?: number;
+  bags?: number | string;
 }
 
 export interface Payment {
@@ -49,6 +51,8 @@ export interface LedgerStep {
     actualWeight?: number;
     netWeightLoss?: number;
     partyName?: string;
+    bagsCount?: number;
+    bags?: number | string;
   };
 }
 
@@ -467,6 +471,8 @@ export function calculateLedger(
       actualWeight: latestTxn.actualWeight,
       netWeightLoss: latestTxn.netWeightLoss,
       partyName: latestTxn.partyName,
+      bagsCount: latestTxn.bagsCount,
+      bags: latestTxn.bags,
     };
   };
 

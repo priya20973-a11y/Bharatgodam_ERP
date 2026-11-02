@@ -64,6 +64,8 @@ export interface ITransaction {
   direction: 'INWARD' | 'OUTWARD';
   commodityName: string;
   quantityMT: number;
+  bagsCount?: number;
+  bags?: number | string;
   gatePass: string;
   warehouseName?: string;
   location?: string;

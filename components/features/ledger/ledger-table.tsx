@@ -196,6 +196,13 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({ steps, isLoading = fal
                             Party: {transaction.partyName}
                           </span>
                         )}
+                        {(transaction.bagsCount != null
+                          ? transaction.bagsCount
+                          : (transaction.bags != null && transaction.bags !== '' ? transaction.bags : null)) !== null && (
+                          <span className="text-[10px] text-slate-600 font-medium">
+                            Bags: {transaction.bagsCount ?? transaction.bags}
+                          </span>
+                        )}
                         {transaction.actualWeight != null && (
                           <span className="text-[10px] text-slate-500 font-medium">
                             Actual: {formatDecimal(transaction.actualWeight)} MT

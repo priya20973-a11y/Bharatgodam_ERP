@@ -31,6 +31,43 @@ export async function getStockReport(filters: StockReportFilter = {}) {
     const rawData = await db.collection('transactions').aggregate([
       { $match: matchStage },
       {
+        $lookup: {
+          from: 'outwards',
+          let: { srcId: '$sourceId', txId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ['$_id', '$$srcId'] },
+                    { $eq: [{ $toString: '$_id' }, '$$srcId'] },
+                    { $eq: ['$_id', '$$txId'] },
+                  ]
+                }
+              }
+            },
+            { $project: { bagsCount: 1 } }
+          ],
+          as: '_matchedOutward'
+        }
+      },
+      {
+        $addFields: {
+          effectiveBags: {
+            $cond: [
+              { $eq: ['$direction', 'OUTWARD'] },
+              {
+                $ifNull: [
+                  { $arrayElemAt: ['$_matchedOutward.bagsCount', 0] },
+                  { $ifNull: ['$bagsCount', 0] }
+                ]
+              },
+              { $ifNull: ['$bagsCount', 0] }
+            ]
+          }
+        }
+      },
+      {
         $group: {
           _id: {
             clientId: '$clientId',
@@ -41,8 +78,8 @@ export async function getStockReport(filters: StockReportFilter = {}) {
           warehouseName: { $first: '$warehouseName' },
           inwardQuantity: { $sum: { $cond: [{ $eq: ['$direction', 'INWARD'] }, '$quantityMT', 0] } },
           outwardQuantity: { $sum: { $cond: [{ $eq: ['$direction', 'OUTWARD'] }, '$quantityMT', 0] } },
-          inwardBags: { $sum: { $cond: [{ $eq: ['$direction', 'INWARD'] }, '$bagsCount', 0] } },
-          outwardBags: { $sum: { $cond: [{ $eq: ['$direction', 'OUTWARD'] }, '$bagsCount', 0] } },
+          inwardBags: { $sum: { $cond: [{ $eq: ['$direction', 'INWARD'] }, '$effectiveBags', 0] } },
+          outwardBags: { $sum: { $cond: [{ $eq: ['$direction', 'OUTWARD'] }, '$effectiveBags', 0] } },
         }
       },
       {

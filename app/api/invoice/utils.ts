@@ -759,6 +759,10 @@ export async function buildMonthlyInvoiceFromTransactions(
       periodStart: item.startDate || '',
       periodEnd: item.endDate || '',
       status: item.status || 'COMPLETED',
+      bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
+      bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
+      gatePass: item.gatePass || item.gatepass || '',
+      direction: item.direction || '',
       createdAt: new Date(),
     }));
 
@@ -1045,6 +1049,10 @@ export async function buildMonthlyInvoiceFromLedger(
       periodStart: item.fromDate || '',
       periodEnd: item.toDate || '',
       status: item.status || 'COMPLETED',
+      bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
+      bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
+      gatePass: item.gatePass || item.gatepass || '',
+      direction: item.direction || '',
       createdAt: new Date(),
     })
   );
@@ -1330,14 +1338,107 @@ export async function getTransactionsForInvoiceMonth(
       warehouseDocs.map((w: any) => [w._id.toString(), w])
     );
 
+    // Fetch actual outward records directly to ensure accurate bag tracking for outward transactions
+    const outwardTxns = transactions.filter(
+      (txn: any) => (txn.direction || txn.type || '').toUpperCase() === 'OUTWARD'
+    );
+
+    const outwardDocsMap = new Map<string, any>();
+    let clientOutwardDocs: any[] = [];
+
+    if (outwardTxns.length > 0) {
+      const outwardIds: any[] = [];
+      outwardTxns.forEach((txn: any) => {
+        if (txn.sourceId) {
+          outwardIds.push(txn.sourceId);
+          if (ObjectId.isValid(txn.sourceId)) outwardIds.push(new ObjectId(txn.sourceId));
+        }
+        if (txn.outwardId) {
+          outwardIds.push(txn.outwardId);
+          if (ObjectId.isValid(txn.outwardId)) outwardIds.push(new ObjectId(txn.outwardId));
+        }
+        if (txn._id) {
+          outwardIds.push(txn._id);
+          if (ObjectId.isValid(txn._id)) outwardIds.push(new ObjectId(txn._id));
+        }
+      });
+
+      const [directOutwards, generalOutwards] = await Promise.all([
+        outwardIds.length > 0
+          ? db.collection('outwards').find({
+              _id: { $in: outwardIds },
+              ...tenantFilter,
+            }).toArray()
+          : Promise.resolve([]),
+        db.collection('outwards').find({
+          clientId: { $in: clientIdValues },
+          ...tenantFilter,
+        }).toArray(),
+      ]);
+
+      clientOutwardDocs = [...directOutwards, ...generalOutwards];
+      clientOutwardDocs.forEach((doc: any) => {
+        if (doc._id) {
+          outwardDocsMap.set(doc._id.toString(), doc);
+        }
+      });
+    }
+
+    const findOutwardDocForTxn = (txn: any) => {
+      if (txn.sourceId && outwardDocsMap.has(txn.sourceId.toString())) {
+        return outwardDocsMap.get(txn.sourceId.toString());
+      }
+      if (txn.outwardId && outwardDocsMap.has(txn.outwardId.toString())) {
+        return outwardDocsMap.get(txn.outwardId.toString());
+      }
+      if (txn._id && outwardDocsMap.has(txn._id.toString())) {
+        return outwardDocsMap.get(txn._id.toString());
+      }
+      if (txn.gatePass && String(txn.gatePass).trim()) {
+        const gp = String(txn.gatePass).trim().toLowerCase();
+        const matched = clientOutwardDocs.find(
+          (o: any) => String(o.gatePass || '').trim().toLowerCase() === gp
+        );
+        if (matched) return matched;
+      }
+      const rawDate = txn.date || txn.inwardDate || txn.outwardDate || '';
+      const txnDateStr = rawDate instanceof Date
+        ? rawDate.toISOString().split('T')[0]
+        : String(rawDate).split('T')[0];
+      const txnQty = Number(txn.quantityMT ?? txn.quantity ?? txn.qty ?? 0);
+
+      return clientOutwardDocs.find((o: any) => {
+        const oDateStr = o.date instanceof Date ? o.date.toISOString().split('T')[0] : String(o.date || '').split('T')[0];
+        const oQty = Number(o.quantityMT || 0);
+        const sameClient = String(o.clientId || '') === String(txn.clientId || '');
+        const sameCommodity = String(o.commodityId || '') === String(txn.commodityId || '');
+        const sameWarehouse = !txn.warehouseId || !o.warehouseId || String(o.warehouseId || '') === String(txn.warehouseId || '');
+        const sameDate = oDateStr === txnDateStr;
+        const sameQty = Math.abs(oQty - txnQty) < 0.001;
+        return sameClient && sameCommodity && sameWarehouse && sameDate && sameQty;
+      }) || null;
+    };
+
     return transactions.map((txn: any) => {
+      const isOutward = (txn.direction || txn.type || '').toUpperCase() === 'OUTWARD';
       const rawQuantity = txn.quantityMT ?? txn.quantity ?? txn.qty ?? 0;
-      const rawBags =
-        txn.bags ??
-        txn.bagsCount ??
-        txn.bagCount ??
-        txn.bags_count ??
-        '';
+      let rawBags: number | string = '';
+
+      if (isOutward) {
+        const outwardDoc = findOutwardDocForTxn(txn);
+        if (outwardDoc && outwardDoc.bagsCount !== undefined && outwardDoc.bagsCount !== null && outwardDoc.bagsCount !== '') {
+          rawBags = Number(outwardDoc.bagsCount);
+        } else if (txn.bagsCount !== undefined && txn.bagsCount !== null && txn.bagsCount !== '') {
+          rawBags = Number(txn.bagsCount);
+        } else if (txn.bags !== undefined && txn.bags !== null && txn.bags !== '') {
+          rawBags = Number(txn.bags);
+        }
+      } else {
+        const baseBags = txn.bags ?? txn.bagsCount ?? txn.bagCount ?? txn.bags_count;
+        if (baseBags !== undefined && baseBags !== null && baseBags !== '') {
+          rawBags = Number(baseBags);
+        }
+      }
 
       return {
         date: (() => {
@@ -1364,6 +1465,7 @@ export async function getTransactionsForInvoiceMonth(
         quantityMT: Number(rawQuantity || 0),
         quantity: Number(rawQuantity || 0),
         bags: rawBags,
+        bagsCount: rawBags !== '' ? Number(rawBags) : undefined,
         gatePass: txn.gatePass || txn.gatepass || '',
         ratePerMTPerDay: (() => {
           const txnRate = Number(
@@ -1542,7 +1644,8 @@ function buildOpeningBalanceRows(
       warehouseId: balance.warehouseId,
       quantityMT: balance.quantityMT,
       quantity: balance.quantityMT,
-      bags: balance.bags || '',
+      bags: balance.bags > 0 ? balance.bags : '',
+      bagsCount: balance.bags > 0 ? balance.bags : undefined,
       daysTotal: monthDays,
       rentTotal: Number(balance.quantityMT * balance.ratePerDay * monthDays || 0),
       status: 'OPENING_BALANCE',
@@ -1662,6 +1765,7 @@ export function transformTransactionsToBillingRows(
           quantityMT,
           quantity: quantityMT,
           bags: bagCountValue,
+          bagsCount: bagCountValue !== '' ? Number(bagCountValue) : undefined,
           daysTotal: days,
           rentTotal,
           status: txn.status || 'COMPLETED',
@@ -2000,7 +2104,8 @@ export async function resolveMonthlyInvoiceFromId(
                 rate: Number(item.rate ?? 0),
                 warehouseName: item.warehouseName || '',
                 warehouseId: item.warehouseId || '',
-                bags: item.bags || '',
+                bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
+            bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
               })
             );
 
@@ -2078,7 +2183,8 @@ export async function resolveMonthlyInvoiceFromId(
               item.commodityName || '',
             warehouseName: item.warehouseName || '',
             warehouseId: item.warehouseId || '',
-            bags: item.bags || '',
+            bags: item.bags !== undefined && item.bags !== null ? item.bags : (item.bagsCount ?? ''),
+            bagsCount: item.bagsCount ?? (item.bags !== undefined && item.bags !== '' ? Number(item.bags) : undefined),
           }));
 
     const totalRentFromPeriods = billingPeriods.reduce(

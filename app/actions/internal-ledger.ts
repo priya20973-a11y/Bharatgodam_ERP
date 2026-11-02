@@ -287,7 +287,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
   bookings.forEach(inspectLinkedIds);
   transactionDocs.forEach(inspectLinkedIds);
 
-  const [inwardDocs, outwardDocs, coldInwardDocs, coldOutwardDocs] = await Promise.all([
+  const [inwardDocs, outwardDocs, coldInwardDocs, coldOutwardDocs, clientOutwardDocs] = await Promise.all([
     linkedInwardIdHexes.length > 0 || linkedInwardIdStrings.length > 0
       ? db.collection('inwards').find({
           _id: { $in: [...linkedInwardIdHexes, ...linkedInwardIdStrings as any] }
@@ -296,7 +296,7 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     linkedOutwardIdHexes.length > 0 || linkedOutwardIdStrings.length > 0
       ? db.collection('outwards').find({
           _id: { $in: [...linkedOutwardIdHexes, ...linkedOutwardIdStrings as any] }
-        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
+        }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1, bagsCount: 1, bags: 1, date: 1, quantityMT: 1, clientId: 1, commodityId: 1, warehouseId: 1 }).toArray()
       : Promise.resolve([]),
     linkedInwardIdHexes.length > 0 || linkedInwardIdStrings.length > 0
       ? db.collection('coldinwards').find({
@@ -308,7 +308,58 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
           _id: { $in: [...linkedOutwardIdHexes, ...linkedOutwardIdStrings as any] }
         }).project({ receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1 }).toArray()
       : Promise.resolve([]),
+    // Also fetch outwards for this client account to ensure historical and direct outward transactions get actual bag quantity
+    db.collection('outwards').find({
+      ...(clientObjectId ? { clientId: { $in: [clientObjectId, accountId] } } : { clientId: accountId }),
+      ...tenantFilter,
+      ...activeRecordFilter,
+    }).project({ _id: 1, receiptNumber: 1, gatePass: 1, lotNo: 1, weighbridgeSlipNo: 1, bagsCount: 1, bags: 1, date: 1, quantityMT: 1, clientId: 1, commodityId: 1, warehouseId: 1 }).toArray()
   ]);
+
+  const outwardDocMap = new Map<string, any>();
+  const outwardDocList = [...(outwardDocs || []), ...(clientOutwardDocs || [])];
+  outwardDocList.forEach((doc: any) => {
+    if (doc?._id) {
+      outwardDocMap.set(doc._id.toString(), doc);
+    }
+  });
+
+  const resolveOutwardBags = (txn: any): number | undefined => {
+    const sId = txn.sourceId ? String(txn.sourceId).trim() : '';
+    const outId = txn.outwardId ? String(txn.outwardId).trim() : '';
+    const idStr = txn._id ? String(txn._id).trim() : '';
+
+    let matchedDoc: any = null;
+    if (sId && outwardDocMap.has(sId)) matchedDoc = outwardDocMap.get(sId);
+    else if (outId && outwardDocMap.has(outId)) matchedDoc = outwardDocMap.get(outId);
+    else if (idStr && outwardDocMap.has(idStr)) matchedDoc = outwardDocMap.get(idStr);
+
+    if (!matchedDoc && txn.gatePass && String(txn.gatePass).trim()) {
+      const gp = String(txn.gatePass).trim().toLowerCase();
+      matchedDoc = outwardDocList.find((o: any) => String(o.gatePass || '').trim().toLowerCase() === gp);
+    }
+
+    if (!matchedDoc) {
+      const txnDateStr = txn.date instanceof Date ? txn.date.toISOString().split('T')[0] : String(txn.date || '').split('T')[0];
+      const txnQty = Number(txn.quantityMT ?? txn.mt ?? 0);
+      matchedDoc = outwardDocList.find((o: any) => {
+        const oDateStr = o.date instanceof Date ? o.date.toISOString().split('T')[0] : String(o.date || '').split('T')[0];
+        const oQty = Number(o.quantityMT || 0);
+        return oDateStr === txnDateStr && Math.abs(oQty - txnQty) < 0.001;
+      });
+    }
+
+    if (matchedDoc && matchedDoc.bagsCount !== undefined && matchedDoc.bagsCount !== null && matchedDoc.bagsCount !== '') {
+      return Number(matchedDoc.bagsCount);
+    }
+    if (txn.bagsCount !== undefined && txn.bagsCount !== null && txn.bagsCount !== '') {
+      return Number(txn.bagsCount);
+    }
+    if (txn.bags !== undefined && txn.bags !== null && txn.bags !== '') {
+      return Number(txn.bags);
+    }
+    return undefined;
+  };
 
   const linkedReferenceMap = new Map<string, string>();
   const recordDocReference = (doc: any) => {
@@ -352,7 +403,10 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
     transactionData.push(txn);
   };
 
-  bookings.forEach((txn) =>
+  bookings.forEach((txn) => {
+    const isOutward = txn.direction === 'OUTWARD';
+    const bagsCount = isOutward ? resolveOutwardBags(txn) : (txn.bagsCount !== undefined ? Number(txn.bagsCount) : (txn.bags !== undefined && txn.bags !== '' ? Number(txn.bags) : undefined));
+
     addTransaction({
       _id: txn._id?.toString() || '',
       transactionId: resolveRecordTransactionId(txn),
@@ -371,10 +425,15 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       actualWeight: txn.actualWeight,
       netWeightLoss: txn.netWeightLoss,
       partyName: txn.partyName,
-    })
-  );
+      bagsCount: bagsCount,
+      bags: bagsCount,
+    });
+  });
 
-  transactionDocs.forEach((txn) =>
+  transactionDocs.forEach((txn) => {
+    const isOutward = txn.direction === 'OUTWARD';
+    const bagsCount = isOutward ? resolveOutwardBags(txn) : (txn.bagsCount !== undefined ? Number(txn.bagsCount) : (txn.bags !== undefined && txn.bags !== '' ? Number(txn.bags) : undefined));
+
     addTransaction({
       _id: txn._id?.toString() || '',
       transactionId: resolveRecordTransactionId(txn),
@@ -393,8 +452,10 @@ export async function getInternalLedgerData(accountId: string, tenantFilter: any
       actualWeight: txn.actualWeight,
       netWeightLoss: txn.netWeightLoss,
       partyName: txn.partyName,
-    })
-  );
+      bagsCount: bagsCount,
+      bags: bagsCount,
+    });
+  });
 
   transactionData.sort((a, b) => {
     const ta = a.date ? new Date(a.date).getTime() : 0;

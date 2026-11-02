@@ -197,14 +197,17 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
     }
     lines.push('');
     lines.push('LEDGER STEPS');
-    // Single, well-aligned header row (11 columns matching data rows exactly)
-    lines.push('Step No,Commodity,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Rent Days,Transaction Id,Transaction GatePass');
+    // Single, well-aligned header row matching data rows exactly
+    lines.push('Step No,Commodity,Start Date,End Date,Days,Quantity (MT),Rate (₹/day/MT),Rent Amount (₹),Rent Days,Transaction Id,Transaction GatePass,Bags');
 
     const stepsToExport = ledgerData.ledgerSteps;
     stepsToExport.forEach((step) => {
       const txId = sanitizeTransactionId(step.transaction?.transactionId, '-');
       const rawGatePass = step.transaction?.gatePass || '';
       const gatePass = isMongoObjectId(rawGatePass) ? '-' : (rawGatePass || '-');
+      const bagsVal = step.transaction?.bagsCount != null
+        ? step.transaction.bagsCount
+        : (step.transaction?.bags || '-');
       lines.push([
         step.stepNo,
         step.commodity || '-',
@@ -216,7 +219,8 @@ export const LedgerCalculator: React.FC<LedgerCalculatorProps> = ({
         formatDecimal(step.rentAmount),
         step.daysDifference || '',
         txId,
-        gatePass
+        gatePass,
+        bagsVal
       ].map(formatCSVCell).join(','));
     });
 
