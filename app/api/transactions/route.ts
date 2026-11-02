@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { generateTimeStateLedger } from '@/lib/ledger-time-state-engine';
 import { createStockEntry, generateMonthlyInvoices } from '@/app/actions/stock-ledger-actions';
-import { getTenantFilterForMongo, appendOwnershipForMongo, isAdmin } from '@/lib/ownership';
+import { getTenantFilterForMongo, appendOwnershipForMongo, isAdmin, isWsp } from '@/lib/ownership';
 import Warehouse from '@/lib/models/Warehouse';
 import { ObjectId } from 'mongodb';
 import { calculateRent } from '@/lib/pricing-engine';
@@ -624,12 +624,42 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || !isAdmin(session)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = session.user as any;
+    const role = user?.role?.toString().toUpperCase();
+    const isClientUser = role === 'FARMER' || role === 'FPO' || role === 'COMPANY';
+    if (isClientUser) {
+      return NextResponse.json({ success: false, message: 'Client accounts are not authorized to edit transactions.' }, { status: 403 });
+    }
+
+    const isAdminUser = isAdmin(session);
+    const isWspUser = isWsp(session) || role === 'WSP';
+    if (!isAdminUser && !isWspUser) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient permissions to edit transactions.' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { transactionId, date, quantityMT, bagsCount, bags, sourceType } = body;
+    const {
+      transactionId,
+      date,
+      quantityMT,
+      actualWeight,
+      netWeightLoss,
+      bagsCount,
+      bags,
+      gatePass,
+      vehicleNumber,
+      transportationName,
+      driverName,
+      stackNo,
+      lotNo,
+      note,
+      notes,
+      sourceType,
+    } = body;
 
     if (!transactionId || !date || quantityMT === undefined) {
       return NextResponse.json({ success: false, message: 'transactionId, date and quantityMT are required' }, { status: 400 });
@@ -641,7 +671,7 @@ export async function PATCH(request: Request) {
 
     const parsedQuantity = Number(quantityMT);
     if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      return NextResponse.json({ success: false, message: 'quantityMT must be a positive number' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'quantityMT must be a positive number (> 0)' }, { status: 400 });
     }
 
     const parsedDate = new Date(date);
@@ -659,8 +689,154 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
     }
 
-    if (transaction.direction !== transaction.type && transaction.direction) {
-      // If older records stored direction differently, still allow
+    // For non-admin (e.g. WSP), verify tenant ownership
+    if (!isAdminUser) {
+      const tenantFilter = getTenantFilterForMongo(session);
+      const whId = transaction.warehouseId;
+      if (whId) {
+        const whMatch: any[] = [{ _id: whId }];
+        if (typeof whId === 'string' && ObjectId.isValid(whId)) {
+          whMatch.push({ _id: new ObjectId(whId) });
+        }
+        const ownedWarehouse = await db.collection('warehouses').findOne({
+          $or: whMatch,
+          ...tenantFilter,
+        });
+        if (!ownedWarehouse) {
+          return NextResponse.json({ success: false, message: 'Forbidden: You do not have permission to edit transactions for this warehouse.' }, { status: 403 });
+        }
+      }
+    }
+
+    // ── Stock Consistency & Negative Stock Validation ──
+    const targetClientId = transaction.clientId || transaction.accountId;
+    const targetWarehouseId = transaction.warehouseId;
+    const targetCommodityId = transaction.commodityId;
+
+    if (targetClientId && targetWarehouseId && targetCommodityId) {
+      const cIdStr = String(targetClientId);
+      const wIdStr = String(targetWarehouseId);
+      const commIdStr = String(targetCommodityId);
+
+      const clientMatch: any[] = [{ clientId: cIdStr }, { accountId: cIdStr }];
+      if (ObjectId.isValid(cIdStr)) {
+        clientMatch.push({ clientId: new ObjectId(cIdStr) });
+        clientMatch.push({ accountId: new ObjectId(cIdStr) });
+      }
+
+      const warehouseMatch: any[] = [{ warehouseId: wIdStr }];
+      if (ObjectId.isValid(wIdStr)) {
+        warehouseMatch.push({ warehouseId: new ObjectId(wIdStr) });
+      }
+
+      const commodityMatch: any[] = [{ commodityId: commIdStr }];
+      if (ObjectId.isValid(commIdStr)) {
+        commodityMatch.push({ commodityId: new ObjectId(commIdStr) });
+      }
+
+      const relatedTxns = await db.collection('transactions').find({
+        $and: [
+          { $or: clientMatch },
+          { $or: warehouseMatch },
+          { $or: commodityMatch },
+          { status: { $nin: ['DELETED', 'CANCELLED'] } },
+        ],
+      }).toArray();
+
+      const txnIdStr = transaction._id.toString();
+      const newNormalizedDate = normalizeDateToYYYYMMDD(date);
+
+      const timeline: Array<{ date: string; direction: string; quantityMT: number; isTarget: boolean }> = [];
+      let foundTarget = false;
+
+      for (const t of relatedTxns) {
+        const isCurrent = t._id?.toString() === txnIdStr || (transaction.sourceId && t.sourceId?.toString() === transaction.sourceId.toString());
+        if (isCurrent) {
+          if (!foundTarget) {
+            timeline.push({
+              date: newNormalizedDate,
+              direction: (transaction.direction || t.direction || 'INWARD').toUpperCase(),
+              quantityMT: parsedQuantity,
+              isTarget: true,
+            });
+            foundTarget = true;
+          }
+        } else {
+          timeline.push({
+            date: normalizeDateToYYYYMMDD(t.date || t.createdAt),
+            direction: (t.direction || t.type || 'INWARD').toUpperCase(),
+            quantityMT: Number(t.quantityMT || t.quantity || 0),
+            isTarget: false,
+          });
+        }
+      }
+
+      if (!foundTarget) {
+        timeline.push({
+          date: newNormalizedDate,
+          direction: (transaction.direction || 'INWARD').toUpperCase(),
+          quantityMT: parsedQuantity,
+          isTarget: true,
+        });
+      }
+
+      // Sort timeline chronologically
+      timeline.sort((a, b) => a.date.localeCompare(b.date));
+
+      let runningStock = 0;
+      for (const step of timeline) {
+        if (step.direction === 'INWARD') {
+          runningStock += step.quantityMT;
+        } else if (step.direction === 'OUTWARD') {
+          runningStock -= step.quantityMT;
+        }
+
+        if (runningStock < -1e-9) {
+          return NextResponse.json({
+            success: false,
+            message: `Validation Error: This edit would cause a negative stock balance (${runningStock.toFixed(4)} MT) on ${step.date}. Outward quantity exceeds available inward stock.`,
+          }, { status: 400 });
+        }
+      }
+
+      if (runningStock < -1e-9) {
+        return NextResponse.json({
+          success: false,
+          message: `Validation Error: Total outward quantity exceeds total inward quantity by ${Math.abs(runningStock).toFixed(4)} MT. Negative stock is not allowed.`,
+        }, { status: 400 });
+      }
+    }
+
+    // ── Warehouse Capacity Check ──
+    const oldQuantity = Number(transaction.quantityMT || 0);
+    const qtyDiff = parsedQuantity - oldQuantity;
+    if (transaction.warehouseId && Math.abs(qtyDiff) > 1e-9) {
+      try {
+        const whIdObj = ObjectId.isValid(String(transaction.warehouseId)) ? new ObjectId(String(transaction.warehouseId)) : null;
+        const warehouseDoc = whIdObj ? await db.collection('warehouses').findOne({ _id: whIdObj }) : null;
+        if (warehouseDoc) {
+          const dir = (transaction.direction || '').toUpperCase();
+          const capacityDelta = dir === 'INWARD' ? qtyDiff : -qtyDiff;
+          const currentOccupied = Number(warehouseDoc.occupiedCapacity || 0);
+          const nextOccupied = currentOccupied + capacityDelta;
+
+          if (nextOccupied < -1e-9) {
+            return NextResponse.json({
+              success: false,
+              message: `Validation Error: Warehouse occupied capacity would become negative (${nextOccupied.toFixed(4)} MT).`,
+            }, { status: 400 });
+          }
+
+          if (warehouseDoc.totalCapacity && nextOccupied > Number(warehouseDoc.totalCapacity)) {
+            return NextResponse.json({
+              success: false,
+              message: `Validation Error: Warehouse occupied capacity (${nextOccupied.toFixed(4)} MT) would exceed total capacity (${warehouseDoc.totalCapacity} MT).`,
+            }, { status: 400 });
+          }
+        }
+      } catch (capCheckError) {
+        console.error('Failed warehouse capacity pre-check:', capCheckError);
+      }
     }
 
     const updateTxFields: any = {
@@ -671,6 +847,32 @@ export async function PATCH(request: Request) {
     if (bagsVal !== undefined && !Number.isNaN(bagsVal)) {
       updateTxFields.bagsCount = bagsVal;
       updateTxFields.bags = bagsVal;
+    }
+    if (actualWeight !== undefined) {
+      if (actualWeight === null || actualWeight === '') {
+        updateTxFields.actualWeight = null;
+        updateTxFields.netWeightLoss = null;
+      } else {
+        const parsedActualWeight = Number(actualWeight);
+        if (!Number.isNaN(parsedActualWeight) && parsedActualWeight >= 0) {
+          updateTxFields.actualWeight = parsedActualWeight;
+          const parsedLoss = netWeightLoss !== undefined && netWeightLoss !== null && netWeightLoss !== ''
+            ? Number(netWeightLoss)
+            : Number((parsedQuantity - parsedActualWeight).toFixed(4));
+          updateTxFields.netWeightLoss = parsedLoss;
+        }
+      }
+    }
+    if (gatePass !== undefined) updateTxFields.gatePass = String(gatePass).trim();
+    if (vehicleNumber !== undefined) updateTxFields.vehicleNumber = String(vehicleNumber).trim();
+    if (transportationName !== undefined) updateTxFields.transportationName = String(transportationName).trim();
+    if (driverName !== undefined) updateTxFields.driverName = String(driverName).trim();
+    if (stackNo !== undefined) updateTxFields.stackNo = String(stackNo).trim();
+    if (lotNo !== undefined) updateTxFields.lotNo = String(lotNo).trim();
+    if (notes !== undefined || note !== undefined) {
+      const noteVal = String(notes ?? note ?? '').trim();
+      updateTxFields.note = noteVal;
+      updateTxFields.notes = noteVal;
     }
 
     await db.collection('transactions').updateMany(
@@ -697,6 +899,32 @@ export async function PATCH(request: Request) {
       if (bagsVal !== undefined && !Number.isNaN(bagsVal)) {
         docUpdate.bagsCount = bagsVal;
         docUpdate.bags = bagsVal;
+      }
+      if (actualWeight !== undefined) {
+        if (actualWeight === null || actualWeight === '') {
+          docUpdate.actualWeight = null;
+          docUpdate.netWeightLoss = null;
+        } else {
+          const parsedActualWeight = Number(actualWeight);
+          if (!Number.isNaN(parsedActualWeight) && parsedActualWeight >= 0) {
+            docUpdate.actualWeight = parsedActualWeight;
+            const parsedLoss = netWeightLoss !== undefined && netWeightLoss !== null && netWeightLoss !== ''
+              ? Number(netWeightLoss)
+              : Number((parsedQuantity - parsedActualWeight).toFixed(4));
+            docUpdate.netWeightLoss = parsedLoss;
+          }
+        }
+      }
+      if (gatePass !== undefined) docUpdate.gatePass = String(gatePass).trim();
+      if (vehicleNumber !== undefined) docUpdate.vehicleNumber = String(vehicleNumber).trim();
+      if (transportationName !== undefined) docUpdate.transportationName = String(transportationName).trim();
+      if (driverName !== undefined) docUpdate.driverName = String(driverName).trim();
+      if (stackNo !== undefined) docUpdate.stackNo = String(stackNo).trim();
+      if (lotNo !== undefined) docUpdate.lotNo = String(lotNo).trim();
+      if (notes !== undefined || note !== undefined) {
+        const noteVal = String(notes ?? note ?? '').trim();
+        docUpdate.note = noteVal;
+        docUpdate.notes = noteVal;
       }
 
       if (srcType === 'inward') {
@@ -730,7 +958,11 @@ export async function PATCH(request: Request) {
 
     if (isDirectTransaction) {
       try {
-        await syncTransactionStockEntry(db, transaction, { date, quantityMT: parsedQuantity });
+        await syncTransactionStockEntry(db, transaction, {
+          date,
+          quantityMT: parsedQuantity,
+          gatePass: gatePass !== undefined ? String(gatePass).trim() : transaction.gatePass,
+        });
       } catch (syncError) {
         console.error('Failed to resync stock entry after transaction update:', syncError);
         // Continue, but keep transaction updated. Don't fail the entire request on sync failure.
@@ -738,13 +970,11 @@ export async function PATCH(request: Request) {
     } else {
       // For processInward/processOutward transactions:
       // Adjust warehouse capacity only if quantity changed
-      const oldQuantity = Number(transaction.quantityMT || 0);
-      if (parsedQuantity !== oldQuantity && transaction.warehouseId) {
+      if (Math.abs(qtyDiff) > 1e-9 && transaction.warehouseId) {
         try {
           const warehouse = await Warehouse.findById(transaction.warehouseId);
           if (warehouse) {
             const dir = (transaction.direction || '').toUpperCase();
-            const qtyDiff = parsedQuantity - oldQuantity;
             const capacityDelta = dir === 'INWARD' ? qtyDiff : -qtyDiff;
             
             const nextOccupied = warehouse.occupiedCapacity + capacityDelta;
@@ -966,12 +1196,15 @@ export async function PATCH(request: Request) {
     try {
       revalidatePath('/dashboard/transactions-report');
       revalidatePath('/dashboard/warehouses');
+      revalidatePath('/dashboard/warehouse');
       revalidatePath('/dashboard/ledger');
       revalidatePath('/dashboard/reports');
       revalidatePath('/dashboard/revenue');
       revalidatePath('/dashboard');
       revalidatePath('/dashboard/inward');
       revalidatePath('/dashboard/outward');
+      revalidatePath('/dashboard/client-invoices');
+      revalidatePath('/dashboard/stock-report');
     } catch (revalError) {
       console.error('Failed to revalidate paths after transaction edit:', revalError);
     }
@@ -1103,12 +1336,15 @@ export async function DELETE(request: Request) {
     try {
       revalidatePath('/dashboard/transactions-report');
       revalidatePath('/dashboard/warehouses');
+      revalidatePath('/dashboard/warehouse');
       revalidatePath('/dashboard/ledger');
       revalidatePath('/dashboard/reports');
       revalidatePath('/dashboard/revenue');
       revalidatePath('/dashboard');
       revalidatePath('/dashboard/inward');
       revalidatePath('/dashboard/outward');
+      revalidatePath('/dashboard/client-invoices');
+      revalidatePath('/dashboard/stock-report');
     } catch (revalError) {
       console.error('Failed to revalidate paths after transaction delete:', revalError);
     }
@@ -1133,16 +1369,179 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const transactionIdParam = searchParams.get('transactionId') || searchParams.get('id');
+    const sourceTypeParam = searchParams.get('sourceType') || undefined;
+
+    const db = await getDb();
+    const tenantFilter = getTenantFilterForMongo(session);
+    console.log("[AUTH] tenant:", JSON.stringify(tenantFilter));
+
+    if (transactionIdParam) {
+      const txn = await getTransactionInfo(db, transactionIdParam, sourceTypeParam);
+      if (!txn) {
+        return NextResponse.json({ success: false, message: 'Transaction not found' }, { status: 404 });
+      }
+
+      let clientName = txn.clientName;
+      if (!clientName && txn.clientId) {
+        try {
+          const clientDoc = await db.collection('clients').findOne({ _id: new ObjectId(String(txn.clientId)) });
+          if (clientDoc) clientName = clientDoc.name || clientDoc.clientName;
+        } catch {}
+      }
+      let warehouseName = txn.warehouseName;
+      if (!warehouseName && txn.warehouseId) {
+        try {
+          const whDoc = await db.collection('warehouses').findOne({ _id: new ObjectId(String(txn.warehouseId)) });
+          if (whDoc) warehouseName = whDoc.name;
+        } catch {}
+      }
+      let commodityName = txn.commodityName;
+      if (!commodityName && txn.commodityId) {
+        try {
+          const commDoc = await db.collection('commodities').findOne({ _id: new ObjectId(String(txn.commodityId)) });
+          if (commDoc) commodityName = commDoc.name;
+        } catch {}
+      }
+
+      let currentStock: number | null = null;
+      let availableStock: number | null = null;
+
+      const cId = txn.clientId?.toString() || txn.accountId?.toString();
+      const cmId = txn.commodityId?.toString();
+      const wId = txn.warehouseId?.toString();
+
+      if (cId && cmId && wId) {
+        try {
+          const cObjId = ObjectId.isValid(cId) ? new ObjectId(cId) : null;
+          const cmObjId = ObjectId.isValid(cmId) ? new ObjectId(cmId) : null;
+          const wObjId = ObjectId.isValid(wId) ? new ObjectId(wId) : null;
+
+          if (cObjId && cmObjId && wObjId) {
+            const inwardAgg = await db.collection('inwards').aggregate([
+              { $match: { clientId: cObjId, commodityId: cmObjId, warehouseId: wObjId } },
+              { $group: { _id: null, total: { $sum: '$quantityMT' } } },
+            ]).toArray();
+
+            const outwardAgg = await db.collection('outwards').aggregate([
+              { $match: { clientId: cObjId, commodityId: cmObjId, warehouseId: wObjId } },
+              { $group: { _id: null, total: { $sum: '$quantityMT' } } },
+            ]).toArray();
+
+            let totalIn = Number(inwardAgg[0]?.total || 0);
+            let totalOut = Number(outwardAgg[0]?.total || 0);
+
+            if (totalIn === 0 && totalOut === 0) {
+              const txnsAgg = await db.collection('transactions').aggregate([
+                {
+                  $match: {
+                    $or: [
+                      { accountId: cId },
+                      { accountId: cObjId },
+                      { clientId: cId },
+                      { clientId: cObjId },
+                    ],
+                    commodityId: { $in: [cmId, cmObjId] },
+                    warehouseId: { $in: [wId, wObjId] },
+                    deletedAt: { $exists: false },
+                  },
+                },
+                {
+                  $group: {
+                    _id: '$direction',
+                    total: { $sum: '$quantityMT' },
+                  },
+                },
+              ]).toArray();
+
+              for (const row of txnsAgg) {
+                if ((row._id || '').toUpperCase() === 'INWARD') totalIn += Number(row.total || 0);
+                if ((row._id || '').toUpperCase() === 'OUTWARD') totalOut += Number(row.total || 0);
+              }
+            }
+
+            let totalPledged = 0;
+            try {
+              const pledgeAgg = await db.collection('pledges').aggregate([
+                { $match: { clientId: cObjId, status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+                { $unwind: '$items' },
+                {
+                  $match: {
+                    'items.storageType': 'DRY',
+                    'items.commodityId': cmObjId,
+                    'items.warehouseId': wObjId,
+                  },
+                },
+                {
+                  $group: {
+                    _id: null,
+                    total: {
+                      $sum: {
+                        $subtract: [
+                          '$items.pledgedQuantity',
+                          { $ifNull: ['$items.releasedQuantity', 0] },
+                        ],
+                      },
+                    },
+                  },
+                },
+              ]).toArray();
+              totalPledged = Number(pledgeAgg[0]?.total || 0);
+            } catch {}
+
+            const warehouseRemaining = Math.max(0, totalIn - totalOut - totalPledged);
+            const txnQty = Number(txn.quantityMT || txn.quantity || 0);
+            const isOutward = (txn.direction || txn.type || '').toUpperCase() === 'OUTWARD';
+
+            availableStock = isOutward
+              ? Number((warehouseRemaining + txnQty).toFixed(4))
+              : Number(warehouseRemaining.toFixed(4));
+            currentStock = Number(warehouseRemaining.toFixed(4));
+          }
+        } catch (stockErr) {
+          console.warn('[GET /api/transactions] Could not calculate available stock:', stockErr);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        transaction: {
+          _id: txn._id?.toString(),
+          sourceType: txn.sourceType,
+          direction: (txn.direction || txn.type || 'INWARD').toUpperCase(),
+          date: normalizeDateToYYYYMMDD(txn.date || txn.createdAt),
+          quantityMT: Number(txn.quantityMT || txn.quantity || 0),
+          actualWeight: txn.actualWeight !== undefined && txn.actualWeight !== null ? Number(txn.actualWeight) : undefined,
+          netWeightLoss: txn.netWeightLoss !== undefined && txn.netWeightLoss !== null ? Number(txn.netWeightLoss) : undefined,
+          availableStock: availableStock !== null ? availableStock : undefined,
+          warehouseStock: currentStock !== null ? currentStock : undefined,
+          bagsCount: txn.bagsCount ?? txn.bags,
+          gatePass: txn.gatePass || '',
+          partyName: txn.partyName || '',
+          stackNo: txn.stackNo || '',
+          lotNo: txn.lotNo || '',
+          vehicleNumber: txn.vehicleNumber || '',
+          transportationName: txn.transportationName || '',
+          driverName: txn.driverName || '',
+          notes: txn.notes || txn.note || '',
+          clientName: clientName || '',
+          clientId: txn.clientId?.toString() || '',
+          warehouseName: warehouseName || '',
+          warehouseId: txn.warehouseId?.toString() || '',
+          commodityName: commodityName || '',
+          commodityId: txn.commodityId?.toString() || '',
+          receiptNumber: txn.receiptNumber || '',
+          status: txn.status || 'COMPLETED',
+        }
+      });
+    }
+
     const clientId = searchParams.get('clientId');
     const accountId = searchParams.get('accountId');
     const warehouseId = searchParams.get('warehouseId');
     const direction = searchParams.get('direction');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-
-    const db = await getDb();
-    const tenantFilter = getTenantFilterForMongo(session);
-    console.log("[AUTH] tenant:", JSON.stringify(tenantFilter));
 
     const warehouseDocs = await db.collection('warehouses')
       .find({ ...tenantFilter })

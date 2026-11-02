@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import TransactionsReport from './transactions-report';
 import { getDb } from '@/lib/mongodb';
-import { getTenantFilterForMongo, isAdmin } from '@/lib/ownership';
+import { getTenantFilterForMongo, isAdmin, isWsp } from '@/lib/ownership';
 import { ObjectId } from 'mongodb';
 
 export default async function TransactionsReportWrapper() {
@@ -449,12 +449,63 @@ export default async function TransactionsReportWrapper() {
         notes: t.notes || t.note,
       };
     });
+
+    const parseTimestamp = (dateVal: any): number => {
+      if (!dateVal) return 0;
+      if (dateVal instanceof Date) {
+        const t = dateVal.getTime();
+        return Number.isNaN(t) ? 0 : t;
+      }
+      const str = String(dateVal).trim();
+      if (!str || str === '-') return 0;
+      const parsed = new Date(str).getTime();
+      if (!Number.isNaN(parsed)) return parsed;
+
+      const parts = str.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          const dt = new Date(y, m, d).getTime();
+          if (!Number.isNaN(dt)) return dt;
+        } else if (parts[2].length === 4) {
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const y = parseInt(parts[2], 10);
+          const dt = new Date(y, m, d).getTime();
+          if (!Number.isNaN(dt)) return dt;
+        }
+      }
+      return 0;
+    };
+
+    // Sort all combined transactions (both INWARD and OUTWARD) in descending date order (newest to oldest)
+    combinedTransactions.sort((a: any, b: any) => {
+      const timeA = parseTimestamp(a.date) || parseTimestamp(a.createdAt);
+      const timeB = parseTimestamp(b.date) || parseTimestamp(b.createdAt);
+      if (timeB !== timeA) return timeB - timeA;
+      const createdA = parseTimestamp(a.createdAt);
+      const createdB = parseTimestamp(b.createdAt);
+      if (createdB !== createdA) return createdB - createdA;
+      return String(b._id || '').localeCompare(String(a._id || ''));
+    });
+
     const isStaff = (session.user as any).isStaff;
     const userId = isStaff ? (session.user as any).staffId : session.user.id;
     const userProfile = await db.collection('users').findOne({ _id: new ObjectId(userId) });
     const wspName = userProfile?.companyName || '';
+    const isWspUser = isWsp(session) || session.user?.role === 'WSP';
+    const canEdit = (isAdminUser || isWspUser) && !isClientUser;
 
-    return <TransactionsReport transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []} isAdmin={isAdminUser} wspName={wspName} />;
+    return (
+      <TransactionsReport
+        transactions={Array.isArray(combinedTransactions) ? combinedTransactions : []}
+        isAdmin={isAdminUser}
+        canEdit={canEdit}
+        wspName={wspName}
+      />
+    );
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return (

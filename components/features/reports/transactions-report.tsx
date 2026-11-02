@@ -25,8 +25,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getClientOptions, getWarehouseOptions, logTransactionsExportCSV } from '@/app/actions/reports';
-import { Download, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, ArrowUpDown, Edit } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import TransactionEditModal from './transaction-edit-modal';
 
 
 import { getDropdownDisplayName } from '@/lib/utils';
@@ -49,6 +50,7 @@ export interface TransactionRecord {
   netWeightLoss?: number;
   rentTotal?: number;
   bagsCount?: number;
+  bags?: number | string;
   gatePass?: string;
   partyName?: string;
   stackNo?: string;
@@ -66,13 +68,72 @@ export interface TransactionRecord {
 interface TransactionsReportProps {
   transactions: TransactionRecord[];
   isAdmin?: boolean;
+  canEdit?: boolean;
   isLoading?: boolean;
   wspName?: string;
 }
 
-export default function TransactionsReport({ transactions, isAdmin = false, isLoading = false, wspName = '' }: TransactionsReportProps) {
+export const parseTransactionTimestamp = (dateVal: any): number => {
+  if (!dateVal) return 0;
+  if (dateVal instanceof Date) {
+    const t = dateVal.getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+  const str = String(dateVal).trim();
+  if (!str || str === '-') return 0;
+
+  const parsed = new Date(str).getTime();
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const parts = str.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const dt = new Date(y, m, d).getTime();
+      if (!Number.isNaN(dt)) return dt;
+    } else if (parts[2].length === 4) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      const dt = new Date(y, m, d).getTime();
+      if (!Number.isNaN(dt)) return dt;
+    }
+  }
+
+  return 0;
+};
+
+export const sortTransactionsDesc = (txns: TransactionRecord[]): TransactionRecord[] => {
+  return [...txns].sort((a, b) => {
+    const timeA = parseTransactionTimestamp(a.date) || parseTransactionTimestamp(a.createdAt);
+    const timeB = parseTransactionTimestamp(b.date) || parseTransactionTimestamp(b.createdAt);
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    const createA = parseTransactionTimestamp(a.createdAt);
+    const createB = parseTransactionTimestamp(b.createdAt);
+    if (createB !== createA) {
+      return createB - createA;
+    }
+    return String(b._id || '').localeCompare(String(a._id || ''));
+  });
+};
+
+export default function TransactionsReport({
+  transactions,
+  isAdmin = false,
+  canEdit = false,
+  isLoading = false,
+  wspName = '',
+}: TransactionsReportProps) {
   const router = useRouter();
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const hasEditPermission = isAdmin || canEdit;
+  const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'date', desc: true },
+  ]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     stackNo: false,
     lotNo: false,
@@ -90,14 +151,14 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     pageIndex: 0,
     pageSize: 20,
   });
-  const [liveTransactions, setLiveTransactions] = useState<TransactionRecord[]>(transactions);
+  const [liveTransactions, setLiveTransactions] = useState<TransactionRecord[]>(() => sortTransactionsDesc(transactions));
   const [isDailyReport, setIsDailyReport] = useState(false);
   const [reportType, setReportType] = useState<'transaction' | 'statement'>('transaction');
   const [fromDateFilter, setFromDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
   const [toDateFilter, setToDateFilter] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
-    setLiveTransactions(transactions);
+    setLiveTransactions(sortTransactionsDesc(transactions));
   }, [transactions]);
 
   const handleDeleteTransaction = async (transaction: TransactionRecord) => {
@@ -131,55 +192,20 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     }
   };
 
-  const handleEditTransaction = async (transaction: TransactionRecord) => {
-    const newDate = window.prompt('Enter new transaction date (YYYY-MM-DD)', transaction.date);
-    if (!newDate) return;
-    const parsedDate = new Date(newDate);
-    if (Number.isNaN(parsedDate.getTime())) {
-      toast.error('Invalid date entered');
-      return;
-    }
+  const handleEditTransaction = (transaction: TransactionRecord) => {
+    setEditingTransaction(transaction);
+  };
 
-    const newQuantity = window.prompt('Enter new quantity (MT)', transaction.quantityMT.toString());
-    if (!newQuantity) return;
-    const quantityValue = Number(newQuantity);
-    if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
-      toast.error('Quantity must be a positive number');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/transactions', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transactionId: transaction._id,
-          date: newDate,
-          quantityMT: quantityValue,
-          sourceType: transaction.sourceType,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Unable to edit transaction');
-      }
-
-      setLiveTransactions((current) =>
-        current.map((item) =>
-          item._id === transaction._id
-            ? { ...item, date: newDate, quantityMT: quantityValue }
-            : item
-        )
+  const handleSaveSuccess = (updatedRecord: TransactionRecord) => {
+    setLiveTransactions((current) => {
+      const updatedList = current.map((item) =>
+        item._id === updatedRecord._id
+          ? { ...item, ...updatedRecord }
+          : item
       );
-      toast.success('Transaction updated successfully');
-      router.refresh();
-    } catch (error) {
-      console.error('Edit failed:', error);
-      toast.error(`Edit failed: ${String(error)}`);
-    }
+      return sortTransactionsDesc(updatedList);
+    });
+    router.refresh();
   };
 
   const handleDownloadReceipt = async (transaction: TransactionRecord) => {
@@ -287,7 +313,7 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
 
       const combinedDaily = [...dailyTransactions, ...dummyRecords];
       
-      return combinedDaily.filter((item) => {
+      const filteredDaily = combinedDaily.filter((item) => {
         const matchesClient =
           clientFilter === 'ALL' ||
           item.clientId === clientFilter ||
@@ -298,9 +324,11 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
           item.warehouseName === warehouseFilter;
         return matchesClient && matchesWarehouse;
       });
+
+      return sortTransactionsDesc(filteredDaily);
     }
 
-    return liveTransactions.filter((item) => {
+    const filteredStandard = liveTransactions.filter((item) => {
       const matchesClient =
         clientFilter === 'ALL' ||
         item.clientId === clientFilter ||
@@ -313,6 +341,8 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
       const matchesMonth = monthFilter === 'ALL' || itemMonth === monthFilter;
       return matchesClient && matchesWarehouse && matchesMonth;
     });
+
+    return sortTransactionsDesc(filteredStandard);
   }, [liveTransactions, clientFilter, warehouseFilter, monthFilter, isDailyReport, fromDateFilter, toDateFilter, clientOptions]);
 
   const monthDropdownOptions = useMemo(() => {
@@ -434,11 +464,32 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
     },
     {
       accessorKey: 'date',
-      header: 'Date',
+      header: ({ column }) => {
+        return (
+          <button
+            type="button"
+            className="flex items-center gap-1 font-bold text-slate-700 hover:text-indigo-600 transition-colors"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          >
+            Date
+            <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+          </button>
+        );
+      },
+      sortingFn: (rowA, rowB, columnId) => {
+        const timeA = parseTransactionTimestamp(rowA.getValue(columnId)) || parseTransactionTimestamp(rowA.original.createdAt);
+        const timeB = parseTransactionTimestamp(rowB.getValue(columnId)) || parseTransactionTimestamp(rowB.original.createdAt);
+        if (timeA !== timeB) return timeA - timeB;
+        const createA = parseTransactionTimestamp(rowA.original.createdAt);
+        const createB = parseTransactionTimestamp(rowB.original.createdAt);
+        if (createA !== createB) return createA - createB;
+        return String(rowA.original._id || '').localeCompare(String(rowB.original._id || ''));
+      },
       cell: ({ row }) => {
         const date = row.getValue('date') as string;
         if (!date || date === '-') return <span className="text-slate-400">—</span>;
-        return new Date(date).toLocaleDateString('en-IN');
+        const parsed = new Date(date);
+        return !Number.isNaN(parsed.getTime()) ? parsed.toLocaleDateString('en-IN') : date;
       },
     },
     {
@@ -609,29 +660,32 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
                 <Download className="w-4 h-4 mr-2" /> Receipt
               </Button>
             )}
+            {hasEditPermission && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEditTransaction(transaction)}
+                className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 flex items-center gap-1"
+                title="Edit Transaction"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                Edit
+              </Button>
+            )}
             {isAdmin && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEditTransaction(transaction)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteTransaction(transaction)}
-                >
-                  Delete
-                </Button>
-              </>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleDeleteTransaction(transaction)}
+              >
+                Delete
+              </Button>
             )}
           </div>
         );
       },
     },
-  ], [isAdmin, handleEditTransaction, handleDeleteTransaction]);
+  ], [isAdmin, hasEditPermission, handleEditTransaction, handleDeleteTransaction]);
 
   const table = useReactTable({
     data: filteredTransactions,
@@ -1002,6 +1056,14 @@ export default function TransactionsReport({ transactions, isAdmin = false, isLo
         </Table>
       </div>
       )}
+
+      {/* Transaction Edit Modal */}
+      <TransactionEditModal
+        isOpen={!!editingTransaction}
+        transaction={editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+        onSaveSuccess={handleSaveSuccess}
+      />
     </div>
   );
 }
