@@ -585,7 +585,7 @@ export default function SignupPage() {
             </div>
 
             {/* Company Logo Upload */}
-            <div>
+            {/* <div>
               <label htmlFor="companyLogo" className="block text-sm font-semibold text-gray-950">
                 Company/WSP Logo *
               </label>
@@ -607,7 +607,7 @@ export default function SignupPage() {
                   className="mt-3 h-24 w-auto rounded-md border border-gray-200 object-contain"
                 />
               )}
-            </div>
+            </div> */}
           </div>
 
           {errors.submit && <p className="text-sm text-red-600 text-center">{errors.submit}</p>}
