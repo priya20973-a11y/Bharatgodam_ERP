@@ -14,6 +14,10 @@ export interface IWarehouse extends Document {
   name: string;
   address: string;
   state?: string;
+  district?: string;
+  location?: string;
+  warehouseLogo?: string;
+  logo?: string;
   totalCapacity: number; // in MT
   occupiedCapacity: number; // in MT
   status: 'ACTIVE' | 'INACTIVE' | 'FULL';
@@ -43,6 +47,10 @@ const WarehouseSchema: Schema = new Schema(
     name: { type: String, required: true },
     address: { type: String, required: true },
     state: { type: String, required: false },
+    district: { type: String, required: false },
+    location: { type: String, required: false },
+    warehouseLogo: { type: String, required: false },
+    logo: { type: String, required: false },
     totalCapacity: { type: Number, required: true, min: 0 },
     occupiedCapacity: { type: Number, default: 0, min: 0 },
     status: {

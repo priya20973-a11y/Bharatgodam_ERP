@@ -77,6 +77,11 @@ export async function createWarehouse(data: {
   warehouseId?: string;
   name: string;
   address: string;
+  location?: string;
+  district?: string;
+  state?: string;
+  warehouseLogo?: string;
+  logo?: string;
   totalCapacity: number;
   warehouseType?: 'Rented' | 'Owner';
   platformCommission?: number;
@@ -168,6 +173,11 @@ export async function updateWarehouse(id: string, data: Partial<{
   warehouseId: string;
   name: string;
   address: string;
+  location: string;
+  district: string;
+  state: string;
+  warehouseLogo: string;
+  logo: string;
   totalCapacity: number;
   warehouseType: 'Rented' | 'Owner';
   platformCommission: number;
@@ -257,6 +267,11 @@ export async function updateWarehouse(id: string, data: Partial<{
       ...(data.ownerEarnings !== undefined ? { ownerEarnings: data.ownerEarnings, ownerEquity: data.ownerEarnings } : {}),
       ...(data.name ? { name: data.name } : {}),
       ...(data.address ? { address: data.address } : {}),
+      ...(data.location !== undefined ? { location: data.location } : {}),
+      ...(data.district !== undefined ? { district: data.district } : {}),
+      ...(data.state !== undefined ? { state: data.state } : {}),
+      ...(data.warehouseLogo !== undefined ? { warehouseLogo: data.warehouseLogo } : {}),
+      ...(data.logo !== undefined ? { logo: data.logo } : {}),
       ...(data.warehouseId !== undefined ? { warehouseId: data.warehouseId } : {}),
       ...(data.totalCapacity !== undefined ? { totalCapacity: data.totalCapacity } : {}),
       ...(data.status ? { status: data.status } : {}),

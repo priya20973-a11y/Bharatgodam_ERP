@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-hot-toast';
-import { Loader2, ArrowUpFromLine, RefreshCcw } from 'lucide-react';
+import { Loader2, ArrowUpFromLine, RefreshCcw, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSession } from 'next-auth/react';
 import { getDropdownDisplayName } from '@/lib/utils';
+import OutwardReceiptSuccessDialog, { OutwardReceiptDialogData } from './outward-receipt-success-dialog';
 
 const outwardSchema = z.object({
   clientId: z.string().min(1, 'Client is required'),
@@ -28,11 +29,29 @@ const outwardSchema = z.object({
   lotNo: z.string().optional(),
   gatePass: z.string().optional(),
   partyName: z.string().optional(),
+  packagingMaterial: z.string().optional(),
+  packagingSize: z.string().optional(),
+  gslNo: z.string().optional(),
   actualWeight: z.preprocess((value) => {
     if (value === '' || value === undefined || value === null) return undefined;
     return Number(value);
   }, z.number().min(0, 'Actual weight cannot be negative')).optional(),
   date: z.string().min(1, 'Date is required'),
+  vehicleNumber: z.string().optional(),
+  agentName: z.string().optional(),
+  authorityPerson: z.string().optional(),
+  variety: z.string().optional(),
+  rsnNo: z.string().optional(),
+  weighbridgeNameAddress: z.string().optional(),
+  inTime: z.string().optional(),
+  outTime: z.string().optional(),
+  grossWeight: z.coerce.number().optional(),
+  tareWeight: z.coerce.number().optional(),
+  netWeight: z.coerce.number().optional(),
+  moisture: z.string().optional(),
+  deliveryOrderNo: z.string().optional(),
+  idProofNo: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 type OutwardFormValues = z.infer<typeof outwardSchema>;
@@ -48,9 +67,13 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [checkingStock, setCheckingStock] = useState(false);
   const [currentStock, setCurrentStock] = useState<number | null>(null);
+  const [showReceiptDetails, setShowReceiptDetails] = useState(false);
+  const [successReceiptData, setSuccessReceiptData] = useState<OutwardReceiptDialogData | null>(null);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -86,8 +109,26 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       lotNo: '',
       gatePass: '',
       partyName: '',
+      packagingMaterial: '',
+      packagingSize: '',
+      gslNo: '',
       actualWeight: undefined,
       date: searchParams.get('date') || new Date().toISOString().split('T')[0],
+      vehicleNumber: '',
+      agentName: 'SELF',
+      authorityPerson: '',
+      variety: '',
+      rsnNo: '',
+      weighbridgeNameAddress: '',
+      inTime: '',
+      outTime: '',
+      grossWeight: undefined,
+      tareWeight: undefined,
+      netWeight: undefined,
+      moisture: '',
+      deliveryOrderNo: '',
+      idProofNo: '',
+      notes: '',
     },
   });
 
@@ -107,6 +148,17 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       setValue('commodityId', '');
     }
   }, [watchedValues.clientId, watchedValues.commodityId, selectedClient?.commodityIds, setValue]);
+
+  useEffect(() => {
+    if (watchedValues.commodityId) {
+      const selectedCommodity = commodities.find(
+        (c) => (c._id?.toString?.() || c._id) === watchedValues.commodityId
+      );
+      if (selectedCommodity) {
+        setValue('variety', selectedCommodity.variety || '');
+      }
+    }
+  }, [watchedValues.commodityId, commodities, setValue]);
 
   const reportUrl = React.useMemo(() => {
     const clientName = clients.find(c => c._id === watchedValues.clientId)?.name;
@@ -161,19 +213,9 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
       return;
     }
 
-    if (submittingRef.current) return;
+    if (submittingRef.current || isSubmitting) return;
     submittingRef.current = true;
-
-    console.log('[OutwardForm] onSubmit payload', {
-      clientId: data.clientId,
-      commodityId: data.commodityId,
-      warehouseId: data.warehouseId,
-      quantityMT: data.quantityMT,
-      actualWeight: data.actualWeight,
-      date: data.date,
-      gatePass: data.gatePass,
-      partyName: data.partyName,
-    });
+    setIsSubmitting(true);
 
     startTransition(async () => {
       try {
@@ -189,13 +231,48 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
           lotNo: data.lotNo,
           gatePass: data.gatePass,
           partyName: data.partyName,
+          packagingMaterial: data.packagingMaterial,
+          packagingSize: data.packagingSize,
+          gslNo: data.gslNo,
           date: data.date,
+          vehicleNumber: data.vehicleNumber,
+          agentName: data.agentName,
+          authorityPerson: data.authorityPerson,
+          variety: data.variety,
+          rsnNo: data.rsnNo,
+          weighbridgeNameAddress: data.weighbridgeNameAddress,
+          inTime: data.inTime,
+          outTime: data.outTime,
+          grossWeight: data.grossWeight,
+          tareWeight: data.tareWeight,
+          netWeight: data.netWeight,
+          moisture: data.moisture,
+          deliveryOrderNo: data.deliveryOrderNo,
+          idProofNo: data.idProofNo,
+          notes: data.notes,
         });
 
         console.log('[OutwardForm] processOutward response', res);
 
         if (res.success) {
           toast.success('Outward Transaction Recorded');
+
+          if (res.receipts) {
+            const selectedCommodity = commodities.find(c => (c._id?.toString?.() || c._id) === data.commodityId);
+            const selectedWarehouse = warehouses.find(w => (w._id?.toString?.() || w._id) === data.warehouseId);
+
+            setSuccessReceiptData({
+              outwardId: res.data._id,
+              dailyReportSrNo: res.receipts.dailyReportSrNo,
+              gatePassNo: res.receipts.gatePassNo,
+              clientName: selectedClient?.name,
+              commodityName: selectedCommodity?.name,
+              warehouseName: selectedWarehouse?.name,
+              bagsCount: data.bagsCount,
+              quantityMT: data.quantityMT,
+            });
+            setShowReceiptDialog(true);
+          }
 
           reset({
             clientId: '',
@@ -207,21 +284,39 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
             lotNo: '',
             gatePass: '',
             partyName: '',
+            packagingMaterial: '',
+            packagingSize: '',
+            gslNo: '',
             actualWeight: undefined,
             date: new Date().toISOString().split('T')[0],
+            vehicleNumber: '',
+            agentName: 'SELF',
+            authorityPerson: '',
+            variety: '',
+            rsnNo: '',
+            weighbridgeNameAddress: '',
+            inTime: '',
+            outTime: '',
+            grossWeight: undefined,
+            tareWeight: undefined,
+            netWeight: undefined,
+            moisture: '',
+            deliveryOrderNo: '',
+            idProofNo: '',
+            notes: '',
           });
 
           router.refresh();
           onSuccess?.();
-          setTimeout(() => { submittingRef.current = false; }, 1000);
         } else {
           console.warn('Outward form server response error:', res.error);
           toast.error(res.error || 'Failed to process outward');
-          submittingRef.current = false;
         }
       } catch (err: any) {
         console.error('Outward Error:', err);
         toast.error('Internal Server Error: ' + err.message);
+      } finally {
+        setIsSubmitting(false);
         submittingRef.current = false;
       }
     });
@@ -466,6 +561,221 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
 
       </div>
 
+      {/* Collapsible Receipt Details Section */}
+      <div className="border-t pt-4">
+        <button
+          type="button"
+          className="flex items-center justify-between w-full py-2 text-left group"
+          onClick={() => setShowReceiptDetails(!showReceiptDetails)}
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-orange-600" />
+            <div>
+              <span className="text-sm font-bold text-slate-900 group-hover:text-orange-600 transition-colors">
+                Receipt &amp; Gate Pass Details (Optional)
+              </span>
+              <span className="text-xs text-slate-500 ml-2">
+                Add truck number, packaging, weighbridge, and timing details for withdrawal receipts
+              </span>
+            </div>
+          </div>
+          {showReceiptDetails ? (
+            <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+          )}
+        </button>
+
+        {showReceiptDetails && (
+          <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="vehicleNumber" className="text-xs font-semibold text-slate-700">Truck / Vehicle No.</label>
+                <Input 
+                  id="vehicleNumber"
+                  {...register('vehicleNumber')}
+                  placeholder="e.g., GJ-03-AB-1234"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="agentName" className="text-xs font-semibold text-slate-700">Agent Name</label>
+                <Input 
+                  id="agentName"
+                  {...register('agentName')}
+                  placeholder="e.g., SELF"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="authorityPerson" className="text-xs font-semibold text-slate-700">Authority Person</label>
+                <Input 
+                  id="authorityPerson"
+                  {...register('authorityPerson')}
+                  placeholder="e.g., Ashwinbhai"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="variety" className="text-xs font-semibold text-slate-700">Variety</label>
+                <Input 
+                  id="variety"
+                  {...register('variety')}
+                  placeholder="e.g., Lokwan"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="packagingMaterial" className="text-xs font-semibold text-slate-700">Packaging Material</label>
+                <Input 
+                  id="packagingMaterial"
+                  {...register('packagingMaterial')}
+                  placeholder="e.g., PP Bag, Jute Bag"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="packagingSize" className="text-xs font-semibold text-slate-700">Packaging Size</label>
+                <Input 
+                  id="packagingSize"
+                  {...register('packagingSize')}
+                  placeholder="e.g., 50 kg"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="inTime" className="text-xs font-semibold text-slate-700">In Time</label>
+                <Input 
+                  id="inTime"
+                  {...register('inTime')}
+                  placeholder="e.g., 1:56 PM"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="outTime" className="text-xs font-semibold text-slate-700">Out Time</label>
+                <Input 
+                  id="outTime"
+                  {...register('outTime')}
+                  placeholder="e.g., 4:56 PM"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="grossWeight" className="text-xs font-semibold text-slate-700">Gross Weight (KG)</label>
+                <Controller
+                  name="grossWeight"
+                  control={control}
+                  render={({ field }) => (
+                    <Input 
+                      id="grossWeight"
+                      type="number"
+                      placeholder="e.g., 26955"
+                      className="bg-white text-xs h-9"
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    />
+                  )}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="tareWeight" className="text-xs font-semibold text-slate-700">Tare Weight (KG)</label>
+                <Controller
+                  name="tareWeight"
+                  control={control}
+                  render={({ field }) => (
+                    <Input 
+                      id="tareWeight"
+                      type="number"
+                      placeholder="e.g., 7480"
+                      className="bg-white text-xs h-9"
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="moisture" className="text-xs font-semibold text-slate-700">Moisture (%)</label>
+                <Input 
+                  id="moisture"
+                  {...register('moisture')}
+                  placeholder="e.g., 11.2%"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="gslNo" className="text-xs font-semibold text-slate-700">GSL Number</label>
+                <Input 
+                  id="gslNo"
+                  {...register('gslNo')}
+                  placeholder="e.g., 51211"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="rsnNo" className="text-xs font-semibold text-slate-700">RSN / RST Number</label>
+                <Input 
+                  id="rsnNo"
+                  {...register('rsnNo')}
+                  placeholder="e.g., 13082"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="idProofNo" className="text-xs font-semibold text-slate-700">ID Proof Number / Mobile</label>
+                <Input 
+                  id="idProofNo"
+                  {...register('idProofNo')}
+                  placeholder="e.g., 9638253590"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="weighbridgeNameAddress" className="text-xs font-semibold text-slate-700">Weighbridge Name / Address</label>
+                <Input 
+                  id="weighbridgeNameAddress"
+                  {...register('weighbridgeNameAddress')}
+                  placeholder="e.g., Aum Shiv W/B, Gondal"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="deliveryOrderNo" className="text-xs font-semibold text-slate-700">Delivery Order No. &amp; Date</label>
+                <Input 
+                  id="deliveryOrderNo"
+                  {...register('deliveryOrderNo')}
+                  placeholder="e.g., DO-1002 / 16-03-2026"
+                  className="bg-white text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="notes" className="text-xs font-semibold text-slate-700">Remarks / Notes</label>
+              <Input 
+                id="notes"
+                {...register('notes')}
+                placeholder="Additional notes for receipts"
+                className="bg-white text-xs h-9"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-4 pt-2">
         <Button
           type="button"
@@ -482,11 +792,17 @@ export default function OutwardForm({ clients, commodities, warehouses, onSucces
         <Button
           type="submit"
           className="flex-[2] bg-orange-600 hover:bg-orange-700 text-white font-bold h-10"
-          disabled={isPending || checkingStock || (currentStock !== null && currentStock <= 0)}
+          disabled={isPending || isSubmitting || checkingStock || (currentStock !== null && currentStock <= 0)}
         >
-          {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Withdrawal...</> : 'Confirm Withdrawal'}
+          {isSubmitting || isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Withdrawal...</> : 'Confirm Withdrawal'}
         </Button>
       </div>
+
+      <OutwardReceiptSuccessDialog
+        isOpen={showReceiptDialog}
+        onClose={() => setShowReceiptDialog(false)}
+        data={successReceiptData}
+      />
     </form>
   );
 }

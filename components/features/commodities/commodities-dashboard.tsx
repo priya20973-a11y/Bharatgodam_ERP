@@ -19,7 +19,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
   const [items, setItems] = useState(initialData);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', ratePerMtPerDay: 0 });
+  const [formData, setFormData] = useState({ name: '', variety: '', ratePerMtPerDay: 0 });
   const [gradingParameters, setGradingParameters] = useState<GradingParameter[]>([]);
 
   const handleAddParameter = () => {
@@ -78,13 +78,13 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ name: '', ratePerMtPerDay: 0 });
+    setFormData({ name: '', variety: '', ratePerMtPerDay: 0 });
     setGradingParameters([]);
   };
 
   const handleEditClick = (item: any) => {
     setEditingId(item._id);
-    setFormData({ name: item.name, ratePerMtPerDay: item.ratePerMtPerDay });
+    setFormData({ name: item.name, variety: item.variety || '', ratePerMtPerDay: item.ratePerMtPerDay });
     setGradingParameters(item.gradingParameters || []);
   };
 
@@ -97,7 +97,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
           {editingId ? 'Adjust Commodity Settings' : 'Register New Commodity'}
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Commodity Name *</label>
             <Input 
@@ -105,6 +105,14 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
               value={formData.name} 
               onChange={(e) => setFormData({ ...formData, name: e.target.value.toUpperCase() })} 
               placeholder="e.g. WHEAT"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Variety (Optional)</label>
+            <Input 
+              value={formData.variety} 
+              onChange={(e) => setFormData({ ...formData, variety: e.target.value })} 
+              placeholder="e.g. Lokwan, Sharbati"
             />
           </div>
           <div className="space-y-2">
@@ -209,6 +217,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead className="font-bold">Commodity</TableHead>
+              <TableHead className="font-bold">Variety</TableHead>
               <TableHead className="font-bold">Daily Rate (₹/MT)</TableHead>
               <TableHead className="font-bold">Added By</TableHead>
               <TableHead className="text-right font-bold">Actions</TableHead>
@@ -224,6 +233,15 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
                       <div className="text-xs text-slate-500 mt-1 font-normal">
                         {item.gradingParameters.length} Grading Parameter(s)
                       </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-700">
+                    {item.variety ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                        {item.variety}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs italic">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -244,7 +262,7 @@ export default function CommoditiesDashboard({ initialData, isAdminUser }: { ini
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   No commodities found
                 </TableCell>

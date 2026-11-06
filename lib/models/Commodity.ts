@@ -9,6 +9,7 @@ export interface IGradingParameter {
 
 export interface ICommodity extends Document {
   name: string;
+  variety?: string;
   ratePerMtPerDay: number; // ₹ per MT per Day
   ratePerMtMonth?: number; // ₹ per MT per Month
   gradingParameters?: IGradingParameter[];
@@ -28,6 +29,7 @@ const GradingParameterSchema = new Schema({
 const CommoditySchema: Schema = new Schema(
   {
     name: { type: String, required: true, uppercase: true },
+    variety: { type: String, trim: true, required: false },
     ratePerMtPerDay: { type: Number, required: true, min: 0 },
     ratePerMtMonth: { type: Number, min: 0 },
     gradingParameters: { type: [GradingParameterSchema], required: false, default: [] },

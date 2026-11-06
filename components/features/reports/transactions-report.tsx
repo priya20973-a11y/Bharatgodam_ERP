@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getClientOptions, getWarehouseOptions, logTransactionsExportCSV } from '@/app/actions/reports';
-import { Download, ChevronLeft, ChevronRight, ArrowUpDown, Edit } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, ArrowUpDown, Edit, Truck, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import TransactionEditModal from './transaction-edit-modal';
 
@@ -36,6 +36,7 @@ import { useRouter } from 'next/navigation';
 export interface TransactionRecord {
   _id: string;
   sourceType?: string;
+  sourceId?: string;
   direction: 'INWARD' | 'OUTWARD' | 'No Data Found';
   date: string;
   clientName: string;
@@ -63,6 +64,10 @@ export interface TransactionRecord {
   note?: string;
   notes?: string;
   receiptNumber?: string;
+  variety?: string;
+  packagingMaterial?: string;
+  packagingSize?: string;
+  gslNo?: string;
 }
 
 interface TransactionsReportProps {
@@ -571,6 +576,33 @@ export default function TransactionsReport({
       },
     },
     {
+      accessorKey: 'packagingMaterial',
+      header: 'Pkg Material',
+      cell: ({ row }) => {
+        const value = row.getValue('packagingMaterial');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
+      accessorKey: 'packagingSize',
+      header: 'Pkg Size',
+      cell: ({ row }) => {
+        const value = row.getValue('packagingSize');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
+      accessorKey: 'gslNo',
+      header: 'GSL No.',
+      cell: ({ row }) => {
+        const value = row.getValue('gslNo');
+        if (typeof value === 'object' || value === undefined || value === null || value === '') return <span className="text-slate-400">—</span>;
+        return <span>{String(value)}</span>;
+      },
+    },
+    {
       accessorKey: 'vehicleNumber',
       header: 'Vehicle No.',
       cell: ({ row }) => {
@@ -650,14 +682,37 @@ export default function TransactionsReport({
 
         return (
           <div className="flex flex-wrap gap-2">
+            {transaction.direction === 'INWARD' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 h-8 text-xs font-semibold"
+                  onClick={() => window.open(`/api/dry-storage/receipts/daily-report?id=${transaction.sourceId || transaction._id}`, '_blank')}
+                  title="Daily Truck Transaction Report"
+                >
+                  <Truck className="w-3.5 h-3.5 mr-1 text-indigo-600" /> Daily Report
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-slate-800 border-slate-300 hover:bg-slate-100 h-8 text-xs font-semibold"
+                  onClick={() => window.open(`/api/dry-storage/receipts/gate-pass?id=${transaction.sourceId || transaction._id}`, '_blank')}
+                  title="Gate Pass"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1 text-slate-700" /> Gate Pass
+                </Button>
+              </>
+            )}
             {transaction.direction === 'INWARD' && transaction.receiptNumber && (
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 text-xs"
                 onClick={() => handleDownloadReceipt(transaction)}
-                title="Open Receipt"
+                title="Open Storage Receipt"
               >
-                <Download className="w-4 h-4 mr-2" /> Receipt
+                <Download className="w-3.5 h-3.5 mr-1" /> Storage Receipt
               </Button>
             )}
             {hasEditPermission && (
@@ -755,6 +810,9 @@ export default function TransactionsReport({
         'Actual Wt (MT)': item.direction === 'OUTWARD' && item.actualWeight != null ? item.actualWeight : '-',
         'Net Loss (MT)': item.direction === 'OUTWARD' && item.netWeightLoss != null ? item.netWeightLoss : '-',
         'Bags': item.bagsCount != null ? item.bagsCount : 'N.A.',
+        'Packaging Material': item.packagingMaterial || '',
+        'Packaging Size': item.packagingSize || '',
+        'GSL No': item.gslNo || '',
         'Gate Pass': item.gatePass || '',
         'Vehicle Number': item.vehicleNumber || '',
         'Transportation': item.transportationName || '',

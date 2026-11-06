@@ -7,6 +7,7 @@ export default function CommodityForm() {
   const { addCommodity } = useWarehouse();
   const [formData, setFormData] = useState({
     name: '',
+    variety: '',
     rate: 0,
     rateUnit: 'day' as 'day' | 'month',
   });
@@ -23,7 +24,7 @@ export default function CommodityForm() {
     e.preventDefault();
     if (formData.name && formData.rate > 0) {
       addCommodity(formData);
-      setFormData({ name: '', rate: 0, rateUnit: 'day' });
+      setFormData({ name: '', variety: '', rate: 0, rateUnit: 'day' });
     }
   };
 
@@ -44,6 +45,20 @@ export default function CommodityForm() {
             required
             className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="Enter commodity name"
+          />
+        </div>
+        <div>
+          <label htmlFor="variety" className="block text-sm font-medium text-slate-700 mb-1">
+            Variety (Optional)
+          </label>
+          <input
+            type="text"
+            id="variety"
+            name="variety"
+            value={formData.variety}
+            onChange={handleChange}
+            className="w-full rounded-md border border-slate-300 p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Enter variety (e.g. Lokwan)"
           />
         </div>
         <div>

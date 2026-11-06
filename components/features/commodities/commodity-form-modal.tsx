@@ -28,11 +28,12 @@ export default function CommodityFormModal({ isOpen, onClose, initialData, onSuc
   useEffect(() => {
     if (initialData && isOpen) {
       setValue('name', initialData.name);
+      setValue('variety', initialData.variety || '');
       setValue('baseRate', initialData.baseRate);
       setValue('category', initialData.category);
       setValue('unit', initialData.unit || 'MT');
     } else if (isOpen) {
-      reset({ unit: 'MT' });
+      reset({ unit: 'MT', variety: '' });
     }
   }, [initialData, isOpen, setValue, reset]);
 
@@ -43,6 +44,7 @@ export default function CommodityFormModal({ isOpen, onClose, initialData, onSuc
     try {
       const payload = {
         name: data.name,
+        variety: data.variety && data.variety.trim() !== '' ? data.variety.trim() : undefined,
         ratePerMtPerDay: data.baseRate,
       };
 
@@ -100,6 +102,16 @@ export default function CommodityFormModal({ isOpen, onClose, initialData, onSuc
                   placeholder="E.g., WHEAT, OIL, HAZARDOUS LIQUID" 
                 />
                 {errors.name && <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.name.message}</p>}
+             </div>
+
+             <div className="col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Variety (Optional)</label>
+                <input 
+                  {...register('variety')} 
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 font-medium bg-slate-50" 
+                  placeholder="E.g., Lokwan, Sharbati" 
+                />
+                {errors.variety && <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.variety.message}</p>}
              </div>
 
              <div>

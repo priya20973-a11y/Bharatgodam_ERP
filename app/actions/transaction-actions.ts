@@ -15,62 +15,36 @@ import { authOptions } from '@/lib/auth';
 import { getTenantFilterForMongo, appendOwnershipForMongo, requireSession, isAdmin } from '@/lib/ownership';
 import { requireWspActionPermission } from '@/lib/server-wsp-permissions';
 import { logActivity } from '@/lib/cold-logger';
+import { getNextDryReceiptSequence } from '@/lib/dry-storage-receipt-sequence';
 
 async function createTransactionSession() {
-  const dbConnection = await connectToDatabase();
+  await connectToDatabase();
   if (!mongoose.connection.db) {
     throw new Error('Database connection not established');
   }
 
-  const admin = mongoose.connection.db.admin();
-  const serverInfo = await admin.command({ hello: 1 }).catch(() => admin.command({ isMaster: 1 }));
-  const supportsTransactions = Boolean(serverInfo.setName || serverInfo.msg === 'isdbgrid');
-
-  console.log('[createTransactionSession] serverInfo', {
-    serverInfo: {
-      setName: serverInfo?.setName,
-      msg: serverInfo?.msg,
-      isWritablePrimary: serverInfo?.isWritablePrimary,
-      ok: serverInfo?.ok,
-    },
-    supportsTransactions,
-  });
-
-  if (!supportsTransactions) {
-    console.log('[createTransactionSession] transactions not supported, proceeding without session');
-    return null;
-  }
-
-  let session: mongoose.ClientSession | null = null;
   try {
-    session = await mongoose.connection.startSession({ causalConsistency: false });
-    await session.startTransaction({
-      readConcern: { level: 'snapshot' },
-      writeConcern: { w: 'majority' },
-      readPreference: 'primary',
-    });
-    console.log('[createTransactionSession] mongoose transaction session started', {
-      transactionOptions: {
-        readConcern: 'snapshot',
-        writeConcern: 'majority',
-        readPreference: 'primary',
-      },
+    const admin = mongoose.connection.db.admin();
+    // Fast probe with strict 1500ms timeout to avoid hanging if cluster is slow
+    const serverInfoPromise = admin.command({ hello: 1 }).catch(() => admin.command({ isMaster: 1 }));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+    const serverInfo: any = await Promise.race([serverInfoPromise, timeoutPromise]).catch(() => null);
+
+    const supportsTransactions = Boolean(serverInfo?.setName || serverInfo?.msg === 'isdbgrid');
+
+    if (!supportsTransactions) {
+      return null;
+    }
+
+    const session = await mongoose.connection.startSession({ causalConsistency: false });
+    session.startTransaction({
+      readConcern: { level: 'local' },
+      writeConcern: { w: 'majority', wtimeoutMS: 5000 },
+      maxCommitTimeMS: 5000,
     });
     return session;
   } catch (error: unknown) {
-    const unsupportedTransaction = isTransactionError(error);
-    console.error('[createTransactionSession] failed to start transaction, falling back to no transaction', {
-      unsupportedTransaction,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    if (session) {
-      try {
-        await session.endSession();
-      } catch (closeError) {
-        console.error('[createTransactionSession] failed to end session after transaction failure', closeError);
-      }
-    }
+    console.warn('[createTransactionSession] Non-transactional fallback:', error);
     return null;
   }
 }
@@ -347,73 +321,153 @@ export async function processInward(data: {
     observedValue: string;
     status?: string;
   }[];
+  agentName?: string;
+  authorityPerson?: string;
+  variety?: string;
+  packagingMaterial?: string;
+  packagingSize?: string;
+  gslNo?: string;
+  rsnNo?: string;
+  weighbridgeNameAddress?: string;
+  inTime?: string;
+  outTime?: string;
+  grossWeight?: number;
+  tareWeight?: number;
+  netWeight?: number;
+  moisture?: string;
+  deliveryOrderNo?: string;
+  idProofNo?: string;
+  idempotencyKey?: string;
 }) {
   if (!data.isColdStorage) {
     await requireWspActionPermission('inward');
   }
   const authSession = await requireSession();
-  const session = await createTransactionSession();
-  const createOptions: { session: mongoose.ClientSession } | undefined = session ? { session } : undefined;
+  await connectToDatabase();
 
-  try {
-    const inwardDate = data.date ? new Date(data.date) : new Date();
-    const outwardDate = new Date(data.outwardDate);
+  const inwardDate = data.date ? new Date(data.date) : new Date();
+  const outwardDate = new Date(data.outwardDate);
 
-    // Date Validation for Dry Storage Assaying
-    if (!data.isColdStorage && data.isAssayingRequired) {
-      if (data.assayingDate) {
-        const assaying = new Date(data.assayingDate).setHours(0,0,0,0);
-        const inward = new Date(inwardDate).setHours(0,0,0,0);
-        if (assaying < inward) {
-          throw new Error('Assaying Date must be on or after the Inward Date.');
-        }
+  // Date Validation for Dry Storage Assaying
+  if (!data.isColdStorage && data.isAssayingRequired) {
+    if (data.assayingDate) {
+      const assaying = new Date(data.assayingDate).setHours(0, 0, 0, 0);
+      const inward = new Date(inwardDate).setHours(0, 0, 0, 0);
+      if (assaying < inward) {
+        throw new Error('Assaying Date must be on or after the Inward Date.');
+      }
 
-        if (data.assayingExpiryDate) {
-          const expiry = new Date(data.assayingExpiryDate).setHours(0,0,0,0);
-          if (assaying > expiry) {
-            throw new Error('Expiry Date must not be earlier than Assaying Date.');
-          }
+      if (data.assayingExpiryDate) {
+        const expiry = new Date(data.assayingExpiryDate).setHours(0, 0, 0, 0);
+        if (assaying > expiry) {
+          throw new Error('Expiry Date must not be earlier than Assaying Date.');
         }
       }
     }
+  }
 
-    // 0. Fetch Commodity for Rate
-    const commodityQuery = Commodity.findById(data.commodityId);
-    const commodity = session ? await commodityQuery.session(session) : await commodityQuery;
-    if (!commodity) throw new Error('Commodity not found');
+  // 1. Idempotency Check: if idempotencyKey was already processed, return existing record
+  if (data.idempotencyKey) {
+    try {
+      const existingInward = await Inward.findOne({ idempotencyKey: data.idempotencyKey })
+        .maxTimeMS(3000)
+        .lean();
 
-    // 1. Resolve client, commodity, and warehouse names for transaction linkage
-    const clientQuery = Client.findById(data.clientId);
-    const warehouseQuery = Warehouse.findById(data.warehouseId);
-    const [client, warehouse] = session
-      ? await Promise.all([clientQuery.session(session), warehouseQuery.session(session)])
-      : await Promise.all([clientQuery, warehouseQuery]);
-
-    if (!client) throw new Error('Client not found');
-    if (!warehouse) throw new Error('Warehouse not found');
-    if (warehouse.status === 'INACTIVE') {
-      throw new Error('Warehouse is deactivated and cannot be used for new transactions');
+      if (existingInward) {
+        console.log('[processInward] Idempotency match found, returning existing inward:', existingInward._id);
+        return {
+          success: true,
+          data: JSON.parse(JSON.stringify(existingInward)),
+          receipts: !data.isColdStorage ? {
+            dailyReportUrl: `/api/dry-storage/receipts/daily-report?id=${existingInward._id}`,
+            gatePassUrl: `/api/dry-storage/receipts/gate-pass?id=${existingInward._id}`,
+            dailyReportSrNo: (existingInward as any).dailyReportSrNo || '001',
+            gatePassNo: (existingInward as any).gatePass || (existingInward as any).gatePassNo || '001',
+          } : undefined,
+          isDuplicate: true,
+        };
+      }
+    } catch (idempErr) {
+      console.warn('[processInward] Idempotency lookup error:', idempErr);
     }
+  }
 
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('Database connection not established');
+  // 2. Rapid double-submit protection: Return existing record if exact duplicate created within 15 seconds
+  if (!data.isColdStorage) {
+    try {
+      const fifteenSecondsAgo = new Date(Date.now() - 15000);
+      const rapidDuplicate = await Inward.findOne({
+        clientId: new mongoose.Types.ObjectId(data.clientId),
+        warehouseId: new mongoose.Types.ObjectId(data.warehouseId),
+        commodityId: new mongoose.Types.ObjectId(data.commodityId),
+        quantityMT: data.quantityMT,
+        bagsCount: data.bagsCount,
+        createdAt: { $gte: fifteenSecondsAgo },
+      }).maxTimeMS(2000).lean();
 
-    let receiptNumber = '';
-    if (!data.isColdStorage && authSession?.user?.id) {
+      if (rapidDuplicate) {
+        console.warn('[processInward] Rapid duplicate detected within 15s window, returning existing entry:', rapidDuplicate._id);
+        return {
+          success: true,
+          data: JSON.parse(JSON.stringify(rapidDuplicate)),
+          receipts: {
+            dailyReportUrl: `/api/dry-storage/receipts/daily-report?id=${rapidDuplicate._id}`,
+            gatePassUrl: `/api/dry-storage/receipts/gate-pass?id=${rapidDuplicate._id}`,
+            dailyReportSrNo: (rapidDuplicate as any).dailyReportSrNo || '001',
+            gatePassNo: (rapidDuplicate as any).gatePass || (rapidDuplicate as any).gatePassNo || '001',
+          },
+          isDuplicate: true,
+        };
+      }
+    } catch (rapidErr) {
+      console.warn('[processInward] Rapid duplicate check error:', rapidErr);
+    }
+  }
+
+  // 3. Pre-fetch and validate commodity, client, and warehouse before starting transaction
+  const [commodity, client, warehouse] = await Promise.all([
+    Commodity.findById(data.commodityId).maxTimeMS(4000),
+    Client.findById(data.clientId).maxTimeMS(4000),
+    Warehouse.findById(data.warehouseId).maxTimeMS(4000),
+  ]);
+
+  if (!commodity) throw new Error('Commodity not found');
+  if (!client) throw new Error('Client not found');
+  if (!warehouse) throw new Error('Warehouse not found');
+  if (warehouse.status === 'INACTIVE') {
+    throw new Error('Warehouse is deactivated and cannot be used for new transactions');
+  }
+
+  if (warehouse.occupiedCapacity + data.quantityMT > warehouse.totalCapacity) {
+    throw new Error('Transaction exceeds warehouse total capacity');
+  }
+
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+
+  // 4. Generate user storage receipt sequence BEFORE transaction (bounded with max 20 attempts)
+  let receiptNumber = '';
+  if (!data.isColdStorage && authSession?.user?.id) {
+    try {
       const userId = new mongoose.Types.ObjectId(authSession.user.id);
-      const userDoc = await db.collection('users').findOne({ _id: userId });
-      
+      const userDoc = await db.collection('users').findOne({ _id: userId }, { maxTimeMS: 2000 });
+
       if (userDoc) {
         let currentSeq = userDoc.storageReceiptCurrentNumber || userDoc.storageReceiptStartingNumber || 1;
         let isUnique = false;
-        
+        let attempts = 0;
+
         const prefix = userDoc.storageReceiptPrefix || '';
         const suffix = userDoc.storageReceiptSuffix || '';
         const padding = userDoc.storageReceiptPadding || 4;
-        
-        while (!isUnique) {
+
+        while (!isUnique && attempts < 20) {
+          attempts++;
           const generatedReceipt = `${prefix}${String(currentSeq).padStart(padding, '0')}${suffix}`;
-          const existing = await db.collection('inwards').findOne({ receiptNumber: generatedReceipt, userId });
+          const existing = await db.collection('inwards').findOne(
+            { receiptNumber: generatedReceipt, userId },
+            { projection: { _id: 1 }, maxTimeMS: 2000 }
+          );
           if (!existing) {
             isUnique = true;
             receiptNumber = generatedReceipt;
@@ -421,24 +475,95 @@ export async function processInward(data: {
             currentSeq++;
           }
         }
-        
+
+        if (!receiptNumber) {
+          receiptNumber = `${prefix}${String(currentSeq).padStart(padding, '0')}${suffix}`;
+        }
+
         await db.collection('users').updateOne(
-           { _id: userId },
-           { $set: { storageReceiptCurrentNumber: currentSeq + 1 } }
-        );
+          { _id: userId },
+          { $set: { storageReceiptCurrentNumber: currentSeq + 1 } },
+          { maxTimeMS: 2000 }
+        ).catch(err => console.warn('[processInward] Error updating storageReceiptCurrentNumber:', err));
       }
+    } catch (seqUserErr) {
+      console.warn('[processInward] Error in user receiptNumber generation:', seqUserErr);
     }
+  }
 
-    const notesValue = (data.notes !== undefined ? data.notes : data.note) || undefined;
+  // 5. Auto-generate safe sequences for Dry Storage receipts BEFORE transaction
+  let dailyReportSrNo = '';
+  let gatePassNumber = data.gatePass && data.gatePass.trim() !== '' ? data.gatePass.trim() : '';
 
-    // 2. Create Inward Record
+  if (!data.isColdStorage) {
+    try {
+      dailyReportSrNo = await getNextDryReceiptSequence(data.warehouseId, 'DAILY_REPORT_SR', authSession?.user?.id);
+      if (!gatePassNumber) {
+        gatePassNumber = await getNextDryReceiptSequence(data.warehouseId, 'GATE_PASS_NO', authSession?.user?.id);
+      }
+    } catch (seqErr) {
+      console.error('Sequence generation error:', seqErr);
+      if (!dailyReportSrNo) dailyReportSrNo = '001';
+      if (!gatePassNumber) gatePassNumber = '001';
+    }
+  } else {
+    if (!gatePassNumber) {
+      gatePassNumber = `GP-${Date.now()}`;
+    }
+  }
+
+  const notesValue = (data.notes !== undefined ? data.notes : data.note) || undefined;
+  const computedNetWeight = data.netWeight !== undefined && data.netWeight !== null 
+    ? data.netWeight 
+    : (data.quantityMT ? data.quantityMT * 1000 : undefined);
+
+  // Financial Calculations
+  const monthlyRate = commodity.ratePerMtPerDay * 30;
+  const rent = calculateRent(data.quantityMT, monthlyRate, inwardDate, outwardDate);
+  const totalAmount = rent.totalAmount;
+  const ratePerMTPerDay =
+    commodity.ratePerMtPerDay ??
+    (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
+
+  const whType = warehouse.warehouseType || 'Owner';
+  const ownerPercent = whType === 'Rented' ? 0 : (warehouse.ownerEarnings ?? (warehouse.ownerEquity ?? 60));
+  const platformPercent = whType === 'Rented' ? 100 : (warehouse.platformCommission ?? (100 - ownerPercent));
+  const ownerShare = whType === 'Rented' ? 0 : Math.round(totalAmount * (ownerPercent / 100) * 100) / 100;
+  const platformShare = Math.round((totalAmount - ownerShare) * 100) / 100;
+
+  // 6. Open transaction session strictly for atomic writes
+  const session = await createTransactionSession();
+  const createOptions: { session: mongoose.ClientSession } | undefined = session ? { session } : undefined;
+
+  try {
+    // 6.1 Create Inward Record
     const inwardPayload = appendOwnershipForMongo({
       ...data,
+      idempotencyKey: data.idempotencyKey || undefined,
       note: notesValue,
       notes: notesValue,
       date: inwardDate,
       outwardDate: outwardDate,
       receiptNumber: receiptNumber || undefined,
+      dailyReportSrNo: dailyReportSrNo || undefined,
+      gatePass: gatePassNumber || undefined,
+      gatePassNo: gatePassNumber || undefined,
+      agentName: data.agentName || undefined,
+      authorityPerson: data.authorityPerson || undefined,
+      variety: (data.variety && data.variety.trim() !== '') ? data.variety.trim() : (commodity.variety || undefined),
+      packagingMaterial: data.packagingMaterial?.trim() || undefined,
+      packagingSize: data.packagingSize?.trim() || undefined,
+      gslNo: (data.gslNo || (data as any).gslNumber)?.trim() || undefined,
+      rsnNo: data.rsnNo || undefined,
+      weighbridgeNameAddress: data.weighbridgeNameAddress || undefined,
+      inTime: data.inTime || undefined,
+      outTime: data.outTime || undefined,
+      grossWeight: data.grossWeight !== undefined ? data.grossWeight : undefined,
+      tareWeight: data.tareWeight !== undefined ? data.tareWeight : undefined,
+      netWeight: computedNetWeight,
+      moisture: data.moisture || undefined,
+      deliveryOrderNo: data.deliveryOrderNo || undefined,
+      idProofNo: data.idProofNo || undefined,
       assayerId: data.assayerId ? new mongoose.Types.ObjectId(data.assayerId) : undefined,
       gradingStatus: data.isAssayingRequired ? 'PENDING' : undefined,
     }, authSession);
@@ -447,10 +572,7 @@ export async function processInward(data: {
       ? await Inward.create([inwardPayload], createOptions)
       : await Inward.create([inwardPayload]);
 
-    // 3. Update Warehouse Capacity
-    if (warehouse.occupiedCapacity + data.quantityMT > warehouse.totalCapacity) {
-      throw new Error('Transaction exceeds warehouse total capacity');
-    }
+    // 6.2 Update Warehouse Capacity
     warehouse.occupiedCapacity += data.quantityMT;
     if (warehouse.occupiedCapacity >= warehouse.totalCapacity) warehouse.status = 'FULL';
     if (session) {
@@ -459,7 +581,7 @@ export async function processInward(data: {
       await warehouse.save();
     }
 
-    // 4. Link into shared transaction history
+    // 6.3 Link into shared transaction history
     const inwardTransaction = appendOwnershipForMongo({
       accountId: data.clientId,
       clientId: data.clientId,
@@ -475,7 +597,25 @@ export async function processInward(data: {
       bagsCount: data.bagsCount,
       stackNo: data.stackNo,
       lotNo: data.lotNo,
-      gatePass: data.gatePass || `GP-${Date.now()}`,
+      gatePass: gatePassNumber,
+      gatePassNo: gatePassNumber,
+      dailyReportSrNo: dailyReportSrNo || undefined,
+      agentName: data.agentName || undefined,
+      authorityPerson: data.authorityPerson || undefined,
+      variety: (data.variety && data.variety.trim() !== '') ? data.variety.trim() : (commodity.variety || undefined),
+      packagingMaterial: data.packagingMaterial?.trim() || undefined,
+      packagingSize: data.packagingSize?.trim() || undefined,
+      gslNo: (data.gslNo || (data as any).gslNumber)?.trim() || undefined,
+      rsnNo: data.rsnNo || undefined,
+      weighbridgeNameAddress: data.weighbridgeNameAddress || undefined,
+      inTime: data.inTime || undefined,
+      outTime: data.outTime || undefined,
+      grossWeight: data.grossWeight !== undefined ? data.grossWeight : undefined,
+      tareWeight: data.tareWeight !== undefined ? data.tareWeight : undefined,
+      netWeight: computedNetWeight,
+      moisture: data.moisture || undefined,
+      deliveryOrderNo: data.deliveryOrderNo || undefined,
+      idProofNo: data.idProofNo || undefined,
       vehicleNumber: data.vehicleNumber,
       transportationName: data.transportationName,
       driverName: data.driverName,
@@ -489,21 +629,12 @@ export async function processInward(data: {
       updatedAt: new Date(),
     }, authSession);
 
-
     await db.collection('transactions').insertOne(
       inwardTransaction,
       session ? { session } : undefined
     );
 
-    // 3. Financial Calculations
-    const monthlyRate = commodity.ratePerMtPerDay * 30; // Convert daily rate to monthly
-    const rent = calculateRent(data.quantityMT, monthlyRate, inwardDate, outwardDate);
-    const totalAmount = rent.totalAmount;
-
-    // 5. Create Ledger Entry for Invoice Generation
-    const ratePerMTPerDay =
-      commodity.ratePerMtPerDay ??
-      (commodity.ratePerMtMonth ? commodity.ratePerMtMonth / 30 : 10);
+    // 6.4 Create Ledger Entry for Invoice Generation
     const ledgerEntry = appendOwnershipForMongo({
       inwardId: newInward._id,
       clientId: new mongoose.Types.ObjectId(data.clientId),
@@ -523,12 +654,8 @@ export async function processInward(data: {
       ledgerEntry,
       session ? { session } : undefined
     );
-    const whType = warehouse.warehouseType || 'Owner';
-    const ownerPercent = whType === 'Rented' ? 0 : (warehouse.ownerEarnings ?? (warehouse.ownerEquity ?? 60));
-    const platformPercent = whType === 'Rented' ? 100 : (warehouse.platformCommission ?? (100 - ownerPercent));
-    const ownerShare = whType === 'Rented' ? 0 : Math.round(totalAmount * (ownerPercent / 100) * 100) / 100;
-    const platformShare = Math.round((totalAmount - ownerShare) * 100) / 100;
 
+    // 6.5 Revenue Distribution
     if (session) {
       await RevenueDistribution.create([{
         inwardId: newInward._id,
@@ -549,11 +676,17 @@ export async function processInward(data: {
       }]);
     }
 
-    if (session) {
-      await session.commitTransaction();
+    // 6.6 Commit Transaction safely with timeout race
+    if (session && session.inTransaction()) {
+      const commitPromise = session.commitTransaction();
+      const commitTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Transaction commit timed out after 5000ms')), 5000)
+      );
+      await Promise.race([commitPromise, commitTimeout]);
     }
 
-    await logActivity({
+    // 7. Non-blocking Activity Log (never stalls inward response)
+    logActivity({
       actionType: 'CREATE',
       module: 'Inward',
       recordId: newInward._id.toString(),
@@ -561,27 +694,46 @@ export async function processInward(data: {
       newValue: JSON.parse(JSON.stringify(newInward)),
       storageType: data.isColdStorage ? 'Cold Storage' : 'Dry Storage',
       sessionFallback: authSession
-    });
+    }).catch(logErr => console.warn('[processInward] Activity log warning:', logErr));
 
-    // Revalidation
-    revalidatePath('/dashboard/inward');
-    revalidatePath('/dashboard/warehouses');
-    revalidatePath('/dashboard/ledger');
-    revalidatePath('/dashboard/reports');
-    revalidatePath('/dashboard/revenue');
+    // 8. Revalidation
+    try {
+      revalidatePath('/dashboard/inward');
+      revalidatePath('/dashboard/warehouses');
+      revalidatePath('/dashboard/ledger');
+      revalidatePath('/dashboard/reports');
+      revalidatePath('/dashboard/revenue');
+    } catch (revalErr) {
+      console.warn('[processInward] revalidatePath warning:', revalErr);
+    }
 
     return {
       success: true,
-      data: JSON.parse(JSON.stringify(newInward))
+      data: JSON.parse(JSON.stringify(newInward)),
+      receipts: !data.isColdStorage ? {
+        dailyReportUrl: `/api/dry-storage/receipts/daily-report?id=${newInward._id}`,
+        gatePassUrl: `/api/dry-storage/receipts/gate-pass?id=${newInward._id}`,
+        dailyReportSrNo: newInward.dailyReportSrNo || dailyReportSrNo,
+        gatePassNo: newInward.gatePass || gatePassNumber,
+      } : undefined,
     };
   } catch (error: unknown) {
-    if (session) {
-      await session.abortTransaction();
+    if (session && session.inTransaction()) {
+      try {
+        await session.abortTransaction();
+      } catch (abortErr) {
+        console.warn('[processInward] Error aborting transaction:', abortErr);
+      }
     }
+    console.error('[processInward] Error during transaction execution:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     if (session) {
-      session.endSession();
+      try {
+        await session.endSession();
+      } catch (endErr) {
+        console.warn('[processInward] Error ending session:', endErr);
+      }
     }
   }
 }
@@ -602,7 +754,27 @@ export async function processOutward(data: {
   actualWeight?: number;
   netWeightLoss?: number;
   partyName?: string;
+  packagingMaterial?: string;
+  packagingSize?: string;
+  gslNo?: string;
   isColdStorage?: boolean;
+  vehicleNumber?: string;
+  transportationName?: string;
+  driverName?: string;
+  agentName?: string;
+  authorityPerson?: string;
+  variety?: string;
+  rsnNo?: string;
+  weighbridgeNameAddress?: string;
+  inTime?: string;
+  outTime?: string;
+  grossWeight?: number;
+  tareWeight?: number;
+  netWeight?: number;
+  moisture?: string;
+  deliveryOrderNo?: string;
+  idProofNo?: string;
+  notes?: string;
 }) {
   if (!data.isColdStorage) {
     await requireWspActionPermission('outward');
@@ -683,14 +855,67 @@ export async function processOutward(data: {
     }
 
     const c = commodity as any;
+
+    // Auto-generate safe sequences for Dry Storage receipts BEFORE outward record creation
+    let dailyReportSrNo = '';
+    let gatePassNumber = data.gatePass && data.gatePass.trim() !== '' ? data.gatePass.trim() : '';
+
+    if (!data.isColdStorage) {
+      try {
+        dailyReportSrNo = await getNextDryReceiptSequence(data.warehouseId, 'DAILY_REPORT_SR', authSession?.user?.id);
+        if (!gatePassNumber) {
+          gatePassNumber = await getNextDryReceiptSequence(data.warehouseId, 'GATE_PASS_NO', authSession?.user?.id);
+        }
+      } catch (seqErr) {
+        console.error('Sequence generation error for outward:', seqErr);
+        if (!dailyReportSrNo) dailyReportSrNo = '001';
+        if (!gatePassNumber) gatePassNumber = '001';
+      }
+    } else {
+      if (!gatePassNumber) {
+        gatePassNumber = `GP-${Date.now()}`;
+      }
+    }
+
+    const computedNetWeight = data.netWeight !== undefined
+      ? data.netWeight
+      : (data.actualWeight !== undefined
+        ? data.actualWeight * 1000
+        : (data.grossWeight !== undefined && data.tareWeight !== undefined
+          ? data.grossWeight - data.tareWeight
+          : (data.quantityMT ? data.quantityMT * 1000 : undefined)));
+
     const outwardPayload = appendOwnershipForMongo({
       ...data,
+      packagingMaterial: data.packagingMaterial?.trim() || undefined,
+      packagingSize: data.packagingSize?.trim() || undefined,
+      gslNo: (data.gslNo || (data as any).gslNumber)?.trim() || undefined,
       actualWeight: data.actualWeight,
       netWeightLoss: data.netWeightLoss,
       partyName: data.partyName,
       unit: c.unit || 'MT',
       unitRate: c.ratePerMtPerDay || (c.ratePerMtMonth ? c.ratePerMtMonth / 30 : 10),
       date: outwardDate,
+      dailyReportSrNo: dailyReportSrNo || undefined,
+      gatePass: gatePassNumber || undefined,
+      gatePassNo: gatePassNumber || undefined,
+      agentName: data.agentName || undefined,
+      authorityPerson: data.authorityPerson || undefined,
+      variety: (data.variety && data.variety.trim() !== '') ? data.variety.trim() : (commodity.variety || undefined),
+      rsnNo: data.rsnNo || undefined,
+      weighbridgeNameAddress: data.weighbridgeNameAddress || undefined,
+      inTime: data.inTime || undefined,
+      outTime: data.outTime || undefined,
+      grossWeight: data.grossWeight !== undefined ? data.grossWeight : undefined,
+      tareWeight: data.tareWeight !== undefined ? data.tareWeight : undefined,
+      netWeight: computedNetWeight,
+      moisture: data.moisture || undefined,
+      deliveryOrderNo: data.deliveryOrderNo || undefined,
+      idProofNo: data.idProofNo || undefined,
+      vehicleNumber: data.vehicleNumber || undefined,
+      transportationName: data.transportationName || undefined,
+      driverName: data.driverName || undefined,
+      notes: data.notes || undefined,
     }, authSession);
 
     const [newOutward] = session
@@ -726,8 +951,31 @@ export async function processOutward(data: {
       netWeightLoss: data.netWeightLoss,
       stackNo: data.stackNo,
       lotNo: data.lotNo,
-      gatePass: data.gatePass || `GP-${Date.now()}`,
+      gatePass: gatePassNumber,
+      gatePassNo: gatePassNumber,
+      dailyReportSrNo: dailyReportSrNo || undefined,
       partyName: data.partyName,
+      agentName: data.agentName || undefined,
+      authorityPerson: data.authorityPerson || undefined,
+      variety: (data.variety && data.variety.trim() !== '') ? data.variety.trim() : (commodity.variety || undefined),
+      packagingMaterial: data.packagingMaterial?.trim() || undefined,
+      packagingSize: data.packagingSize?.trim() || undefined,
+      gslNo: (data.gslNo || (data as any).gslNumber)?.trim() || undefined,
+      rsnNo: data.rsnNo || undefined,
+      weighbridgeNameAddress: data.weighbridgeNameAddress || undefined,
+      inTime: data.inTime || undefined,
+      outTime: data.outTime || undefined,
+      grossWeight: data.grossWeight !== undefined ? data.grossWeight : undefined,
+      tareWeight: data.tareWeight !== undefined ? data.tareWeight : undefined,
+      netWeight: computedNetWeight,
+      moisture: data.moisture || undefined,
+      deliveryOrderNo: data.deliveryOrderNo || undefined,
+      idProofNo: data.idProofNo || undefined,
+      vehicleNumber: data.vehicleNumber || undefined,
+      transportationName: data.transportationName || undefined,
+      driverName: data.driverName || undefined,
+      note: data.notes || undefined,
+      notes: data.notes || undefined,
       status: 'COMPLETED',
       sourceType: 'outward',
       sourceId: newOutward._id?.toString(),
@@ -826,7 +1074,16 @@ export async function processOutward(data: {
     revalidatePath('/dashboard/ledger');
     revalidatePath('/dashboard/reports');
 
-    return { success: true, data: JSON.parse(JSON.stringify(newOutward)) };
+    return {
+      success: true,
+      data: JSON.parse(JSON.stringify(newOutward)),
+      receipts: !data.isColdStorage ? {
+        dailyReportUrl: `/api/dry-storage/receipts/daily-report?id=${newOutward._id}&type=outward`,
+        gatePassUrl: `/api/dry-storage/receipts/gate-pass?id=${newOutward._id}&type=outward`,
+        dailyReportSrNo: newOutward.dailyReportSrNo || dailyReportSrNo,
+        gatePassNo: newOutward.gatePass || gatePassNumber,
+      } : undefined,
+    };
   } catch (error: unknown) {
     console.error('[processOutward] caught error', {
       message: error instanceof Error ? error.message : String(error),

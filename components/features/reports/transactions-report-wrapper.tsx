@@ -447,6 +447,10 @@ export default async function TransactionsReportWrapper() {
         driverName: t.driverName,
         note: t.note || t.notes,
         notes: t.notes || t.note,
+        variety: t.variety,
+        packagingMaterial: t.packagingMaterial,
+        packagingSize: t.packagingSize,
+        gslNo: t.gslNo,
       };
     });
 

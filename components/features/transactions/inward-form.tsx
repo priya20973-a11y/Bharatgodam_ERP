@@ -15,6 +15,8 @@ import { toast } from 'react-hot-toast';
 import { Loader2, Calculator, Calendar, Info } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { getDropdownDisplayName } from '@/lib/utils';
+import InwardReceiptSuccessDialog, { InwardReceiptDialogData } from './inward-receipt-success-dialog';
+import { ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
 const getGradingStatus = (observedValue: string | undefined, lowRange: number | undefined, highRange: number | undefined) => {
   if (!observedValue || observedValue.trim() === '') return '';
@@ -49,6 +51,22 @@ const inwardSchema = z.object({
   assayingExpiryDate: z.string().optional(),
   marketValuePerMT: z.coerce.number().min(0, 'Cannot be negative').optional(),
   gradingResults: z.any().optional(),
+  agentName: z.string().optional(),
+  authorityPerson: z.string().optional(),
+  variety: z.string().optional(),
+  packagingMaterial: z.string().optional(),
+  packagingSize: z.string().optional(),
+  gslNo: z.string().optional(),
+  rsnNo: z.string().optional(),
+  weighbridgeNameAddress: z.string().optional(),
+  inTime: z.string().optional(),
+  outTime: z.string().optional(),
+  grossWeight: z.coerce.number().optional(),
+  tareWeight: z.coerce.number().optional(),
+  netWeight: z.coerce.number().optional(),
+  moisture: z.string().optional(),
+  deliveryOrderNo: z.string().optional(),
+  idProofNo: z.string().optional(),
 }).refine((data) => {
   return new Date(data.outwardDate) > new Date(data.inwardDate);
 }, {
@@ -89,7 +107,9 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
   const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<string>('inw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9));
   const router = useRouter();
   const searchParams = useSearchParams();
   const [calculations, setCalculations] = useState<{
@@ -97,6 +117,10 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
     rate: number;
     total: number;
   } | null>(null);
+
+  const [showReceiptDetails, setShowReceiptDetails] = useState(false);
+  const [successReceiptData, setSuccessReceiptData] = useState<InwardReceiptDialogData | null>(null);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
 
   // Use unique IDs for hydration safety
   const clientIdId = useId();
@@ -141,6 +165,22 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
       assayingExpiryDate: '',
       marketValuePerMT: undefined,
       gradingResults: [],
+      agentName: 'SELF',
+      authorityPerson: '',
+      variety: '',
+      packagingMaterial: '',
+      packagingSize: '',
+      gslNo: '',
+      rsnNo: '',
+      weighbridgeNameAddress: '',
+      inTime: '',
+      outTime: '',
+      grossWeight: undefined,
+      tareWeight: undefined,
+      netWeight: undefined,
+      moisture: '',
+      deliveryOrderNo: '',
+      idProofNo: '',
     },
   });
 
@@ -160,6 +200,17 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
       setValue('commodityId', '');
     }
   }, [watchedValues.clientId, watchedValues.commodityId, selectedClient?.commodityIds, setValue]);
+
+  useEffect(() => {
+    if (watchedValues.commodityId) {
+      const selectedCommodity = commodities.find(
+        (c) => (c._id?.toString?.() || c._id) === watchedValues.commodityId
+      );
+      if (selectedCommodity) {
+        setValue('variety', selectedCommodity.variety || '');
+      }
+    }
+  }, [watchedValues.commodityId, commodities, setValue]);
 
   const reportUrl = React.useMemo(() => {
     const clientName = clients.find(c => c._id === watchedValues.clientId)?.name;
@@ -211,78 +262,138 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
       return;
     }
 
-    if (submittingRef.current) return;
+    if (submittingRef.current || isSubmitting) return;
     submittingRef.current = true;
+    setIsSubmitting(true);
 
-    startTransition(async () => {
-      try {
-        const res = await processInward({
-          clientId: data.clientId,
-          commodityId: data.commodityId,
-          warehouseId: data.warehouseId,
-          quantityMT: data.quantityMT,
-          bagsCount: data.bagsCount,
-          stackNo: data.stackNo,
-          lotNo: data.lotNo,
-          gatePass: data.gatePass,
-          vehicleNumber: data.vehicleNumber,
-          transportationName: data.transportationName,
-          driverName: data.driverName,
-          note: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
-          notes: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
-          date: data.inwardDate, // ISO string
-          outwardDate: data.outwardDate, // ISO string
-          isAssayingRequired: data.isAssayingRequired,
-          assayerId: data.assayerId || undefined,
-          assayingDate: data.assayingDate || undefined,
-          assayingExpiryDate: data.assayingExpiryDate || undefined,
-          marketValuePerMT: data.marketValuePerMT,
-          totalMarketValue: data.marketValuePerMT && data.quantityMT ? data.marketValuePerMT * data.quantityMT : 0,
-          gradingResults: data.gradingResults,
+    try {
+      const submitPromise = processInward({
+        clientId: data.clientId,
+        commodityId: data.commodityId,
+        warehouseId: data.warehouseId,
+        quantityMT: data.quantityMT,
+        bagsCount: data.bagsCount,
+        stackNo: data.stackNo,
+        lotNo: data.lotNo,
+        gatePass: data.gatePass,
+        vehicleNumber: data.vehicleNumber,
+        transportationName: data.transportationName,
+        driverName: data.driverName,
+        note: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
+        notes: (data.notes !== undefined && data.notes !== '') ? data.notes : (data.note || ''),
+        date: data.inwardDate, // ISO string
+        outwardDate: data.outwardDate, // ISO string
+        isAssayingRequired: data.isAssayingRequired,
+        assayerId: data.assayerId || undefined,
+        assayingDate: data.assayingDate || undefined,
+        assayingExpiryDate: data.assayingExpiryDate || undefined,
+        marketValuePerMT: data.marketValuePerMT,
+        totalMarketValue: data.marketValuePerMT && data.quantityMT ? data.marketValuePerMT * data.quantityMT : 0,
+        gradingResults: data.gradingResults,
+        agentName: data.agentName,
+        authorityPerson: data.authorityPerson,
+        variety: data.variety,
+        packagingMaterial: data.packagingMaterial,
+        packagingSize: data.packagingSize,
+        gslNo: data.gslNo,
+        rsnNo: data.rsnNo,
+        weighbridgeNameAddress: data.weighbridgeNameAddress,
+        inTime: data.inTime,
+        outTime: data.outTime,
+        grossWeight: data.grossWeight,
+        tareWeight: data.tareWeight,
+        netWeight: data.netWeight,
+        moisture: data.moisture,
+        deliveryOrderNo: data.deliveryOrderNo,
+        idProofNo: data.idProofNo,
+        idempotencyKey: idempotencyKeyRef.current,
+      });
+
+      const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
+        setTimeout(
+          () => resolve({ success: false, error: 'Request timed out after 25 seconds. Please verify recent entries before retrying.' }),
+          25000
+        )
+      );
+
+      const res: any = await Promise.race([submitPromise, timeoutPromise]);
+
+      if (res.success) {
+        toast.success(res.isDuplicate ? 'Inward entry verified (duplicate prevented)' : 'Inward transaction recorded & receipts generated');
+
+        const inwardId = res.data?._id || res.data?.id;
+        if (inwardId) {
+          setSuccessReceiptData({
+            inwardId: inwardId.toString(),
+            dailyReportSrNo: res.receipts?.dailyReportSrNo || res.data?.dailyReportSrNo || '001',
+            gatePassNo: res.receipts?.gatePassNo || res.data?.gatePass || '001',
+            clientName: clients.find(c => c._id?.toString() === data.clientId)?.name,
+            commodityName: commodities.find(c => c._id?.toString() === data.commodityId)?.name,
+            warehouseName: warehouses.find(w => w._id?.toString() === data.warehouseId)?.name,
+            bagsCount: data.bagsCount,
+            quantityMT: data.quantityMT,
+          });
+          setShowReceiptDialog(true);
+        }
+
+        // Generate a new idempotency key for the next inward entry
+        idempotencyKeyRef.current = 'inw_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+        setCalculations(null); // Explicitly clear live charges display
+
+        reset({
+          clientId: '',
+          commodityId: '',
+          warehouseId: '',
+          inwardDate: new Date().toISOString().split('T')[0],
+          outwardDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          quantityMT: undefined,
+          bagsCount: undefined,
+          stackNo: '',
+          lotNo: '',
+          gatePass: '',
+          vehicleNumber: '',
+          transportationName: '',
+          driverName: '',
+          note: '',
+          notes: '',
+          isAssayingRequired: false,
+          assayerId: '',
+          assayingDate: '',
+          assayingExpiryDate: '',
+          marketValuePerMT: undefined,
+          gradingResults: [],
+          agentName: 'SELF',
+          authorityPerson: '',
+          variety: '',
+          packagingMaterial: '',
+          packagingSize: '',
+          gslNo: '',
+          rsnNo: '',
+          weighbridgeNameAddress: '',
+          inTime: '',
+          outTime: '',
+          grossWeight: undefined,
+          tareWeight: undefined,
+          netWeight: undefined,
+          moisture: '',
+          deliveryOrderNo: '',
+          idProofNo: '',
         });
 
-        if (res.success) {
-          toast.success('Inward transaction recorded');
-
-          setCalculations(null); // Explicitly clear live charges display
-          
-          reset({
-            clientId: '',
-            commodityId: '',
-            warehouseId: '',
-            inwardDate: new Date().toISOString().split('T')[0],
-            outwardDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            quantityMT: undefined,
-            bagsCount: undefined,
-            stackNo: '',
-            lotNo: '',
-            gatePass: '',
-            vehicleNumber: '',
-            transportationName: '',
-            driverName: '',
-            note: '',
-            notes: '',
-            isAssayingRequired: false,
-            assayerId: '',
-            assayingDate: '',
-            assayingExpiryDate: '',
-            marketValuePerMT: undefined,
-            gradingResults: [],
-          });
-          
+        startTransition(() => {
           router.refresh();
-          onSuccess?.();
-          setTimeout(() => { submittingRef.current = false; }, 1000);
-        } else {
-          toast.error(res.error || 'Failed to process inward');
-          submittingRef.current = false;
-        }
-      } catch (err: any) {
-        console.error('Submission Error:', err);
-        toast.error('Internal Server Error: ' + err.message);
-        submittingRef.current = false;
+        });
+        onSuccess?.();
+      } else {
+        toast.error(res.error || 'Failed to process inward');
       }
-    });
+    } catch (err: any) {
+      console.error('Submission Error:', err);
+      toast.error('Submission Error: ' + (err?.message || 'Unexpected error occurred'));
+    } finally {
+      setIsSubmitting(false);
+      submittingRef.current = false;
+    }
   };
 
   return (
@@ -683,6 +794,202 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
           </div>
         </div>
 
+        {/* Collapsible Receipt Details Section */}
+        <div className="border-t pt-4">
+          <button
+            type="button"
+            className="flex items-center justify-between w-full py-2 text-left group"
+            onClick={() => setShowReceiptDetails(!showReceiptDetails)}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              <div>
+                <span className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                  Receipt &amp; Gate Pass Details (Optional)
+                </span>
+                <span className="text-xs text-slate-500 ml-2">
+                  Add weighbridge, packaging, timings, and ID proof to appear on receipts
+                </span>
+              </div>
+            </div>
+            {showReceiptDetails ? (
+              <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+            )}
+          </button>
+
+          {showReceiptDetails && (
+            <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="agentName" className="text-xs font-semibold text-slate-700">Agent Name</label>
+                  <Input 
+                    id="agentName"
+                    {...register('agentName')}
+                    placeholder="e.g., SELF"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="authorityPerson" className="text-xs font-semibold text-slate-700">Authority Person</label>
+                  <Input 
+                    id="authorityPerson"
+                    {...register('authorityPerson')}
+                    placeholder="e.g., Ashwinbhai"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="variety" className="text-xs font-semibold text-slate-700">Variety</label>
+                  <Input 
+                    id="variety"
+                    {...register('variety')}
+                    placeholder="e.g., Lokwan"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="packagingMaterial" className="text-xs font-semibold text-slate-700">Packaging Material</label>
+                  <Input 
+                    id="packagingMaterial"
+                    {...register('packagingMaterial')}
+                    placeholder="e.g., PP Bag, Jute Bag"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="packagingSize" className="text-xs font-semibold text-slate-700">Packaging Size</label>
+                  <Input 
+                    id="packagingSize"
+                    {...register('packagingSize')}
+                    placeholder="e.g., 50 kg"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="inTime" className="text-xs font-semibold text-slate-700">In Time</label>
+                  <Input 
+                    id="inTime"
+                    {...register('inTime')}
+                    placeholder="e.g., 1:56 PM"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="outTime" className="text-xs font-semibold text-slate-700">Out Time</label>
+                  <Input 
+                    id="outTime"
+                    {...register('outTime')}
+                    placeholder="e.g., 4:56 PM"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="grossWeight" className="text-xs font-semibold text-slate-700">Gross Weight (KG)</label>
+                  <Controller
+                    name="grossWeight"
+                    control={control}
+                    render={({ field }) => (
+                      <Input 
+                        id="grossWeight"
+                        type="number"
+                        placeholder="e.g., 26955"
+                        className="bg-white text-xs h-9"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="tareWeight" className="text-xs font-semibold text-slate-700">Tare Weight (KG)</label>
+                  <Controller
+                    name="tareWeight"
+                    control={control}
+                    render={({ field }) => (
+                      <Input 
+                        id="tareWeight"
+                        type="number"
+                        placeholder="e.g., 7480"
+                        className="bg-white text-xs h-9"
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                      />
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="moisture" className="text-xs font-semibold text-slate-700">Moisture (%)</label>
+                  <Input 
+                    id="moisture"
+                    {...register('moisture')}
+                    placeholder="e.g., 11.2%"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="gslNo" className="text-xs font-semibold text-slate-700">GSL Number</label>
+                  <Input 
+                    id="gslNo"
+                    {...register('gslNo')}
+                    placeholder="e.g., 51211"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="rsnNo" className="text-xs font-semibold text-slate-700">RSN / RST Number</label>
+                  <Input 
+                    id="rsnNo"
+                    {...register('rsnNo')}
+                    placeholder="e.g., 13082"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="idProofNo" className="text-xs font-semibold text-slate-700">ID Proof Number / Mobile</label>
+                  <Input 
+                    id="idProofNo"
+                    {...register('idProofNo')}
+                    placeholder="e.g., 9638253590"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="weighbridgeNameAddress" className="text-xs font-semibold text-slate-700">Weighbridge Name / Address</label>
+                  <Input 
+                    id="weighbridgeNameAddress"
+                    {...register('weighbridgeNameAddress')}
+                    placeholder="e.g., Aum Shiv W/B, Gondal"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="deliveryOrderNo" className="text-xs font-semibold text-slate-700">Delivery Order No. &amp; Date</label>
+                  <Input 
+                    id="deliveryOrderNo"
+                    {...register('deliveryOrderNo')}
+                    placeholder="e.g., DO-1002 / 16-03-2026"
+                    className="bg-white text-xs h-9"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-6">
             <div className="space-y-2">
                 <label htmlFor="notes" className="text-sm font-semibold text-slate-700">Notes</label>
@@ -707,8 +1014,8 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
             </div>
         </div>
 
-        <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12" disabled={isPending}>
-          {isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Entry...</> : 'Confirm Inward Entry'}
+        <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12" disabled={isSubmitting || isPending}>
+          {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Entry...</> : 'Confirm Inward Entry'}
         </Button>
       </div>
 
@@ -749,6 +1056,12 @@ export default function InwardForm({ clients, commodities, warehouses, assayers 
           </motion.div>
         )}
       </AnimatePresence>
+
+      <InwardReceiptSuccessDialog
+        isOpen={showReceiptDialog}
+        onClose={() => setShowReceiptDialog(false)}
+        data={successReceiptData}
+      />
     </form>
   );
 }

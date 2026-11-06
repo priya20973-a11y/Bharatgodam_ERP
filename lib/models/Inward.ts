@@ -18,6 +18,25 @@ export interface IInward extends Document {
   outwardDate?: Date;
   qrId?: string;
   receiptNumber?: string;
+  dailyReportSrNo?: string;
+  gatePassNo?: string;
+  agentName?: string;
+  authorityPerson?: string;
+  variety?: string;
+  packagingMaterial?: string;
+  packagingSize?: string;
+  gslNo?: string;
+  rsnNo?: string;
+  weighbridgeNameAddress?: string;
+  inTime?: string;
+  outTime?: string;
+  grossWeight?: number;
+  tareWeight?: number;
+  netWeight?: number;
+  moisture?: string;
+  deliveryOrderNo?: string;
+  idProofNo?: string;
+  idempotencyKey?: string;
   isAssayingRequired?: boolean;
   assayerId?: mongoose.Types.ObjectId;
   assayingDate?: Date;
@@ -66,6 +85,25 @@ const InwardSchema: Schema = new Schema(
     outwardDate: { type: Date },
     qrId: { type: String, unique: true, sparse: true },
     receiptNumber: { type: String, trim: true },
+    dailyReportSrNo: { type: String, trim: true },
+    gatePassNo: { type: String, trim: true },
+    agentName: { type: String, trim: true },
+    authorityPerson: { type: String, trim: true },
+    variety: { type: String, trim: true },
+    packagingMaterial: { type: String, trim: true },
+    packagingSize: { type: String, trim: true },
+    gslNo: { type: String, trim: true },
+    rsnNo: { type: String, trim: true },
+    weighbridgeNameAddress: { type: String, trim: true },
+    inTime: { type: String, trim: true },
+    outTime: { type: String, trim: true },
+    grossWeight: { type: Number, required: false },
+    tareWeight: { type: Number, required: false },
+    netWeight: { type: Number, required: false },
+    moisture: { type: String, trim: true },
+    deliveryOrderNo: { type: String, trim: true },
+    idProofNo: { type: String, trim: true },
+    idempotencyKey: { type: String, trim: true, sparse: true, index: true },
     isAssayingRequired: { type: Boolean, default: false },
     assayerId: { type: Schema.Types.ObjectId, ref: 'Assayer', required: false },
     assayingDate: { type: Date, required: false },
