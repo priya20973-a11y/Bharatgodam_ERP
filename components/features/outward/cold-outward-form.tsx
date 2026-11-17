@@ -666,6 +666,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     const commodity = commodities.find(c => c._id === (inward.commodityId?._id || inward.commodityId));
     const isGradingFromInward = inward.gradingApplied === true;
     const remainingQtyDb = inward.remainingQuantityKg !== undefined && inward.remainingQuantityKg !== null ? inward.remainingQuantityKg : (inward.quantityKg || 0);
+    const availableQty = inward.availableQty !== undefined ? inward.availableQty : remainingQtyDb;
 
     const initialStackSelections: Record<string, any> = {};
     if (inward.availableAllocations && inward.availableAllocations.length > 1) {
@@ -692,9 +693,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         mixed: inward.mixed || null,
         plusMinus: '-',
         netWeightLoss: null,
-        grossWeight: remainingQtyDb || null,
+        grossWeight: availableQty || null,
         emptyWeight: null,
-        outwardWeight: remainingQtyDb || null,
+        outwardWeight: availableQty || null,
         gradingApplied: isGradingFromInward ? true : false,
         gradingChargeType: isGradingFromInward && inward.gradingChargeType ? inward.gradingChargeType : (commodity?.gradingCharge?.type || 'Per Bag'),
         gradingRate: isGradingFromInward && inward.gradingRate !== undefined ? inward.gradingRate : (commodity?.gradingCharge?.defaultRate || 0),
@@ -839,7 +840,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           }
 
           if (outwardWeight > alloc.availableQty) {
-            toast.error(`Outward weight for Stack ${alloc.stackName || alloc.stackNo} exceeds available quantity (${alloc.availableQty} KG)`);
+            if ((item.inward?.pledgedQuantity || 0) > 0) {
+              toast.error('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
+            } else {
+              toast.error(`Outward weight for Stack ${alloc.stackName || alloc.stackNo} exceeds available quantity (${alloc.availableQty} KG)`);
+            }
             return;
           }
 
@@ -905,9 +910,15 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         const remainingQtyDb = item.inward.remainingQuantityKg !== undefined && item.inward.remainingQuantityKg !== null
           ? item.inward.remainingQuantityKg
           : (item.inward.quantityKg || 0);
+        const availableQty = item.inward.availableQty !== undefined ? item.inward.availableQty : remainingQtyDb;
+        const activePledgedQty = item.inward.pledgedQuantity || 0;
 
-        if (calcNetWeight > remainingQtyDb) {
-          toast.error(`Quantity exceeds available stock (${remainingQtyDb.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
+        if (calcNetWeight > availableQty) {
+          if (activePledgedQty > 0 || remainingQtyDb > availableQty) {
+            toast.error('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
+          } else {
+            toast.error(`Quantity exceeds available stock (${availableQty.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
+          }
           return;
         }
 
@@ -922,7 +933,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           const alloc = allocations[i];
           if (remainingNetWeight <= 0) break;
 
-          const allocAvailQty = allocations.length === 1 ? remainingQtyDb : (alloc.availableQty || 0);
+          const allocAvailQty = allocations.length === 1 ? availableQty : (alloc.availableQty || 0);
           const isLastAlloc = i === allocations.length - 1 || remainingNetWeight <= allocAvailQty;
           const deductNetWeight = Math.min(remainingNetWeight, allocAvailQty);
           
@@ -1338,7 +1349,10 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                         className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700">
-                        LOT: {inw.lotNo || '-'} | Receipt: {inw.receiptNumber || '-'} | {inw.date ? new Date(inw.date).toLocaleDateString('en-GB') : ''} | {inw.commodityId?.name}{inw.commodityId?.type ? `(${inw.commodityId.type})` : ''}{inw.commodityId?.unit ? ` [${inw.commodityId.unit}${inw.commodityId.siUnit ? ` / ${inw.commodityId.siUnit}` : ''}]` : ''}
+                        LOT: {inw.lotNo || '-'} | Receipt: {inw.receiptNumber || '-'} | {inw.date ? new Date(inw.date).toLocaleDateString('en-GB') : ''} | {inw.commodityId?.name}{inw.commodityId?.type ? `(${inw.commodityId.type})` : ''}{inw.commodityId?.unit ? ` [${inw.commodityId.unit}${inw.commodityId.siUnit ? ` / ${inw.commodityId.siUnit}` : ''}]` : ''} | Avail: {(inw.availableQty !== undefined ? inw.availableQty : (inw.remainingQuantityKg ?? inw.quantityKg)).toFixed(2)} KG
+                        {(inw.pledgedQuantity || 0) > 0 && (
+                          <span className="text-amber-600 font-semibold ml-1.5">[Pledged: {Number(inw.pledgedQuantity).toFixed(2)} KG]</span>
+                        )}
                       </span>
                     </div>
                   )
@@ -1486,8 +1500,13 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                 </span>
               )}
               <span className="text-slate-500 font-normal">
-                - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(remainingQtyDb) || 0).toFixed(2)} KG)
+                - {(item.inward.availableAllocations || [{ chamberName: item.inward.chamberName, chamberNo: item.inward.chamberNo, floorName: item.inward.floorName, floorNo: item.inward.floorNo, stackName: item.inward.stackName, stackNo: item.inward.stackNo }]).map((a: any) => formatLocation(a, item.inward._id)).join(', ')} (Available Weight: {(Number(item.inward.availableQty !== undefined ? item.inward.availableQty : remainingQtyDb) || 0).toFixed(2)} KG)
               </span>
+              {(item.inward.pledgedQuantity || 0) > 0 && (
+                <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold border border-amber-200">
+                  Pledged & Locked: {Number(item.inward.pledgedQuantity).toFixed(2)} KG
+                </span>
+              )}
             </h4>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 bg-slate-50 p-3 rounded-md border border-slate-100">

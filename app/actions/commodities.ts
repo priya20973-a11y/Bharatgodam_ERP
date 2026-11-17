@@ -29,6 +29,7 @@ export async function fetchCommodities() {
     return {
       _id: item._id,
       name: item.name,
+      variety: item.variety || '',
       ratePerMtPerDay: item.ratePerMtPerDay,
       updatedAt: item.updatedAt,
       createdAt: item.createdAt,
@@ -40,7 +41,7 @@ export async function fetchCommodities() {
   })));
 }
 
-export async function addCommodity(data: { name: string; ratePerMtPerDay: number; gradingParameters?: any[] }) {
+export async function addCommodity(data: { name: string; ratePerMtPerDay: number; variety?: string; gradingParameters?: any[] }) {
   await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
@@ -82,6 +83,7 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
     const itemData = { 
       ...data, 
       name: nameVal,
+      variety: data.variety && data.variety.trim() !== '' ? data.variety.trim() : undefined,
       gradingParameters: data.gradingParameters || []
     };
 
@@ -107,7 +109,7 @@ export async function addCommodity(data: { name: string; ratePerMtPerDay: number
   }
 }
 
-export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number; gradingParameters?: any[] }) {
+export async function updateCommodity(id: string, data: { name: string; ratePerMtPerDay: number; variety?: string; gradingParameters?: any[] }) {
   await requireWspActionPermission('commodityMaster');
   await connectToDatabase();
   try {
@@ -150,6 +152,7 @@ export async function updateCommodity(id: string, data: { name: string; ratePerM
     const itemData = { 
       ...data, 
       name: nameVal,
+      variety: data.variety && data.variety.trim() !== '' ? data.variety.trim() : undefined,
       gradingParameters: data.gradingParameters || []
     };
 

@@ -75,6 +75,14 @@ interface ProfileData {
   storageReceiptSuffix?: string;
   storageReceiptStartingNumber?: number;
   storageReceiptPadding?: number;
+  dailyReportPrefix?: string;
+  dailyReportSuffix?: string;
+  dailyReportStartingNumber?: number;
+  dailyReportPadding?: number;
+  gatePassPrefix?: string;
+  gatePassSuffix?: string;
+  gatePassStartingNumber?: number;
+  gatePassPadding?: number;
 }
 
 const initialProfileForm = {
@@ -106,6 +114,14 @@ const initialProfileForm = {
   storageReceiptSuffix: '',
   storageReceiptStartingNumber: 1,
   storageReceiptPadding: 4,
+  dailyReportPrefix: '',
+  dailyReportSuffix: '',
+  dailyReportStartingNumber: 1,
+  dailyReportPadding: 3,
+  gatePassPrefix: '',
+  gatePassSuffix: '',
+  gatePassStartingNumber: 1,
+  gatePassPadding: 3,
 };
 
 const initialPasswordForm = {
@@ -180,6 +196,14 @@ export default function ProfilePage() {
         storageReceiptSuffix: data.user.storageReceiptSuffix || '',
         storageReceiptStartingNumber: data.user.storageReceiptStartingNumber || 1,
         storageReceiptPadding: data.user.storageReceiptPadding || 4,
+        dailyReportPrefix: data.user.dailyReportPrefix || '',
+        dailyReportSuffix: data.user.dailyReportSuffix || '',
+        dailyReportStartingNumber: data.user.dailyReportStartingNumber || 1,
+        dailyReportPadding: data.user.dailyReportPadding || 3,
+        gatePassPrefix: data.user.gatePassPrefix || '',
+        gatePassSuffix: data.user.gatePassSuffix || '',
+        gatePassStartingNumber: data.user.gatePassStartingNumber || 1,
+        gatePassPadding: data.user.gatePassPadding || 3,
       });
       setLogoPreview(data.user.companyLogo || null);
       setGstNotApplicable(data.user.gstNumber === 'NA');
@@ -759,6 +783,136 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Daily Truck Transaction Report Serial Number Settings */}
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 lg:col-span-2">
+              <div className="border-b border-slate-200 pb-3">
+                <h3 className="font-semibold text-slate-800 text-base">Daily Truck Transaction Report Serial Number</h3>
+                <p className="text-xs text-slate-500 mt-1">Configure serial number prefix, starting sequence, and padding for Daily Truck Transaction Reports</p>
+              </div>
+              
+              <div className="grid gap-6 lg:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Prefix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.dailyReportPrefix}
+                    onChange={(event) => setProfileForm({ ...profileForm, dailyReportPrefix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. DR- or leave blank"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Suffix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.dailyReportSuffix}
+                    onChange={(event) => setProfileForm({ ...profileForm, dailyReportSuffix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. /26 or leave blank"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Starting Number</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={profileForm.dailyReportStartingNumber}
+                    onChange={(event) => setProfileForm({ ...profileForm, dailyReportStartingNumber: Math.max(1, Number(event.target.value) || 1) })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Padding / Number Length</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={profileForm.dailyReportPadding}
+                    onChange={(event) => setProfileForm({ ...profileForm, dailyReportPadding: Math.min(10, Math.max(1, Number(event.target.value) || 3)) })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. 3 for 001"
+                  />
+                </label>
+
+                <div className="lg:col-span-2 rounded-md bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-sm font-medium text-blue-900 mb-1">Live Preview (Next Generated Serial Number)</p>
+                  <p className="text-slate-800 font-mono text-base font-semibold">
+                    {profileForm.dailyReportPrefix || ''}
+                    {String(profileForm.dailyReportStartingNumber || 1).padStart(profileForm.dailyReportPadding || 3, '0')}
+                    {profileForm.dailyReportSuffix || ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Gate Pass Number Settings */}
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 lg:col-span-2">
+              <div className="border-b border-slate-200 pb-3">
+                <h3 className="font-semibold text-slate-800 text-base">Gate Pass Number Settings</h3>
+                <p className="text-xs text-slate-500 mt-1">Configure Gate Pass number prefix, starting sequence, and padding for dry storage receipts</p>
+              </div>
+              
+              <div className="grid gap-6 lg:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Prefix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.gatePassPrefix}
+                    onChange={(event) => setProfileForm({ ...profileForm, gatePassPrefix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. GP- or leave blank"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Suffix (Optional)</span>
+                  <input
+                    type="text"
+                    value={profileForm.gatePassSuffix}
+                    onChange={(event) => setProfileForm({ ...profileForm, gatePassSuffix: event.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. /26 or leave blank"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Starting Number</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={profileForm.gatePassStartingNumber}
+                    onChange={(event) => setProfileForm({ ...profileForm, gatePassStartingNumber: Math.max(1, Number(event.target.value) || 1) })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700">Padding / Number Length</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={profileForm.gatePassPadding}
+                    onChange={(event) => setProfileForm({ ...profileForm, gatePassPadding: Math.min(10, Math.max(1, Number(event.target.value) || 3)) })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    placeholder="e.g. 3 for 001"
+                  />
+                </label>
+
+                <div className="lg:col-span-2 rounded-md bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-sm font-medium text-blue-900 mb-1">Live Preview (Next Generated Gate Pass Number)</p>
+                  <p className="text-slate-800 font-mono text-base font-semibold">
+                    {profileForm.gatePassPrefix || ''}
+                    {String(profileForm.gatePassStartingNumber || 1).padStart(profileForm.gatePassPadding || 3, '0')}
+                    {profileForm.gatePassSuffix || ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">IEC Code (Optional)</span>
               <input
@@ -883,6 +1037,14 @@ export default function ProfilePage() {
                 storageReceiptSuffix: profile?.storageReceiptSuffix || '',
                 storageReceiptStartingNumber: profile?.storageReceiptStartingNumber || 1,
                 storageReceiptPadding: profile?.storageReceiptPadding || 4,
+                dailyReportPrefix: profile?.dailyReportPrefix || '',
+                dailyReportSuffix: profile?.dailyReportSuffix || '',
+                dailyReportStartingNumber: profile?.dailyReportStartingNumber || 1,
+                dailyReportPadding: profile?.dailyReportPadding || 3,
+                gatePassPrefix: profile?.gatePassPrefix || '',
+                gatePassSuffix: profile?.gatePassSuffix || '',
+                gatePassStartingNumber: profile?.gatePassStartingNumber || 1,
+                gatePassPadding: profile?.gatePassPadding || 3,
               });
               setMessage(null);
               setError(null);

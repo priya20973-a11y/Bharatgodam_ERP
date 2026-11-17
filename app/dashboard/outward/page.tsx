@@ -2,6 +2,7 @@ import { getClients } from '@/app/actions/client-actions';
 import { fetchCommodities } from '@/app/actions/commodities';
 import { getWarehouses } from '@/app/actions/warehouse-actions';
 import OutwardForm from '@/components/features/transactions/outward-form';
+import OutwardRecentList from '@/components/features/transactions/outward-recent-list';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata = {
@@ -30,12 +31,14 @@ export default async function OutwardPage() {
         </p>
       </div>
 
-      <div className="max-w-4xl">
+      <div className="max-w-5xl space-y-8">
         <OutwardForm 
           clients={sanitized.clients} 
           commodities={sanitized.commodities} 
           warehouses={sanitized.warehouses}
         />
+
+        <OutwardRecentList />
       </div>
       <Toaster position="top-right" />
     </div>

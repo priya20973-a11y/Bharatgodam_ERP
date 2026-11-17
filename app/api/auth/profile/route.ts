@@ -46,6 +46,14 @@ export async function GET() {
         storageReceiptSuffix: user.storageReceiptSuffix || '',
         storageReceiptStartingNumber: user.storageReceiptStartingNumber || 1,
         storageReceiptPadding: user.storageReceiptPadding || 4,
+        dailyReportPrefix: user.dailyReportPrefix || '',
+        dailyReportSuffix: user.dailyReportSuffix || '',
+        dailyReportStartingNumber: user.dailyReportStartingNumber || 1,
+        dailyReportPadding: user.dailyReportPadding || 3,
+        gatePassPrefix: user.gatePassPrefix || '',
+        gatePassSuffix: user.gatePassSuffix || '',
+        gatePassStartingNumber: user.gatePassStartingNumber || 1,
+        gatePassPadding: user.gatePassPadding || 3,
       },
     });
   } catch (error: any) {
@@ -94,7 +102,15 @@ export async function PATCH(req: Request) {
       storageReceiptPrefix,
       storageReceiptSuffix,
       storageReceiptStartingNumber,
-      storageReceiptPadding
+      storageReceiptPadding,
+      dailyReportPrefix,
+      dailyReportSuffix,
+      dailyReportStartingNumber,
+      dailyReportPadding,
+      gatePassPrefix,
+      gatePassSuffix,
+      gatePassStartingNumber,
+      gatePassPadding
     } = body;
 
     const db = await getDb();
@@ -229,6 +245,34 @@ export async function PATCH(req: Request) {
       if (storageReceiptSuffix !== undefined) updates.storageReceiptSuffix = storageReceiptSuffix || '';
       if (storageReceiptStartingNumber !== undefined) updates.storageReceiptStartingNumber = storageReceiptStartingNumber || 1;
       if (storageReceiptPadding !== undefined) updates.storageReceiptPadding = storageReceiptPadding || 4;
+      if (dailyReportPrefix !== undefined) updates.dailyReportPrefix = dailyReportPrefix || '';
+      if (dailyReportSuffix !== undefined) updates.dailyReportSuffix = dailyReportSuffix || '';
+      if (dailyReportStartingNumber !== undefined) {
+        const startNum = Number(dailyReportStartingNumber) || 1;
+        updates.dailyReportStartingNumber = startNum;
+        // Synchronize sequence counter
+        const counterId = `dry_daily_report_sr_user_${userId}`;
+        db.collection<{ _id: string; seq: number }>('counters').updateOne(
+          { _id: counterId },
+          { $set: { seq: startNum - 1 } },
+          { upsert: true }
+        ).catch((err) => console.warn('Failed to sync daily report counter:', err));
+      }
+      if (dailyReportPadding !== undefined) updates.dailyReportPadding = Math.min(Math.max(Number(dailyReportPadding) || 3, 1), 10);
+      if (gatePassPrefix !== undefined) updates.gatePassPrefix = gatePassPrefix || '';
+      if (gatePassSuffix !== undefined) updates.gatePassSuffix = gatePassSuffix || '';
+      if (gatePassStartingNumber !== undefined) {
+        const startNum = Number(gatePassStartingNumber) || 1;
+        updates.gatePassStartingNumber = startNum;
+        // Synchronize sequence counter
+        const counterId = `dry_gate_pass_no_user_${userId}`;
+        db.collection<{ _id: string; seq: number }>('counters').updateOne(
+          { _id: counterId },
+          { $set: { seq: startNum - 1 } },
+          { upsert: true }
+        ).catch((err) => console.warn('Failed to sync gate pass counter:', err));
+      }
+      if (gatePassPadding !== undefined) updates.gatePassPadding = Math.min(Math.max(Number(gatePassPadding) || 3, 1), 10);
     }
     if (coldLanguage !== undefined) updates.coldLanguage = coldLanguage;
 
@@ -289,6 +333,14 @@ export async function PATCH(req: Request) {
         storageReceiptSuffix: user.storageReceiptSuffix || '',
         storageReceiptStartingNumber: user.storageReceiptStartingNumber || 1,
         storageReceiptPadding: user.storageReceiptPadding || 4,
+        dailyReportPrefix: user.dailyReportPrefix || '',
+        dailyReportSuffix: user.dailyReportSuffix || '',
+        dailyReportStartingNumber: user.dailyReportStartingNumber || 1,
+        dailyReportPadding: user.dailyReportPadding || 3,
+        gatePassPrefix: user.gatePassPrefix || '',
+        gatePassSuffix: user.gatePassSuffix || '',
+        gatePassStartingNumber: user.gatePassStartingNumber || 1,
+        gatePassPadding: user.gatePassPadding || 3,
       },
     });
   } catch (error: any) {

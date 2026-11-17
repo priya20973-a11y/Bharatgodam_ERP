@@ -3,6 +3,7 @@ import { fetchCommodities } from '@/app/actions/commodities';
 import { getWarehouses } from '@/app/actions/warehouse-actions';
 import { getAssayers } from '@/app/actions/assayer-actions';
 import InwardForm from '@/components/features/transactions/inward-form';
+import InwardRecentList from '@/components/features/transactions/inward-recent-list';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata = {
@@ -32,13 +33,15 @@ export default async function InwardPage() {
         </p>
       </div>
 
-      <div className="max-w-4xl">
+      <div className="max-w-5xl space-y-8">
         <InwardForm 
           clients={sanitized.clients} 
           commodities={sanitized.commodities} 
           warehouses={sanitized.warehouses}
           assayers={sanitized.assayers}
         />
+
+        <InwardRecentList />
       </div>
       <Toaster position="top-right" />
     </div>

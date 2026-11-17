@@ -27,6 +27,11 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
     warehouseId: warehouse?.warehouseId || '',
     name: warehouse?.name || '',
     address: warehouse?.address || '',
+    mobile: warehouse?.mobile || warehouse?.phone || '',
+    location: warehouse?.location || '',
+    district: warehouse?.district || '',
+    state: warehouse?.state || '',
+    warehouseLogo: warehouse?.warehouseLogo || warehouse?.logo || '',
     totalCapacity: warehouse?.totalCapacity || 0,
     warehouseType: (warehouse?.warehouseType || 'Owner') as 'Rented' | 'Owner',
     platformCommission: warehouse?.platformCommission !== undefined 
@@ -52,6 +57,11 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
       warehouseId: warehouse?.warehouseId || '',
       name: warehouse?.name || '',
       address: warehouse?.address || '',
+      mobile: warehouse?.mobile || warehouse?.phone || '',
+      location: warehouse?.location || '',
+      district: warehouse?.district || '',
+      state: warehouse?.state || '',
+      warehouseLogo: warehouse?.warehouseLogo || warehouse?.logo || '',
       totalCapacity: warehouse?.totalCapacity || 0,
       warehouseType: whType,
       platformCommission: warehouse?.platformCommission !== undefined 
@@ -182,6 +192,40 @@ export default function WarehouseForm({ warehouse, onSuccess }: WarehouseFormPro
             value={formData.address} 
             onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
             placeholder="Full Address"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Mobile Number (Optional)</label>
+          <Input 
+            value={formData.mobile} 
+            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })} 
+            placeholder="e.g. +91 98765 43210"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Location (Optional)</label>
+            <Input 
+              value={formData.location} 
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })} 
+              placeholder="e.g. YOVJ-3 W/h NO-5 Gondal"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">District / State (Optional)</label>
+            <Input 
+              value={formData.district} 
+              onChange={(e) => setFormData({ ...formData, district: e.target.value })} 
+              placeholder="e.g. Rajkot, Gujarat"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Warehouse Logo URL / Data URI (Optional)</label>
+          <Input 
+            value={formData.warehouseLogo} 
+            onChange={(e) => setFormData({ ...formData, warehouseLogo: e.target.value })} 
+            placeholder="https://... or data:image/..."
           />
         </div>
         <div className="space-y-2">
