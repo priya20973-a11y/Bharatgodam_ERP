@@ -215,6 +215,9 @@ export default function UsersManagementClient({ users }: { users: User[] }) {
                             <strong>Warehouse:</strong> {user.warehouseLocation || 'Not provided'}
                           </div>
                           <div>
+                            <strong>Storage Type:</strong> {user.storagePlan === 'COLD' ? 'Cold Storage' : 'Dry Storage'}
+                          </div>
+                          <div>
                             <strong>GST:</strong> {user.gstNumber || 'Not provided'}
                           </div>
                         </div>

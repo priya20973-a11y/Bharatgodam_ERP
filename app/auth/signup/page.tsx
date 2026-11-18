@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Mail, Lock, User, Phone, Building, MapPin, FileText, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -62,14 +62,13 @@ export default function SignupPage() {
     bankAccountNumber: '',
     ifscCode: '',
     bankBranch: '',
-    companyLogo: '',
     panNumber: '',
   });
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [gstNotApplicable, setGstNotApplicable] = useState(false);
   const [isColdStorage, setIsColdStorage] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const submissionInProgress = useRef(false);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -89,7 +88,6 @@ export default function SignupPage() {
     if (!formData.bankAccountNumber.trim()) newErrors.bankAccountNumber = 'Bank account number is required';
     if (!formData.ifscCode.trim()) newErrors.ifscCode = 'IFSC code is required';
     if (!formData.bankBranch.trim()) newErrors.bankBranch = 'Bank branch is required';
-    if (!formData.companyLogo) newErrors.companyLogo = 'Company logo is required';
 
     if (gstNotApplicable) {
       // NA checked, no format validation needed
@@ -150,37 +148,11 @@ export default function SignupPage() {
     }
   };
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setErrors(prev => ({ ...prev, companyLogo: 'Please upload a valid image file.' }));
-      return;
-    }
-
-    const maxSize = 1024 * 1024; // 1MB
-    if (file.size > maxSize) {
-      setErrors(prev => ({ ...prev, companyLogo: 'Logo file must be 1MB or smaller.' }));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === 'string') {
-        setFormData(prev => ({ ...prev, companyLogo: result }));
-        setLogoPreview(result);
-        setErrors(prev => ({ ...prev, companyLogo: '' }));
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (submissionInProgress.current || !validateForm()) return;
 
+    submissionInProgress.current = true;
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/signup', {
@@ -208,6 +180,7 @@ export default function SignupPage() {
       console.error('Signup error:', error);
       setErrors({ submit: 'Network error. Please try again.' });
     } finally {
+      submissionInProgress.current = false;
       setIsLoading(false);
     }
   };
@@ -584,30 +557,6 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* Company Logo Upload */}
-            {/* <div>
-              <label htmlFor="companyLogo" className="block text-sm font-semibold text-gray-950">
-                Company/WSP Logo *
-              </label>
-              <input
-                id="companyLogo"
-                name="companyLogo"
-                type="file"
-                accept="image/*"
-                required
-                onChange={handleLogoChange}
-                className="mt-2 block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <p className="mt-2 text-xs text-gray-500">Logo upload for your WSP account. Max 1MB. (Required) *</p>
-              {errors.companyLogo && <p className="mt-1 text-sm text-red-600">{errors.companyLogo}</p>}
-              {logoPreview && (
-                <img
-                  src={logoPreview}
-                  alt="Logo preview"
-                  className="mt-3 h-24 w-auto rounded-md border border-gray-200 object-contain"
-                />
-              )}
-            </div> */}
           </div>
 
           {errors.submit && <p className="text-sm text-red-600 text-center">{errors.submit}</p>}

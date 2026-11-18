@@ -14,6 +14,7 @@ export interface User {
   companyName?: string;
   phoneNumber?: string;
   warehouseLocation?: string;
+  storagePlan?: string;
   gstNumber?: string;
   status?: 'ACTIVE' | 'INACTIVE';
   createdAt?: string;
@@ -124,6 +125,7 @@ export async function getAllUsers(): Promise<User[]> {
       companyName: user.companyName,
       phoneNumber: user.phoneNumber,
       warehouseLocation: user.warehouseLocation,
+      storagePlan: user.storagePlan || 'DRY',
       gstNumber: user.gstNumber,
       status: user.status,
       password: user.password,

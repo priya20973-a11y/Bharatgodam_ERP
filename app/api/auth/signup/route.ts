@@ -21,7 +21,6 @@ export async function POST(req: Request) {
       bankAccountNumber,
       ifscCode,
       bankBranch,
-      companyLogo,
       panNumber,
       role,
       storagePlan
@@ -38,13 +37,6 @@ export async function POST(req: Request) {
     if (!bankName || !accountName || !bankAccountNumber || !ifscCode || !bankBranch) {
       return NextResponse.json(
         { message: 'All bank details including Account Name are required.' },
-        { status: 400 }
-      );
-    }
-
-    if (!companyLogo) {
-      return NextResponse.json(
-        { message: 'Company logo is required.' },
         { status: 400 }
       );
     }
@@ -156,7 +148,6 @@ export async function POST(req: Request) {
       bankAccountNumber: bankAccountNumber.trim(),
       ifscCode: ifscCode.trim(),
       bankBranch: bankBranch.trim(),
-      companyLogo,
       panNumber: trimmedPan,
       role: normalizedRole,
       storagePlan: storagePlan || 'DRY',

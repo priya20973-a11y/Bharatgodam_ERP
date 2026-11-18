@@ -19,6 +19,7 @@ interface SignupRequest {
   bankBranch?: string;
   companyLogo?: string | null;
   role: string;
+  storagePlan?: string;
   status: string;
   createdAt: string;
 }
@@ -172,6 +173,12 @@ export default function SignupRequestsPage() {
                 <MapPin size={16} className="text-gray-500" />
                 <span>{request.warehouseLocation}</span>
               </div>
+              <div>
+                <span className="text-gray-500">Storage Type:</span>{' '}
+                <span className="font-medium">
+                  {request.storagePlan === 'COLD' ? 'Cold Storage' : 'Dry Storage'}
+                </span>
+              </div>
               {request.bankName && (
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500">Bank:</span>
@@ -262,6 +269,7 @@ export default function SignupRequestsPage() {
               <div><strong>Phone:</strong> {selectedRequest.phoneNumber}</div>
               {selectedRequest.address && <div><strong>Address:</strong> {selectedRequest.address}</div>}
               <div><strong>Location:</strong> {selectedRequest.warehouseLocation}</div>
+              <div><strong>Storage Type:</strong> {selectedRequest.storagePlan === 'COLD' ? 'Cold Storage' : 'Dry Storage'}</div>
               {selectedRequest.bankName && <div><strong>Bank Name:</strong> {selectedRequest.bankName}</div>}
               {selectedRequest.accountName && <div><strong>Account Name:</strong> {selectedRequest.accountName}</div>}
               {selectedRequest.bankAccountNumber && <div><strong>Account Number:</strong> {selectedRequest.bankAccountNumber}</div>}
