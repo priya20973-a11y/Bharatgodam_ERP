@@ -38,15 +38,17 @@ export function generateDailyTruckReportHTML(data: DailyTruckReportData): string
     }
   };
 
-  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || userDoc?.companyLogo || '';
-  const warehouseName = warehouse?.name || userDoc?.companyName || 'Warehouse & Logistics';
+  const logoUrl = userDoc?.companyLogo || warehouse?.warehouseLogo || warehouse?.logo || '';
+  const companyName = userDoc?.companyName?.trim() || userDoc?.fullName?.trim() || warehouse?.name || 'Company Name';
+  const warehouseName = warehouse?.name || '';
   
   // Format address line
   const addressParts: string[] = [];
+  if (warehouse?.name && warehouse.name !== companyName) addressParts.push(warehouse.name);
   if (warehouse?.address) addressParts.push(warehouse.address);
   if (warehouse?.location && warehouse.location !== warehouse.address) addressParts.push(warehouse.location);
-  if (warehouse?.email) addressParts.push(`E-mail : ${warehouse.email}`);
-  else if (userDoc?.email) addressParts.push(`E-mail : ${userDoc.email}`);
+  const displayEmail = userDoc?.invoiceEmail || warehouse?.email || userDoc?.email || '';
+  if (displayEmail) addressParts.push(`E-mail : ${displayEmail}`);
   const warehouseAddressLine = addressParts.join('. ') || 'Warehouse & Logistics Hub';
 
   const srNo = record?.dailyReportSrNo || '001';
@@ -418,7 +420,7 @@ export function generateDailyTruckReportHTML(data: DailyTruckReportData): string
           `}
         </td>
         <td class="wh-title-cell">
-          <div class="wh-name">${escapeHtml(warehouseName)}</div>
+          <div class="wh-name">${escapeHtml(companyName)}</div>
           <div class="wh-address">${escapeHtml(warehouseAddressLine)}</div>
         </td>
         <td class="logo-cell">

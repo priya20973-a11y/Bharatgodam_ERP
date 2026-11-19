@@ -38,8 +38,9 @@ export function generateGatePassHTML(data: GatePassData): string {
     }
   };
 
-  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || userDoc?.companyLogo || '';
-  const warehouseName = warehouse?.name || userDoc?.companyName || 'Warehouse & Logistics';
+  const logoUrl = userDoc?.companyLogo || warehouse?.warehouseLogo || warehouse?.logo || '';
+  const companyName = userDoc?.companyName?.trim() || userDoc?.fullName?.trim() || warehouse?.name || 'Company Name';
+  const warehouseName = warehouse?.name || '';
 
   const dateVal = formatDate(record?.date || record?.createdAt || new Date());
   const gatePassNoVal = record?.gatePass || record?.gatePassNo || '001';
@@ -441,7 +442,7 @@ export function generateGatePassHTML(data: GatePassData): string {
           `}
         </td>
         <td class="wh-title-cell">
-          <div class="wh-name">${escapeHtml(warehouseName)}</div>
+          <div class="wh-name">${escapeHtml(companyName)}</div>
         </td>
         <td class="logo-cell">
           ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" class="logo-img" alt="Logo" />` : `

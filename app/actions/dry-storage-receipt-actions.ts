@@ -207,9 +207,38 @@ export async function getDryStorageReceiptData(id: string, recordType?: 'inward'
     }
   }
 
-  let userDoc = null;
+  let userDoc: any = null;
   if (session?.user?.id && db) {
-    userDoc = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(session.user.id) });
+    try {
+      userDoc = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(session.user.id) });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Fallback: If session user doesn't have companyName, fetch the record owner's profile
+  if (!userDoc?.companyName && primaryDoc?.userId && db) {
+    try {
+      const ownerUser = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(primaryDoc.userId) });
+      if (ownerUser?.companyName) {
+        userDoc = {
+          ...(ownerUser || {}),
+          ...(userDoc || {}),
+          companyName: ownerUser.companyName,
+          companyLogo: userDoc?.companyLogo || ownerUser.companyLogo,
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Fallback to session.user.companyName if present
+  if (session?.user && (!userDoc || !userDoc.companyName) && (session.user as any).companyName) {
+    userDoc = {
+      ...(userDoc || {}),
+      companyName: (session.user as any).companyName,
+    };
   }
 
   return JSON.parse(JSON.stringify({

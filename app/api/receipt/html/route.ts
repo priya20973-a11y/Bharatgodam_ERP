@@ -93,9 +93,49 @@ export async function GET(request: NextRequest) {
     }
 
     const db = mongoose.connection.db;
-    let userDoc = null;
+    let userDoc: any = null;
     if (session?.user?.id && db) {
-      userDoc = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(session.user.id) });
+      try {
+        userDoc = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(session.user.id) });
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Resolve parent organization if logged-in user is staff
+    if (userDoc?.role === 'STAFF' && userDoc?.wspId && db) {
+      try {
+        const parentWsp = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(userDoc.wspId) });
+        if (parentWsp) {
+          userDoc = parentWsp;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Fallback: If session user doesn't have invoiceEmail, fetch the inward record owner's profile
+    if (!userDoc?.invoiceEmail && inward?.userId && db) {
+      try {
+        const ownerUser = await db.collection('users').findOne({ _id: new mongoose.Types.ObjectId(inward.userId) });
+        if (ownerUser?.invoiceEmail) {
+          userDoc = {
+            ...(ownerUser || {}),
+            ...(userDoc || {}),
+            invoiceEmail: ownerUser.invoiceEmail,
+          };
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Fallback to session.user.invoiceEmail if present
+    if (session?.user && (!userDoc || !userDoc.invoiceEmail) && (session.user as any).invoiceEmail) {
+      userDoc = {
+        ...(userDoc || {}),
+        invoiceEmail: (session.user as any).invoiceEmail,
+      };
     }
 
     const protocol = request.headers.get('x-forwarded-proto') || 'http';

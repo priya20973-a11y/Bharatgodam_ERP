@@ -216,6 +216,10 @@ export default function ProfilePage() {
   }
 
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingProfile(true);
+    setMessage(null);
+    setError(null);
     const isNew = !!profile?.isNewRegistration;
 
     if (!profileForm.fullName.trim()) {

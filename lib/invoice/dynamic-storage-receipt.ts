@@ -56,6 +56,7 @@ export async function generateDynamicStorageReceiptHTML(data: {
 
   const notesText = (inward.notes || inward.note || '').trim();
   const notesDisplay = notesText ? escapeHtml(notesText) : '';
+  const invoiceEmail = userDoc?.invoiceEmail ? String(userDoc.invoiceEmail).trim() : '';
 
   // Assaying details
   let gradingRows = '';
@@ -264,6 +265,10 @@ export async function generateDynamicStorageReceiptHTML(data: {
           <tr>
             <td style="border: none;">Warehouse Address</td>
             <td style="border: none;">: ${warehouse?.address || '—'}</td>
+          </tr>
+          <tr>
+            <td style="border: none;">Invoice Email</td>
+            <td style="border: none;">: ${escapeHtml(invoiceEmail || '—')}</td>
           </tr>
         </table>
       </div>

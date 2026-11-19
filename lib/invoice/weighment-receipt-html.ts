@@ -55,11 +55,16 @@ export function generateWeighmentReceiptHTML(data: WeighmentReceiptData): string
     return '';
   };
 
-  const logoUrl = warehouse?.warehouseLogo || warehouse?.logo || userDoc?.companyLogo || '';
-  const warehouseName = warehouse?.name || userDoc?.companyName || 'Warehouse & Logistics Hub';
+  const logoUrl = userDoc?.companyLogo || warehouse?.warehouseLogo || warehouse?.logo || '';
+  const companyName = userDoc?.companyName?.trim() || userDoc?.fullName?.trim() || warehouse?.name || 'Company Name';
 
-  // Warehouse Address and Mobile Number (Fetched from Warehouse Master)
-  const warehouseAddress = warehouse?.address || warehouse?.location || userDoc?.address || 'Warehouse Facility';
+  // Warehouse Address and Mobile Number (Fetched from Warehouse Master / Organization)
+  const addressParts: string[] = [];
+  if (warehouse?.name && warehouse.name !== companyName) addressParts.push(warehouse.name);
+  if (warehouse?.address) addressParts.push(warehouse.address);
+  else if (warehouse?.location) addressParts.push(warehouse.location);
+  else if (userDoc?.address) addressParts.push(userDoc.address);
+  const warehouseAddress = addressParts.join(', ') || 'Warehouse Facility';
   const warehouseMobile = warehouse?.mobile || warehouse?.phone || warehouse?.contactNumber || userDoc?.phoneNumber || userDoc?.phone || userDoc?.mobile || '';
 
   const receiptNo = record?.gatePass || record?.gatePassNo || record?.dailyReportSrNo || (record?._id ? record._id.toString().slice(-6).toUpperCase() : '001');
@@ -705,7 +710,7 @@ export function generateWeighmentReceiptHTML(data: WeighmentReceiptData): string
           `}
         </div>
         <div class="header-info">
-          <div class="header-title">${escapeHtml(warehouseName)}</div>
+          <div class="header-title">${escapeHtml(companyName)}</div>
           <div class="header-address">${escapeHtml(warehouseAddress)}</div>
           ${warehouseMobile ? `
             <div class="header-mobile">📞 Mobile / Phone: ${escapeHtml(warehouseMobile)}</div>
@@ -802,7 +807,7 @@ export function generateWeighmentReceiptHTML(data: WeighmentReceiptData): string
         </div>
       </div>
       <div class="footer-note">
-        This is a computer-generated weighment slip issued by ${escapeHtml(warehouseName)}. Verified &amp; Recorded electronically.
+        This is a computer-generated weighment slip issued by ${escapeHtml(companyName)}. Verified &amp; Recorded electronically.
       </div>
     </div>
   </div>
