@@ -21,10 +21,11 @@ interface ColdInwardWrapperProps {
   clients: any[];
   commodities: any[];
   warehouses: any[];
+  assayers?: any[];
   searchParams?: { [key: string]: string | undefined };
 }
 
-export default function ColdInwardWrapper({ initialInwards, pagination: initialPagination, initialDrafts = [], clients, commodities, warehouses, searchParams }: ColdInwardWrapperProps) {
+export default function ColdInwardWrapper({ initialInwards, pagination: initialPagination, initialDrafts = [], clients, commodities, warehouses, assayers = [], searchParams }: ColdInwardWrapperProps) {
   const { t } = useColdTranslation();
   const [inwards, setInwards] = useState(initialInwards);
   const [pagination, setPagination] = useState(initialPagination);
@@ -37,6 +38,10 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
   const initialPrefill = searchParams?.warehouseId ? {
     common: {
       warehouseId: searchParams.warehouseId,
+      isAssayingRequired: false,
+      assayerId: '',
+      assayingDate: new Date().toISOString().split('T')[0],
+      assayingExpiryDate: '',
     },
     clients: [{
       id: Date.now().toString(),
@@ -46,6 +51,11 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
       gradingRate: 0,
       gradingChargeType: 'Per Bag',
       stockType: 'Self',
+      isAssayingRequired: false,
+      assayerId: '',
+      assayingDate: new Date().toISOString().split('T')[0],
+      assayingExpiryDate: '',
+      gradingResults: [],
       stacks: [{
         id: Date.now().toString(),
         chamberNo: searchParams.chamberName,
@@ -171,6 +181,7 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
             clients={clients} 
             commodities={commodities} 
             warehouses={warehouses} 
+            assayers={assayers}
             onSuccess={refreshData} 
             prefillData={editingDraft ? editingDraft.formData : initialPrefill}
             draftId={editingDraft ? editingDraft._id : undefined}

@@ -2,6 +2,7 @@ import { getColdInwards, getColdInwardDrafts } from '@/app/actions/cold-inward-a
 import { getColdWarehouses } from '@/app/actions/cold-warehouse-actions';
 import { getClients } from '@/app/actions/client-actions';
 import { fetchColdCommodities } from '@/app/actions/cold-commodities';
+import { getColdAssayers } from '@/app/actions/cold-assayer-actions';
 import ColdInwardWrapper from '@/components/features/inward/cold-inward-wrapper';
 
 export const metadata = {
@@ -17,12 +18,13 @@ export default async function ColdInwardsPage({ searchParams }: { searchParams: 
   const clientId = resolvedSearchParams?.clientId;
   const commodityId = resolvedSearchParams?.commodityId;
 
-  const [inwardResult, drafts, warehouses, clients, commodities] = await Promise.all([
+  const [inwardResult, drafts, warehouses, clients, commodities, assayers] = await Promise.all([
     getColdInwards({ page, limit, search, warehouseId, clientId, commodityId }),
     getColdInwardDrafts(),
     getColdWarehouses({ includeInactive: false }),
     getClients(),
-    fetchColdCommodities()
+    fetchColdCommodities(),
+    getColdAssayers()
   ]);
 
   return (
@@ -34,6 +36,7 @@ export default async function ColdInwardsPage({ searchParams }: { searchParams: 
         clients={clients} 
         commodities={commodities} 
         warehouses={warehouses} 
+        assayers={assayers}
         searchParams={resolvedSearchParams}
       />
     </div>

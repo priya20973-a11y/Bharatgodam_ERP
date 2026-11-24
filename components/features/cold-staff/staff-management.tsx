@@ -24,6 +24,10 @@ const MODULES: { id: PermissionModule; key: string }[] = [
   { id: 'environmentRecords', key: 'environmentRecords' },
   { id: 'bulkUpload', key: 'bulkUpload' },
   { id: 'receiptConfiguration', key: 'receiptConfiguration' },
+  { id: 'assayerMaster', key: 'assayerMaster' },
+  { id: 'pledgeeMaster', key: 'pledgeeMaster' },
+  { id: 'assaying', key: 'assaying' },
+  { id: 'pledge', key: 'pledge' },
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'print', 'approve'];

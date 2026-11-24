@@ -23,6 +23,10 @@ export const gu: Dictionary = {
     language: 'ભાષા',
     staff: 'સ્ટાફ પરવાનગીઓ',
     environmentRecords: 'કોલ્ડ એન્વાયર્નમેન્ટ',
+    pledgeeMaster: 'પ્લેજ માસ્ટર',
+    assayerMaster: 'એસેયર માસ્ટર',
+    assaying: 'એસેઇંગ / ગ્રેડિંગ',
+    pledges: 'પ્લેજ અને લોન',
     overviewCategory: 'ઓવરવ્યુ',
     warehouseCategory: 'વેરહાઉસ સંચાલન',
     inventoryCategory: 'ઇન્વેન્ટરી',
@@ -575,7 +579,11 @@ export const gu: Dictionary = {
       clientMaster: 'ગ્રાહક માસ્ટર',
       floorMapping: 'ફ્લોર મેપિંગ',
       ownershipTransfer: 'માલિકી બદલી',
-      stockShifting: 'સ્ટોક ફેરબદલ'
+      stockShifting: 'સ્ટોક ફેરબદલ',
+      assayerMaster: 'એસેયર માસ્ટર',
+      pledgeeMaster: 'પ્લેજ માસ્ટર',
+      assaying: 'એસેઇંગ / ગ્રેડિંગ',
+      pledge: 'પ્લેજ અને લોન'
     },
     actionsList: {
       view: 'જુઓ',

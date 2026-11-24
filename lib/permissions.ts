@@ -18,7 +18,11 @@ export type PermissionModule =
   | 'environmentRecords'
   | 'stockShifting'
   | 'bulkUpload'
-  | 'receiptConfiguration';
+  | 'receiptConfiguration'
+  | 'pledge'
+  | 'pledgeeMaster'
+  | 'assayerMaster'
+  | 'assaying';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'print' | 'approve';
 

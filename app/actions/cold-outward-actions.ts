@@ -5,6 +5,7 @@ import ColdOutward from '@/lib/models/ColdOutward';
 import ColdInward from '@/lib/models/ColdInward';
 import ColdTransfer from '@/lib/models/ColdTransfer';
 import ColdCommodity from '@/lib/models/ColdCommodity';
+import ColdPledge from '@/lib/models/ColdPledge';
 import { generateReceiptNumber } from '@/lib/receipt-generator';
 import { revalidatePath } from 'next/cache';
 import { hasPermission } from '@/lib/permissions';
@@ -14,6 +15,118 @@ import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
 import { calculatePerMonthRent, calculateDailyRateRent } from '@/lib/utils/cold-rent-calculator';
 import { calculateStorageCharge, validateQuantityAndPricing } from '@/lib/utils/cold-unit-conversion';
 import { logColdActivity } from '@/lib/cold-logger';
+
+/**
+ * Calculates the exact real-time physical remaining stock, active pledged stock,
+ * and net available unpledged stock for a Cold Storage Inward receipt.
+ * Formula:
+ * Available Stock = Total Inward Stock - Already Outward Stock - Active Pledged Stock
+ */
+export async function getColdInwardAvailableStock(inwardId: mongoose.Types.ObjectId | string) {
+  const inwId = typeof inwardId === 'string' ? new mongoose.Types.ObjectId(inwardId) : inwardId;
+  const inward = await ColdInward.findById(inwId);
+  if (!inward) {
+    return {
+      found: false,
+      inward: null,
+      totalInwardKg: 0,
+      totalInwardBags: 0,
+      alreadyOutwardKg: 0,
+      alreadyOutwardBags: 0,
+      physicalRemainingKg: 0,
+      physicalRemainingBags: 0,
+      activePledgedKg: 0,
+      activePledgedBags: 0,
+      availableStockKg: 0,
+      availableStockBags: 0,
+    };
+  }
+
+  const totalInwardKg = Number(inward.quantityKg) || 0;
+  const totalInwardBags = Number(inward.bagsCount) || 0;
+
+  // 1. Fetch all already completed outward transactions for this inward
+  const outwards = await ColdOutward.aggregate([
+    { $match: { inwardId: inwId, isCarryOver: { $ne: true } } },
+    {
+      $group: {
+        _id: null,
+        totalOutKg: { $sum: '$quantityKg' },
+        totalOutBags: { $sum: '$bagsCount' },
+      },
+    },
+  ]);
+
+  const alreadyOutwardKg = outwards[0]?.totalOutKg || 0;
+  const alreadyOutwardBags = outwards[0]?.totalOutBags || 0;
+
+  const physicalRemainingKg = Math.max(0, totalInwardKg - alreadyOutwardKg);
+  const physicalRemainingBags = Math.max(0, totalInwardBags - alreadyOutwardBags);
+
+  // 2. Fetch active and partial pledges from ColdPledge
+  const ColdPledgeModel = mongoose.models.ColdPledge || ColdPledge;
+  const coldPledgeAgg = await ColdPledgeModel.aggregate([
+    { $match: { status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+    { $unwind: '$items' },
+    { $match: { 'items.inwardId': inwId } },
+    {
+      $group: {
+        _id: null,
+        totalPledgedKg: {
+          $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] },
+        },
+        totalPledgedBags: {
+          $sum: { $subtract: ['$items.pledgedBags', { $ifNull: ['$items.releasedBags', 0] }] },
+        },
+      },
+    },
+  ]);
+
+  let legacyPledgedKg = 0;
+  let legacyPledgedBags = 0;
+  try {
+    const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+    const legacyAgg = await Pledge.aggregate([
+      { $match: { status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+      { $unwind: '$items' },
+      { $match: { 'items.inwardId': inwId, 'items.storageType': 'COLD' } },
+      {
+        $group: {
+          _id: null,
+          totalPledgedKg: {
+            $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] },
+          },
+          totalPledgedBags: {
+            $sum: { $subtract: ['$items.pledgedBags', { $ifNull: ['$items.releasedBags', 0] }] },
+          },
+        },
+      },
+    ]);
+    legacyPledgedKg = legacyAgg[0]?.totalPledgedKg || 0;
+    legacyPledgedBags = legacyAgg[0]?.totalPledgedBags || 0;
+  } catch {}
+
+  const activePledgedKg = Math.max(0, (coldPledgeAgg[0]?.totalPledgedKg || 0) + legacyPledgedKg);
+  const activePledgedBags = Math.max(0, (coldPledgeAgg[0]?.totalPledgedBags || 0) + legacyPledgedBags);
+
+  const availableStockKg = Math.max(0, physicalRemainingKg - activePledgedKg);
+  const availableStockBags = Math.max(0, physicalRemainingBags - activePledgedBags);
+
+  return {
+    found: true,
+    inward,
+    totalInwardKg,
+    totalInwardBags,
+    alreadyOutwardKg,
+    alreadyOutwardBags,
+    physicalRemainingKg,
+    physicalRemainingBags,
+    activePledgedKg,
+    activePledgedBags,
+    availableStockKg,
+    availableStockBags,
+  };
+}
 
 export async function getColdOutwards(limit: number = 250) {
   await connectToDatabase();
@@ -300,15 +413,45 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     }
   });
 
-  const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
-  const activePledges = await Pledge.aggregate([
-    { $match: { clientId: new mongoose.Types.ObjectId(clientId), status: 'ACTIVE' } },
+  const ColdPledge = mongoose.models.ColdPledge || (await import('@/lib/models/ColdPledge')).default;
+  const activeColdPledges = await ColdPledge.aggregate([
+    { $match: { clientId: new mongoose.Types.ObjectId(clientId), status: { $in: ['ACTIVE', 'PARTIAL'] } } },
     { $unwind: '$items' },
-    { $match: { 'items.storageType': 'COLD' } },
-    { $group: { _id: '$items.inwardId', totalPledged: { $sum: '$items.pledgedQuantity' } } }
+    {
+      $group: {
+        _id: '$items.inwardId',
+        totalPledged: {
+          $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] }
+        }
+      }
+    }
   ]);
+
+  let legacyPledges: any[] = [];
+  try {
+    const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
+    legacyPledges = await Pledge.aggregate([
+      { $match: { clientId: new mongoose.Types.ObjectId(clientId), status: { $in: ['ACTIVE', 'PARTIAL'] } } },
+      { $unwind: '$items' },
+      { $match: { 'items.storageType': 'COLD' } },
+      {
+        $group: {
+          _id: '$items.inwardId',
+          totalPledged: {
+            $sum: { $subtract: ['$items.pledgedQuantity', { $ifNull: ['$items.releasedQuantity', 0] }] }
+          }
+        }
+      }
+    ]);
+  } catch {}
+
   const pledgeMap = new Map();
-  activePledges.forEach(p => pledgeMap.set(p._id.toString(), p.totalPledged));
+  activeColdPledges.forEach(p => pledgeMap.set(p._id.toString(), p.totalPledged || 0));
+  legacyPledges.forEach(p => {
+    const key = p._id.toString();
+    const cur = pledgeMap.get(key) || 0;
+    pledgeMap.set(key, cur + (p.totalPledged || 0));
+  });
 
   const availableInwards = inwards.map((inward: any) => {
     if (!inward.stackAllocations) return null;
@@ -401,10 +544,12 @@ export async function getAvailableInwardsForClient(clientId: string, isWarehouse
     
     if (totalAvailableQty > 0) {
       const metadata = inwardMetadataMap.get(inward._id.toString());
+      const pledgedQuantity = pledgeMap.get(inward._id.toString()) || 0;
       return { 
         ...inward,
         uniqueKey: inward._id.toString(),
         availableQty: totalAvailableQty,
+        pledgedQuantity,
         availableAllocations,
         receiptNumber: metadata?.receiptNumber || inward.receiptNumber,
         lotNo: metadata?.lotNo || inward.lotNo
@@ -431,56 +576,77 @@ export async function createColdOutward(data: any) {
       return { success: false, error: 'Cannot create outward: Inward ID is required.' };
     }
 
-    let inward: any = null;
-    if (data.inwardId) {
-      inward = await ColdInward.findById(data.inwardId);
-      if (!inward) {
-        return { success: false, error: 'Cannot create outward: Inward not found.' };
-      }
-      
-      const outwards = await ColdOutward.aggregate([
-        { $match: { inwardId: inward._id, isCarryOver: { $ne: true } } },
-        { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
-      ]);
-      const totalOutward = outwards[0]?.totalOut || 0;
-      const totalOutwardBags = outwards[0]?.totalBags || 0;
-      
-      const physicalRemaining = inward.quantityKg - totalOutward;
-      
-      const Pledge = mongoose.models.Pledge || (await import('@/lib/models/Pledge')).default;
-      const pledgeAgg = await Pledge.aggregate([
-        { $match: { status: 'ACTIVE' } },
-        { $unwind: '$items' },
-        { $match: { 'items.inwardId': inward._id, 'items.storageType': 'COLD' } },
-        { $group: { _id: null, totalPledged: { $sum: '$items.pledgedQuantity' } } }
-      ]);
-      const totalPledged = pledgeAgg[0]?.totalPledged || 0;
+    const stockInfo = await getColdInwardAvailableStock(data.inwardId);
+    if (!stockInfo.found || !stockInfo.inward) {
+      return { success: false, error: 'Cannot create outward: Inward not found.' };
+    }
 
-      const currentRemaining = physicalRemaining - totalPledged;
-      
-      if (physicalRemaining <= 0) {
-        if (inward.status !== 'Completed') {
-          inward.status = 'Completed';
-          inward.remainingQuantityKg = 0;
-          await inward.save();
-        }
-        return { success: false, error: 'Cannot create outward: Inward is already completed.' };
+    const inward = stockInfo.inward;
+    const physicalRemaining = stockInfo.physicalRemainingKg;
+    const totalPledged = stockInfo.activePledgedKg;
+    const availableStock = stockInfo.availableStockKg;
+
+    if (physicalRemaining <= 0) {
+      if (inward.status !== 'Completed') {
+        inward.status = 'Completed';
+        inward.remainingQuantityKg = 0;
+        inward.remainingBagsCount = 0;
+        await inward.save();
       }
-      
-      if (data.quantityKg > currentRemaining) {
-        if (totalPledged > 0) {
-           return { success: false, error: `Quantity exceeds available stock. Physical remaining: ${physicalRemaining} Kg, Pledged: ${totalPledged} Kg` };
-        }
-        return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
+      return { success: false, error: 'Cannot create outward: Inward is already completed.' };
+    }
+
+    const outwardQuantityKg = Number(data.quantityKg) || 0;
+    const outwardBagsCount = Number(data.bagsCount) || 0;
+
+    if (outwardQuantityKg <= 0 || isNaN(outwardQuantityKg)) {
+      return { success: false, error: 'Cannot create outward: Outward quantity must be a valid number greater than 0.' };
+    }
+
+    // Strict stock-locking validation:
+    // Available Stock = Total Inward Stock - Already Outward Stock - Active Pledged Stock
+    if (outwardQuantityKg > availableStock) {
+      if (totalPledged > 0) {
+        return {
+          success: false,
+          error: 'Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.',
+        };
       }
-      
-      const remainingKg = physicalRemaining - data.quantityKg;
-      const remainingBags = (inward.bagsCount - totalOutwardBags) - data.bagsCount;
-      
-      inward.remainingQuantityKg = Math.max(0, remainingKg);
-      inward.remainingBagsCount = Math.max(0, remainingBags);
-      inward.status = inward.remainingQuantityKg <= 0 ? 'Completed' : 'Partial';
-      await inward.save();
+      return {
+        success: false,
+        error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${availableStock} Kg`,
+      };
+    }
+
+    const remainingKg = physicalRemaining - outwardQuantityKg;
+    const remainingBags = stockInfo.physicalRemainingBags - outwardBagsCount;
+    const newStatus = remainingKg <= 0 ? 'Completed' : 'Partial';
+
+    // Concurrency protection: Atomic conditional update
+    const updatedInward = await ColdInward.findOneAndUpdate(
+      {
+        _id: inward._id,
+        $or: [
+          { remainingQuantityKg: { $gte: outwardQuantityKg } },
+          { remainingQuantityKg: { $exists: false } },
+          { remainingQuantityKg: null },
+        ],
+      },
+      {
+        $set: {
+          remainingQuantityKg: Math.max(0, remainingKg),
+          remainingBagsCount: Math.max(0, remainingBags),
+          status: newStatus,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedInward) {
+      return {
+        success: false,
+        error: 'Cannot create outward: Stock was modified by a concurrent transaction. Please refresh and try again.',
+      };
     }
 
     let rentRs = 0;
@@ -655,6 +821,59 @@ export async function createBatchColdOutwards(payload: any) {
       return { success: false, error: 'No items provided for batch.' };
     }
 
+    // 1. Pre-aggregate requested outward weight & bags per Inward ID across all batch items
+    const requestedByInward = new Map<string, { totalKg: number; totalBags: number }>();
+    for (const item of payload.items) {
+      if (!item.inwardId) {
+        return { success: false, error: 'Cannot create outward: Inward ID is required for all items.' };
+      }
+      const inwIdStr = item.inwardId.toString();
+      const cur = requestedByInward.get(inwIdStr) || { totalKg: 0, totalBags: 0 };
+      cur.totalKg += Number(item.quantityKg) || 0;
+      cur.totalBags += Number(item.bagsCount) || 0;
+      requestedByInward.set(inwIdStr, cur);
+    }
+
+    // 2. Strict Stock Locking & Pledge Validation for every Inward BEFORE creating any outward records
+    const inwardStockMap = new Map<string, any>();
+    for (const [inwIdStr, req] of requestedByInward.entries()) {
+      if (req.totalKg <= 0 || isNaN(req.totalKg)) {
+        return { success: false, error: 'Cannot create outward: Outward quantity must be a valid number greater than 0.' };
+      }
+
+      const stockInfo = await getColdInwardAvailableStock(inwIdStr);
+      if (!stockInfo.found || !stockInfo.inward) {
+        return { success: false, error: 'Cannot create outward: Inward not found.' };
+      }
+
+      if (stockInfo.physicalRemainingKg <= 0 && req.totalKg > 0) {
+        if (stockInfo.inward.status !== 'Completed') {
+          stockInfo.inward.status = 'Completed';
+          stockInfo.inward.remainingQuantityKg = 0;
+          stockInfo.inward.remainingBagsCount = 0;
+          await stockInfo.inward.save();
+        }
+        return { success: false, error: 'Cannot create outward: Inward is already completed.' };
+      }
+
+      // Check available stock against active pledged lock
+      // Available Stock = Total Inward Stock - Already Outward Stock - Active Pledged Stock
+      if (req.totalKg > stockInfo.availableStockKg) {
+        if (stockInfo.activePledgedKg > 0) {
+          return {
+            success: false,
+            error: 'Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.',
+          };
+        }
+        return {
+          success: false,
+          error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${stockInfo.availableStockKg} Kg`,
+        };
+      }
+
+      inwardStockMap.set(inwIdStr, stockInfo);
+    }
+
     const batchId = new mongoose.Types.ObjectId().toString();
     const createdOutwards = [];
 
@@ -662,61 +881,30 @@ export async function createBatchColdOutwards(payload: any) {
     const warehouseId = firstItem.warehouseId || payload.warehouseId;
     const batchReceiptNumber = await generateReceiptNumber(warehouseId, 'outward', firstItem.chamberName || firstItem.chamberNo?.toString());
 
+    // Track deductions per inward across items in the batch
+    const deductedByInward = new Map<string, { deductedKg: number; deductedBags: number }>();
+
     for (const item of payload.items) {
-      if (!item.inwardId) {
-        return { success: false, error: 'Cannot create outward: Inward ID is required for all items.' };
-      }
+      const inwIdStr = item.inwardId.toString();
+      const stockInfo = inwardStockMap.get(inwIdStr);
+      const inward = stockInfo.inward;
 
-      let inward: any = null;
-      if (item.inwardId) {
-        inward = await ColdInward.findById(item.inwardId);
-        if (!inward) {
-          return { success: false, error: 'Cannot create outward: Inward not found.' };
-        }
-        
-        const outwards = await ColdOutward.aggregate([
-          { $match: { inwardId: inward._id, isCarryOver: { $ne: true } } },
-          { $group: { _id: null, totalOut: { $sum: '$quantityKg' }, totalBags: { $sum: '$bagsCount' } } }
-        ]);
-        const totalOutward = outwards[0]?.totalOut || 0;
-        const totalOutwardBags = outwards[0]?.totalBags || 0;
-        
-        const currentRemaining = Math.max(0, inward.quantityKg - totalOutward);
-        const currentRemainingBags = Math.max(0, inward.bagsCount - totalOutwardBags);
-        
-        if (currentRemaining <= 0 && Number(item.quantityKg) > 0) {
-          if (inward.status !== 'Completed') {
-            inward.status = 'Completed';
-            inward.remainingQuantityKg = 0;
-            inward.remainingBagsCount = 0;
-            await inward.save();
-          }
-          return { success: false, error: 'Cannot create outward: Inward is already completed.' };
-        }
-        
-        const outwardQuantityKg = Number(item.quantityKg) || 0;
-        const outwardBagsCount = Number(item.bagsCount) || 0;
-        
-        if (outwardQuantityKg <= 0 || isNaN(outwardQuantityKg)) {
-           return { success: false, error: 'Cannot create outward: Outward quantity must be a valid number greater than 0.' };
-        }
-        
-        if (outwardQuantityKg > currentRemaining) {
-          return { success: false, error: `Quantity exceeds the remaining stock for this specific Inward. Available: ${currentRemaining} Kg` };
-        }
-        
-        const newRemaining = currentRemaining - outwardQuantityKg;
-        const remainingBags = currentRemainingBags - outwardBagsCount;
-        
-        inward.remainingQuantityKg = Math.max(0, newRemaining) || 0;
-        inward.remainingBagsCount = Math.max(0, remainingBags) || 0;
-        inward.status = inward.remainingQuantityKg <= 0 ? 'Completed' : 'Partial';
-        
-        if (isNaN(inward.remainingQuantityKg) || inward.remainingQuantityKg == null) inward.remainingQuantityKg = 0;
-        if (isNaN(inward.remainingBagsCount) || inward.remainingBagsCount == null) inward.remainingBagsCount = 0;
+      const outwardQuantityKg = Number(item.quantityKg) || 0;
+      const outwardBagsCount = Number(item.bagsCount) || 0;
 
-        await inward.save();
-      }
+      const curDeducted = deductedByInward.get(inwIdStr) || { deductedKg: 0, deductedBags: 0 };
+      curDeducted.deductedKg += outwardQuantityKg;
+      curDeducted.deductedBags += outwardBagsCount;
+      deductedByInward.set(inwIdStr, curDeducted);
+
+      const newRemainingKg = Math.max(0, stockInfo.physicalRemainingKg - curDeducted.deductedKg);
+      const newRemainingBags = Math.max(0, stockInfo.physicalRemainingBags - curDeducted.deductedBags);
+      const newStatus = newRemainingKg <= 0 ? 'Completed' : 'Partial';
+
+      inward.remainingQuantityKg = newRemainingKg;
+      inward.remainingBagsCount = newRemainingBags;
+      inward.status = newStatus;
+      await inward.save();
 
       let rentRs = 0;
       let rentReason = '';

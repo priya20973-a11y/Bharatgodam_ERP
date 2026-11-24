@@ -20,12 +20,13 @@ interface ColdInwardFormProps {
   clients: any[];
   commodities: any[];
   warehouses: any[];
+  assayers?: any[];
   onSuccess: () => void;
   prefillData?: any;
   draftId?: string;
 }
 
-export default function ColdInwardForm({ clients, commodities, warehouses, onSuccess, prefillData, draftId }: ColdInwardFormProps) {
+export default function ColdInwardForm({ clients, commodities, warehouses, assayers = [], onSuccess, prefillData, draftId }: ColdInwardFormProps) {
   const { t } = useColdTranslation();
   const [loading, setLoading] = useState(false);
 
@@ -58,6 +59,10 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
     emptyWeight: prefillData?.common?.emptyWeight || null,
     sameCommodity: prefillData?.common?.sameCommodity || false,
     commodityId: prefillData?.common?.commodityId || '',
+    isAssayingRequired: prefillData?.common?.isAssayingRequired || false,
+    assayerId: prefillData?.common?.assayerId || '',
+    assayingDate: prefillData?.common?.assayingDate || prefillData?.common?.date || new Date().toISOString().split('T')[0],
+    assayingExpiryDate: prefillData?.common?.assayingExpiryDate || '',
   });
 
   const [clientSections, setClientSections] = useState<any[]>(prefillData?.clients || []);
@@ -143,7 +148,14 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       kataBharati: 0,
       stacks: [{ id: Date.now().toString(), chamberNo: '', floorNo: '', stackNo: '', allocatedWeight: null, allocatedBags: null, stockType: initialStockType }],
       referencePersons: [],
-      qualityEntries: []
+      qualityEntries: [],
+      isAssayingRequired: common.isAssayingRequired || false,
+      assayerId: common.assayerId || '',
+      assayingDate: common.assayingDate || common.date || new Date().toISOString().split('T')[0],
+      assayingExpiryDate: common.assayingExpiryDate || '',
+      marketValuePerUnit: '',
+      totalMarketValue: '',
+      gradingResults: []
     }]);
   };
 
@@ -493,6 +505,19 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
       if (!common.sameCommodity && !c.commodityId) {
         toast.error(`Commodity required for client ${i + 1}`);
         return;
+      }
+      if (c.isAssayingRequired) {
+        if (!c.assayingDate) {
+          c.assayingDate = common.date || new Date().toISOString().split('T')[0];
+        }
+        if (common.date && new Date(c.assayingDate).setHours(0,0,0,0) < new Date(common.date).setHours(0,0,0,0)) {
+          toast.error(`Assaying Date must be on or after Inward Date for client ${i + 1}`);
+          return;
+        }
+        if (c.assayingExpiryDate && new Date(c.assayingExpiryDate).setHours(0,0,0,0) < new Date(c.assayingDate).setHours(0,0,0,0)) {
+          toast.error(`Expiry Date must not be earlier than Assaying Date for client ${i + 1}`);
+          return;
+        }
       }
       for (const s of c.stacks) {
         if (!s.chamberNo || !s.floorNo || !s.stackNo) {
@@ -851,6 +876,7 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
             </div>
           </div>
         )}
+
       </div>
 
       {/* Client Sections */}
@@ -1361,6 +1387,154 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
                 </div>
               </div>
             )}
+
+            {/* Assaying & Grading */}
+            <div className="mt-4 border p-4 rounded-md bg-white border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b mb-3 gap-2">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Assaying & Grading</h4>
+                  <p className="text-xs text-slate-500">Record quality testing and accredited laboratory grading</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-slate-700">Assaying Required?</span>
+                  <div className="flex items-center space-x-3">
+                    <label className="flex items-center space-x-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`assayingRequired_${cIdx}`}
+                        checked={client.isAssayingRequired === true}
+                        onChange={() => {
+                          const effectiveCommId = common.sameCommodity ? common.commodityId : client.commodityId;
+                          const comm = commodities.find((c) => c._id === effectiveCommId);
+                          const gParams = (comm?.gradingParameters && comm.gradingParameters.length > 0)
+                            ? comm.gradingParameters.map((gp: any) => ({
+                                parameterName: gp.name,
+                                observedValue: '',
+                                status: '',
+                              }))
+                            : (comm?.qualityParameters ? comm.qualityParameters.map((qp: any) => ({
+                                parameterName: qp.name,
+                                observedValue: '',
+                                status: '',
+                              })) : []);
+                          updateClientFields(cIdx, {
+                            isAssayingRequired: true,
+                            isAssayingExplicitlySet: true,
+                            assayingDate: client.assayingDate || common.date || new Date().toISOString().split('T')[0],
+                            gradingResults: client.gradingResults && client.gradingResults.length > 0 ? client.gradingResults : gParams,
+                          });
+                        }}
+                        className="text-cyan-700 focus:ring-cyan-600"
+                      />
+                      <span className="text-sm font-medium text-slate-800">Yes</span>
+                    </label>
+                    <label className="flex items-center space-x-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`assayingRequired_${cIdx}`}
+                        checked={!client.isAssayingRequired}
+                        onChange={() => {
+                          updateClientFields(cIdx, {
+                            isAssayingRequired: false,
+                            isAssayingExplicitlySet: true,
+                            assayerId: '',
+                            assayingDate: '',
+                            assayingExpiryDate: '',
+                            gradingResults: []
+                          });
+                        }}
+                        className="text-cyan-700 focus:ring-cyan-600"
+                      />
+                      <span className="text-sm font-medium text-slate-800">No</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {client.isAssayingRequired && (
+                <div className="space-y-4 pt-1">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 uppercase">Select Assayer (Optional)</label>
+                      <Select
+                        value={client.assayerId || 'none'}
+                        onValueChange={(val) => updateClient(cIdx, 'assayerId', val === 'none' ? '' : val)}
+                      >
+                        <SelectTrigger className="bg-white text-xs h-9">
+                          <SelectValue placeholder="Choose an active assayer..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-xs">None / Assign Later</SelectItem>
+                          {assayers && assayers.length > 0 && (
+                            assayers
+                              .filter((a) => a.status === 'Active')
+                              .map((a) => (
+                                <SelectItem key={a._id} value={a._id} className="text-xs">
+                                  {a.name} ({a.licenceNumber || 'No Lic'})
+                                </SelectItem>
+                              ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 uppercase">Assaying Date *</label>
+                      <Input
+                        type="date"
+                        value={client.assayingDate || common.date}
+                        onChange={(e) => updateClient(cIdx, 'assayingDate', e.target.value)}
+                        className="bg-white text-xs h-9"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 uppercase">Expiry Date</label>
+                      <Input
+                        type="date"
+                        value={client.assayingExpiryDate || ''}
+                        onChange={(e) => updateClient(cIdx, 'assayingExpiryDate', e.target.value)}
+                        className="bg-white text-xs h-9"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Grading results observations */}
+                  {client.gradingResults && client.gradingResults.length > 0 && (
+                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/60 mt-3">
+                      <h5 className="text-xs font-bold text-slate-700 uppercase mb-2">Grading Observations</h5>
+                      <div className="space-y-2">
+                        {client.gradingResults.map((gr: any, grIdx: number) => (
+                          <div key={grIdx} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center bg-white p-2 rounded border border-slate-200">
+                            <span className="text-xs font-semibold text-slate-800">{gr.parameterName}</span>
+                            <Input
+                              placeholder="Observed Value"
+                              value={gr.observedValue || ''}
+                              onChange={(e) => {
+                                const newGr = [...client.gradingResults];
+                                newGr[grIdx] = { ...newGr[grIdx], observedValue: e.target.value };
+                                updateClient(cIdx, 'gradingResults', newGr);
+                              }}
+                              className="text-xs h-8 bg-white"
+                            />
+                            <Input
+                              placeholder="Status (OK / Fail)"
+                              value={gr.status || ''}
+                              onChange={(e) => {
+                                const newGr = [...client.gradingResults];
+                                newGr[grIdx] = { ...newGr[grIdx], status: e.target.value };
+                                updateClient(cIdx, 'gradingResults', newGr);
+                              }}
+                              className="text-xs h-8 bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
           </div>
         );

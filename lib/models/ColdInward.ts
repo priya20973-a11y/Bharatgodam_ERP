@@ -58,6 +58,29 @@ export interface IColdInward extends Document {
   remarks?: string;
   note?: string;
   cipc?: string;
+  isAssayingRequired?: boolean;
+  assayerId?: mongoose.Types.ObjectId;
+  assayingDate?: Date;
+  assayingExpiryDate?: Date;
+  marketValuePerUnit?: number;
+  totalMarketValue?: number;
+  gradingResults?: {
+    parameterName: string;
+    observedValue: string;
+    status?: string;
+  }[];
+  approvedGradingResults?: {
+    parameterName: string;
+    observedValue: string;
+    status?: string;
+  }[];
+  gradingStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  gradingDecisionDate?: Date;
+  gradingDecisionBy?: mongoose.Types.ObjectId;
+  gradingDecisionByName?: string;
+  gradingDecisionByEmail?: string;
+  gradingDecisionRole?: string;
+  gradingDecisionRemarks?: string;
   qualityEntries?: {
     parameterName: string;
     value: number;
@@ -137,6 +160,41 @@ const ColdInwardSchema: Schema = new Schema(
     remarks: { type: String, required: false },
     note: { type: String, required: false },
     cipc: { type: String, required: false },
+    isAssayingRequired: { type: Boolean, default: false },
+    assayerId: { type: Schema.Types.ObjectId, ref: 'ColdAssayer', required: false },
+    assayingDate: { type: Date, required: false },
+    assayingExpiryDate: { type: Date, required: false },
+    marketValuePerUnit: { type: Number, required: false, min: 0 },
+    totalMarketValue: { type: Number, required: false, min: 0 },
+    gradingResults: {
+      type: [{
+        parameterName: String,
+        observedValue: String,
+        status: String
+      }],
+      required: false,
+      default: []
+    },
+    approvedGradingResults: {
+      type: [{
+        parameterName: String,
+        observedValue: String,
+        status: String
+      }],
+      required: false,
+      default: []
+    },
+    gradingStatus: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      required: false,
+    },
+    gradingDecisionDate: { type: Date, required: false },
+    gradingDecisionBy: { type: Schema.Types.ObjectId, ref: 'User', required: false },
+    gradingDecisionByName: { type: String, required: false },
+    gradingDecisionByEmail: { type: String, required: false },
+    gradingDecisionRole: { type: String, required: false },
+    gradingDecisionRemarks: { type: String, required: false },
     qualityEntries: [{
       parameterName: { type: String, required: true },
       value: { type: Number, required: true },
@@ -164,6 +222,11 @@ ColdInwardSchema.index({ clientId: 1, date: -1 });
 ColdInwardSchema.index({ warehouseId: 1, clientId: 1, date: -1 });
 ColdInwardSchema.index({ receiptNumber: 1 });
 ColdInwardSchema.index({ lotNo: 1 });
+ColdInwardSchema.index({ isAssayingRequired: 1, date: -1 });
+
+if (process.env.NODE_ENV === 'development') {
+  delete mongoose.models.ColdInward;
+}
 
 const ColdInward: Model<IColdInward> =
   mongoose.models.ColdInward || mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);

@@ -27,7 +27,9 @@ import {
   ChevronDown, 
   ChevronRight, 
   ChevronLeft,
-  LogOut
+  LogOut,
+  UserCheck,
+  Award
 } from 'lucide-react';
 import LogoutButton from '@/components/features/auth/logout-button';
 import { signOut } from 'next-auth/react';
@@ -80,6 +82,8 @@ const coldNavCategories: NavCategory[] = [
     icon: Users,
     items: [
       { name: 'Client Master', translationKey: 'sidebar.clientMaster', href: '/cold/clients', icon: Users, module: 'clientMaster' },
+      { name: 'Pledge Master', translationKey: 'sidebar.pledgeeMaster', href: '/cold/pledgees', icon: Users, module: 'pledgeeMaster' },
+      { name: 'Assayer Master', translationKey: 'sidebar.assayerMaster', href: '/cold/assayer', icon: UserCheck, module: 'assayerMaster' },
     ],
   },
   {
@@ -91,7 +95,9 @@ const coldNavCategories: NavCategory[] = [
       { name: 'Commodities', translationKey: 'sidebar.commodities', href: '/cold/commodities', icon: Package, module: 'commodity' },
       { name: 'Purchase', translationKey: 'sidebar.purchase', href: '/cold/purchase', icon: ShoppingCart, module: 'purchase' },
       { name: 'Inward', translationKey: 'sidebar.inward', href: '/cold/inward', icon: ArrowDownToLine, module: 'inward' },
+      { name: 'Assaying / Grading', translationKey: 'sidebar.assaying', href: '/cold/assaying', icon: Award, module: 'assaying' },
       { name: 'Outward', translationKey: 'sidebar.outward', href: '/cold/outward', icon: ArrowUpFromLine, module: 'outward' },
+      { name: 'Pledge', translationKey: 'sidebar.pledges', href: '/cold/pledges', icon: FileText, module: 'pledge' },
       { name: 'Bulk Upload', translationKey: 'sidebar.bulkUpload', href: '/cold/bulk-upload', icon: Upload, module: 'inward' },
       { name: 'Stock Shifting', translationKey: 'sidebar.stockShifting', href: '/cold/stock-shifting', icon: ArrowRightLeft, module: 'stockShifting' },
       { name: 'Ownership Transfer', translationKey: 'sidebar.transferOwnership', href: '/cold/transfers', icon: ArrowRightLeft, module: 'ownershipTransfer' },

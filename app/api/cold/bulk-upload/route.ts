@@ -389,7 +389,8 @@ export async function POST(request: NextRequest) {
         }
 
         const normalizedGradingFlag = (row.grading || '').trim().toUpperCase();
-        const gradingType = normalizedGradingFlag === 'Y' || normalizedGradingFlag === 'YES' || normalizedGradingFlag === 'TRUE' ? 'Grading' : '';
+        const isAssayingRequired = normalizedGradingFlag === 'Y' || normalizedGradingFlag === 'YES' || normalizedGradingFlag === 'TRUE';
+        const gradingType = isAssayingRequired ? 'Grading' : '';
         const normalizedPurchaseValue = (row.selfPurchase || '').trim().toLowerCase();
         const stockType = normalizedPurchaseValue === 'purchase' || normalizedPurchaseValue === 'p' ? 'Purchase' : normalizedPurchaseValue === 'self' || normalizedPurchaseValue === 's' ? 'Self' : 'Self';
         const largeBag = Number(row.largeBag || 0);
@@ -439,12 +440,16 @@ export async function POST(request: NextRequest) {
               commodityId: commodityId.toString(),
               cipc: row.cipc || '',
               lotNo: row.lotNo || '',
+              isAssayingRequired,
+              assayingDate: isAssayingRequired ? dateKey : undefined,
             },
             clients: [{
               clientId: clientId.toString(),
               commodityId: commodityId.toString(),
               grade: row.grading ? 'Large' : '',
               gradingType,
+              isAssayingRequired,
+              assayingDate: isAssayingRequired ? dateKey : undefined,
               seed: row.seed || '',
               tableLabel: row.tableLabel || '',
               marko: row.marko || '',

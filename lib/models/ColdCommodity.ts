@@ -18,6 +18,7 @@ export interface IColdCommodity extends Document {
   rentCalculationOn?: 'Kg' | 'Bag';
   rentType?: 'One Time' | 'Per Month' | 'Daily Rate';
   hsnCode?: string;
+  gradingParameters?: { name?: string; remarks?: string; lowRange?: number; highRange?: number }[];
   qualityParameters: { name: string; lowerLimit: number; upperLimit: number }[];
   gradingCharge?: { type: 'Per Bag' | 'Per Kg'; defaultRate: number };
   gradingType?: string;
@@ -51,6 +52,12 @@ const ColdCommoditySchema: Schema = new Schema(
     rentCalculationOn: { type: String, enum: ['Kg', 'Bag'], default: 'Kg' },
     rentType: { type: String, enum: ['One Time', 'Per Month', 'Daily Rate'], default: 'One Time' },
     hsnCode: { type: String, required: false },
+    gradingParameters: [{
+      name: { type: String, required: false },
+      remarks: { type: String, required: false },
+      lowRange: { type: Number, required: false },
+      highRange: { type: Number, required: false },
+    }],
     qualityParameters: [
       {
         name: { type: String, required: true },

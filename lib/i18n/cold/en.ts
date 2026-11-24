@@ -23,6 +23,10 @@ export const en: Dictionary = {
     language: 'Language',
     staff: 'Staff Permissions',
     environmentRecords: 'Environment Records',
+    pledgeeMaster: 'Pledge Master',
+    assayerMaster: 'Assayer Master',
+    assaying: 'Assaying / Grading',
+    pledges: 'Pledges & Loans',
     overviewCategory: 'Overview',
     warehouseCategory: 'Warehouse Management',
     inventoryCategory: 'Inventory',
@@ -571,7 +575,11 @@ export const en: Dictionary = {
       floorMapping: 'Floor Mapping',
       ownershipTransfer: 'Ownership Transfer',
       stockShifting: 'Stock Shifting',
-      environmentRecords: 'Cold Environment'
+      environmentRecords: 'Cold Environment',
+      assayerMaster: 'Assayer Master',
+      pledgeeMaster: 'Pledge Master',
+      assaying: 'Assaying / Grading',
+      pledge: 'Pledges & Loans'
     },
     actionsList: {
       view: 'View',

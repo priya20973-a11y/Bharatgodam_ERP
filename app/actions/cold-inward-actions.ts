@@ -836,6 +836,15 @@ export async function createColdInward(data: any) {
 
     const inwardReceiptNumber = await generateReceiptNumber(data.warehouseId, 'inward', data.chamberName || data.chamberNo?.toString());
 
+    const isAssaying = Boolean(
+      data.isAssayingRequired === true ||
+      data.isAssayingRequired === 'true'
+    );
+    let cleanAssayerId: mongoose.Types.ObjectId | undefined = undefined;
+    if (data.assayerId && data.assayerId !== 'none' && mongoose.Types.ObjectId.isValid(data.assayerId)) {
+      cleanAssayerId = new mongoose.Types.ObjectId(data.assayerId);
+    }
+
     const inward = await ColdInward.create(appendOwnership({
       ...data,
       unit,
@@ -845,6 +854,14 @@ export async function createColdInward(data: any) {
       qrId: crypto.randomUUID(),
       receiptNumber: inwardReceiptNumber,
       qualityEntries: data.qualityEntries || [],
+      isAssayingRequired: isAssaying,
+      assayerId: cleanAssayerId,
+      assayingDate: data.assayingDate ? new Date(data.assayingDate) : (isAssaying ? (data.date ? new Date(data.date) : new Date()) : undefined),
+      assayingExpiryDate: data.assayingExpiryDate ? new Date(data.assayingExpiryDate) : undefined,
+      marketValuePerUnit: data.marketValuePerUnit ? Number(data.marketValuePerUnit) : undefined,
+      totalMarketValue: data.totalMarketValue ? Number(data.totalMarketValue) : undefined,
+      gradingResults: data.gradingResults || [],
+      gradingStatus: isAssaying ? (data.gradingStatus || 'PENDING') : undefined,
       date: data.date ? new Date(data.date) : new Date(),
     }, session));
     
@@ -858,6 +875,7 @@ export async function createColdInward(data: any) {
     });
 
     revalidatePath('/cold/inward');
+    revalidatePath('/cold/assaying');
     return { success: true, data: JSON.parse(JSON.stringify(inward)), warning };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -1092,6 +1110,32 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         const commodity = await ColdCommodity.findOne({ _id: client.commodityId, ...getTenantFilter(session) }).lean();
         const unit = commodity?.unit || 'KG';
 
+        let isAssaying = false;
+        if (client.isAssayingRequired !== undefined && client.isAssayingRequired !== null && client.isAssayingRequired !== '') {
+          isAssaying = client.isAssayingRequired === true || client.isAssayingRequired === 'true';
+        } else {
+          isAssaying = Boolean(data.common?.isAssayingRequired === true || data.common?.isAssayingRequired === 'true');
+        }
+
+        let cleanAssayerId: mongoose.Types.ObjectId | undefined = undefined;
+        const rawAssayerId = (client.assayerId && client.assayerId !== 'none')
+          ? client.assayerId
+          : (isAssaying && data.common?.assayerId && data.common.assayerId !== 'none' ? data.common.assayerId : undefined);
+
+        if (rawAssayerId && mongoose.Types.ObjectId.isValid(rawAssayerId)) {
+          cleanAssayerId = new mongoose.Types.ObjectId(rawAssayerId);
+        }
+
+        const effectiveAssayingDate = client.assayingDate
+          ? new Date(client.assayingDate)
+          : (data.common?.assayingDate
+              ? new Date(data.common.assayingDate)
+              : (isAssaying ? (data.common?.date ? new Date(data.common.date) : new Date()) : undefined));
+
+        const effectiveExpiryDate = client.assayingExpiryDate
+          ? new Date(client.assayingExpiryDate)
+          : (data.common?.assayingExpiryDate ? new Date(data.common.assayingExpiryDate) : undefined);
+
         const inwardData = {
           ...data.common,
           clientId: client.clientId,
@@ -1124,6 +1168,14 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
           farmerId: client.farmerId,
           referencePersons: client.referencePersons,
           warehouseId: data.warehouseId,
+          isAssayingRequired: isAssaying,
+          assayerId: cleanAssayerId,
+          assayingDate: effectiveAssayingDate,
+          assayingExpiryDate: effectiveExpiryDate,
+          marketValuePerUnit: client.marketValuePerUnit ? Number(client.marketValuePerUnit) : (data.common?.marketValuePerUnit ? Number(data.common.marketValuePerUnit) : undefined),
+          totalMarketValue: client.totalMarketValue ? Number(client.totalMarketValue) : (data.common?.totalMarketValue ? Number(data.common.totalMarketValue) : undefined),
+          gradingResults: client.gradingResults || [],
+          gradingStatus: isAssaying ? (client.gradingStatus || 'PENDING') : undefined,
           gradingApplied: client.gradingApplied || false,
           gradingChargeType: client.gradingChargeType,
           gradingRate: client.gradingRate,
@@ -1180,6 +1232,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
     }
 
     revalidatePath('/cold/inward');
+    revalidatePath('/cold/assaying');
     const uniqueWarnings = [...new Set(warnings)];
     return { success: true, createdIds: createdInwards.map(i => i._id.toString()), clientReceiptMap, warning: uniqueWarnings.length > 0 ? uniqueWarnings.join(' ') : undefined };
   } catch (error: any) {
