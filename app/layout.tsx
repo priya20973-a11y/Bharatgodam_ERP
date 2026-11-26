@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NextAuthSessionProvider from '@/components/providers/session-provider';
 import { WarehouseProvider } from '@/contexts/WarehouseContext';
+import OfflineRuntime from '@/components/providers/offline-runtime';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <NextAuthSessionProvider>
           <WarehouseProvider>
             {children}
+            <OfflineRuntime />
           </WarehouseProvider>
         </NextAuthSessionProvider>
       </body>

@@ -60,6 +60,7 @@ export interface IColdOutward extends Document {
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   batchId?: string;
+  offlineTransactionId?: string;
   displayWeightDetails?: boolean;
   transportationName?: string;
   driverNumber?: string;
@@ -132,6 +133,7 @@ const ColdOutwardSchema: Schema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     batchId: { type: String, required: false },
+    offlineTransactionId: { type: String, required: false },
     displayWeightDetails: { type: Boolean, required: false, default: false },
     transportationName: { type: String, required: false },
     driverNumber: { type: String, required: false },
@@ -150,6 +152,7 @@ ColdOutwardSchema.index({ clientId: 1, date: -1 });
 ColdOutwardSchema.index({ receiptNumber: 1 });
 ColdOutwardSchema.index({ lotNo: 1 });
 ColdOutwardSchema.index({ batchId: 1 });
+ColdOutwardSchema.index({ offlineTransactionId: 1 }, { unique: true, sparse: true });
 
 const ColdOutward: Model<IColdOutward> =
   mongoose.models.ColdOutward || mongoose.model<IColdOutward>('ColdOutward', ColdOutwardSchema);

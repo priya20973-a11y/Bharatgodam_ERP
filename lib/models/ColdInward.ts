@@ -67,6 +67,7 @@ export interface IColdInward extends Document {
   referencePersons?: IReferencePerson[];
   date: Date;
   batchId?: string;
+  offlineTransactionId?: string;
   userId?: mongoose.Types.ObjectId;
   userEmail?: string;
   villageName?: string;
@@ -146,6 +147,7 @@ const ColdInwardSchema: Schema = new Schema(
     referencePersons: [ReferencePersonSchema],
     date: { type: Date, default: Date.now },
     batchId: { type: String, required: false },
+    offlineTransactionId: { type: String, required: false },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     userEmail: { type: String, required: false },
     villageName: { type: String, required: false },
@@ -164,6 +166,7 @@ ColdInwardSchema.index({ clientId: 1, date: -1 });
 ColdInwardSchema.index({ warehouseId: 1, clientId: 1, date: -1 });
 ColdInwardSchema.index({ receiptNumber: 1 });
 ColdInwardSchema.index({ lotNo: 1 });
+ColdInwardSchema.index({ offlineTransactionId: 1 }, { unique: true, sparse: true });
 
 const ColdInward: Model<IColdInward> =
   mongoose.models.ColdInward || mongoose.model<IColdInward>('ColdInward', ColdInwardSchema);

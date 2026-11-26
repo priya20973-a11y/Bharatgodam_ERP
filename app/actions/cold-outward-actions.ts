@@ -655,12 +655,40 @@ export async function createBatchColdOutwards(payload: any) {
       return { success: false, error: 'No items provided for batch.' };
     }
 
-    const batchId = new mongoose.Types.ObjectId().toString();
+    if (payload.offlineTransactionId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.offlineTransactionId)) {
+        return { success: false, error: 'Invalid offline transaction ID.' };
+      }
+      payload.items = payload.items.map((item: any, index: number) => ({
+        ...item,
+        offlineTransactionId: `${payload.offlineTransactionId}:${index}`,
+      }));
+      const existing = await ColdOutward.find({
+        offlineTransactionId: {
+          $in: payload.items.map((item: any) => item.offlineTransactionId),
+        },
+        ...getTenantFilter(session),
+      }).lean();
+      const existingIds = new Set(existing.map((item: any) => item.offlineTransactionId));
+      if (existingIds.size === payload.items.length) {
+        return { success: true, data: JSON.parse(JSON.stringify(existing)) };
+      }
+      payload.batchReceiptNumber = existing[0]?.receiptNumber;
+      payload.items = payload.items.filter(
+        (item: any) => !existingIds.has(item.offlineTransactionId),
+      );
+    }
+
+    const batchId = payload.offlineTransactionId || new mongoose.Types.ObjectId().toString();
     const createdOutwards = [];
 
     const firstItem = payload.items[0];
     const warehouseId = firstItem.warehouseId || payload.warehouseId;
-    const batchReceiptNumber = await generateReceiptNumber(warehouseId, 'outward', firstItem.chamberName || firstItem.chamberNo?.toString());
+    const batchReceiptNumber = payload.batchReceiptNumber || await generateReceiptNumber(
+      warehouseId,
+      'outward',
+      firstItem.chamberName || firstItem.chamberNo?.toString(),
+    );
 
     for (const item of payload.items) {
       if (!item.inwardId) {

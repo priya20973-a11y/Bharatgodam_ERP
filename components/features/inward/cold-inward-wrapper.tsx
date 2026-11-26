@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ColdInwardList from './cold-inward-list';
 import ColdInwardForm from './cold-inward-form';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { Plus, X, FileEdit, Trash2 } from 'lucide-react';
 import { getColdInwards, getColdInwardDrafts, deleteColdInwardDraft } from '@/app/actions/cold-inward-actions';
 import { Toaster, toast } from 'react-hot-toast';
 import { useColdTranslation } from '@/components/providers/cold-language-provider';
+import { useSession } from 'next-auth/react';
+import { getOfflineTransactions, type OfflineTransaction } from '@/lib/offline-db';
+import { submitOfflineColdInwardDraft } from '@/lib/offline-inward-sync';
 
 interface ColdInwardWrapperProps {
   initialInwards: any[];
@@ -26,12 +29,42 @@ interface ColdInwardWrapperProps {
 
 export default function ColdInwardWrapper({ initialInwards, pagination: initialPagination, initialDrafts = [], clients, commodities, warehouses, searchParams }: ColdInwardWrapperProps) {
   const { t } = useColdTranslation();
+  const { data: session } = useSession();
   const [inwards, setInwards] = useState(initialInwards);
   const [pagination, setPagination] = useState(initialPagination);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [drafts, setDrafts] = useState(initialDrafts);
+  const [offlineDrafts, setOfflineDrafts] = useState<OfflineTransaction[]>([]);
+  const [submittingOfflineDraftId, setSubmittingOfflineDraftId] = useState<string>();
   const [isAdding, setIsAdding] = useState(searchParams?.action === 'add');
   const [editingDraft, setEditingDraft] = useState<any>(null);
+  const userId = session?.user?.id;
+
+  const refreshOfflineDrafts = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      const transactions = await getOfflineTransactions(userId);
+      setOfflineDrafts(transactions.filter(
+        (transaction) => transaction.type === 'COLD_INWARD' && transaction.status !== 'SYNCED',
+      ));
+    } catch (error) {
+      console.error('Unable to load local cold-storage inward drafts:', error);
+      toast.error('Unable to load on-device inward Drafts.');
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const startupTimeout = window.setTimeout(() => void refreshOfflineDrafts(), 0);
+    window.addEventListener('offline-transactions-updated', refreshOfflineDrafts);
+    return () => {
+      window.clearTimeout(startupTimeout);
+      window.removeEventListener('offline-transactions-updated', refreshOfflineDrafts);
+    };
+  }, [refreshOfflineDrafts, userId]);
+
+  const visibleOfflineDrafts = offlineDrafts.filter((draft) => draft.userId === userId);
 
   // Convert searchParams to proper prefillData format for the form if coming from Stack Details
   const initialPrefill = searchParams?.warehouseId ? {
@@ -139,6 +172,30 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
     }
   };
 
+  const handleSubmitOfflineDraft = async (transactionId: string) => {
+    if (!userId || submittingOfflineDraftId) return;
+    setSubmittingOfflineDraftId(transactionId);
+    try {
+      const result = await submitOfflineColdInwardDraft(transactionId, userId);
+      if (!result.success) {
+        toast.error(result.error || 'Inward submission failed. The Draft remains on this device.');
+        return;
+      }
+
+      toast.success('Inward submitted successfully.');
+      await Promise.all([refreshData(), refreshOfflineDrafts()]);
+    } catch (error) {
+      console.error('Unable to submit the local cold-storage inward draft:', error);
+      toast.error('The Draft remains on this device, but could not be submitted.');
+    } finally {
+      setSubmittingOfflineDraftId(undefined);
+    }
+  };
+
+  const handleResumeOfflineDraft = (transactionId: string) => {
+    window.location.assign(`/offline?resume=${encodeURIComponent(transactionId)}`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 mb-6">
@@ -204,6 +261,69 @@ export default function ColdInwardWrapper({ initialInwards, pagination: initialP
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {!isAdding && visibleOfflineDrafts.length > 0 && (
+        <div className="mb-6 space-y-4">
+          <h3 className="font-semibold text-lg text-slate-700 border-b pb-2">
+            On-device Inward Drafts
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visibleOfflineDrafts.map((draft) => {
+              const payload = draft.payload as {
+                common?: { truckNo?: string };
+                clients?: Array<{ lotNo?: string }>;
+              };
+              const isSubmitting = draft.status === 'SYNCING' ||
+                submittingOfflineDraftId === draft.transactionId;
+
+              return (
+                <div key={draft.transactionId} className="p-4 border rounded-lg bg-orange-50 flex flex-col gap-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs font-semibold bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                      {isSubmitting ? 'Submitting…' : 'Draft'}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {new Date(draft.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="font-medium text-sm">
+                    Lot: {payload.clients?.map((client) => client.lotNo).filter(Boolean).join(', ') || 'N/A'}
+                  </p>
+                  <p className="text-xs text-slate-600 truncate">
+                    Truck: {payload.common?.truckNo || 'N/A'}
+                  </p>
+                  {draft.lastError && <p className="text-xs text-rose-700">{draft.lastError}</p>}
+                  {draft.submissionUncertain && (
+                    <p className="text-xs text-amber-800">
+                      Retry unchanged before editing to confirm server status.
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSubmitting || draft.submissionUncertain === true}
+                      onClick={() => handleResumeOfflineDraft(draft.transactionId)}
+                    >
+                      Resume Transaction
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={submittingOfflineDraftId === draft.transactionId}
+                      onClick={() => void handleSubmitOfflineDraft(draft.transactionId)}
+                    >
+                      {submittingOfflineDraftId === draft.transactionId
+                        ? 'Submitting…'
+                        : draft.status === 'SYNCING' ? 'Check / Retry Submit' : 'Sync / Submit'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

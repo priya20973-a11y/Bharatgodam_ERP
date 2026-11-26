@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { createColdInwardBulk, getStackAvailableCapacity, getMultipleStackCapacities, saveColdInwardDraft } from '@/app/actions/cold-inward-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import { Trash2, Plus, QrCode, Camera, Upload } from 'lucide-react';
 import { getDynamicUnitLabel } from '@/lib/utils';
 import StackQRScannerModal from './stack-qr-scanner-modal';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
+import { enqueueOfflineTransaction } from '@/lib/offline-db';
 
 interface ColdInwardFormProps {
   clients: any[];
@@ -27,6 +29,7 @@ interface ColdInwardFormProps {
 
 export default function ColdInwardForm({ clients, commodities, warehouses, onSuccess, prefillData, draftId }: ColdInwardFormProps) {
   const { t } = useColdTranslation();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
 
   // Local clients state for inline creation
@@ -604,8 +607,18 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
 
     const submitData = async (isConfirmed = false) => {
       setLoading(true);
+      const transactionId = crypto.randomUUID();
+      const payload = {
+        common,
+        warehouseId: common.warehouseId,
+        clients: clientSections,
+        confirmed: isConfirmed,
+      };
       try {
-        const res = await createColdInwardBulk({ common, warehouseId: common.warehouseId, clients: clientSections, confirmed: isConfirmed }, draftId);
+        const res = await createColdInwardBulk({
+          ...payload,
+          offlineTransactionId: transactionId,
+        }, draftId);
         if (res.success) {
           toast.success('Inwards created successfully');
           if (res.warning) {
@@ -630,8 +643,23 @@ export default function ColdInwardForm({ clients, commodities, warehouses, onSuc
           setLoading(false);
         }
       } catch (err) {
-        toast.error('Something went wrong');
-        setLoading(false);
+        try {
+          const userId = session?.user?.id;
+          if (!userId) throw new Error('Offline authorization is unavailable for this account.');
+          await enqueueOfflineTransaction({
+            transactionId,
+            userId,
+            type: 'COLD_INWARD',
+            payload,
+            status: 'DRAFT',
+          });
+          toast.success('Inward saved on this device as a Draft. Submit it when ready.');
+          onSuccess();
+        } catch (queueError) {
+          console.error('Unable to queue the inward transaction offline:', queueError);
+          toast.error(queueError instanceof Error ? queueError.message : 'Unable to save offline transaction.');
+          setLoading(false);
+        }
       }
     };
 

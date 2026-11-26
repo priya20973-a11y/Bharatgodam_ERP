@@ -915,6 +915,28 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
   try {
     const session = await requireSession();
     if (!hasPermission(session, 'inward', 'create')) throw new Error('Forbidden: Insufficient permissions');
+
+    if (data.offlineTransactionId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.offlineTransactionId)) {
+        return { success: false, error: 'Invalid offline transaction ID.' };
+      }
+      const expectedIds = data.clients.map(
+        (_client: unknown, index: number) => `${data.offlineTransactionId}:${index}`,
+      );
+      const existing = await ColdInward.find({
+        offlineTransactionId: { $in: expectedIds },
+        ...getTenantFilter(session),
+      }).lean();
+      if (existing.length === expectedIds.length && expectedIds.length > 0) {
+        return { success: true, data: JSON.parse(JSON.stringify(existing)) };
+      }
+      if (existing.length > 0) {
+        return {
+          success: false,
+          error: 'This offline inward was only partially processed. Contact an administrator before retrying.',
+        };
+      }
+    }
     
     if (!data.common?.truckNo || data.common.truckNo.trim() === '') {
       return { success: false, error: 'Truck Number is required.' };
@@ -1022,7 +1044,7 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
       dbSession.startTransaction();
 
       // Now insert
-      for (const client of data.clients) {
+      for (const [clientIndex, client] of data.clients.entries()) {
         if (client.grade === '') {
           delete client.grade;
         }
@@ -1140,6 +1162,9 @@ export async function createColdInwardBulk(data: any, draftId?: string) {
         
         const [inward] = await ColdInward.create([appendOwnership({
           ...inwardData,
+          offlineTransactionId: data.offlineTransactionId
+            ? `${data.offlineTransactionId}:${clientIndex}`
+            : undefined,
           receiptNumber: inwardReceiptNumber,
           date: data.common.date ? new Date(data.common.date) : new Date(),
         }, session)], { session: dbSession });

@@ -8,7 +8,7 @@ export default defineConfig({
     reporter: 'html',
 
     use: {
-        baseURL: 'http://localhost:3000',
+        baseURL: 'http://localhost:3100',
         trace: 'on-first-retry',
         // Automatically capture a screenshot if a test fails
         screenshot: 'only-on-failure',
@@ -21,11 +21,10 @@ export default defineConfig({
         },
     ],
 
-    // CRITICAL FIX: Tell Playwright to boot Next.js
     webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: !process.env.CI, // Use your existing running terminal if available
-        timeout: 120 * 1000, // Give Next.js 2 minutes to compile on first boot
+        command: 'npm run start -- --port 3100',
+        url: 'http://localhost:3100',
+        reuseExistingServer: false,
+        timeout: 120 * 1000,
     },
 });

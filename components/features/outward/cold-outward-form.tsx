@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { createBatchColdOutwards, getAvailableInwardsForClient, resolveQRForColdOutward } from '@/app/actions/cold-outward-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import OutwardQRScannerModal from './outward-qr-scanner-modal';
 import StackQRScannerModal from '@/components/features/inward/stack-qr-scanner-modal';
 import { parseStackQrString, verifyStackMatch, getUniqueInwardStacks, isSingleStackAllocMatch, InwardStackLocation } from '@/lib/utils/stack-qr-parser';
 import { formatChamberName, formatFloorName } from '@/lib/utils/cold-naming';
+import { enqueueOfflineTransaction, type OfflineTransaction } from '@/lib/offline-db';
 
 const formatLocation = (alloc: any, inwardId: string) => {
   const chamber = alloc.chamberName || alloc.chamberNo;
@@ -54,10 +56,37 @@ interface ColdOutwardFormProps {
   warehouses: any[];
   onSuccess: () => void;
   prefillData?: any;
+  offlineMode?: {
+    inwards: any[];
+    draft?: OfflineTransaction;
+    onSaveDraft: (payload: Record<string, unknown>, transactionId: string) => Promise<boolean>;
+  };
 }
 
-export default function ColdOutwardForm({ clients, commodities, warehouses, onSuccess, prefillData }: ColdOutwardFormProps) {
+function getOfflineQrIdentifier(value: string): string {
+  const trimmed = value.trim();
+  try {
+    const url = new URL(trimmed);
+    const match = url.pathname.match(/\/(?:qr\/transfer|qr\/inward|cold\/inward\/qr)\/([^/]+)/);
+    return match ? decodeURIComponent(match[1]) : trimmed;
+  } catch {
+    const match = trimmed.match(/\/(?:qr\/transfer|qr\/inward|cold\/inward\/qr)\/([^/?#]+)/);
+    return match ? decodeURIComponent(match[1]) : trimmed;
+  }
+}
+
+export default function ColdOutwardForm({
+  clients,
+  commodities,
+  warehouses,
+  onSuccess,
+  prefillData,
+  offlineMode,
+}: ColdOutwardFormProps) {
   const { t, formatNumber } = useColdTranslation();
+  const { data: session } = useSession();
+  const offlineInwards = offlineMode?.inwards;
+  const offlineDraft = offlineMode?.draft;
   const [loading, setLoading] = useState(false);
 
   const [clientId, setClientId] = useState('');
@@ -70,6 +99,8 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   // QR Scanner State
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [isResolvingQr, setIsResolvingQr] = useState(false);
+  const [offlineQrMessage, setOfflineQrMessage] = useState('');
+  const [offlineValidationMessage, setOfflineValidationMessage] = useState('');
 
   // Receipt Search State
   const [searchReceiptNo, setSearchReceiptNo] = useState('');
@@ -106,6 +137,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const hydratedDraftId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -120,6 +152,30 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   }, [dropdownRef]);
 
   useEffect(() => {
+    if (offlineInwards) {
+      const ownerIds = isCarryOver ? clientIds : (clientId ? [clientId] : []);
+      const items = ownerIds.length === 0
+        ? []
+        : offlineInwards.filter((inward: any) =>
+          ownerIds.includes(inward._offlineOwnerId || inward.clientId?._id || inward.clientId),
+        );
+      const filteredItems = prefillData?.warehouseId && prefillData?.chamberName &&
+        prefillData?.floorNo && prefillData?.stackNo
+        ? items.filter((inward: any) => {
+          const chamberMatches = inward.chamberName === prefillData.chamberName ||
+            inward.chamberNo?.toString() === prefillData.chamberName;
+          return chamberMatches &&
+            inward.floorNo === Number(prefillData.floorNo) &&
+            inward.stackNo === Number(prefillData.stackNo);
+        })
+        : items;
+      setAvailableInwards(filteredItems);
+      setSelectedItems((previous) => previous.filter((item) =>
+        filteredItems.some((inward: any) => inward.uniqueKey === item.inwardId),
+      ));
+      return;
+    }
+
     if (isCarryOver && clientIds.length > 0) {
       Promise.all(clientIds.map(cId => {
         const isWarehouse = warehouses.some((w: any) => w._id === cId);
@@ -168,7 +224,107 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       setAvailableInwards([]);
       setSelectedItems([]);
     }
-  }, [clientId, clientIds, isCarryOver, warehouses, prefillData]);
+  }, [clientId, clientIds, isCarryOver, warehouses, prefillData, offlineInwards]);
+
+  useEffect(() => {
+    const draft = offlineDraft;
+    if (!draft || hydratedDraftId.current === draft.transactionId || !offlineInwards?.length) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const payload = draft.payload as Record<string, any>;
+      const savedItems = Array.isArray(payload.items) ? payload.items : [];
+      const groupedItems = new Map<string, any>();
+      for (const savedItem of savedItems) {
+        const savedInwardId = String(savedItem.inwardId?._id || savedItem.inwardId || '');
+        const inward = offlineInwards.find((item: any) => String(item._id) === savedInwardId);
+        if (!inward) {
+          toast.error('This draft references stock that is not cached on this device. The saved draft is unchanged.');
+          hydratedDraftId.current = draft.transactionId;
+          return;
+        }
+
+        const inwardId = inward.uniqueKey || inward._id;
+        let item = groupedItems.get(inwardId);
+        if (!item) {
+          const commodity = commodities.find(
+            (entry: any) => entry._id === (inward.commodityId?._id || inward.commodityId),
+          );
+          item = {
+            inwardId,
+            inward,
+            grade: savedItem.grade || inward.grade || '',
+            bagsCount: 0,
+            jin: 0,
+            mixed: 0,
+            plusMinus: '-',
+            netWeightLoss: savedItem.netWeightLoss ?? null,
+            grossWeight: savedItem.grossWeight ?? null,
+            emptyWeight: savedItem.emptyWeight ?? 0,
+            outwardWeight: 0,
+            gradingApplied: savedItem.gradingApplied ?? inward.gradingApplied === true,
+            gradingChargeType: savedItem.gradingChargeType ||
+              inward.gradingChargeType || commodity?.gradingCharge?.type || 'Per Bag',
+            gradingRate: Number(savedItem.gradingRate ?? inward.gradingRate ?? commodity?.gradingCharge?.defaultRate ?? 0),
+            verifyStockWithQr: false,
+            verified: true,
+            verifiedStacks: {},
+            verificationError: null,
+            stackSelections: {},
+          };
+          groupedItems.set(inwardId, item);
+        }
+
+        const weight = Number(savedItem.quantityKg) || 0;
+        const bags = Number(savedItem.bagsCount) || 0;
+        const jin = Number(savedItem.jin) || 0;
+        const mixed = Number(savedItem.mixed) || 0;
+        item.outwardWeight += weight;
+        item.bagsCount += bags;
+        item.jin += jin;
+        item.mixed += mixed;
+
+        if (inward.availableAllocations?.length > 1) {
+          const allocationKey = `${savedItem.chamberName || savedItem.chamberNo}_${savedItem.floorNo}_${savedItem.stackNo}`;
+          item.stackSelections[allocationKey] = {
+            selected: true,
+            outwardWeight: weight,
+            bagsCount: bags,
+            jin,
+            mixed,
+          };
+        }
+      }
+
+      const firstItem = savedItems[0] || {};
+      const ownerIds = Array.isArray(payload.offlineOwnerIds)
+        ? payload.offlineOwnerIds.map(String)
+        : [String(payload.clientId || firstItem.clientId || '')].filter(Boolean);
+      setIsCarryOver(Boolean(payload.isCarryOver));
+      setClientIds(ownerIds);
+      setClientId(ownerIds[0] || '');
+      setCarryOverClientId(String(payload.carryOverClientId || ''));
+      setDate(String(payload.date || new Date().toISOString()).slice(0, 10));
+      setTruckNo(String(payload.truckNo || ''));
+      const savedVehicleType = String(payload.vehicleType || 'Truck');
+      const vehicleTypes = ['Truck', 'Tempo', 'Pickup', 'Trailer', 'Container', 'Other'];
+      setVehicleType(vehicleTypes.includes(savedVehicleType) ? savedVehicleType : 'Other');
+      setVehicleTypeOther(vehicleTypes.includes(savedVehicleType) ? '' : savedVehicleType);
+      setWeighbridgeSlipNo(String(payload.weighbridgeSlipNo || firstItem.weighbridgeSlipNo || ''));
+      setWeighbridgeCharge(payload.weighbridgeCharge ?? '');
+      setRemarks(String(payload.remarks || ''));
+      setNote(String(payload.note || ''));
+      setGlobalGrossWeight(firstItem.grossWeight ?? '');
+      setGlobalEmptyWeight(firstItem.emptyWeight ?? '');
+      setDisplayWeightDetails(Boolean(firstItem.displayWeightDetails));
+      setTransportationName(String(firstItem.transportationName || ''));
+      setDriverNumber(String(firstItem.driverNumber || ''));
+      setSelectedItems(Array.from(groupedItems.values()));
+      hydratedDraftId.current = draft.transactionId;
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [offlineDraft, offlineInwards, commodities]);
 
   // Stack QR Verification State
   const [scanningStackForInwardId, setScanningStackForInwardId] = useState<string | null>(null);
@@ -254,9 +410,82 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     setScanningTargetStackKey(null);
   };
 
+  const addOfflineInward = (inward: any, ownerId: string, message: string, verifyStockWithQr: boolean) => {
+    const commodity = commodities.find(
+      (entry: any) => entry._id === (inward.commodityId?._id || inward.commodityId),
+    );
+    const stackSelections: Record<string, any> = {};
+    if (inward.availableAllocations?.length > 1) {
+      inward.availableAllocations.forEach((allocation: any) => {
+        const key = `${allocation.chamberName || allocation.chamberNo}_${allocation.floorNo}_${allocation.stackNo}`;
+        stackSelections[key] = {
+          selected: true,
+          outwardWeight: allocation.availableQty,
+          bagsCount: allocation.bagsCount || null,
+          jin: null,
+          mixed: null,
+        };
+      });
+    }
+    const inwardId = inward.uniqueKey || inward._id;
+    const remainingQty = inward.availableQty ?? inward.remainingQuantityKg ?? inward.quantityKg ?? 0;
+    setClientId(ownerId);
+    if (isCarryOver) {
+      setClientIds((current) => current.includes(ownerId) ? current : [...current, ownerId]);
+    }
+    setAvailableInwards((current) =>
+      current.some((item: any) => item.uniqueKey === inwardId)
+        ? current
+        : [inward, ...current],
+    );
+    setSelectedItems([{
+      inwardId,
+      inward,
+      grade: inward.grade || '',
+      bagsCount: inward.bagsCount || null,
+      jin: inward.jin || null,
+      mixed: inward.mixed || null,
+      plusMinus: '-',
+      netWeightLoss: null,
+      grossWeight: remainingQty || null,
+      emptyWeight: 0,
+      outwardWeight: remainingQty || null,
+      gradingApplied: inward.gradingApplied === true,
+      gradingChargeType: inward.gradingChargeType || commodity?.gradingCharge?.type || 'Per Bag',
+      gradingRate: inward.gradingRate ?? commodity?.gradingCharge?.defaultRate ?? 0,
+      verifyStockWithQr,
+      verified: false,
+      verifiedStacks: {},
+      verificationError: null,
+      stackSelections,
+    }]);
+    toast.success(message);
+  };
+
   const handleQrScanSuccess = async (scannedText: string) => {
     setIsResolvingQr(true);
+    setOfflineQrMessage('');
     try {
+      if (offlineMode) {
+        const identifier = getOfflineQrIdentifier(scannedText);
+        const inward = offlineMode.inwards.find((item: any) =>
+          item.qrId === identifier ||
+          String(item._id) === identifier ||
+          item._offlineTransferIds?.includes(identifier),
+        );
+        if (!inward || Number(inward.availableQty) <= 0) {
+          const message = 'No matching inward or ownership-transfer stock is available in this device’s offline data.';
+          setOfflineQrMessage(message);
+          toast.error(message);
+          return;
+        }
+        const ownerId = String(inward._offlineOwnerId || inward.clientId?._id || inward.clientId || '');
+        const message = 'Loaded cached receipt details. Final stock is revalidated when submitted.';
+        setOfflineQrMessage(message);
+        addOfflineInward(inward, ownerId, message, true);
+        return;
+      }
+
       const res = await resolveQRForColdOutward(scannedText);
       if (res.success && res.clientId && res.inward) {
         const inward = res.inward;
@@ -345,6 +574,18 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     const timer = setTimeout(async () => {
       setIsSearchingLot(true);
       try {
+        if (offlineInwards) {
+          const query = searchLotQuery.trim().toLowerCase();
+          const cachedLots = offlineInwards.filter((inward: any) =>
+            !query || String(inward.lotNo || '').toLowerCase().includes(query),
+          );
+          setLotSearchResults(cachedLots);
+          setLotCacheMap(new Map(
+            cachedLots.map((inward: any) => [inward.uniqueKey || inward._id, inward]),
+          ));
+          return;
+        }
+
         const { searchMultipleColdInwardsByLotNo } = await import('@/app/actions/cold-inward-actions');
         const inwards = await searchMultipleColdInwardsByLotNo(searchLotQuery.trim());
         setLotSearchResults(inwards || []);
@@ -366,7 +607,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchLotQuery, isLotDropdownOpen]);
+  }, [searchLotQuery, isLotDropdownOpen, offlineInwards]);
 
   // Auto focus search input when dropdown opens
   useEffect(() => {
@@ -384,12 +625,16 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     }
 
     const inward = lotSearchResults.find(i => (i.uniqueKey || i._id) === itemId) || lotCacheMap.get(itemId);
-    const resClientId = inward?.clientId?._id || inward?.clientId;
+    const resClientId = offlineMode
+      ? inward?._offlineOwnerId || inward?.clientId?._id || inward?.clientId
+      : inward?.clientId?._id || inward?.clientId;
 
     if (!isCarryOver && resClientId) {
       const currentLotClients = selectedLotIds
         .map(id => lotSearchResults.find(i => (i.uniqueKey || i._id) === id) || lotCacheMap.get(id))
-        .map(i => i?.clientId?._id || i?.clientId)
+        .map(i => offlineMode
+          ? i?._offlineOwnerId || i?.clientId?._id || i?.clientId
+          : i?.clientId?._id || i?.clientId)
         .filter(Boolean);
       const targetClient = clientId || (currentLotClients.length > 0 ? currentLotClients[0] : null);
 
@@ -419,14 +664,20 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       let targetClient = clientId;
       if (!targetClient && selectedLotIds.length > 0) {
         const firstSelected = displayedLots.find(i => (i.uniqueKey || i._id) === selectedLotIds[0]) || lotCacheMap.get(selectedLotIds[0]);
-        targetClient = firstSelected?.clientId?._id || firstSelected?.clientId;
+        targetClient = offlineMode
+          ? firstSelected?._offlineOwnerId || firstSelected?.clientId?._id || firstSelected?.clientId
+          : firstSelected?.clientId?._id || firstSelected?.clientId;
       }
       if (!targetClient && displayedLots.length > 0) {
-        targetClient = displayedLots[0].clientId?._id || displayedLots[0].clientId;
+        targetClient = offlineMode
+          ? displayedLots[0]._offlineOwnerId || displayedLots[0].clientId?._id || displayedLots[0].clientId
+          : displayedLots[0].clientId?._id || displayedLots[0].clientId;
       }
 
       const matching = displayedLots.filter(i => {
-        const cId = i.clientId?._id || i.clientId;
+        const cId = offlineMode
+          ? i._offlineOwnerId || i.clientId?._id || i.clientId
+          : i.clientId?._id || i.clientId;
         return !targetClient || cId === targetClient;
       });
 
@@ -468,7 +719,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         continue;
       }
 
-      const resClientId = inward.clientId?._id || inward.clientId;
+      const resClientId = offlineMode
+        ? inward._offlineOwnerId || inward.clientId?._id || inward.clientId
+        : inward.clientId?._id || inward.clientId;
       if (isCarryOver && resClientId) {
         if (!updatedClientIds.includes(resClientId)) {
           updatedClientIds.push(resClientId);
@@ -650,7 +903,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
       };
       fetchBySearch();
     }
-  }, [prefillData, commodities, clients]);
+  }, [prefillData, commodities, clients, offlineMode?.inwards]);
 
   const handleAddInward = (inwardId: string) => {
     if (!inwardId) return;
@@ -779,13 +1032,18 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const reportValidationError = (message: string) => {
+      if (offlineMode) setOfflineValidationMessage(message);
+      toast.error(message);
+    };
+    setOfflineValidationMessage('');
     const isAnyClientSelected = isCarryOver ? clientIds.length > 0 : !!clientId;
     if (!isAnyClientSelected || selectedItems.length === 0) {
-      toast.error(t('outward.fillRequired'));
+      reportValidationError(t('outward.fillRequired'));
       return;
     }
     if (!truckNo || truckNo.trim() === '') {
-      toast.error('Truck Number is required');
+      reportValidationError('Truck Number is required');
       return;
     }
 
@@ -796,7 +1054,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         const uniqueStacks = getUniqueInwardStacks(item.inward);
         const unverifiedStack = uniqueStacks.find(s => !item.verifiedStacks?.[s.key]);
         if (unverifiedStack) {
-          toast.error(`Stock verification required for Item ${idx + 1} (${item.inward?.commodityId?.name || 'Inward'}). Unverified stack: ${unverifiedStack.displayName}`);
+          reportValidationError(`Stock verification required for Item ${idx + 1} (${item.inward?.commodityId?.name || 'Inward'}). Unverified stack: ${unverifiedStack.displayName}`);
           return;
         }
       }
@@ -825,7 +1083,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         });
 
         if (selectedAllocations.length === 0) {
-          toast.error(`Please select at least one stack for outward in Item (${item.inward?.commodityId?.name || 'Inward'})`);
+          reportValidationError(`Please select at least one stack for outward in Item (${item.inward?.commodityId?.name || 'Inward'})`);
           return;
         }
 
@@ -835,15 +1093,15 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           const outwardWeight = Number(stackSel?.outwardWeight || 0);
 
           if (outwardWeight <= 0) {
-            toast.error(`Please enter valid outward weight for selected stack ${alloc.stackName || alloc.stackNo}`);
+            reportValidationError(`Please enter valid outward weight for selected stack ${alloc.stackName || alloc.stackNo}`);
             return;
           }
 
           if (outwardWeight > alloc.availableQty) {
             if ((item.inward?.pledgedQuantity || 0) > 0) {
-              toast.error('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
+              reportValidationError('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
             } else {
-              toast.error(`Outward weight for Stack ${alloc.stackName || alloc.stackNo} exceeds available quantity (${alloc.availableQty} KG)`);
+              reportValidationError(`Outward weight for Stack ${alloc.stackName || alloc.stackNo} exceeds available quantity (${alloc.availableQty} KG)`);
             }
             return;
           }
@@ -903,7 +1161,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         const calcTotalBags = Number(item.bagsCount || 0) + Number(item.jin || 0) + Number(item.mixed || 0);
 
         if (calcNetWeight <= 0) {
-          toast.error(`Please enter valid weight for inward ${item.inwardId.slice(-4)}`);
+          reportValidationError(`Please enter valid weight for inward ${item.inwardId.slice(-4)}`);
           return;
         }
 
@@ -915,9 +1173,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
         if (calcNetWeight > availableQty) {
           if (activePledgedQty > 0 || remainingQtyDb > availableQty) {
-            toast.error('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
+            reportValidationError('Outward not allowed. This quantity is currently pledged and locked. Release the pledge before creating outward.');
           } else {
-            toast.error(`Quantity exceeds available stock (${availableQty.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
+            reportValidationError(`Quantity exceeds available stock (${availableQty.toFixed(2)} KG) for inward ${item.inwardId.slice(-4)}`);
           }
           return;
         }
@@ -1003,33 +1261,73 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
     }
 
     setLoading(true);
-    try {
-      const activeClientId = isCarryOver ? clientIds[0] : clientId;
-      const clientModel = warehouses.some((w: any) => w._id === activeClientId) ? 'ColdWarehouse' : 'Client';
-      
-      const payloadItems = itemsPayload.map(ip => {
-        const itemClientId = ip.clientId || activeClientId;
-        return {
-          ...ip,
-          clientId: itemClientId,
-          clientModel: warehouses.some((w: any) => w._id === itemClientId) ? 'ColdWarehouse' : 'Client',
-        };
-      });
+    const transactionId = offlineMode?.draft?.transactionId || crypto.randomUUID();
+    const activeClientId = isCarryOver ? clientIds[0] : clientId;
+    const clientModel = warehouses.some((w: any) => w._id === activeClientId) ? 'ColdWarehouse' : 'Client';
+    const payloadItems = itemsPayload.map(ip => {
+      const itemClientId = ip.clientId || activeClientId;
+      return {
+        ...ip,
+        clientId: itemClientId,
+        clientModel: warehouses.some((w: any) => w._id === itemClientId) ? 'ColdWarehouse' : 'Client',
+      };
+    });
+    const payload = {
+      clientId: activeClientId,
+      clientModel,
+      date,
+      truckNo,
+      vehicleType: vehicleType === 'Other' ? vehicleTypeOther : vehicleType,
+      weighbridgeSlipNo,
+      weighbridgeCharge: weighbridgeCharge === '' ? undefined : weighbridgeCharge,
+      remarks,
+      note,
+      items: payloadItems,
+      isCarryOver,
+      carryOverClientId: isCarryOver ? carryOverClientId : undefined,
+      carryOverClientName: isCarryOver ? clients.find(c => c._id === carryOverClientId)?.name : undefined,
+      ...(offlineMode ? { offlineOwnerIds: isCarryOver ? clientIds : [clientId] } : {}),
+    };
 
+    if (offlineMode) {
+      setLoading(true);
+      try {
+        const saved = await offlineMode.onSaveDraft(payload, transactionId);
+        if (saved) {
+          toast.success('Outward saved on this device as a Draft. Submit it when ready.');
+          onSuccess();
+          if (!offlineMode.draft) {
+            setIsCarryOver(true);
+            setClientId('');
+            setClientIds([]);
+            setCarryOverClientId('');
+            setSelectedItems([]);
+            setTruckNo('');
+            setDate(new Date().toISOString().slice(0, 10));
+            setRemarks('');
+            setNote('');
+            setGlobalGrossWeight('');
+            setGlobalEmptyWeight('');
+            setWeighbridgeSlipNo('');
+            setWeighbridgeCharge('');
+            setTransportationName('');
+            setDriverNumber('');
+          }
+        }
+      } catch (queueError) {
+        console.error('Unable to save the outward draft offline:', queueError);
+        toast.error(queueError instanceof Error ? queueError.message : t('outward.somethingWentWrong'));
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
       const res = await createBatchColdOutwards({
-        clientId: activeClientId,
-        clientModel,
-        date,
-        truckNo,
-        vehicleType: vehicleType === 'Other' ? vehicleTypeOther : vehicleType,
-        weighbridgeSlipNo,
-        weighbridgeCharge: weighbridgeCharge === '' ? undefined : weighbridgeCharge,
-        remarks,
-        note,
-        items: payloadItems,
-        isCarryOver,
-        carryOverClientId: isCarryOver ? carryOverClientId : undefined,
-        carryOverClientName: isCarryOver ? clients.find(c => c._id === carryOverClientId)?.name : undefined
+        ...payload,
+        offlineTransactionId: transactionId,
+        batchId: transactionId,
       });
 
       if (res.success) {
@@ -1039,7 +1337,24 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
         toast.error(res.error || t('outward.saveFailed'));
       }
     } catch (err) {
-      toast.error(t('outward.somethingWentWrong'));
+      try {
+        const userId = session?.user?.id;
+        if (!userId) throw new Error('Offline authorization is unavailable for this account.');
+        await enqueueOfflineTransaction({
+          transactionId,
+          userId,
+          type: 'COLD_OUTWARD',
+          payload: {
+            ...payload,
+          },
+          status: 'DRAFT',
+        });
+        toast.success('Outward saved on this device as a Draft. Submit it when ready.');
+        onSuccess();
+      } catch (queueError) {
+        console.error('Unable to queue the outward transaction offline:', queueError);
+        toast.error(queueError instanceof Error ? queueError.message : t('outward.somethingWentWrong'));
+      }
     } finally {
       setLoading(false);
     }
@@ -1048,7 +1363,9 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-6 border rounded-lg bg-slate-50">
       <div className="flex justify-between items-center border-b pb-2">
-        <h3 className="font-semibold text-lg">{t('outward.newTransaction')}</h3>
+        <h3 className="font-semibold text-lg">
+          {offlineMode?.draft ? 'Resume outward draft' : t('outward.newTransaction')}
+        </h3>
         <Button
           type="button"
           variant="outline"
@@ -1060,6 +1377,16 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
           Scan Receipt QR
         </Button>
       </div>
+      {offlineQrMessage && (
+        <p role="status" className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-900">
+          {offlineQrMessage}
+        </p>
+      )}
+      {offlineValidationMessage && (
+        <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900">
+          {offlineValidationMessage}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col justify-start pt-1">
@@ -1546,6 +1873,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                           <label className="flex items-center gap-2.5 cursor-pointer select-none">
                             <input
                               type="checkbox"
+                              aria-label={`Use stack ${alloc.stackNo}`}
                               checked={stackSel.selected || false}
                               onChange={(e) => handleStackSelectionChange(item.inwardId, allocKey, 'selected', e.target.checked)}
                               className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
@@ -1568,6 +1896,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                               <label className="text-xs font-semibold text-blue-700">Weight (KG) *</label>
                               <ColdNumberInput
                                 required
+                                aria-label={`Outward weight for stack ${alloc.stackNo}`}
                                 min="0"
                                 max={alloc.availableQty}
                                 step="0.01"
@@ -1579,6 +1908,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                             <div className="space-y-1">
                               <label className="text-xs font-medium text-slate-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'large')}</label>
                               <ColdNumberInput
+                                aria-label={`Large bags for stack ${alloc.stackNo}`}
                                 min="0"
                                 value={stackSel.bagsCount ?? ''}
                                 onChange={(val) => handleStackSelectionChange(item.inwardId, allocKey, 'bagsCount', val ? Number(val) : null)}
@@ -1587,6 +1917,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                             <div className="space-y-1">
                               <label className="text-xs font-medium text-slate-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'small')}</label>
                               <ColdNumberInput
+                                aria-label={`Small bags for stack ${alloc.stackNo}`}
                                 min="0"
                                 value={stackSel.jin ?? ''}
                                 onChange={(val) => handleStackSelectionChange(item.inwardId, allocKey, 'jin', val ? Number(val) : null)}
@@ -1595,6 +1926,7 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                             <div className="space-y-1">
                               <label className="text-xs font-medium text-slate-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'mixed')}</label>
                               <ColdNumberInput
+                                aria-label={`Mixed bags for stack ${alloc.stackNo}`}
                                 min="0"
                                 value={stackSel.mixed ?? ''}
                                 onChange={(val) => handleStackSelectionChange(item.inwardId, allocKey, 'mixed', val ? Number(val) : null)}
@@ -1627,22 +1959,22 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
                 <div className="grid grid-cols-1 gap-4 mb-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-green-700">Weight (KG) *</label>
-                    <ColdNumberInput required min="0" step="0.01" value={item.outwardWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'outwardWeight', val ? Number(val) : null)} />
+                    <ColdNumberInput aria-label="Outward weight" required min="0" step="0.01" value={item.outwardWeight ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'outwardWeight', val ? Number(val) : null)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'large')}</label>
-                    <ColdNumberInput required min="0" value={item.bagsCount ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'bagsCount', val ? Number(val) : null)} />
+                    <ColdNumberInput aria-label="Large bags" required min="0" value={item.bagsCount ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'bagsCount', val ? Number(val) : null)} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'small')}</label>
-                    <ColdNumberInput min="0" value={item.jin ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'jin', val ? Number(val) : null)} />
+                    <ColdNumberInput aria-label="Small bags" min="0" value={item.jin ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'jin', val ? Number(val) : null)} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-blue-600">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'mixed')}</label>
-                    <ColdNumberInput min="0" value={item.mixed ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'mixed', val ? Number(val) : null)} />
+                    <ColdNumberInput aria-label="Mixed bags" min="0" value={item.mixed ?? ''} onChange={(val) => handleItemChange(item.inwardId, 'mixed', val ? Number(val) : null)} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-green-700">{getDynamicUnitLabel(item.inward.unit || item.inward.commodityId?.unit || 'KG', 'total')}</label>
@@ -1823,7 +2155,11 @@ export default function ColdOutwardForm({ clients, commodities, warehouses, onSu
 
       <div className="flex justify-end gap-2 pt-4">
         <Button type="submit" variant="destructive" disabled={loading || selectedItems.length === 0}>
-          {loading ? t('outward.saving') : t('outward.saveOutward')}
+          {loading
+            ? t('outward.saving')
+            : offlineMode
+              ? offlineMode.draft ? 'Save Draft Changes' : 'Save Outward Draft'
+              : t('outward.saveOutward')}
         </Button>
       </div>
 

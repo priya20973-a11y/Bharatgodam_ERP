@@ -8,6 +8,7 @@
     "start": "next start",
     "serve:revenue": "node server/index.js",
     "seed:admin": "node scripts/seed-admin.js",
+    "test:offline": "npm run build && playwright test tests/offline.spec.ts",
     "lint": "eslint"
   },
   "dependencies": {
